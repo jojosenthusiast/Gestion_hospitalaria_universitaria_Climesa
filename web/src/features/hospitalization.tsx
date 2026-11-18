@@ -9,7 +9,10 @@ import { useQuickAction } from './personal/accion';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
 import './hospitalization/admission-actions.css';
 import { RowMenu } from '../components/row-menu';
+import { useFold } from '../components/fold';
 
+const ADMISSIONS_SHOWN = 20;
+const urgency = (a: Admission) => a.state === 'pendiente_cama' ? 0 : a.unstable ? 1 : 2;
 type Suggestion = { id: string; version: number; code: string; room: string; category: string; reason: string };
 /** Row actions the web offers, in display order; the first one present is the row's primary action. `firmar_alta` is MED-only in the apps (D-02). */
 type RowAction = 'asignar_cama' | 'registrar_salida' | 'solicitar_alta' | 'trasladar' | 'autorizar' | 'reasignar_tratante' | 'revocar_alta' | 'cancelar' | 'anular';
@@ -71,6 +74,9 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
   const close = () => setDialog(null), saved = (message = '') => { setDialog(null); setDone(message); data.refresh(); };
   const indicatedRows = (data.data ?? []).filter(a => a.state === 'pendiente_cama' && a.origin === 'consulta' && a.allowedActions?.includes('asignar_cama'));
   const props = dialog && { api, admission: dialog.admission, onClose: close, onSaved: saved };
+  // What needs a hand first: waiting for a bed, then unstable patients; the rest keeps the API order and folds.
+  const ordered = (data.data ?? []).map((row, index) => ({ row, index })).sort((a, b) => urgency(a.row) - urgency(b.row) || a.index - b.index).map(x => x.row);
+  const fold = useFold(ordered, ADMISSIONS_SHOWN);
   return <>
     <CompactHeader breadcrumb="Hospital / Admisiones" title="Hospitalización" actions={can(profile, 'admision.crear') && <button className="primary-button" onClick={() => setCreating(true)}><Icon name="plus" size={18}/>Ingresar paciente</button>}/>
     {done && <p className="admission-done" role="status"><Icon name="check" size={18} />{done}</p>}
@@ -78,17 +84,17 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
       <h2>Ingresos indicados <span className="count-chip">{indicatedRows.length}</span></h2>
       <ul>{indicatedRows.map(row => <li key={row.id}>
         <div><strong>{row.patientName}</strong><small>{[row.attendingDoctorName ? `Indicado por ${row.attendingDoctorName}` : null, categoryNames[row.requestedCategory] ?? row.requestedCategory, row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</div>
-        <button type="button" className="primary-button" onClick={() => setDialog({ kind: 'asignar_cama', admission: row })}>Ingresar</button>
+        <button type="button" className="secondary-button" onClick={() => setDialog({ kind: 'asignar_cama', admission: row })}>Ingresar</button>
       </li>)}</ul>
     </section>}
-    <section className="data-workbench"><RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}>
+    <section className="data-workbench"><RemoteState state={data}>{rows => rows.length ? <><table className="record-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{fold.shown.map(row => <tr key={row.id}>
       <td data-label="Paciente" className="cell-person"><strong>{row.patientName}</strong><small>{[row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null, row.postSurgical ? 'Posquirúrgico' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</td>
       <td data-label="Origen">{originNames[row.origin] ?? row.origin}</td>
       <td data-label="Categoría">{categoryNames[row.requestedCategory] ?? row.requestedCategory}{row.authorized && <small>Excepción autorizada</small>}</td>
       <td data-label="Estado"><Tag value={row.state} /><DischargeWait row={row} /></td>
       <td data-label="Cama">{row.bed ? <span className="nowrap-code">{row.bed}</span> : 'Sin cama'}</td>
       <td data-label="Acción" className="cell-actions"><RowMenu label={row.patientName} actions={availableActions(row).map(a => ({ key: a.key, label: a.label, onClick: () => setDialog({ kind: a.key, admission: row }) }))} /></td>
-    </tr>)}</tbody></table> : <Empty title="No hay admisiones activas" description="Las nuevas admisiones aparecerán aquí cuando Recepción o Jefatura las registren." />}</RemoteState></section>
+    </tr>)}</tbody></table>{fold.more}</> : <Empty title="No hay admisiones activas" description="Las nuevas admisiones aparecerán aquí cuando Recepción o Jefatura las registren." />}</RemoteState></section>
     {creating && <AdmissionStepper api={api} profile={profile} patient={prefill} onClose={() => { setCreating(false); setPrefill(null); }} onSaved={() => { setCreating(false); setPrefill(null); setDone('Ingreso registrado; aparece en la lista.'); data.refresh(); }} />}
     {dialog?.kind === 'asignar_cama' && <BedSuggestionDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}
     {dialog?.kind === 'trasladar' && <TransferDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}

@@ -152,6 +152,9 @@ describe('Inicio · panel del día', () => {
     montar('DPD');
     await screen.findByRole('region', { name: 'Eventos denegados o fallidos' });
     expect(screen.queryByText(/admision\.leer|ticket_fila/)).toBeNull();
+    // W04: the failed events link to the filtered audit; the chain group asks to verify it today.
+    expect(within(screen.getByRole('region', { name: 'Eventos denegados o fallidos' })).getAllByRole('link')[0].getAttribute('href')).toBe('#/auditoria?resultado=denegado,fallido');
+    expect(screen.getByText('Cadena sin verificar hoy')).toBeTruthy();
   });
 
   it('ADM: un dato, un lugar: ocupación y cuentas solo como cifras', async () => {

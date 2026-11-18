@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { MoreLink } from '../../components/fold';
 import { BarChart, HBarList, type Tone } from '../../components/charts';
 import { roleNames, staffTypeNames, type AccessProfile, type Appointment, type AuditRow, type Shift } from '../../lib/api';
-import { formatDate, formatDuration, formatPercent, formatRelative, formatTime, joinParts, minutesSince, plural } from '../../lib/format';
+import { formatDate, formatDateTime, formatDuration, formatPercent, formatRelative, formatTime, joinParts, minutesSince, plural } from '../../lib/format';
 import { StatusBadge } from '../../components/system';
 import type { Remote } from '../common';
 import { milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames } from '../ambulance/types';
@@ -157,6 +157,13 @@ const jop: RoleDashboard = {
 // ───────────────────────────── DPD · protección de datos
 const AUDIT_LIMIT = 200;
 const failedEvents = (rows: AuditRow[]) => rows.filter(r => r.result !== 'exito');
+const FAILED_HREF = '#/auditoria?resultado=denegado,fallido';
+/** W04 · DPD: «cadena de auditoría por verificar» while nobody ran `auditoria.verificar` today (read from the latest events). */
+const chainUnverified = (d: DashboardData): TrayGroupSpec => ({
+  id: 'cadena', title: 'Cadena sin verificar hoy', href: '#/auditoria?accion=verificar', state: asRemote(d.audit),
+  items: d.audit.data && !d.audit.data.some(r => r.action === 'auditoria.verificar' && isToday(r.at))
+    ? [{ id: 'cadena', title: 'Integridad de la bitácora', detail: 'Nadie la ha verificado hoy', tone: 'warn' as Tone, href: '#/auditoria?accion=verificar', action: 'Verificar' }] : [],
+});
 const dpd: RoleDashboard = {
   title: 'Protección de datos',
   needs: ['audit', 'users'],
@@ -165,9 +172,9 @@ const dpd: RoleDashboard = {
     { id: 'cadena', label: 'Verificar la cadena', hint: 'Comprueba que nadie alteró la bitácora', icon: 'shield', href: '#/auditoria?accion=verificar', permission: 'auditoria.ver' },
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores agregados', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
-  tray: ({ d }) => [{
-    id: 'denegados', title: 'Eventos denegados o fallidos', href: '#/auditoria', masculine: true, state: asRemote(d.audit),
-    items: failedEvents(d.audit.data ?? []).map(r => ({ id: r.seq, title: auditActionLabel(r.action), detail: `${roleNames[r.role] ?? r.role} · ${formatTime(r.at)}`, tone: 'urgent' as Tone, href: '#/auditoria', action: 'Revisar', tag: r.result === 'denegado' ? 'Denegado' : 'Fallido', status: r.result === 'denegado' ? 'denegado' : 'fallido' })),
+  tray: ({ d }) => [chainUnverified(d), {
+    id: 'denegados', title: 'Eventos denegados o fallidos', href: FAILED_HREF, masculine: true, state: asRemote(d.audit),
+    items: failedEvents(d.audit.data ?? []).map(r => ({ id: r.seq, title: auditActionLabel(r.action), detail: `${roleNames[r.role] ?? r.role} · ${formatDateTime(r.at, { short: true })}`, tone: 'urgent' as Tone, href: FAILED_HREF, action: 'Revisar', tag: r.result === 'denegado' ? 'Denegado' : 'Fallido', status: r.result === 'denegado' ? 'denegado' : 'fallido' })),
   }],
   figures: ({ d }) => [
     // The list holds the latest 200 events: at the cap the real total is larger, so it reads «200+» (W-DPD-1).
