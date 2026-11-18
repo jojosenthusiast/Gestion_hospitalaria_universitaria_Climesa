@@ -487,6 +487,8 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
             Text(stringResource(R.string.rec_agendar_paciente), style = MaterialTheme.typography.titleSmall)
             PatientSearchPicker(search.query, search.results, search.searching, search.hasMore, search.patient, model::issueQuery, model::pickIssuePatient, model::moreIssuePatients, enabled = !sending)
             search.error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+            // S1: an inactive patient handed in from the record is a calm reason, not a search error.
+            search.blocked?.let { BlockedReason(it) }
             // B1 / D-1: with an appointment today the primary action registers the arrival (Consulta general, linked to it);
             // "Emitir sin la cita" falls back to the walk-in chips.
             if (arrival) {

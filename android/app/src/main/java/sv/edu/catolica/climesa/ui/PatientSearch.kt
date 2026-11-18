@@ -34,6 +34,8 @@ data class PatientSearchState(
     val searching: Boolean = false,
     val patient: PickerPatient? = null,
     val error: String? = null,
+    /** S1: why the patient handed in (from the record) cannot be chosen; calm, not an error. */
+    val blocked: String? = null,
 )
 
 /**
@@ -53,7 +55,7 @@ internal class PatientSelectorSearch(
     fun query(text: String) {
         val q = text.take(100)
         job?.cancel()
-        write { it.copy(query = q, error = null, results = if (ReceptionScheduling.canSearch(q)) it.results else emptyList(), hasMore = false, searching = false) }
+        write { it.copy(query = q, error = null, blocked = null, results = if (ReceptionScheduling.canSearch(q)) it.results else emptyList(), hasMore = false, searching = false) }
         if (!ReceptionScheduling.canSearch(q)) return
         job = scope.launch { delay(debounceMs); fetch(q, 0) }
     }
@@ -63,7 +65,7 @@ internal class PatientSelectorSearch(
     /** S1: a blocked row is never chosen; it shows its reason in the list instead. */
     fun pick(patient: PickerPatient?) {
         if (patient != null && PatientGate.blockedReason(patient, purpose) != null) return
-        job?.cancel(); write { it.copy(patient = patient, query = "", results = emptyList(), hasMore = false, searching = false) }
+        job?.cancel(); write { it.copy(patient = patient, blocked = null, query = "", results = emptyList(), hasMore = false, searching = false) }
     }
 
     fun cancel() { job?.cancel() }

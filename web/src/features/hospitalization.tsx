@@ -114,6 +114,13 @@ function categoryOptions(admission: Admission) {
   return admission.authorized || admission.requestedCategory === 'vip' ? [admission.requestedCategory, other] : [admission.requestedCategory];
 }
 
+/** R3: a bed list shows the first BED_FOLD choices in the order they come (best first) and folds the rest behind «Ver N más». */
+const BED_FOLD = 3;
+function BedRadios<T extends { id: string; code: string }>({ rows, name, bedId, onPick, detail }: { rows: readonly T[]; name: string; bedId: string; onPick: (id: string) => void; detail: (row: T) => string }) {
+  const { shown, more } = useFold(rows, BED_FOLD);
+  return <>{shown.map(row => <label className="check-field" key={row.id}><input type="radio" name={name} value={row.id} checked={bedId === row.id} onChange={() => onPick(row.id)} /><span><strong>{row.code}</strong> <small>{detail(row)}</small></span></label>)}{more}</>;
+}
+
 /**
  * S13: the suggested beds show at once. With an authorized exception (or a VIP request) both categories are listed, the
  * requested one first, so nobody picks a category before seeing beds. The first suggestion comes chosen until the person picks.
@@ -133,7 +140,7 @@ function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { ap
   // WEB-08: el motivo lo escribe la persona; si queda vacío no se envía uno inventado.
   async function assign() { if (selected && await action.run(`/admisiones/${admission.id}/cama`, { bedId: selected.id, version: selected.version, ...(reason.trim() ? { reason: reason.trim() } : {}) })) onSaved(`${admission.patientName}: ingresada · Cama ${selected.code}.`); }
   const group = (category: string, rows: Suggestion[]) => <fieldset className="choice-list" key={category}><legend>{both ? `Camas sugeridas · ${categoryNames[category] ?? category}${category !== admission.requestedCategory ? ' (excepción)' : ''}` : 'Camas sugeridas'}</legend>
-    {rows.length ? rows.map(row => <label className="check-field" key={row.id}><input type="radio" name="bed" value={row.id} checked={bedId === row.id} onChange={() => setBedId(row.id)} /><span><strong>{row.code}</strong> <small>{row.room} · {categoryNames[row.category] ?? row.category} · {row.reason}</small></span></label>) : <p className="muted">Sin camas libres de esta categoría.</p>}</fieldset>;
+    {rows.length ? <BedRadios rows={rows} name="bed" bedId={bedId} onPick={setBedId} detail={row => `${row.room} · ${categoryNames[row.category] ?? row.category} · ${row.reason}`} /> : <p className="muted">Sin camas libres de esta categoría.</p>}</fieldset>;
   const summary = [['Paciente', admission.patientName], ['Origen', originNames[admission.origin] ?? admission.origin], ['Médico tratante', admission.attendingDoctorName || 'Sin asignar'], ['Categoría', categoryNames[admission.requestedCategory] ?? admission.requestedCategory], ['Aislamiento', admission.isolation ? 'Sí' : 'No'], ...(admission.motive ? [['Motivo', admission.motive]] : [])];
   return <Dialog title={admission.origin === 'consulta' ? 'Ingresar paciente indicado' : 'Asignar cama'} onClose={onClose} busy={action.busy}>
     <dl className="detail-grid admission-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
@@ -149,7 +156,7 @@ function TransferDialog({ api, admission, version, onClose, onSaved }: { api: Ap
   return <Dialog title="Trasladar a otra cama" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p className="form-intro">Paciente: <strong>{admission.patientName}</strong> · cama actual {admission.bed} · médico tratante {admission.attendingDoctorName || 'sin asignar'}. {admission.bedCategory ? `Solo camas libres de categoría ${categoryNames[admission.bedCategory] ?? admission.bedCategory}. ` : ''}La cama de origen queda pendiente de limpieza.</p>
     <WriteError error={spanishProblem(action.error)} onReload={onSaved} />
-    <RemoteState state={beds}>{() => free.length ? <fieldset className="choice-list"><legend>Camas libres</legend>{free.map(b => <label className="check-field" key={b.id}><input type="radio" name="transfer-bed" value={b.id} checked={bedId === b.id} onChange={() => setBedId(b.id)} /><span><strong>{b.code}</strong> <small>{b.room} · {categoryNames[b.category] ?? b.category}</small></span></label>)}</fieldset> : <Empty title="Sin camas libres" description="No hay camas de la misma categoría disponibles para el traslado en este momento." />}</RemoteState>
+    <RemoteState state={beds}>{() => free.length ? <fieldset className="choice-list"><legend>Camas libres</legend><BedRadios rows={free} name="transfer-bed" bedId={bedId} onPick={setBedId} detail={b => `${b.room} · ${categoryNames[b.category] ?? b.category}`} /></fieldset> : <Empty title="Sin camas libres" description="No hay camas de la misma categoría disponibles para el traslado en este momento." />}</RemoteState>
     <Field label="Motivo del traslado" value={reason} onChange={setReason} required minLength={10} maxLength={500} hint="Al menos 10 caracteres." />
     <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} label="Confirmar traslado" disabled={!selected || reason.trim().length < 10} /></div>
   </form></Dialog>;
