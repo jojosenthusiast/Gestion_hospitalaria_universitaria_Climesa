@@ -116,7 +116,7 @@ export class LaboratoryService {
         SELECT o.id,o.consulta_id AS "consultationId",o.paciente_id AS "patientId",o.medico_id AS "doctorId",
         o.prioridad AS priority,o.estado AS state,o.creada_en AS "createdAt",o.muestra_tomada_en AS "sampleTakenAt",
         o.completada_en AS "completedAt",o.revisada_en AS "reviewedAt",o.enmendada_en AS "amendedAt",o.version,o.revisor AS reviewer,
-        o.externa AS external,o.lugar_externo AS "externalPlace",o.instrucciones_externas AS "externalInstructions",CASE WHEN o.revisada_en IS NOT NULL THEN o.nota_paciente END AS "patientNote",
+        o.externa AS external,o.lugar_externo AS "externalPlace",o.instrucciones_externas AS "externalInstructions",CASE WHEN o.revisada_en IS NOT NULL THEN o.nota_paciente END AS "patientNote",o.motivo_cancelacion AS "cancellationReason",
         coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
         p.expediente AS "patientRecord",p.sexo AS "patientSex",p.nacimiento::text AS "birthRaw",m.nombres||' '||m.apellidos AS "doctorName",
         count(oi.id)::int AS "itemCount",count(r.orden_item_id)::int AS "capturedCount",
@@ -132,7 +132,7 @@ export class LaboratoryService {
                       WHEN p.precision_nacimiento='estimada' THEN p.edad_estimada + date_part('year',age(coalesce((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,$8::date),p.edad_estimada_en))::int END) <@ rg.edad_anios
             AND coalesce((o.muestra_tomada_en AT TIME ZONE 'America/El_Salvador')::date,$8::date) <@ rg.vigencia
           ORDER BY (rg.sexo=p.sexo) DESC LIMIT 1) rr ON true
-        GROUP BY o.id,o.consulta_id,o.paciente_id,o.medico_id,o.prioridad,o.estado,o.creada_en,o.muestra_tomada_en,o.completada_en,o.revisada_en,o.enmendada_en,o.version,o.revisor,o.externa,o.lugar_externo,o.instrucciones_externas,o.nota_paciente,p.id,m.id
+        GROUP BY o.id,o.consulta_id,o.paciente_id,o.medico_id,o.prioridad,o.estado,o.creada_en,o.muestra_tomada_en,o.completada_en,o.revisada_en,o.enmendada_en,o.version,o.revisor,o.externa,o.lugar_externo,o.instrucciones_externas,o.nota_paciente,o.motivo_cancelacion,p.id,m.id
         ORDER BY o.creada_en DESC`, [lab, !!patient, doctor, patient, only ?? null, this.clock.now(), hasPermission(actor, 'laboratorio.revisar'), this.clock.today()]);
       await auditLabReads(c, actor, this.clock.now(), result.rows);
       return result.rows;
@@ -449,6 +449,9 @@ export class LaboratoryService {
       if (old.doctorId !== actor.staffId && !contextsOf(actor, 'laboratorio.cancelar').includes('x')) throw new ForbiddenException('No puedes cancelar esta orden.');
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La orden cambió; vuelve a cargarla.');
       const row = (await c.query(`UPDATE laboratorio.orden SET estado='cancelado',motivo_cancelacion=$2,version=version+1 WHERE id=$1 RETURNING id,estado AS state,version`, [id, dto.reason.trim()])).rows[0];
+      // A cancelled order leaves nothing to review: its open "Resultados por revisar" items close in the same transaction.
+      await c.query(`UPDATE laboratorio.pendiente_medico SET estado='revisado',revisado_en=$2,revisado_por=coalesce($3::uuid,medico_id),actualizado_en=$2,version=version+1
+        WHERE orden_id=$1 AND estado='pendiente'`, [id, this.clock.now(), actor.staffId ?? null]);
       await this.commands.audit(c, actor, { action: 'laboratorio.cancelar', entity: 'orden_laboratorio', entityId: id, patientId: old.patientId, permission: 'laboratorio.cancelar', reason: dto.reason });
       await this.commands.event(c, 'laboratorio.actualizado', 'orden_laboratorio', id, row.version, await channelsFor(c, ['laboratorio.ver_cola', 'resultados.ver']));
       return row;

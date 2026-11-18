@@ -383,7 +383,7 @@ struct DoctorDayView: View {
                 let orders = try await Part<[LabOrder]>.load { try await api.get("/laboratorio/ordenes", as: [LabOrder].self) }
                 switch orders {
                 case let .loaded(list):
-                    day.pendingResults = .loaded(ReviewRules.pending(list).count)
+                    day.pendingResults = .loaded(ReviewRules.toReview(list))
                     day.criticalResults = ReviewRules.criticalToReview(list)
                 case let .failed(message):
                     day.pendingResults = .failed(message)
@@ -616,10 +616,12 @@ struct ResultsReviewView: View {
                 }
             }
             // I-32: critical results are tagged on their row (critical first); no extra banner repeating the count.
-            let pending = ReviewRules.pending(orders)
+            // An order already in «Resultados por revisar» is not listed a second time below it.
+            let inInbox = Set((followUps?.value ?? []).map(\.orderId))
+            let pending = ReviewRules.pending(orders).filter { !inInbox.contains($0.id) }
             let inProgress = ReviewRules.cancellable(orders)
-            if pending.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
-            else {
+            if pending.isEmpty && inInbox.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
+            else if !pending.isEmpty {
                 ListCard(items: pending) { order in
                     NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
                         LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order))
@@ -941,14 +943,17 @@ struct HospitalizedView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[Admission]>()
+    @State private var expanded = false
 
     var body: some View {
         LoadState(loader: loader, retry: load) { admissions in
-            let listed = DischargeRules.listed(admissions)
+            // Row 13: discharge requests first, then signed discharges; two shown, the rest folded.
+            let listed = DischargeRules.ranked(admissions)
             if listed.isEmpty { EmptyStateView(title: L.text("hospitalized.none"), symbol: "bed.double") }
-            ForEach(listed) { admission in
+            ForEach(AttentionFold.shown(listed, expanded: expanded)) { admission in
                 HospitalizedRow(admission: admission, actions: HospitalizedRowActions.of(admission), reload: load)
             }
+            AttentionFoldToggle(count: listed.count, expanded: $expanded)
         }
         .task(id: live.snapshot.version(.admissions)) { await load() }
     }

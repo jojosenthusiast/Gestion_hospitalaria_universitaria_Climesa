@@ -5,7 +5,7 @@ import type { AccessProfile, Api } from '../lib/api';
 import { LaboratoryPage } from '../features/laboratory';
 import { LabResultsInbox } from '../features/dashboards/lab-results-inbox';
 import { LabFollowUpPanel } from '../features/dashboards/lab-follow-up';
-import { markOf, parseValue, releaseLines } from '../lib/lab-sheet';
+import { formatLabValue, markOf, parseValue, rangeText, releaseLines } from '../lib/lab-sheet';
 
 /** R7 U3, journey C1 "Comprobaciones" (fase2-recorridos-auditoria.md), on a fixed clock: Wednesday 2026-12-02, 09:00 local. */
 beforeEach(() => {
@@ -29,6 +29,13 @@ describe('R7 C1 · reglas de la hoja', () => {
     expect([parseValue('5,1'), parseValue('5.1'), parseValue('abc'), parseValue('')]).toEqual([5.1, 5.1, null, null]);
     expect(releaseLines([{ name: 'Glucosa', value: 88, unit: 'mg/dL', mark: 'normal' }, { name: 'Hemoglobina', value: 7.1, unit: 'g/dL', mark: 'critico_bajo' }]).map(l => l.text))
       .toEqual(['Hemoglobina 7.1 g/dL (crítico bajo)', 'Glucosa 88 mg/dL']);
+  });
+
+  it('el rango incluye los límites críticos y el valor va con su unidad en un solo formato', () => {
+    expect(rangeText(range(12, 15.5, 7, 20))).toBe(`${formatLabValue(12)}–${formatLabValue(15.5)} · crítico < ${formatLabValue(7)} o > ${formatLabValue(20)}`);
+    expect(rangeText({ min: 70, max: null, criticalLow: null, criticalHigh: null })).toBe('≥ 70');
+    expect(rangeText({ min: null, max: null, criticalLow: null, criticalHigh: 400 })).toBe('crítico > 400');
+    expect([formatLabValue(452), formatLabValue(452, 'mil/µL')]).toEqual(['452', '452 mil/µL']);
   });
 });
 

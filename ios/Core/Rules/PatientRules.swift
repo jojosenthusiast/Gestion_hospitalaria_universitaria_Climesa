@@ -254,12 +254,44 @@ public enum PatientLabRules {
     /// pending order never says so.
     public static func awaitsReview(_ order: LabOrder) -> Bool { order.state == .completado && order.reviewedAt == nil }
 
-    public static func valueText(_ result: LabItemResult?) -> String {
+    /// Closed results (released or cancelled) beyond the newest `keep` fold under «Ver N más»; open orders always show.
+    public static func fold(_ orders: [LabOrder], keep: Int = 3) -> (shown: [LabOrder], folded: [LabOrder]) {
+        let closed: (LabOrder) -> Bool = { $0.state == .cancelado || ($0.state == .completado && $0.reviewedAt != nil) }
+        let kept = Set(orders.filter(closed).prefix(keep).map(\.id))
+        return (orders.filter { !closed($0) || kept.contains($0.id) }, orders.filter { closed($0) && !kept.contains($0.id) })
+    }
+
+    /// One es-SV number format for lab values on every screen («13.5», «452», at most three decimals, no grouping).
+    public static func number(_ value: Double) -> String {
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "es_SV")
+        formatter.numberStyle = .decimal
+        formatter.usesGroupingSeparator = false
+        formatter.maximumFractionDigits = 3
+        return formatter.string(from: NSNumber(value: value)) ?? String(value)
+    }
+
+    /// The value (or text) of a result; a number carries its unit when the exam has one («5.1 g/dL»).
+    public static func valueText(_ result: LabItemResult?, unit: String? = nil) -> String {
         guard let result else { return "—" }
         if let value = result.value {
-            return value.rounded() == value ? String(Int(value)) : String(value)
+            let shown = number(value)
+            guard let unit, !unit.isEmpty else { return shown }
+            return "\(shown) \(unit)"
         }
         return result.text ?? "—"
+    }
+
+    /// «12–15.5 · crítico < 7 o > 20» for doctors; nil without limits.
+    public static func rangeText(_ range: LabItemRange?) -> String? {
+        guard let range else { return nil }
+        var normal: String?
+        if let min = range.min, let max = range.max { normal = "\(number(min))–\(number(max))" }
+        else if let max = range.max { normal = "≤ \(number(max))" }
+        else if let min = range.min { normal = "≥ \(number(min))" }
+        let limits = [range.criticalLow.map { "< \(number($0))" }, range.criticalHigh.map { "> \(number($0))" }].compactMap { $0 }
+        let parts = [normal, limits.isEmpty ? nil : "crítico " + limits.joined(separator: " o ")].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 }
 

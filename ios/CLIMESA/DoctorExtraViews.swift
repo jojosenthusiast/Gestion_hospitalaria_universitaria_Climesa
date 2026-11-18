@@ -59,6 +59,7 @@ struct PatientRecordScreen: View {
     var body: some View {
         ScreenFrame(title: "patients.record") {
             DoctorPatientRoom(patientId: patientId)
+            DoctorPatientVitals(patientId: patientId)
             ClinicalHistoryView(patientId: patientId, viewerIsPatient: false)
         }
     }
@@ -87,6 +88,41 @@ private struct DoctorPatientRoom: View {
     private func load() async {
         guard account.can("admision.ver") else { loader.clear(); return }
         await loader.load { try await account.client().get("/admisiones", as: [Admission].self) }
+    }
+}
+
+/// Row 4: últimos signos vitales del paciente, solo lectura (`GET /pacientes/{id}/signos`, permiso `signos.registrar`).
+/// Sin relación de atención la API responde 403: la tarjeta no se muestra y el expediente ya explica por qué.
+private struct DoctorPatientVitals: View {
+    let patientId: String
+    @EnvironmentObject private var account: AccountModel
+    @Environment(LiveViewModel.self) private var live
+    @State private var loader = Loader<PatientVitalsHistory?>()
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            if let error = loader.error {
+                SectionCard(title: L.text("consultation.vitals")) { PartError(message: error, retry: load) }
+            } else if let history = loader.value ?? nil {
+                let items = PatientVitalsRules.latest(history.items)
+                SectionCard(title: L.text("consultation.vitals")) {
+                    if items.isEmpty { Text("consultation.vitals.none").font(Typo.small).foregroundStyle(Theme.muted) }
+                    ForEach(Array(items.enumerated()), id: \.element.id) { index, sign in
+                        if index > 0 { Divider().overlay(Theme.line) }
+                        ListRow(title: ConsultationView.vitalsText(sign), meta: ClimesaDates.short(sign.takenAt))
+                    }
+                }
+            }
+        }
+        .task(id: live.snapshot.version([.consultations, .admissions])) { await load() }
+    }
+
+    private func load() async {
+        guard account.can("signos.registrar") else { loader.clear(); return }
+        await loader.load {
+            do { return try await account.client().get("/pacientes/\(patientId)/signos", as: PatientVitalsHistory.self) }
+            catch let failure as APIFailure where failure.isForbidden { return nil }
+        }
     }
 }
 
@@ -238,7 +274,7 @@ struct AmbulanceOverviewView: View {
     @ViewBuilder private func logRow(_ entry: AmbulanceLogEntry) -> some View {
         SectionCard {
             ListRow(title: "\(entry.origin) → \(entry.destination)", subtitle: [AmbulanceLogRules.typeLabel(entry.type), entry.municipality].compactMap { $0 }.joined(separator: " · "),
-                    meta: ClimesaDates.display(entry.dispatchedAt)) {
+                    meta: ClimesaDates.short(entry.dispatchedAt)) {
                 MedicoTag(entry.priority.rawValue, label: entry.priority.label)
             }
             HStack(spacing: Spacing.s) {

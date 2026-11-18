@@ -23,8 +23,9 @@ class WardJourneyTest {
         assertEquals("Sin cama asignada", HospitalizationRules.vitalsSubject(waiting)?.detail)
     }
 
+    // ENF/AST audit #14: a signed discharge still takes signs until the exit; only a closed stay loses the shortcut.
     @Test fun noSignsShortcutAfterDischargeOrWithoutPatient() {
-        assertNull(HospitalizationRules.vitalsSubject(AdmissionParser.admissions(JSONArray().put(row("alta_firmada"))).single()))
+        assertNull(HospitalizationRules.vitalsSubject(AdmissionParser.admissions(JSONArray().put(row("egresado"))).single()))
         assertNull(HospitalizationRules.vitalsSubject(AdmissionParser.admissions(JSONArray().put(row("hospitalizado", JSONObject.NULL))).single()))
     }
 

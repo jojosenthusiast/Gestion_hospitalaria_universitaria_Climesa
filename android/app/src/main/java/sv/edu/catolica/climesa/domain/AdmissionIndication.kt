@@ -19,10 +19,29 @@ data class IndicationDraft(
     val postSurgical: Boolean = false,
 )
 
+/** Row 11: the patient's active admission on the server, and whether it was indicated from this consultation. */
+data class ExistingAdmission(val id: String, val state: String, val fromThisConsultation: Boolean)
+
 /** `POST /admisiones/indicaciones` (AdmissionDto with `origin = consulta`). The API repeats every rule. */
 object AdmissionIndication {
     const val PATH = "/admisiones/indicaciones"
     val CATEGORIES = listOf("semiprivada", "vip")
+
+    /** The states the API counts as active when it refuses another admission (same as iOS `AdmissionIndicationRules`). */
+    val ACTIVE_STATES = setOf("pendiente_cama", "hospitalizado", "alta_firmada")
+
+    /**
+     * Row 11 (mirror of iOS `loadExisting`): the patient's active admission from `GET /admisiones`, preferring the one indicated
+     * from this consultation; null when there is none. After leaving and coming back, an indication already made shows as done.
+     */
+    fun existing(rows: Any?, patientId: String?, consultationId: String?): ExistingAdmission? {
+        val array = rows as? org.json.JSONArray ?: return null
+        if (patientId.isNullOrBlank()) return null
+        val active = (0 until array.length()).mapNotNull(array::optJSONObject)
+            .filter { it.optString("patientId") == patientId && it.optString("state") in ACTIVE_STATES }
+            .map { ExistingAdmission(it.optString("id"), it.optString("state"), it.optString("origin") == "consulta" && consultationId != null && it.optString("originId") == consultationId) }
+        return active.firstOrNull { it.fromThisConsultation } ?: active.firstOrNull()
+    }
 
     /** Live counter under the motive: "12/500"; it only warns while the minimum is not reached. */
     fun motiveCounter(motive: String): String = "${motive.trim().length}/${AdmissionIntake.MOTIVE_MAX}"

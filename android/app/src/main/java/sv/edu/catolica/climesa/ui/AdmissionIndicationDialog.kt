@@ -19,6 +19,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -34,19 +35,36 @@ import sv.edu.catolica.climesa.domain.AdmissionIntake
 import sv.edu.catolica.climesa.domain.IndicationContext
 import sv.edu.catolica.climesa.domain.IsolationType
 import sv.edu.catolica.climesa.domain.MedicalAppointment
+import sv.edu.catolica.climesa.ui.consultation.ExistingAdmissionViewModel
 
 /**
  * MOV-02 entry inside an open consultation: "Indicar hospitalización" for a physician with `admision.solicitar`, once the
  * consultation exists and while it is still editable. Without a linked staff record it explains why instead of failing later.
  */
 @Composable
-internal fun AdmissionIndicationEntry(item: MedicalAppointment, profile: AccessProfile?, enabled: Boolean, model: AdmissionIndicationViewModel = viewModel()) {
+internal fun AdmissionIndicationEntry(item: MedicalAppointment, profile: AccessProfile?, enabled: Boolean, model: AdmissionIndicationViewModel = viewModel(), existing: ExistingAdmissionViewModel = viewModel()) {
     if (profile == null || "admision.solicitar" !in profile.permissions || item.consultationId == null || item.consultationState == "firmada") return
     val context = IndicationContext(item.patientId.takeIf { it.isNotBlank() }, item.patientName, item.consultationId, profile.staffId, profile.name)
     val blocked = AdmissionIndication.contextError(context)
+    val canRead = "admision.ver" in profile.permissions
+    val sent by model.state.collectAsStateWithLifecycle()
+    val known by existing.state.collectAsStateWithLifecycle()
+    // Row 11: whether the patient already has an admission comes from the server, read on open and after sending.
+    LaunchedEffect(item.consultationId, sent.sent, canRead) { if (canRead) existing.load(context.patientId, item.consultationId) }
     Text(stringResource(R.string.ind_titulo), style = MaterialTheme.typography.titleSmall)
-    if (blocked != null) NoticeBanner(NoticeKind.INFO, blocked)
-    else SecondaryButton(stringResource(R.string.ind_abrir), { model.open(context) }, icon = Icons.Default.Hotel, enabled = enabled)
+    val admission = known.admission
+    when {
+        blocked != null -> NoticeBanner(NoticeKind.INFO, blocked)
+        admission != null -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            StatusBadge(admission.state)
+            Text(stringResource(if (admission.fromThisConsultation) R.string.med_ind_ya_indicada else R.string.med_ind_admision_activa), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        }
+        canRead && !known.known && known.loading -> Text(stringResource(R.string.med_ind_revisando), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else -> {
+            known.error?.let { message -> NoticeBanner(NoticeKind.ERROR, message); RowAction(stringResource(R.string.rec7_volver_a_cargar), { existing.load(context.patientId, item.consultationId) }) }
+            SecondaryButton(stringResource(R.string.ind_abrir), { model.open(context) }, icon = Icons.Default.Hotel, enabled = enabled)
+        }
+    }
     AdmissionIndicationDialog(model)
 }
 

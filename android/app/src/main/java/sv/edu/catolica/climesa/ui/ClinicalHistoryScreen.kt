@@ -112,7 +112,7 @@ private fun OrderHistoryCard(order: LaboratoryOrder) {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("${item.code} · ${item.name}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
                 val result = item.result
-                if (result != null) LabMarkTag(result.mark, "${result.text ?: result.value?.toString().orEmpty()} · ${LaboratoryLabels.mark(result.mark)}")
+                if (result != null) LabMarkTag(result.mark, LaboratoryLabels.valueAndMark(result, item.unit))
                 else Text(stringResource(R.string.historial_valor_oculto), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }

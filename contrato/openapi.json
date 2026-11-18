@@ -27006,7 +27006,9 @@
           },
           "consultationId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Consulta de la que cuelga la orden; null en órdenes de una admisión"
           },
           "patientId": {
             "type": "string",
@@ -27124,6 +27126,11 @@
             "items": {
               "$ref": "#/components/schemas/AccionExternaLaboratorio"
             }
+          },
+          "cancellationReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo de la cancelación; null si la orden no está cancelada"
           }
         },
         "required": [
@@ -27150,7 +27157,8 @@
           "external",
           "externalPlace",
           "externalInstructions",
-          "externalActions"
+          "externalActions",
+          "cancellationReason"
         ]
       },
       "LabResultHistoryResponse": {
@@ -27274,7 +27282,9 @@
           },
           "consultationId": {
             "type": "string",
-            "format": "uuid"
+            "format": "uuid",
+            "nullable": true,
+            "description": "Consulta de la que cuelga la orden; null en órdenes de una admisión"
           },
           "patientId": {
             "type": "string",
@@ -27395,7 +27405,8 @@
           },
           "cancellationReason": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Motivo de la cancelación; null si la orden no está cancelada"
           },
           "history": {
             "description": "Vacío para quien no ve valores",

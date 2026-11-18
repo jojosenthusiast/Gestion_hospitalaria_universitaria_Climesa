@@ -56,6 +56,16 @@ describe('Fase 0 · signos, franjas, salida, traslado, eventos y cancelación (F
     expect(saved.status).toBe(400);
   });
 
+  test('ENF/AST #14: con el alta firmada y la salida pendiente, el historial sigue enlazado a la admisión', async () => {
+    const admission = await hospitalize('HAB-205-A');
+    expect((await t.call('MED', 'POST', `/admisiones/${admission.id}/alta`, { type: 'medica', version: admission.version, summary: 'Evolución favorable sin complicaciones' })).status).toBe(201);
+    const { patientId } = await t.one<{ patientId: string }>('SELECT paciente_id AS "patientId" FROM hospitalizacion.admision WHERE id=$1', [admission.id]);
+    const history = await t.call('ENF', 'GET', `/pacientes/${patientId}/signos`);
+    expect(history.status).toBe(200);
+    expect(history.body.admissionId).toBe(admission.id);
+    expect(history.body.bed).toBe('HAB-205-A');
+  });
+
   test('API-07: con la jornada ya iniciada, las franjas se alinean desde el inicio de la jornada y se exige inicio alineado', async () => {
     // Fixed business time (tomorrow 10:00 local) so the test never runs out of slots near midnight.
     const day = businessDate(new Date(now.valueOf() + 86_400_000));

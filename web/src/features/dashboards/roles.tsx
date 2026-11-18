@@ -64,14 +64,28 @@ export function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
 }
 
 /** Zero stock reads «Agotado» (urgent), never «Bajo mínimo» with the waiting clock (coordinator, prod). */
-const stockState = (r: { disponible: number; vencido: number }) => r.disponible <= 0 ? { tag: 'Agotado', status: 'agotado' } : r.vencido > 0 ? { tag: 'Vencido', status: 'vencido' } : { tag: 'Bajo mínimo', status: 'bajo_minimo' };
+const stockState = (r: { disponible: number; vencido: number; bajo_minimo: boolean }) => r.disponible <= 0 ? { tag: 'Agotado', status: 'agotado' } : r.vencido > 0 ? { tag: 'Vencido', status: 'vencido' } : r.bajo_minimo ? { tag: 'Bajo mínimo', status: 'bajo_minimo' } : { tag: 'Por vencer', status: 'por_vencer' };
 const unitsOf = unitPlural;
 /** `/inventario/existencias` returns one row per lot and warehouse, repeating the article columns: keep one row per article. */
 const perArticle = (rows: StockRow[]) => [...new Map(rows.map(r => [r.articulo_id, { ...r, minimo: Number(r.minimo), disponible: Number(r.disponible), vencido: Number(r.vencido) }])).values()];
-const lowStock = (d: DashboardData): TrayGroupSpec => ({
-  id: 'inventario', title: 'Inventario bajo el mínimo', href: '#/inventario', masculine: true, state: asRemote(d.stock),
-  items: perArticle(d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0).map(r => ({ id: r.articulo_id, title: r.nombre, detail: [(r.bajo_minimo || r.disponible <= 0) && `Quedan ${plural(r.disponible, r.unidad, unitsOf(r.unidad))} · mínimo ${r.minimo}`, r.vencido > 0 && `${r.vencido} vencidos`].filter(Boolean).join(' · '), tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
-});
+/** Same window as the API (`EXPIRING_DAYS`): active stock of lots that expire within 30 days, per article. */
+const EXPIRING_DAYS = 30;
+/** `/inventario/existencias` also carries each lot's expiry and quantity (StockResponse). */
+const expiringSoon = (rows: (StockRow & { expiresAt?: string | null; quantity?: string | number | null })[]) => {
+  const today = localDay(), limit = localDay(new Date(Date.now() + EXPIRING_DAYS * 86400000)), soon = new Map<string, number>();
+  for (const r of rows) {
+    const day = r.expiresAt?.slice(0, 10), quantity = Number(r.quantity ?? 0);
+    if (day && day >= today && day <= limit && quantity > 0) soon.set(r.articulo_id, (soon.get(r.articulo_id) ?? 0) + quantity);
+  }
+  return soon;
+};
+const lowStock = (d: DashboardData): TrayGroupSpec => {
+  const soon = expiringSoon(d.stock.data ?? []);
+  return {
+    id: 'inventario', title: 'Inventario bajo el mínimo', href: '#/inventario', masculine: true, state: asRemote(d.stock),
+    items: perArticle(d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0 || soon.has(r.articulo_id)).map(r => ({ id: r.articulo_id, title: r.nombre, detail: [(r.bajo_minimo || r.disponible <= 0) && `Quedan ${plural(r.disponible, r.unidad, unitsOf(r.unidad))} · mínimo ${r.minimo}`, r.vencido > 0 && `${plural(r.vencido, r.unidad, unitsOf(r.unidad))} vencidos`, soon.has(r.articulo_id) && `${plural(soon.get(r.articulo_id) as number, r.unidad, unitsOf(r.unidad))} por vencer`].filter(Boolean).join(' · '), tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
+  };
+};
 const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
   id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
   items: (d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: `${r.address} · ${formatRelative(r.createdAt)}`, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Despachar', area: 'AMB' as const })),
@@ -96,7 +110,8 @@ const noBed = (d: DashboardData): TrayGroupSpec => ({
 
 const labCount = (rows: LabOrderRow[], state: string) => rows.filter(o => o.state === state).length;
 const pendingReview = (rows: LabOrderRow[]) => rows.filter(o => o.state === 'completado' && !o.reviewedAt);
-const turnaround = (rows: LabOrderRow[]) => rows.filter(o => o.completedAt).map(o => ({ day: localDay(o.completedAt as string), minutes: minutesBetween(o.createdAt, o.completedAt as string) }));
+// External reports are done elsewhere: they do not measure this lab's turnaround (same rule as /metricas/tiempo_laboratorio).
+const turnaround = (rows: LabOrderRow[]) => rows.filter(o => o.completedAt && !o.external).map(o => ({ day: localDay(o.completedAt as string), minutes: minutesBetween(o.createdAt, o.completedAt as string) }));
 const average = (values: number[]) => values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
 const occupancy = (b: { camas: { total: number; libres: number } }) => b.camas.total ? Math.round(((b.camas.total - b.camas.libres) / b.camas.total) * 100) : null;
 
@@ -314,7 +329,8 @@ const lab: RoleDashboard = {
   ],
   tray: ({ d }) => [{
     id: 'muestras', title: 'Muestras por tomar', href: '#/laboratorio', state: asRemote(d.lab),
-    items: (d.lab.data ?? []).filter(o => o.state === 'pendiente').sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2) || a.createdAt.localeCompare(b.createdAt)).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: `${o.items.map(i => i.name).join(', ')} · ${formatRelative(o.createdAt)}`, tone: 'warn' as Tone, href: '#/laboratorio?accion=muestra', action: 'Tomar muestra', status: o.priority === 'urgente' || o.priority === 'emergencia' ? o.priority : undefined })),
+    // External orders are done elsewhere: no sample to take here. Each row opens the sample of its own order.
+    items: (d.lab.data ?? []).filter(o => o.state === 'pendiente' && !o.external).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2) || a.createdAt.localeCompare(b.createdAt)).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: `${o.items.map(i => i.name).join(', ')} · ${formatRelative(o.createdAt)}`, tone: 'warn' as Tone, href: `#/laboratorio?orden=${o.id}&accion=muestra`, action: 'Tomar muestra', status: o.priority === 'urgente' || o.priority === 'emergencia' ? o.priority : undefined })),
   }, lowStock(d)],
   figures: ({ d }) => {
     const today = d.lab.data ? turnaround(d.lab.data).filter(t => t.day === localDay()).map(t => t.minutes) : [];

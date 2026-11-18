@@ -48,6 +48,19 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(PatientLabRules.statusText(orders[0]), "En revisión médica")
     }
 
+    func testOrdenDeAdmisionSinConsultaNoRompeLaLista() throws {
+        let orders = try decode([LabOrder].self, #"[{"id":"o2","consultationId":null,"patientId":"p1","doctorId":"d1","priority":"rutina","state":"cancelado","createdAt":"2026-11-20T14:00:00.000Z","sampleTakenAt":null,"completedAt":null,"reviewedAt":null,"version":2,"patientName":null,"cancellationReason":"Muestra hemolizada, se repite.","items":[]},{"id":"o3","consultationId":"k1","patientId":"p1","doctorId":"d1","priority":"rutina","state":"completado","createdAt":"2026-11-19T14:00:00.000Z","sampleTakenAt":null,"completedAt":"2026-11-19T16:00:00.000Z","reviewedAt":"2026-11-19T17:00:00.000Z","version":5,"patientName":null,"patientNote":"Todo en orden; control en un mes.","items":[{"id":"i1","examId":"e1","code":"HB","name":"Hemoglobina","unit":"g/dL","result":{"value":13.5,"text":null,"mark":"normal"},"referenceRange":{"min":12,"max":15.5,"criticalLow":7,"criticalHigh":20}}]}]"#)
+        XCTAssertEqual(orders.count, 2)
+        XCTAssertNil(orders[0].consultationId)
+        XCTAssertEqual(orders[0].cancellationReason, "Muestra hemolizada, se repite.")
+        XCTAssertEqual(orders[1].consultationId, "k1")
+        XCTAssertEqual(orders[1].patientNote, "Todo en orden; control en un mes.")
+        XCTAssertEqual(orders[1].items[0].referenceRange, LabItemRange(min: 12, max: 15.5, criticalLow: 7, criticalHigh: 20))
+        XCTAssertEqual(PatientLabRules.valueText(orders[1].items[0].result, unit: orders[1].items[0].unit), "13.5 g/dL")
+        XCTAssertEqual(PatientLabRules.rangeText(orders[1].items[0].referenceRange), "12–15.5 · crítico < 7 o > 20")
+        XCTAssertEqual(PatientLabRules.valueText(LabItemResult(value: 452, text: nil, mark: nil), unit: "mil/µL"), "452 mil/µL")
+    }
+
     func testHistorialClinico() throws {
         let history = try decode(ClinicalHistory.self, #"""
         {"patient":{"id":"p1","record":"EXP-0000001","fullName":"Paciente Ficticio"},"access":"propio",

@@ -43,7 +43,16 @@ data class QueueConsultation(
     /** T10f: this doctor made the last call (`calledByMe`); another clinician made it (`calledByColleague`). Missing is false. */
     val calledByMe: Boolean = false,
     val calledByColleague: Boolean = false,
+    /** Row version for the queue writes (`llamar`, `deshacer-llamado`, `no-se-presento`, `prioridad`). */
+    val version: Int = 1,
+    val priority: String = "rutina",
+    /** Area code shown with the number ("CON 7"). */
+    val area: String = QueueLabels.areaOf(service ?: "consulta_general"),
+    /** Server `allowedActions` and reversible `undoActions` of the row: every queue button comes from them. */
+    val allowedActions: List<QueueAction> = emptyList(),
+    val undoActions: List<String> = emptyList(),
 ) {
+    val code: String get() = "$area $number"
     /**
      * A called number without an own consultation is another office's only when another clinician called it (web
      * `calledElsewhere`). A call by reception or an assistant, or one with no recorded caller, stays actionable.
@@ -77,6 +86,20 @@ sealed interface ConsultationPrimary {
             return if (canCallWaiting) CallWaiting else null
         }
     }
+}
+
+/**
+ * Row 1 (MED audit): the queue actions a doctor gets on a called number of "Mi día", same rules as iOS `rowActions` and the
+ * reception board: only what the server offers on the row, the undo only for the doctor's own call, and the priority with
+ * `fila.gestionar` while the number waits or is called.
+ */
+object QueueCardActions {
+    fun canUndo(ticket: QueueConsultation, canCall: Boolean) =
+        canCall && ticket.state == "llamado" && ticket.calledByMe && "deshacer_llamado" in ticket.undoActions
+    fun canCallAgain(ticket: QueueConsultation, canCall: Boolean) = canCall && QueueAction.CALL in ticket.allowedActions
+    fun canMarkAbsent(ticket: QueueConsultation) = QueueAction.ABSENT in ticket.allowedActions
+    fun priorities(ticket: QueueConsultation, canManage: Boolean): List<String> =
+        if (canManage && ticket.state in listOf("en_espera", "llamado")) listOf("emergencia", "urgente", "rutina").filter { it != ticket.priority } else emptyList()
 }
 
 /** Own open consultation of any day (`GET /consultas/sin-firmar`, m-22), to resume and sign it. */
@@ -123,7 +146,11 @@ object ConsultationResume {
         val rows = value as? org.json.JSONArray ?: return emptyList()
         return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { row ->
             QueueConsultation(row.optString("id"), row.optInt("numero"), row.optString("patientName").takeIf { it.isNotBlank() && it != "null" } ?: "Paciente no identificado", row.optString("state"), row.text("consultationId"), row.text("consultationState"), row.text("service"),
-                calledByMe = row.optBoolean("calledByMe", false), calledByColleague = row.optBoolean("calledByColleague", false))
+                calledByMe = row.optBoolean("calledByMe", false), calledByColleague = row.optBoolean("calledByColleague", false),
+                version = row.optInt("version", 1), priority = row.text("priority") ?: "rutina",
+                area = row.text("area") ?: QueueLabels.areaOf(row.text("service") ?: "consulta_general"),
+                allowedActions = ServerActions.allowed(row).mapNotNull(QueueAction::of).distinct(),
+                undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList())
         } }
     }
 

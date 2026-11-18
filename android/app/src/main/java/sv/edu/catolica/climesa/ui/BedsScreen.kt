@@ -27,6 +27,7 @@ private fun BedAction.labelRes() = when (this) {
 fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: BedsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     LaunchedEffect(profile.channels, profile.permissions) { model.start(profile.channels, profile.permissions.toSet()) }
+    var restOpen by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     PageList(modifier) {
         item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
@@ -36,10 +37,12 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
         }
         state.message?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         when {
-            state.loading -> item { LoadingState() }
-            state.error != null -> item { ErrorState(state.error, onRetry = model::reload) }
+            state.loading && state.beds.isEmpty() -> item { LoadingState() }
+            // ENF/AST audit #3: a failed reload keeps the board on screen; the full error only when there is nothing to show.
+            state.error != null && state.beds.isEmpty() -> item { ErrorState(state.error, onRetry = model::reload) }
             state.beds.isEmpty() -> item { EmptyState(stringResource(R.string.camas_vacio), icon = Icons.Default.Bed) }
             else -> {
+                state.error?.let { error -> item { NoticeBanner(NoticeKind.WARNING, error) } }
                 item {
                     Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         StatTile(state.beds.count { it.state == "libre" }.toString(), stringResource(R.string.op_camas_libres), Modifier.weight(1f))
@@ -47,13 +50,17 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
                         StatTile(state.beds.size.toString(), stringResource(R.string.op_camas_total), Modifier.weight(1f))
                     }
                 }
-                items(state.beds, key = { it.id }) { bed ->
+                // ENF/AST audit #4: beds to verify, then to finish cleaning, first; the rest folds under "Ver N más".
+                val (actionable, rest) = BedRules.boardGroups(state.beds, state.permissions)
+                val card: @Composable (Bed) -> Unit = { bed ->
                     val actions = BedRules.availableActions(bed, state.permissions)
                     SectionCard(bed.code, eyebrow = bed.room, action = { OperacionStatusTag(bed.state, label = BedRules.stateLabel(bed.state)) }) {
                         bed.occupant?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
                         actions.forEach { action -> SecondaryButton(stringResource(action.labelRes()), { model.select(bed, action) }) }
                     }
                 }
+                items(actionable, key = { it.id }) { card(it) }
+                foldedItems(rest, BedRules.REST_VISIBLE, restOpen, { restOpen = !restOpen }, foldKey = "camas-fold", key = { it.id }) { card(it) }
             }
         }
     }

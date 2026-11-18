@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Mi día: acciones de la fila en un número llamado -->
+    <string name="med_fila_deshacer">Deshacer llamado</string>
+    <string name="med_fila_volver_llamar">Volver a llamar</string>
+    <string name="med_fila_no_se_presento">No se presentó</string>
+    <string name="med_fila_prioridad">Cambiar prioridad</string>
+    <string name="med_fila_ausente_titulo">¿Marcar %1$s como no presentado?</string>
+    <string name="med_fila_ausente_detalle">El número se cierra sin atender. Esta acción no se puede deshacer.</string>
+    <string name="med_fila_ausente_confirmar">Marcar no presentado</string>
+    <!-- Mi día: listas plegadas y agenda por día -->
+    <string name="med_ver_mas">Ver %1$d más</string>
+    <string name="med_ver_menos">Ver menos</string>
+    <string name="med_ver_proximos_dias">Ver próximos días (%1$d)</string>
+    <string name="med_agenda_hoy_vacia">Hoy no tienes citas.</string>
+    <!-- Consulta: signos vitales tomados -->
+    <string name="med_signos_tomados">Signos vitales tomados (%1$d)</string>
+    <string name="med_signos_ninguno">Aún no hay signos vitales en esta consulta.</string>
+    <!-- Consulta: indicación de hospitalización ya hecha -->
+    <string name="med_ind_ya_indicada">Hospitalización indicada desde esta consulta.</string>
+    <string name="med_ind_admision_activa">El paciente ya tiene una admisión activa.</string>
+    <string name="med_ind_revisando">Revisando si el paciente ya tiene una admisión…</string>
+    <!-- Hospitalizados: pendientes del alta firmada -->
+    <string name="med_alta_pendiente_item">%1$s · Responsable: %2$s</string>
+    <string name="med_alta_pendientes_n">%1$d pendientes del alta</string>
+    <string name="med_alta_sin_pendientes">Sin pendientes del alta</string>
+</resources>

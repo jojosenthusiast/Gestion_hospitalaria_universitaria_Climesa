@@ -458,6 +458,12 @@ public extension DoctorDayActionRules {
 // MARK: - B4 · Consulta
 
 public enum ConsultationRecordRules {
+    /// Row 5 (MED audit): a new diagnosis starts as principal only when the consultation has none yet, so a single
+    /// diagnosis is principal and a second one never demotes the first by default.
+    public static func defaultPrincipal(_ diagnoses: [ConsultationDetail.Diagnosis]) -> Bool {
+        !diagnoses.contains { $0.principal }
+    }
+
     /// Orders of this consultation from the doctor's order list (gap B-6: the detail does not carry them), oldest first.
     public static func labOrders(_ orders: [LabOrder], consultationId: String) -> [LabOrder] {
         orders.filter { $0.consultationId == consultationId && $0.state != .cancelado }.sorted { $0.createdAt < $1.createdAt }
@@ -521,6 +527,11 @@ public enum ConsultationRecordRules {
         }
     }
 
+    /// Row 17: the exams of a listed order ("Hemograma, Glucosa"); its state goes in a tag next to them.
+    public static func orderExams(_ order: LabOrder) -> String {
+        order.items.map(\.name).joined(separator: ", ")
+    }
+
     /// "Hemograma, Glucosa · Pendiente" for a listed order.
     public static func orderLine(_ order: LabOrder) -> String {
         "\(order.items.map(\.name).joined(separator: ", ")) · \(order.state.label)"
@@ -570,8 +581,7 @@ public enum ReleaseRules {
     public static func summary(_ order: LabOrder) -> String {
         let who = order.patientName ?? "El paciente"
         let values = orderedItems(order).map { item -> String in
-            var text = "\(item.name) \(PatientLabRules.valueText(item.result))"
-            if let unit = item.unit, !unit.isEmpty, item.result?.value != nil { text += " \(unit)" }
+            var text = "\(item.name) \(PatientLabRules.valueText(item.result, unit: item.unit))"
             if let mark = item.result?.mark, mark != .normal, mark != .desconocido { text += " (\(mark.label.lowercased()))" }
             return text
         }

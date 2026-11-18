@@ -51,7 +51,8 @@ export class PatientVitalsService {
       const patient = await this.patient(c, patientId);
       // The 403 is audited as a denial by the error filter.
       if (!(await this.hasCareContext(c, actor, patientId))) throw new ForbiddenException('Solo puedes ver los signos de un paciente que atiendes: con relación de atención, ingresado, en ambulancia o con actividad hoy.');
-      const stay = (await c.query(`SELECT a.id AS "admissionId",coalesce(o.codigo,'') AS bed FROM hospitalizacion.admision a LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $2::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id WHERE a.paciente_id=$1 AND a.estado IN ('pendiente_cama','hospitalizado') ORDER BY a.id LIMIT 1`, [patientId, this.clock.now()])).rows[0];
+      // A signed discharge keeps the patient in the bed until the exit: their readings still link to that admission.
+      const stay = (await c.query(`SELECT a.id AS "admissionId",coalesce(o.codigo,'') AS bed FROM hospitalizacion.admision a LEFT JOIN hospitalizacion.ocupacion_cama oc ON oc.admision_id=a.id AND oc.periodo @> $2::timestamptz LEFT JOIN infra.espacio o ON o.id=oc.cama_id WHERE a.paciente_id=$1 AND a.estado IN ('pendiente_cama','hospitalizado','alta_firmada') ORDER BY a.id LIMIT 1`, [patientId, this.clock.now()])).rows[0];
       const rows = (await c.query(`SELECT s.id,s.tomado_en AS "takenAt",s.tomado_por AS "takenBy",
         nullif(concat_ws(' ',p.nombres,p.apellidos),'') AS "takenByName",s.consulta_id AS "consultationId",s.admision_id AS "admissionId",
         s.pa_sistolica AS systolic,s.pa_diastolica AS diastolic,s.fc AS "heartRate",s.fr AS "respiratoryRate",s.temperatura AS temperature,

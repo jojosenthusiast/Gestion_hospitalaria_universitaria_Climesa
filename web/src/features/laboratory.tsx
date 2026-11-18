@@ -13,7 +13,7 @@ import { useQuickAction } from './personal/accion';
 import { ActiveFilters, ChipGroup, LiveSearch, ListToolbar, matches } from './listas/chips';
 import { STAGE_LABEL, elapsedMinutes, formatElapsed, isCritical, slaLevel, sortOrders, stageOf, type Stage, type WorkSort } from './listas/lab-worklist';
 import './listas/lists.css';
-import { markOf, parseValue, rangeText, type ReferenceRange, type SheetMark } from '../lib/lab-sheet';
+import { formatLabValue, markOf, parseValue, rangeText, type ReferenceRange, type SheetMark } from '../lib/lab-sheet';
 import { ReleaseDialog, releasedMessage } from './lab-release';
 import { writeHashParams } from '../lib/hash-params';
 
@@ -37,6 +37,8 @@ const isNumeric = (item: LabItem) => item.resultType ? item.resultType === 'nume
 
 /** Pasos que recorre una orden, en orden. Cada uno se marca solo con lo que la orden ya registró. */
 export const LAB_STEPS = ['Solicitada', 'Muestra tomada', 'En proceso', 'Completada', 'Revisada por médico', 'Visible al paciente'] as const;
+/** An external order takes no sample here: its second step is the report that comes back. */
+export const labSteps = (order: Pick<LabOrder, 'external'>) => order.external ? LAB_STEPS.map((label, i) => i === 1 ? 'Informe recibido' : label) : [...LAB_STEPS];
 
 /** Qué pasos ya ocurrieron y cuál es el actual (`current` = índice del primer paso pendiente; -1 si terminó o se canceló). */
 export function labProgress(order: LabOrder) {
@@ -109,10 +111,16 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
   ];
   const clear = () => { setStage('todas'); setUrgentOnly(false); setCriticalOnly(false); setQuery(''); };
   const toggle = <T,>(set: Set<T>, value: T) => { const next = new Set(set); if (next.has(value)) next.delete(value); else next.add(value); return next; };
-  // `?accion=muestra`: abre la toma de muestra de la primera orden pendiente (la más antigua de la cola).
+  // `?accion=muestra`: opens the sample of `?orden=<id>` (a row of "Muestras por tomar" in Inicio) or, without it, the
+  // first order of the queue by priority and age, the same order the list shows.
   useEffect(() => {
     if (!quick || !data.data) return;
-    if (quick === 'muestra' && isLab) { const first = [...data.data].reverse().find(o => allows(o, 'tomar_muestra')); if (first) { setSelectedId(first.id); setSampleFor(first); } }
+    if (quick === 'muestra' && isLab) {
+      const wanted = new URLSearchParams(location.hash.split('?')[1] ?? '').get('orden');
+      const takeable = data.data.filter(o => allows(o, 'tomar_muestra'));
+      const first = takeable.find(o => o.id === wanted) ?? sortOrders(takeable, 'prioridad')[0];
+      if (first) { setSelectedId(first.id); setSampleFor(first); }
+    }
     consumeQuick();
   }, [quick, data.data, isLab, consumeQuick]);
   // `?orden=<id>` (from "Resultados por revisar" in Inicio): opens that order's detail directly.
@@ -204,7 +212,7 @@ function LabWorkRow({ order, now, current, onSelect, batchable, inBatch, onBatch
 function LabStepper({ order }: { order: LabOrder }) {
   const { done, current } = labProgress(order);
   if (order.state === 'cancelado') return <p className="lab-cancelled">Orden cancelada: no continúa el flujo.</p>;
-  return <ol className="lab-steps" aria-label={`Avance de la orden de ${order.patientName}`}>{LAB_STEPS.map((label, i) => <li key={label} className={done[i] ? 'is-done' : i === current ? 'is-now' : ''} aria-current={i === current ? 'step' : undefined}>{done[i] ? <Icon name="check" size={14} /> : <span className="lab-step-n" aria-hidden="true">{i + 1}</span>}<span>{label}{done[i] ? '' : i === current ? ' · ahora' : ''}</span></li>)}</ol>;
+  return <ol className="lab-steps" aria-label={`Avance de la orden de ${order.patientName}`}>{labSteps(order).map((label, i) => <li key={label} className={done[i] ? 'is-done' : i === current ? 'is-now' : ''} aria-current={i === current ? 'step' : undefined}>{done[i] ? <Icon name="check" size={14} /> : <span className="lab-step-n" aria-hidden="true">{i + 1}</span>}<span>{label}{done[i] ? '' : i === current ? ' · ahora' : ''}</span></li>)}</ol>;
 }
 
 /**
@@ -245,6 +253,7 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: 
       <dl className="cl-facts"><div><dt>Prioridad</dt><dd>{order.priority === 'urgente' ? 'Urgente' : 'Rutina'}</dd></div><div><dt>Pidió</dt><dd>{order.doctorName ?? 'Sin dato'}</dd></div><div><dt>Solicitada</dt><dd>{formatDateTime(order.createdAt)}</dd></div><div><dt>{order.external ? 'Informe recibido' : 'Muestra'}</dt><dd>{when(order.sampleTakenAt)}</dd></div><div><dt>Completada</dt><dd>{when(order.completedAt)}</dd></div><div><dt>Revisada</dt><dd>{when(order.reviewedAt)}</dd></div></dl>
     </details>
     <LabStepper order={order} />
+    {(order.state === 'cancelado' || order.amendedAt) && <OrderRecord api={api} order={order} />}
     {completeOpen && <Dialog title="Completar orden" onClose={() => setCompleteOpen(false)} busy={action.busy}><div className="module-form">
       <p>La orden de <strong>{order.patientName}</strong> pasa a revisión de {order.doctorName ?? 'el médico que la pidió'}. Ya no se pueden agregar resultados desde aquí.</p>
       <WriteError error={spanishProblem(action.error)} onReload={() => { setCompleteOpen(false); onChanged(); }} reloadLabel="Recargar la orden" />
@@ -256,6 +265,22 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: 
       onClose={() => { setReleaseOpen(false); onChanged(); }} onReleased={outcome => { setReleaseOpen(false); setDone(releasedMessage(order.patientName, outcome)); onChanged(); }} />}
     {loadOpen && <ExternalResultDialog api={api} order={order} onClose={() => setLoadOpen(false)} onSaved={() => { setLoadOpen(false); onChanged(); }} />}
   </aside>;
+}
+
+type HistoryEntry = { orderItemId: string; version: number; value?: number | null; text?: string | null; mark: string; changedAt: string; changedByName?: string | null; reason: string };
+
+/** Why a cancelled order stopped, and the corrections of its results (old value, who, when and why), from GET /laboratorio/ordenes/{id}. */
+function OrderRecord({ api, order }: { api: Api; order: LabOrder }) {
+  const detail = useData<{ cancellationReason?: string | null; history?: HistoryEntry[] }>(api, `/laboratorio/ordenes/${order.id}`, order.version);
+  const history = detail.data?.history ?? [];
+  const nameOf = (id: string) => order.items.find(item => item.id === id);
+  return <RemoteState state={detail} skeletonRows={1}>{() => <>
+    {order.state === 'cancelado' && <p className="lab-cancel-reason"><strong>Motivo de la cancelación:</strong> {detail.data?.cancellationReason ?? 'Sin motivo registrado'}</p>}
+    {history.length > 0 && <section className="lab-history" aria-label="Correcciones de resultados"><h4>Correcciones</h4><ul>{history.map(entry => {
+      const item = nameOf(entry.orderItemId), before = entry.text ?? (typeof entry.value === 'number' ? formatLabValue(entry.value, item?.unit) : 'sin valor');
+      return <li key={`${entry.orderItemId}-${entry.version}`}><strong>{item?.name ?? 'Examen'}</strong>: antes {before} <Tag value={entry.mark} /><small className="muted">{formatDateTime(entry.changedAt)}{entry.changedByName ? ` · ${entry.changedByName}` : ''} · {entry.reason}</small></li>;
+    })}</ul></section>}
+  </>}</RemoteState>;
 }
 
 /** Same structure as `Field` (label above, control in `input-wrap`) for controls `Field` does not cover. */
@@ -433,7 +458,7 @@ function IdentityHint({ ok }: { ok: boolean | null }) {
   return <small className={`lab-identity ${ok ? 'is-ok' : 'is-bad'}`} role="status"><Icon name={ok ? 'check' : 'close'} size={14} />{ok ? 'Coincide con la orden' : 'No coincide con la orden'}</small>;
 }
 
-const resultText = (item: LabItem) => item.result ? `${item.result.text ?? item.result.value}${item.unit && item.result.text == null ? ` ${item.unit}` : ''}` : '';
+const resultText = (item: LabItem) => !item.result ? '' : item.result.text ?? (typeof item.result.value === 'number' ? formatLabValue(item.result.value, item.unit) : '');
 
 /** S10: observación del laboratorio; si es relevante, se dice que el médico ya la tiene en su bandeja. */
 function ObservationLine({ result }: { result: LabResult }) {
@@ -452,7 +477,7 @@ function LabItemRow({ api, order, item, onChanged }: { api: Api; order: LabOrder
 }
 
 type SheetRow = { raw: string; note: string; relevant: boolean; noteOpen: boolean; left: boolean };
-const SHEET_MARK: Record<SheetMark, { label: string; status: string } | null> = { critico: { label: 'Crítico', status: 'critico_alto' }, fuera: { label: 'Fuera de rango', status: 'en_espera' }, normal: { label: 'Normal', status: 'completado' }, sin_rango: null };
+const SHEET_MARK: Record<SheetMark, { label: string; status: string } | null> = { critico: { label: 'Crítico', status: 'critico_alto' }, fuera: { label: 'Fuera de rango', status: 'alto' }, normal: { label: 'Normal', status: 'completado' }, sin_rango: null };
 
 /**
  * R7 U3, journey C1 (C-1): one sheet per order. Every exam in a table with its range beside it; Tab goes to the next
