@@ -4,9 +4,10 @@ import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
 import { useRefreshAt } from '../../lib/publico';
 import { Dialog, Empty, CompactHeader, RemoteState, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from '../common';
-import { formatNumber } from '../../lib/format';
+import { formatDayHeading, formatNumber, plural } from '../../lib/format';
 import { NoticeCard, NoticeLevelBadge } from './NoticePreview';
-import { audienceRoles, audienceText, durations, filterInbox, inboxFilters, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
+import { audienceRoles, audienceText, durations, filterInbox, groupInbox, inboxFilters, inboxState, inboxStateTag, shortWhen, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
+import '../listas/lists.css';
 import './avisos.css';
 
 export { localToIso } from './rules';
@@ -41,23 +42,43 @@ export function NoticesPage({ api, profile, version }: { api: Api; profile: Acce
   </>;
 }
 
-/** «Para mí»: bandeja de pendientes (02-sistema §5) con lista y detalle; la acción principal es «Enterado». */
+/** One inbox row: level tag, then «Sin leer»/«Enterado» while in force, or «Programado»/«Vencido» otherwise. */
+function InboxRow({ notice: n, selected, onSelect }: { notice: InboxNotice; selected: boolean; onSelect: () => void }) {
+  const state = inboxState(n);
+  const when = state === 'programado' ? (n.desde ? `empieza ${shortWhen(n.desde)}` : '') : state === 'vencido' ? (n.hasta ? `venció ${shortWhen(n.hasta)}` : '')
+    : `${n.publicadoEn ? shortWhen(n.publicadoEn) : ''}${n.hasta ? ` · hasta ${shortWhen(n.hasta)}` : ''}`;
+  return <li><button type="button" className={`notice-row${n.enteradoEn || state !== 'vigente' ? ' is-read' : ''}`} aria-current={selected ? 'true' : undefined} onClick={onSelect}>
+    <span className="notice-row-head"><NoticeLevelBadge level={n.nivel} /><span className="notice-row-tags">
+      {state !== 'vigente' && <Tag value={inboxStateTag[state].value} label={inboxStateTag[state].label} />}
+      {state === 'vigente' ? <Tag value={n.enteradoEn ? 'completado' : 'pendiente'} label={n.enteradoEn ? 'Enterado' : 'Sin leer'} /> : n.enteradoEn && <Tag value="completado" label="Enterado" />}
+    </span></span>
+    <strong>{n.titulo}</strong>
+    <small>{when}</small>
+  </button></li>;
+}
+
+/**
+ * «Para mí»: bandeja (02-sistema §5) con lista y detalle; la acción principal es «Enterado». Como la agenda de citas:
+ * primero los vigentes, después los programados por día y al final, plegados, los vencidos de los últimos 30 días.
+ */
 function NoticeInbox({ api, state, filter }: { api: Api; state: Remote<Inbox>; filter: InboxFilter }) {
   useRefreshAt(state.data?.proximoCambio, state.refresh);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   return <RemoteState state={state}>{data => {
     const items = filterInbox(data.avisos, filter);
-    if (!data.avisos.length) return <Empty title="Estás al día" description="No hay avisos vigentes para tu rol ni tu área." />;
+    if (!data.avisos.length) return <Empty title="Estás al día" description="No hay avisos vigentes, programados ni vencidos en los últimos 30 días para tu rol ni tu área." />;
     if (!items.length) return <Empty title={filter === 'criticos' ? 'Sin avisos críticos' : 'Todo leído'} description="Cambia el filtro para ver los demás avisos." />;
-    const selected = items.find(n => n.id === selectedId) ?? items[0];
+    const { current, upcoming, past } = groupInbox(items);
+    const selected = items.find(n => n.id === selectedId) ?? current[0] ?? upcoming[0]?.items[0] ?? past[0].items[0];
+    const row = (n: InboxNotice) => <InboxRow key={n.id} notice={n} selected={n.id === selected.id} onSelect={() => setSelectedId(n.id)} />;
+    const ahead = current.length + upcoming.length > 0, pastCount = past.reduce((total, d) => total + d.items.length, 0);
+    const pastDays = past.map(d => <section className="ag-day" key={`p-${d.day}`} aria-label={formatDayHeading(`${d.day}T12:00:00-06:00`)}><h3>{formatDayHeading(`${d.day}T12:00:00-06:00`)}</h3><ul className="notice-inbox-list" aria-label="Avisos vencidos">{d.items.map(row)}</ul></section>);
     return <div className="notice-inbox">
-      <ul className="notice-inbox-list" aria-label="Mis avisos">{items.map(n => <li key={n.id}>
-        <button type="button" className={`notice-row${n.enteradoEn ? ' is-read' : ''}`} aria-current={n.id === selected.id ? 'true' : undefined} onClick={() => setSelectedId(n.id)}>
-          <span className="notice-row-head"><NoticeLevelBadge level={n.nivel} /><Tag value={n.enteradoEn ? 'completado' : 'pendiente'} label={n.enteradoEn ? 'Enterado' : 'Sin leer'} /></span>
-          <strong>{n.titulo}</strong>
-          <small>{n.publicadoEn ? formatDateTime(n.publicadoEn) : ''}{n.hasta ? ` · hasta ${formatDateTime(n.hasta)}` : ''}</small>
-        </button>
-      </li>)}</ul>
+      <div className="notice-inbox-sections">
+        {current.length > 0 && <section className="ag-day" aria-label="Vigentes"><h3>Vigentes<small> · hoy</small></h3><ul className="notice-inbox-list" aria-label="Mis avisos">{current.map(row)}</ul></section>}
+        {upcoming.map(d => <section className="ag-day" key={`u-${d.day}`} aria-label={`Programados · ${formatDayHeading(`${d.day}T12:00:00-06:00`)}`}><h3>{formatDayHeading(`${d.day}T12:00:00-06:00`)}<small> · programados</small></h3><ul className="notice-inbox-list" aria-label="Avisos programados">{d.items.map(row)}</ul></section>)}
+        {past.length > 0 && (ahead ? <details className="ag-past"><summary>Vencidos · {plural(pastCount, 'aviso', 'avisos')}</summary>{pastDays}</details> : pastDays)}
+      </div>
       <NoticeDetail key={selected.id} api={api} notice={selected} hours={data.recordatorioHoras} onDone={state.refresh} />
     </div>;
   }}</RemoteState>;
@@ -66,16 +87,20 @@ function NoticeInbox({ api, state, filter }: { api: Api; state: Remote<Inbox>; f
 function NoticeDetail({ api, notice, hours, onDone }: { api: Api; notice: InboxNotice; hours: number; onDone: () => void }) {
   const action = useAction(api);
   const send = async (verb: 'enterado' | 'posponer') => { if (await action.run(`/me/avisos/${notice.id}/${verb}`, {})) onDone(); };
-  const snoozable = notice.nivel === 'critico' && notice.dirigido && !notice.enteradoEn;
+  const current = inboxState(notice) === 'vigente';
+  const snoozable = current && notice.nivel === 'critico' && notice.dirigido && !notice.enteradoEn;
   return <section className="notice-detail" aria-label="Detalle del aviso">
     <NoticeCard notice={notice} emptyAudience="Tu área" />
     <dl className="notice-detail-meta">
       <div><dt>Publicado</dt><dd>{notice.publicadoEn ? formatDateTime(notice.publicadoEn) : '—'}</dd></div>
-      <div><dt>Vigente hasta</dt><dd>{notice.hasta ? formatDateTime(notice.hasta) : '—'}</dd></div>
+      {inboxState(notice) === 'programado' && <div><dt>Empieza</dt><dd>{notice.desde ? formatDateTime(notice.desde) : '—'}</dd></div>}
+      <div><dt>{inboxState(notice) === 'vencido' ? 'Venció' : 'Vigente hasta'}</dt><dd>{notice.hasta ? formatDateTime(notice.hasta) : '—'}</dd></div>
       {notice.recordarEn && !notice.enteradoEn && <div><dt>Te lo recordamos</dt><dd>{formatDateTime(notice.recordarEn)}</dd></div>}
     </dl>
     <WriteError error={action.error} />
-    {notice.enteradoEn
+    {!current
+      ? <p className="notice-detail-done">{notice.enteradoEn && <><Tag value="completado" label="Enterado" /> {formatDateTime(notice.enteradoEn)} · </>}{inboxState(notice) === 'vencido' ? 'Este aviso ya venció.' : 'Podrás dar «Enterado» cuando entre en vigencia.'}</p>
+      : notice.enteradoEn
       ? <p className="notice-detail-done"><Tag value="completado" label="Enterado" /> {formatDateTime(notice.enteradoEn)}</p>
       : <div className="dialog-actions">
         {snoozable && <button type="button" className="secondary-button" disabled={action.busy} onClick={() => void send('posponer')}>Recordarme en {hours} h</button>}
