@@ -13,9 +13,24 @@ export class DischargePendingResponse {
   @StrProp() responsible!: string;
 }
 
+/** D7: a diagnosis of the stay, from the signed consultations (origin consultation and those signed during the stay). */
+export class DischargeDiagnosisResponse {
+  @StrProp({ description: 'Código CIE-10' }) code!: string;
+  @StrProp() description!: string;
+  @BoolProp() principal!: boolean;
+}
+
+/** D7: follow-up after the discharge, the patient's next requested or confirmed appointment. */
+export class DischargeFollowUpResponse {
+  @DateTimeProp() at!: string;
+  @StrProp({ description: 'Estado de la cita (solicitada o confirmada)' }) state!: string;
+  @StrProp({ nullable: true }) doctorName!: string | null;
+  @StrProp({ nullable: true }) specialty!: string | null;
+}
+
 /**
- * The current (not revoked) signed discharge; without the clinical summary (it lives in the record).
- * D-031: `type` and `pending` are clinical and come null to readers without a care relationship (Recepción, Jefatura);
+ * The current (not revoked) signed discharge.
+ * D-031: `type`, `pending`, `summary`, `diagnoses` and `followUp` are clinical and come null to readers without a care relationship (Recepción, Jefatura);
  * `pendingCount` and `specialHandling` are the operational part every reader gets.
  */
 export class AdmissionDischargeResponse {
@@ -25,6 +40,9 @@ export class AdmissionDischargeResponse {
   @ClassArrayProp(DischargePendingResponse, { nullable: true }) pending!: DischargePendingResponse[] | null;
   @IntProp({ description: 'Cantidad de pendientes del alta.' }) pendingCount!: number;
   @BoolProp({ description: 'La salida necesita un trámite especial (defunción o traslado a otro centro); no revela el tipo.' }) specialHandling!: boolean;
+  @StrProp({ nullable: true, description: 'D7: resumen e indicaciones del alta; nulo sin relación de atención o si no se escribió.' }) summary!: string | null;
+  @ClassArrayProp(DischargeDiagnosisResponse, { nullable: true, description: 'D7: diagnósticos de la estancia; nulo sin relación de atención.' }) diagnoses!: DischargeDiagnosisResponse[] | null;
+  @ClassProp(DischargeFollowUpResponse, { nullable: true, description: 'D7: próxima cita de seguimiento; nulo sin relación de atención o sin cita.' }) followUp!: DischargeFollowUpResponse | null;
 }
 
 export class AdmissionResponse {

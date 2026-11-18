@@ -5760,6 +5760,20 @@ export interface components {
             description: string;
             responsible: string;
         };
+        DischargeDiagnosisResponse: {
+            /** @description Código CIE-10 */
+            code: string;
+            description: string;
+            principal: boolean;
+        };
+        DischargeFollowUpResponse: {
+            /** Format: date-time */
+            at: string;
+            /** @description Estado de la cita (solicitada o confirmada) */
+            state: string;
+            doctorName: string | null;
+            specialty: string | null;
+        };
         AdmissionDischargeResponse: {
             type: components["schemas"]["TipoAlta"] | null;
             /** Format: date-time */
@@ -5770,6 +5784,12 @@ export interface components {
             pendingCount: number;
             /** @description La salida necesita un trámite especial (defunción o traslado a otro centro); no revela el tipo. */
             specialHandling: boolean;
+            /** @description D7: resumen e indicaciones del alta; nulo sin relación de atención o si no se escribió. */
+            summary: string | null;
+            /** @description D7: diagnósticos de la estancia; nulo sin relación de atención. */
+            diagnoses: components["schemas"]["DischargeDiagnosisResponse"][] | null;
+            /** @description D7: próxima cita de seguimiento; nulo sin relación de atención o sin cita. */
+            followUp: components["schemas"]["DischargeFollowUpResponse"] | null;
         };
         /** @enum {string} */
         AccionAdmision: "asignar_cama" | "autorizar" | "cancelar" | "anular" | "trasladar" | "firmar_alta" | "solicitar_alta" | "revocar_alta" | "registrar_salida" | "reasignar_tratante" | "nota_enfermeria";

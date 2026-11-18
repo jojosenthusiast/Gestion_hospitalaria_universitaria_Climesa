@@ -29257,6 +29257,53 @@
           "responsible"
         ]
       },
+      "DischargeDiagnosisResponse": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string",
+            "description": "Código CIE-10"
+          },
+          "description": {
+            "type": "string"
+          },
+          "principal": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "code",
+          "description",
+          "principal"
+        ]
+      },
+      "DischargeFollowUpResponse": {
+        "type": "object",
+        "properties": {
+          "at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "state": {
+            "type": "string",
+            "description": "Estado de la cita (solicitada o confirmada)"
+          },
+          "doctorName": {
+            "type": "string",
+            "nullable": true
+          },
+          "specialty": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "at",
+          "state",
+          "doctorName",
+          "specialty"
+        ]
+      },
       "AdmissionDischargeResponse": {
         "type": "object",
         "properties": {
@@ -29290,6 +29337,29 @@
           "specialHandling": {
             "type": "boolean",
             "description": "La salida necesita un trámite especial (defunción o traslado a otro centro); no revela el tipo."
+          },
+          "summary": {
+            "type": "string",
+            "nullable": true,
+            "description": "D7: resumen e indicaciones del alta; nulo sin relación de atención o si no se escribió."
+          },
+          "diagnoses": {
+            "nullable": true,
+            "description": "D7: diagnósticos de la estancia; nulo sin relación de atención.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/DischargeDiagnosisResponse"
+            }
+          },
+          "followUp": {
+            "nullable": true,
+            "description": "D7: próxima cita de seguimiento; nulo sin relación de atención o sin cita.",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/DischargeFollowUpResponse"
+              }
+            ]
           }
         },
         "required": [
@@ -29298,7 +29368,10 @@
           "signedByName",
           "pending",
           "pendingCount",
-          "specialHandling"
+          "specialHandling",
+          "summary",
+          "diagnoses",
+          "followUp"
         ]
       },
       "AccionAdmision": {

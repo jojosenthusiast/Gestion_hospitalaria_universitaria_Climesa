@@ -65,6 +65,36 @@ final class HospitalRulesTests: XCTestCase {
         XCTAssertNil(RoomRules.waiting(list, patientId: "p1"))
     }
 
+    // D7: el paciente ve el resumen de su alta firmada (en cama o cerrada); sin la parte clínica no hay resumen.
+    func testDischargeSummaryIsTheOwnSignedOrClosedStay() throws {
+        let clinical = #"{"type":"medica","signedAt":"2026-11-18T16:30:00Z","signedByName":"Dra. Ficticia","pending":[{"description":"Retirar puntos","responsible":"Consulta externa"}],"pendingCount":1,"specialHandling":false,"summary":"Reposo y dieta blanda.","diagnoses":[{"code":"K35.8","description":"Apendicitis aguda","principal":false},{"code":"A09","description":"Diarrea","principal":true}],"followUp":{"at":"2026-11-21T16:00:00Z","state":"solicitada","doctorName":"Dr. Ficticio","specialty":"Cirugía"}}"#
+        let operational = #"{"type":null,"signedAt":"2026-11-18T16:30:00Z","signedByName":null,"pending":null,"pendingCount":1,"specialHandling":false,"summary":null,"diagnoses":null,"followUp":null}"#
+        func row(_ id: String, patient: String, state: String, bed: String, discharge: String) -> String {
+            #"{"id":"\#(id)","patientId":"\#(patient)","patientName":null,"origin":"consulta","requestedCategory":"vip","state":"\#(state)","isolation":false,"scheduledAt":null,"attendingDoctorId":"d1","version":1,"bed":"\#(bed)","discharge":\#(discharge)}"#
+        }
+        let list = try decode([Admission].self, "[" + [
+            row("e", patient: "p1", state: "egresado", bed: "", discharge: clinical),
+            row("s", patient: "p2", state: "alta_firmada", bed: "202", discharge: clinical),
+            row("r", patient: "p3", state: "alta_firmada", bed: "303", discharge: operational)
+        ].joined(separator: ",") + "]")
+        XCTAssertEqual(DischargeSummaryRules.summary(list, patientId: "p1")?.id, "e")
+        XCTAssertEqual(DischargeSummaryRules.summary(list, patientId: "p2")?.id, "s")
+        XCTAssertNil(DischargeSummaryRules.summary(list, patientId: "p3"))
+        // Con el alta firmada la cama sigue asignada hasta la salida física.
+        XCTAssertEqual(RoomRules.current(list, patientId: "p2")?.bed, "202")
+        XCTAssertNil(RoomRules.current(list, patientId: "p1"))
+
+        let discharge = try XCTUnwrap(list[1].discharge)
+        XCTAssertEqual(discharge.summary, "Reposo y dieta blanda.")
+        XCTAssertEqual(DischargeSummaryRules.typeLabel(discharge), "Alta médica")
+        XCTAssertEqual(DischargeSummaryRules.diagnoses(discharge).map(\.code), ["A09", "K35.8"])
+        XCTAssertEqual(DischargeSummaryRules.diagnosisLine(DischargeSummaryRules.diagnoses(discharge)[0]), "A09 · Diarrea (principal)")
+        XCTAssertEqual(DischargeSummaryRules.pendingLine(try XCTUnwrap(discharge.pending?.first)), "Retirar puntos — Responsable: Consulta externa")
+        let followUp = DischargeSummaryRules.followUpLine(try XCTUnwrap(discharge.followUp))
+        XCTAssertTrue(followUp.hasSuffix(" · Dr. Ficticio · Cirugía (por confirmar)"), followUp)
+        XCTAssertNil(list[2].discharge?.summary)
+    }
+
     func testProfileRulesValidateContactLikeTheAPI() {
         XCTAssertTrue(PatientProfileRules.errors(phone: "7777-7777", email: "ejemplo@example.test", address: "Calle ficticia").isEmpty)
         XCTAssertTrue(PatientProfileRules.errors(phone: "", email: "", address: "").isEmpty)
