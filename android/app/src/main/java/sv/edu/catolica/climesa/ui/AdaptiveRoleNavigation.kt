@@ -194,7 +194,7 @@ private fun CompactRoleScaffold(
                 NavigationBarItem(
                     selected = selected !in navigation.primary,
                     onClick = { moreOpen = true },
-                    icon = { BadgedIcon(Icons.Default.GridView, navigation.more.flatMap { it.sections }.sumOf { badges[it] ?: 0 }) },
+                    icon = { BadgedIcon(Icons.Default.GridView, navigation.more.flatMap { it.sections }.filter { it != AndroidSection.NOTICES }.sumOf { badges[it] ?: 0 }) },
                     label = { Text(stringResource(R.string.ui_mas), style = NavLabel, maxLines = 1) },
                     colors = barItemColors(),
                 )
