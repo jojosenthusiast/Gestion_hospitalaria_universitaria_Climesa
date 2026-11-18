@@ -93,6 +93,8 @@ export class LaboratoryService {
   }
 
   /**
+   * Owner decision D1 (2026-11-18): the patient gets the reference range (never the critical limits) only on results the
+   * doctor already released, the same moment the values arrive.
    * MA-LAB-01: the lab's open work (pending, in process) is never cut off; completed orders are capped to the latest 300.
    * For a doctor, completed orders still waiting for review count as open too (that is the doctor's work).
    * MA-LAB-03: only a reader with laboratorio.revisar who is a doctor (laboratorio.puede_revisar) also sees, with values,
@@ -120,7 +122,8 @@ export class LaboratoryService {
         coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
         p.expediente AS "patientRecord",p.sexo AS "patientSex",p.nacimiento::text AS "birthRaw",m.nombres||' '||m.apellidos AS "doctorName",
         count(oi.id)::int AS "itemCount",count(r.orden_item_id)::int AS "capturedCount",
-        coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'unit',e.unidad,'resultType',e.tipo_resultado,'referenceRange',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor)) AND rr.examen_id IS NOT NULL THEN json_build_object('min',rr.minimo::float8,'max',rr.maximo::float8,'criticalLow',rr.critico_bajo::float8,'criticalHigh',rr.critico_alto::float8) END,
+        coalesce(json_agg(json_build_object('id',oi.id,'examId',oi.examen_id,'code',e.codigo,'name',e.nombre,'unit',e.unidad,'resultType',e.tipo_resultado,'referenceRange',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor)) AND rr.examen_id IS NOT NULL THEN json_build_object('min',rr.minimo::float8,'max',rr.maximo::float8,'criticalLow',rr.critico_bajo::float8,'criticalHigh',rr.critico_alto::float8)
+          WHEN $2::boolean AND o.revisada_en IS NOT NULL AND rr.examen_id IS NOT NULL AND (rr.minimo IS NOT NULL OR rr.maximo IS NOT NULL) THEN json_build_object('min',rr.minimo::float8,'max',rr.maximo::float8) END,
           'result',CASE WHEN ($1::boolean OR $3::uuid IS NOT NULL AND (o.medico_id=$3 OR o.revisor)) AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version,'observation',r.observacion,'relevant',r.observacion_relevante)
           WHEN $2::boolean AND o.revisada_en IS NOT NULL AND r.orden_item_id IS NOT NULL THEN json_build_object('value',r.valor,'text',r.texto,'mark',r.marca,'version',r.version) END) ORDER BY e.nombre) FILTER (WHERE oi.id IS NOT NULL),'[]'::json) AS items
         FROM filas o JOIN pacientes.paciente p ON p.id=o.paciente_id LEFT JOIN personal.persona m ON m.id=o.medico_id

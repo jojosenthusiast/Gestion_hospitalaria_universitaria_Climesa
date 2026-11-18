@@ -54,6 +54,26 @@ describe('R7 · laboratorio: hoja de resultados, bandeja y liberación', () => {
     expect(mine.items.every((i: any) => i.referenceRange == null)).toBe(true);
   });
 
+  test('D1: el paciente recibe el rango sin los críticos solo cuando el médico liberó el resultado', async () => {
+    const o = await inProcess();
+    const done = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados/lote`, { version: o.version, items: sheet(o, 11), complete: true });
+    expect(done.status).toBe(201);
+    const pending = ((await t.call('PAC', 'GET', '/me/laboratorio')).body as any[]).find(x => x.id === o.id);
+    expect(pending.items.every((i: any) => i.referenceRange == null && i.result == null)).toBe(true);
+    const released = await t.call('MED', 'POST', `/laboratorio/ordenes/${o.id}/revisar`, { version: done.body.orderVersion, followUp: false, patientNote: 'Hemoglobina un poco baja; control en un mes.' });
+    expect(released.status).toBe(201);
+    const mine = ((await t.call('PAC', 'GET', '/me/laboratorio')).body as any[]).find(x => x.id === o.id);
+    const hb = mine.items.find((i: any) => i.code === 'HB');
+    expect(hb.referenceRange).toEqual({ min: 12, max: 15.5 });
+    expect(hb.result).toMatchObject({ value: 11, mark: 'bajo' });
+    expect(mine.patientNote).toBe('Hemoglobina un poco baja; control en un mes.');
+    const detail = (await t.call('PAC', 'GET', `/laboratorio/ordenes/${o.id}`)).body;
+    expect(detail.items.find((i: any) => i.code === 'HB').referenceRange).toEqual({ min: 12, max: 15.5 });
+    expect(JSON.stringify(mine)).not.toMatch(/critical/);
+    // The doctor keeps the full range with its critical limits.
+    expect((await listed('MED', o.id)).items.find((i: any) => i.code === 'HB').referenceRange).toEqual({ min: 12, max: 15.5, criticalLow: 7, criticalHigh: 20 });
+  });
+
   test('C-1: un clic guarda las cinco filas y completa la orden con una sola versión; el crítico avisa al médico', async () => {
     const o = await inProcess();
     const saved = await t.call('LAB', 'POST', `/laboratorio/ordenes/${o.id}/resultados/lote`, { version: o.version, items: sheet(o), complete: true });

@@ -169,6 +169,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 107,GET,/api/v1/laboratorio/seguimientos,citas.agendar,"Sin exámenes ni valores",R,4,Citas de seguimiento propuestas por confirmar (Fase 2 S10)
 107,POST,/api/v1/laboratorio/seguimientos/{id}/confirmar,citas.agendar,"Cita del mismo paciente y médico creada con POST /citas",R,4,Confirmar propuesta de cita de seguimiento (Fase 2 S10)
 107,POST,/api/v1/laboratorio/seguimientos/{id}/descartar,citas.agendar,"Motivo de 10 o más",R,4,Descartar propuesta de cita de seguimiento (Fase 2 S10)
+107,GET,/api/v1/laboratorio/tiempo-entrega,laboratorio.ver_cola,"Solo agregados; últimos 7 días; sin órdenes externas; mismo cálculo que /metricas/tiempo_laboratorio",R,5,Tiempo de entrega del propio laboratorio con promedio y mediana (decisión D3)
 107,GET,/api/v1/catalogo/examenes,catalogo.configurar,"Activos e inactivos, con componentes y rangos vigentes",R,3,Catálogo completo de exámenes
 111,GET,/api/v1/inventario/articulos,inventario.ver,Según el contexto del rol,R,4,"Lista de artículos con existencia y estado"
 111,GET,/api/v1/inventario/articulos/{id},inventario.ver,Según el contexto del rol,R,4,"Detalle: lotes, existencia por bodega e historial"
