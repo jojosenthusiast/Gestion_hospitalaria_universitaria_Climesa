@@ -115,11 +115,11 @@ public enum AppointmentRules {
         return now < deadline ? .allowed(deadline: deadline) : .tooLate(deadline: deadline)
     }
 
-    /// "Puedes cancelar hasta las 08:00" (el mismo día) o "... hasta las 08:00 del 20 nov 2026", en hora de El Salvador.
+    /// "Puedes cancelar hasta las 08:00" (el mismo día) o "... hasta las 08:00 del vie 20 nov", sin año, en hora de El Salvador.
     public static func cancelDeadlineText(_ deadline: Date, now: Date) -> String {
-        let time = ClimesaDates.display(ClimesaDates.iso(deadline), .time)
+        let time = ClimesaDates.clock(deadline)
         if ClimesaDates.localDay(deadline) == ClimesaDates.localDay(now) { return "Puedes cancelar hasta las \(time)." }
-        return "Puedes cancelar hasta las \(time) del \(ClimesaDates.display(ClimesaDates.iso(deadline), .date))."
+        return "Puedes cancelar hasta las \(time) del \(ClimesaDates.dayMonth(deadline))."
     }
 
     public static func cancelTooLateText(hours: Int = AppointmentRules.patientCancelHours) -> String {
@@ -137,9 +137,10 @@ public enum AppointmentRules {
     }
 
     /// Texto de la última solicitud de reprogramación, para el paciente.
-    public static func rescheduleText(_ appointment: Appointment) -> String? {
+    public static func rescheduleText(_ appointment: Appointment, now: Date = Date()) -> String? {
         guard let request = appointment.reschedule else { return nil }
-        let when = ClimesaDates.display(request.start)
+        let short = ClimesaDates.short(request.start, now: now)
+        let when = short.prefix(1).lowercased() + short.dropFirst()
         switch request.state {
         case .pendiente: return "Pediste cambiar a \(when). Tu cita actual sigue vigente hasta que Recepción o tu médico respondan."
         case .rechazada: return "No se aceptó el cambio a \(when)\(request.rejectionReason.map { ": \($0)" } ?? ".")"
@@ -326,5 +327,30 @@ public enum CategoryRequestRules {
         case "cancelada": return "cancelada"
         default: return state
         }
+    }
+}
+
+/// Appointments of one El Salvador day, for lists grouped like the agenda.
+public struct AppointmentDay: Equatable, Sendable, Identifiable {
+    /// `yyyy-MM-dd` in El Salvador.
+    public let day: String
+    public let appointments: [Appointment]
+    public var id: String { day }
+}
+
+public extension AppointmentRules {
+    /// Consecutive appointments grouped by their local day, keeping the given order (upcoming soonest first, past latest
+    /// first). An unreadable start keeps its own group under its raw text.
+    static func byDay(_ appointments: [Appointment]) -> [AppointmentDay] {
+        var days: [AppointmentDay] = []
+        for item in appointments {
+            let day = ClimesaDates.parse(item.start).map(ClimesaDates.localDay) ?? item.start
+            if let last = days.last, last.day == day {
+                days[days.count - 1] = AppointmentDay(day: day, appointments: last.appointments + [item])
+            } else {
+                days.append(AppointmentDay(day: day, appointments: [item]))
+            }
+        }
+        return days
     }
 }

@@ -18,6 +18,8 @@ public struct AgendaEntry: Decodable, Sendable, Identifiable, Equatable {
     /// MA-CIT-03: `iniciar_consulta` solo el día de la cita; si no, viene bloqueada con su motivo.
     public var allowedActions: [AppointmentAction]? = nil
     public var blockedActions: [BlockedAction<AppointmentAction>]? = nil
+    /// Categories of the patient's request by reason (`CategoryRefResponse`); absent on an older API.
+    public var categories: [AppointmentCategoryRef]? = nil
     public var id: String { appointmentId }
 }
 

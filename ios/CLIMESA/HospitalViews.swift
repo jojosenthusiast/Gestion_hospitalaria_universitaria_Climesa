@@ -83,8 +83,11 @@ struct HospitalInfoView: View {
             SectionCard {
                 ForEach(Array(list.enumerated()), id: \.offset) { index, doctor in
                     if index > 0 { Divider().overlay(Theme.line) }
+                    // Every state wears its tag, the positive one too: a doctor here is on shift now.
                     ListRow(title: doctor.name, subtitle: [doctor.specialty, doctor.area].compactMap { $0 }.joined(separator: " · "),
-                            meta: doctor.until.map { String(format: L.text("hospital.until"), ClimesaDates.display($0, .time)) })
+                            meta: doctor.until.map { String(format: L.text("hospital.until"), ClimesaDates.display($0, .time)) }) {
+                        StatusBadge("disponible", label: DoctorShiftFilter.conTurno.label)
+                    }
                 }
             }
         } else {

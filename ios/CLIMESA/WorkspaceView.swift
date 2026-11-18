@@ -66,10 +66,10 @@ struct RoleTabsView:View {
                     }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
                         .climesaNavBar()
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
+                        // Avisos one tap away on every tab (Android/web bell); the count no longer sits on Más.
+                        .toolbar { ToolbarItem(placement:.topBarTrailing) { NoticesBell(model:notices) } }
                         .refreshable { await refresh(tab) }
                 }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
-                    // D1: Avisos lives in Más; its tab carries the unread count (`noLeidos`), 0 hides it.
-                    .badge(tab == .mas ? (NoticeRules.badge(notices.inbox) ?? 0) : 0)
             }
         }
         .environment(live)
@@ -109,6 +109,42 @@ struct RoleTabsView:View {
 
     private func refresh(_ tab:AppTab) async {
         if tab == .turnos { await shifts.load(api:account.api) } else { live.refreshAll(); await account.refreshProfile() }
+    }
+}
+
+/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("9+" over nine). It turns red
+/// while an in-force critical notice is still unread.
+struct NoticesBell:View {
+    let model:NoticeInboxModel
+
+    var body:some View {
+        let count=NoticeRules.badge(model.inbox,hiding:model.hidden)
+        let critical=NoticeRules.bellIsCritical(model.inbox,hiding:model.hidden)
+        NavigationLink {
+            ScreenFrame(title:"section.avisos") { NoticesView() }
+        } label: {
+            Image(systemName:critical ? "bell.badge.fill":"bell")
+                .font(.system(size:18,weight:.semibold))
+                .foregroundStyle(Theme.onPrimary)
+                .frame(width:44,height:44)
+                .overlay(alignment:.topTrailing) {
+                    if let text=NoticeRules.badgeText(count) {
+                        Text(verbatim:text).font(Typo.tag).foregroundStyle(Theme.onStatus)
+                            .padding(.horizontal,5).frame(minWidth:18,minHeight:18)
+                            .background(critical ? Theme.critical:Theme.primary,in:Capsule())
+                            .overlay(Capsule().strokeBorder(Theme.navy,lineWidth:1.5))
+                            .offset(x:2,y:2)
+                    }
+                }
+                .contentShape(Rectangle())
+        }
+        .accessibilityLabel(Text(verbatim:accessibilityText(count:count,critical:critical)))
+    }
+
+    private func accessibilityText(count:Int?,critical:Bool)->String {
+        if critical { return L.text("notices.bell.critical") }
+        if let count { return String(format:L.text("notices.bell.unread"),String(count)) }
+        return L.text("notices.bell")
     }
 }
 

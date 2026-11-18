@@ -38,6 +38,9 @@ struct DoctorDayView: View {
     /// D-3: "No se presentó" waits 8 s with «Deshacer», stored at the tap.
     @State private var absences = DeferredAbsences()
     @State private var rejecting: Appointment?
+    /// Owner rule: pending lists show their two most urgent rows; the rest fold behind «Ver N pendientes más».
+    @State private var unsignedOpen = false
+    @State private var reschedulesOpen = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
@@ -66,9 +69,11 @@ struct DoctorDayView: View {
     }
 
     @ViewBuilder private func unsignedSection(_ open: [UnsignedConsultation]) -> some View {
-        ListCard(title: L.text("day.unsigned"), items: open) { item in
+        // The oldest open consultation is the most urgent to sign.
+        let ranked = open.sorted { (ClimesaDates.parse($0.startedAt) ?? .distantPast) < (ClimesaDates.parse($1.startedAt) ?? .distantPast) }
+        ListCard(title: L.text("day.unsigned"), items: AttentionFold.shown(ranked, expanded: unsignedOpen)) { item in
             NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: {
-                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.display(item.startedAt)) {
+                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.short(item.startedAt)) {
                     HStack(spacing: Spacing.s) {
                         Text("day.unsigned.resume").font(Typo.label).foregroundStyle(Theme.primaryText)
                         Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
@@ -77,15 +82,18 @@ struct DoctorDayView: View {
                 .contentShape(Rectangle())
             }.buttonStyle(.plain)
         }
+        AttentionFoldToggle(count: ranked.count, expanded: $unsignedOpen)
     }
 
     @ViewBuilder private func rescheduleSection(_ pending: [Appointment]) -> some View {
+        // The soonest appointment is the most urgent decision.
+        let ranked = pending.sorted { (ClimesaDates.parse($0.start) ?? .distantPast) < (ClimesaDates.parse($1.start) ?? .distantPast) }
         SectionCard(title: L.text("day.reschedules")) {
             WriteNotice(submission: deciding, reload: load)
-            ForEach(Array(pending.enumerated()), id: \.element.id) { index, item in
+            ForEach(Array(AttentionFold.shown(ranked, expanded: reschedulesOpen).enumerated()), id: \.element.id) { index, item in
                 if index > 0 { Divider().overlay(Theme.line) }
-                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(item.start),
-                        meta: item.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
+                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.short(item.start),
+                        meta: item.reschedule.map { "→ \(ClimesaDates.short($0.start))" })
                 // S13: a list of decisions has no primary of its own; "Llamar siguiente" / "Atender" is the day's primary.
                 // I-15: the spinner shows only on the row being decided.
                 HStack(spacing: Spacing.m) {
@@ -95,6 +103,7 @@ struct DoctorDayView: View {
                         .disabled(deciding.busy)
                 }
             }
+            AttentionFoldToggle(count: ranked.count, expanded: $reschedulesOpen)
         }
     }
 
@@ -277,6 +286,7 @@ struct DoctorDayView: View {
                         if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
                         else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
                     }
+                    CategoryMarks(categories: entry.categories)
                     // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`). I-12: a blocked
                     // start is hidden; its server reason is not body text.
                     let canOpen = entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada)))
@@ -896,7 +906,9 @@ private struct CancelLabOrderSheet: View {
         NavigationStack {
             ScreenFrame(title: "results.cancel.title", onClose: { dismiss() }) {
                 SectionCard {
-                    ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: order.patientName, meta: order.state.label)
+                    ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: order.patientName) {
+                        MedicoTag(order.state.rawValue, label: order.state.label)
+                    }
                 }
                 VStack(alignment: .leading, spacing: Spacing.xs) {
                     MedicoTextArea(label: L.text("results.cancel.reason"), text: $reason, error: reasonError ?? submission.fieldErrors["reason"], lines: 3...6)
@@ -990,7 +1002,7 @@ private struct SignedDischarge: View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
             Text(verbatim: discharge.kind.map { String(format: L.text("hospitalized.discharge.signed"), $0.label) } ?? L.text("hospitalized.discharge.signedNoType"))
                 .font(Typo.label).foregroundStyle(Theme.ink)
-            Text(verbatim: String(format: L.text("hospitalized.discharge.signedBy"), discharge.signedByName ?? "—", ClimesaDates.display(discharge.signedAt)))
+            Text(verbatim: String(format: L.text("hospitalized.discharge.signedBy"), discharge.signedByName ?? "—", ClimesaDates.short(discharge.signedAt)))
                 .font(Typo.small).foregroundStyle(Theme.muted)
             if discharge.specialHandling {
                 Text("hospitalized.discharge.specialHandling").font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
@@ -1314,8 +1326,8 @@ private struct RejectRescheduleSheet: View {
         NavigationStack {
             ScreenFrame(title: "day.reschedules.reject.title", onClose: { dismiss() }) {
                 SectionCard {
-                    ListRow(title: appointment.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.display(appointment.start),
-                            meta: appointment.reschedule.map { "→ \(ClimesaDates.display($0.start))" })
+                    ListRow(title: appointment.patientName ?? L.text("day.patient.unknown"), subtitle: ClimesaDates.short(appointment.start),
+                            meta: appointment.reschedule.map { "→ \(ClimesaDates.short($0.start))" })
                 }
                 MedicoTextArea(label: L.text("day.reschedules.reject.reason"), text: $reason, error: submission.fieldErrors["reason"], lines: 3...6)
                 CharacterCounter(count: trimmed.count, range: 10...500)

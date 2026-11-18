@@ -32,6 +32,12 @@ public enum NoticeLevel: String, Sendable, Equatable, CaseIterable {
     }
 }
 
+/// `estado` of an inbox notice: in force now, scheduled to start later, or expired in the last 30 days (history, like
+/// past appointments). An answer without it only carried notices in force.
+public enum NoticeState: String, Sendable, Equatable, CaseIterable {
+    case vigente, programado, vencido
+}
+
 /// `MyInboxNoticeResponse`: un aviso de la bandeja con el acuse de la cuenta.
 public struct InboxNotice: Decodable, Sendable, Identifiable, Equatable {
     public let id: String
@@ -54,11 +60,13 @@ public struct InboxNotice: Decodable, Sendable, Identifiable, Equatable {
     public let remindAt: String?
     /// Lo decide la API: crítico, dirigido, sin «Enterado» y sin posponer. Es lo único que sale en el inicio.
     public let highlighted: Bool
+    /// Only `vigente` notices take «Enterado» and count as unread or critical.
+    public let state: NoticeState
 
     enum CodingKeys: String, CodingKey {
         case id, title = "titulo", body = "cuerpo", from = "desde", until = "hasta", isPublic = "publico", roles
         case level = "nivel", areas, publishedAt = "publicadoEn", targeted = "dirigido", acknowledgedAt = "enteradoEn", remindAt = "recordarEn"
-        case highlighted = "destacado"
+        case highlighted = "destacado", state = "estado"
     }
 
     public init(from decoder: Decoder) throws {
@@ -77,6 +85,7 @@ public struct InboxNotice: Decodable, Sendable, Identifiable, Equatable {
         acknowledgedAt = try c.decodeIfPresent(String.self, forKey: .acknowledgedAt)
         remindAt = try c.decodeIfPresent(String.self, forKey: .remindAt)
         highlighted = try c.decodeIfPresent(Bool.self, forKey: .highlighted) ?? false
+        state = (try c.decodeIfPresent(String.self, forKey: .state)).flatMap(NoticeState.init(rawValue:)) ?? .vigente
     }
 }
 
