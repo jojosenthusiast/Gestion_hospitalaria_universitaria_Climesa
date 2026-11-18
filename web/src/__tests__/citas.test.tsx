@@ -54,10 +54,17 @@ describe('W28 · agendar cita como Recepción (W-01)', () => {
     const option = await within(dialog).findByRole('option', { name: /María Ficticia Uno/ }, { timeout: 2000 });
     expect(option.textContent).toContain('EXP-000001');
     await userEvent.click(option);
+    // R1-R3: «Con turno» (default) lists only doctors on shift, each with its tag; «Todos» adds the others, apagados y al final.
     await userEvent.click(within(dialog).getByRole('combobox', { name: 'Médico' }));
-    const sinTurno = await within(dialog).findByRole('option', { name: /Doctor Sin Jornada/ });
+    expect(within(dialog).queryByRole('option', { name: /Doctor Sin Jornada/ })).toBeNull();
+    expect((await within(dialog).findAllByRole('option'))[0].textContent).toContain('Con turno');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Todos/ }));
+    await userEvent.click(within(dialog).getByRole('combobox', { name: 'Médico' }));
+    const options = await within(dialog).findAllByRole('option');
+    const sinTurno = options[options.length - 1];
+    expect(sinTurno.textContent).toContain('Doctor Sin Jornada');
     expect(sinTurno.getAttribute('aria-disabled')).toBe('true');
-    expect(sinTurno.textContent).toContain('Sin turno');
+    expect(sinTurno.textContent).toContain('Sin turno ese día');
     const paths = api.request.mock.calls.map(([path]) => String(path));
     expect(paths.some(p => p.startsWith('/pacientes/selector?query=maria'))).toBe(true);
     expect(paths.some(p => p.startsWith('/personal') || p === '/pacientes' || p.startsWith('/pacientes?'))).toBe(false);

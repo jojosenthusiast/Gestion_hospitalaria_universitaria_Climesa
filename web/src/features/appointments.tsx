@@ -3,7 +3,8 @@ import { Field, Icon, Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
 import { ActionButton, StatusBadge, statusNames } from '../components/system';
 import { Segmented } from '../components/segmented';
-import { formatDate, formatDayHeading, formatRelative, plural } from '../lib/format';
+import { formatDate, formatDayHeading, formatRelative, formatShortDateTime, formatShortDay, plural } from '../lib/format';
+import { DoctorShiftPicker } from './listas/doctor-shifts';
 import { isPendingCategoryRequest } from './listas/requests';
 import { ChipGroup, LiveSearch, matches } from './listas/chips';
 import { addDays, dayKey, groupAgenda, minutesBetween, shownState, timeRange, weekOf } from './listas/schedule';
@@ -211,7 +212,7 @@ function AppointmentForm({ api, version, patientId, onClose, onSaved }: { api: A
   const doctorId = doctor?.id ?? '';
   // Los médicos (pocos) se piden con el día elegido para saber quién tiene turno; los pacientes se buscan mientras se escribe.
   const catalogs = useData<{ doctors: CatalogDoctor[] }>(api, `/citas/catalogos?date=${encodeURIComponent(date)}`, version);
-  const doctorItems: PickerItem[] = (catalogs.data?.doctors ?? []).filter(d => d.active).map(d => ({ id: d.id, label: `${d.givenNames} ${d.surnames}`, detail: [d.specialty ?? 'Medicina general', d.area].filter(Boolean).join(' · '), disabled: d.tieneTurno === false, reason: d.tieneTurno === false ? 'Sin turno' : undefined }));
+  const doctorItems: PickerItem[] = (catalogs.data?.doctors ?? []).filter(d => d.active).map(d => ({ id: d.id, label: `${d.givenNames} ${d.surnames}`, detail: [d.specialty ?? 'Medicina general', d.area].filter(Boolean).join(' · '), disabled: d.tieneTurno === false, reason: d.tieneTurno === false ? d.motivo ?? 'Sin turno ese día' : undefined }));
   const { availability, error: availabilityError, loading: availabilityLoading } = useAvailability(api, doctorId, date);
   useEffect(() => setSlot(''), [doctorId, date]);
   const franjas = availability?.franjas ?? [];
@@ -221,7 +222,7 @@ function AppointmentForm({ api, version, patientId, onClose, onSaved }: { api: A
   async function save(e: FormEvent) { e.preventDefault(); if (!selectedSlot || !patient) return; if (await action.run('/citas', { patientId: patient.id, doctorId, start: selectedSlot.start, end: selectedSlot.end, reason: reason || undefined })) onSaved(); }
   return <Dialog title="Agendar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p className="form-intro">Busca al paciente por nombre, DUI o expediente (sin importar tildes), elige un médico con turno y toca una franja libre de 20 minutos.</p><WriteError error={action.error} onReload={onSaved} />
     <div className="form-grid">{patientId ? <div className="select-field"><span className="eyebrow">Paciente</span><p className="ag-fixed-patient">{patient ? <><strong>{patient.label}</strong> <small>{patient.detail}</small></> : 'Cargando paciente…'}</p></div>
-      : <SearchPicker label="Paciente" value={patient} onChange={setPatient} search={patientPicker(api)} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." />}<Field label="Fecha" type="date" value={date} onChange={value => setDate(value)} required /><SearchPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Los médicos sin turno ese día aparecen apagados." /></div>
+      : <SearchPicker label="Paciente" value={patient} onChange={setPatient} search={patientPicker(api)} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." />}<Field label="Fecha" type="date" value={date} onChange={value => setDate(value)} hint={/^\d{4}-\d{2}-\d{2}$/.test(date) ? formatShortDay(date) : undefined} required /><DoctorShiftPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Primero los médicos con turno ese día; «Todos» muestra también a los demás." /></div>
     <section className="slot-section" aria-label="Horarios del día" aria-busy={availabilityLoading}><span className="eyebrow">Horario</span>
       {!doctorId ? <p className="form-hint">Elige un médico para ver sus horarios del día.</p> : availabilityLoading ? <p className="form-hint" role="status">Consultando horarios…</p> : <>
         {availability?.workPeriods.length ? <p className="form-hint">Jornada publicada: {availability.workPeriods.map(period => `${timeOnly(period.start)}–${timeOnly(period.end)}`).join(' · ')}</p> : <p className="form-hint">Este médico no tiene una jornada publicada para esta fecha: prueba con otro día u otro médico.</p>}
@@ -240,7 +241,7 @@ function AppointmentRowActions({ row, busy, onDirect, onDialog }: { row: Appoint
   const allowed = row.allowedActions ?? [], blocked = row.blockedActions ?? [];
   const pending = row.reschedule?.state === 'pendiente' ? row.reschedule : null;
   return <div className="row-actions">
-    {pending && <small className="form-hint">Pide cambiar a {formatDateTime(pending.start)}{pending.reason ? ` · ${pending.reason}` : ''}</small>}
+    {pending && <small className="form-hint">Pide cambiar a {formatShortDateTime(pending.start)}{pending.reason ? ` · ${pending.reason}` : ''}</small>}
     {row.reschedule?.state === 'rechazada' && <small className="form-hint">Reprogramación rechazada: {row.reschedule.rejectionReason}</small>}
     {row.state === 'reprogramada' && <small className="form-hint">Se movió a otra franja.</small>}
     {ROW_ACTIONS.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} disabled={busy} aria-label={`${ACTION_LABEL[name]} · ${row.patientName}`} onClick={() => isDialogued(name) ? onDialog(name) : onDirect(name)}>{ACTION_LABEL[name]}</ActionButton>)}
@@ -278,7 +279,7 @@ function ReasonDialog({ api, appointment, action: kind, patientOnly = false, onC
       : await action.run(`/citas/reprogramaciones/${appointment.reschedule!.id}/rechazar`, { version: appointment.reschedule!.version, rejectionReason: reason });
     if (result) onSaved();
   }
-  return <Dialog title={title} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><dl className="ag-summary"><div><dt>Paciente</dt><dd>{appointment.patientName}</dd></div><div><dt>Médico</dt><dd>{appointment.doctorName}</dd></div><div><dt>Horario</dt><dd>{formatDateTime(appointment.start)}</dd></div>{kind === 'rechazar_reprogramacion' && appointment.reschedule && <div><dt>Pide</dt><dd>{formatDateTime(appointment.reschedule.start)}</dd></div>}</dl><WriteError error={action.error} onReload={onSaved} />
+  return <Dialog title={title} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><dl className="ag-summary"><div><dt>Paciente</dt><dd>{appointment.patientName}</dd></div><div><dt>Médico</dt><dd>{appointment.doctorName}</dd></div><div><dt>Horario</dt><dd>{formatShortDateTime(appointment.start)}</dd></div>{kind === 'rechazar_reprogramacion' && appointment.reschedule && <div><dt>Pide</dt><dd>{formatShortDateTime(appointment.reschedule.start)}</dd></div>}</dl><WriteError error={action.error} onReload={onSaved} />
     {quick ? <>
       <fieldset className="fd-chips"><legend>¿Por qué cancelas?</legend>{CANCEL_CODES.map(([value, label]) => <label key={value} className={`fd-chip${code === value ? ' is-on' : ''}`}><input type="radio" name="motivo-cancelacion" value={value} checked={code === value} onChange={() => setCode(value)} />{label}</label>)}</fieldset>
       {code === 'otro' && <Field label="Cuéntanos brevemente" value={reason} onChange={setReason} minLength={3} maxLength={500} required autoFocus />}</>
@@ -297,7 +298,7 @@ function RescheduleDialog({ api, appointment, onClose, onSaved }: { api: Api; ap
   const chosen = franjas.find(item => item.start === slot && item.estado === 'libre');
   async function save(e: FormEvent) { e.preventDefault(); if (!chosen) return; if (await action.run(`/citas/${appointment.id}/reprogramar`, { version: appointment.version, start: chosen.start, end: chosen.end })) onSaved(); }
   return <Dialog title="Reprogramar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
-    <p className="form-intro">Paciente: <strong>{appointment.patientName}</strong> · {appointment.doctorName}<br />Horario actual: {formatDateTime(appointment.start)}. Elige una franja libre del mismo médico.</p>
+    <p className="form-intro">Paciente: <strong>{appointment.patientName}</strong> · {appointment.doctorName}<br />Horario actual: {formatShortDateTime(appointment.start)}. Elige una franja libre del mismo médico.</p>
     <WriteError error={action.error} onReload={onSaved} />
     <Field label="Fecha" type="date" value={date} onChange={value => value && setDate(value)} required />
     <section className="slot-section" aria-label="Horarios del día" aria-busy={loading}>
@@ -443,7 +444,7 @@ function AssignPanel({ api, version, request, onCancel, onSaved }: { api: Api; v
       : suggestion.data ? <Notice kind="info">Nadie tiene hueco en esa franja en las próximas 2 semanas. Elige otra fecha o todo el día.</Notice> : null}
     <div className="rq-days" role="group" aria-label="Días">{days.map(day => <button type="button" key={day} className="cl-chip" aria-pressed={date === day} onClick={() => setDate(day)}>{formatDayHeading(day)}</button>)}</div>
     <div className="form-grid"><Field label="Fecha" type="date" value={date} onChange={value => value && setDate(value)} required />
-      <SearchPicker label="Médico" value={doctor} onChange={item => { setTouched(true); setDoctor(item); }} items={items} minChars={0} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint={request.specialties.length ? `Sugeridos: ${request.specialties.join(', ')}` : undefined} /></div>
+      <DoctorShiftPicker label="Médico" value={doctor} onChange={item => { setTouched(true); setDoctor(item); }} items={items} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint={request.specialties.length ? `Sugeridos: ${request.specialties.join(', ')}` : undefined} /></div>
     <section className="slot-section" aria-label="Horarios del día" aria-busy={loading}>
       <p className="form-hint">{wholeDay ? 'Todo el día.' : `Solo la franja que pidió: ${FRANJA_LABEL[request.franja].toLowerCase()}.`} {request.franja !== 'cualquiera' && <button type="button" className="cl-link-button" onClick={() => setWholeDay(!wholeDay)}>{wholeDay ? `Solo ${FRANJA_LABEL[request.franja].toLowerCase()}` : 'Ver todo el día'}</button>}</p>
       {!doctorId ? <p className="form-hint">Elige un médico para ver sus horarios.</p> : loading ? <p className="form-hint" role="status">Consultando horarios…</p> : <SlotGrid franjas={franjas} value={slot} onChange={setSlot} />}
@@ -479,7 +480,7 @@ function MyRequests({ api, requests, sent }: { api: Api; requests: Remote<Catego
       <div className="rq-main">
         <CategoryList categories={r.categories} />
         <p className="rq-meta"><Tag value={REQUEST_STATE[r.state].value} label={REQUEST_STATE[r.state].label} /> {FRANJA_LABEL[r.franja]}{r.note && <> · {r.note}</>}</p>
-        {r.appointment && <p className="rq-note">Cita con {r.appointment.doctorName}, {formatDateTime(r.appointment.start)}.</p>}
+        {r.appointment && <p className="rq-note">Cita con {r.appointment.doctorName}, {formatShortDateTime(r.appointment.start)}.</p>}
         {r.state === 'rechazada' && r.rejectionReason && <p className="rq-note">{r.rejectionReason}</p>}
       </div>
       {r.allowedActions.includes('cancelar') && <div className="row-actions"><button type="button" className="row-action" disabled={action.busy} aria-label={`Retirar solicitud · ${r.categories.map(c => c.name).join(', ')}`} onClick={() => void withdraw(r)}>Retirar solicitud</button></div>}

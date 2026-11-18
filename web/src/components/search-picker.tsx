@@ -1,8 +1,12 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { StatusBadge } from './system';
 import './search-picker.css';
 
-/** Elemento de un selector. Un elemento `disabled` se ve apagado y muestra su `reason` (por ejemplo "Sin turno"). */
-export type PickerItem = { id: string; label: string; detail?: string; disabled?: boolean; reason?: string };
+/**
+ * Elemento de un selector. Un elemento `disabled` se ve apagado y muestra su `reason` (por ejemplo "Sin turno").
+ * R1: `status` (a status value or family) draws the shared status badge with `statusLabel`, for available rows too.
+ */
+export type PickerItem = { id: string; label: string; detail?: string; disabled?: boolean; reason?: string; status?: string; statusLabel?: string };
 export type PickerPage = { items: PickerItem[]; hasMore?: boolean };
 
 /** Sin tildes ni mayúsculas: "maria" encuentra "María". */
@@ -163,7 +167,7 @@ export function SearchPicker({ label, value, onChange, search, items, minChars =
                 onClick={() => choose(item)}
               >
                 <span><strong>{item.label}</strong>{item.detail && <small>{item.detail}</small>}</span>
-                {item.disabled && item.reason && <em>{item.reason}</em>}
+                {item.status ? <StatusBadge value={item.status} label={item.statusLabel} /> : item.disabled && item.reason && <em>{item.reason}</em>}
               </li>
             ))}
           </ul>
