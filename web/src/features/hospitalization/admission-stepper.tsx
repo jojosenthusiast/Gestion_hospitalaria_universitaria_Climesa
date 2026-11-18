@@ -59,7 +59,7 @@ function PatientStep({ api, form, update }: StepProps & { api: Api }) {
   const change = (patient: PickerItem | null) => update({ patient: patient && { id: patient.id, label: patient.label }, origin: null, originRecord: null, bed: null });
   return <>
     <p className="form-intro">Busca al paciente por nombre, DUI o expediente.</p>
-    <SearchPicker label="Paciente" value={form.patient} onChange={change} search={patientPicker(api)} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." />
+    <SearchPicker label="Paciente" value={form.patient} onChange={change} search={patientPicker(api, 'admit')} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." />
   </>;
 }
 

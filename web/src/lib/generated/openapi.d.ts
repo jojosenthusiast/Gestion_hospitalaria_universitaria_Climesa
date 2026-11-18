@@ -3095,6 +3095,8 @@ export interface components {
             ageRange?: string | null;
             version: number;
             matchReason: string;
+            /** @description El actor puede abrir su historial clínico (misma regla que GET /pacientes/{id}/historial): relación de atención vigente, consulta abierta suya, admisión activa a su cargo o su propio expediente */
+            careRelation: boolean;
         };
         PatientAppointmentTodayResponse: {
             /** Format: uuid */
@@ -3127,6 +3129,12 @@ export interface components {
             fullName: string;
             /** @description Edad en años; solo si el rol puede ver la fecha de nacimiento */
             age?: number;
+            /** @description Paciente activo o provisional; uno inactivo se lista pero no se atiende (fila, cita, consulta, admisión) */
+            active: boolean;
+            /** @description Tiene una admisión activa (pendiente de cama, hospitalizado o alta firmada): no admite otra */
+            activeAdmission: boolean;
+            /** @description El actor tiene contexto de atención con el paciente (misma regla que registrar signos vitales fuera de consulta) */
+            careContext: boolean;
             /** @description Cita confirmada de hoy (B-2); solo con citas.ver global */
             appointmentToday?: components["schemas"]["PatientAppointmentTodayResponse"] | null;
             /** @description Número de fila vigente de hoy; solo con fila.ver global */
@@ -4887,6 +4895,11 @@ export interface components {
             createdAt: string;
             doctor: components["schemas"]["HistoryDoctorResponse"];
         };
+        /**
+         * @description resultado_externo: el actor puede registrar un examen hecho fuera sin orden (POST /laboratorio/pacientes/{id}/resultado-externo)
+         * @enum {string}
+         */
+        AccionHistorial: "resultado_externo";
         ClinicalHistoryResponse: {
             patient: components["schemas"]["HistoryPatientResponse"];
             access: components["schemas"]["AccesoHistorial"];
@@ -4894,6 +4907,8 @@ export interface components {
             laboratory: components["schemas"]["HistoryLabOrderResponse"][];
             /** @description Vacío para el propio paciente */
             admissions: components["schemas"]["HistoryAdmissionResponse"][];
+            /** @description resultado_externo: el actor puede registrar un examen hecho fuera sin orden (POST /laboratorio/pacientes/{id}/resultado-externo) */
+            allowedActions: components["schemas"]["AccionHistorial"][];
         };
         PatientVitalsItemResponse: {
             /** Format: uuid */
@@ -6948,10 +6963,10 @@ export interface components {
             capturedAt: string;
         };
         /**
-         * @description Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo)
+         * @description Acciones que el actor puede hacer sobre el servicio. cerrar: cierre administrativo; hito, deshacer_hito y reportar (prehospital): solo la tripulación asignada
          * @enum {string}
          */
-        AccionServicioAmbulancia: "cerrar";
+        AccionServicioAmbulancia: "cerrar" | "hito" | "deshacer_hito" | "reportar";
         /**
          * @description Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)
          * @enum {string}
@@ -6975,7 +6990,7 @@ export interface components {
             milestones: components["schemas"]["MilestoneEntryResponse"][];
             nextMilestones: components["schemas"]["HitoServicio"][];
             lastLocation: components["schemas"]["LocationPointResponse"] | null;
-            /** @description Acciones que el actor puede hacer sobre el servicio (cerrar: cierre administrativo) */
+            /** @description Acciones que el actor puede hacer sobre el servicio. cerrar: cierre administrativo; hito, deshacer_hito y reportar (prehospital): solo la tripulación asignada */
             allowedActions: components["schemas"]["AccionServicioAmbulancia"][];
             /** @description Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03) */
             finalStates: components["schemas"]["EstadoFinalServicio"][];

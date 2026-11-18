@@ -46,6 +46,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  </>;
 }
 const ADMIN_CLOSED='Servicio cerrado por Jefatura; la unidad quedó disponible.';
+const CREW_ACTIONS=['hito','deshacer_hito','reportar'];
 /** The unit is busy and this person may close the service: the block notice carries the close itself, not «ask Jefatura». */
 export const closeInNotice=(s:AmbulanceStatus)=>s.dispatchBlock?.code==='en_servicio'&&!!s.activeService?.allowedActions?.includes('cerrar');
 export const blockAction=(s:AmbulanceStatus)=>closeInNotice(s)?'Espera a que la tripulación finalice el servicio o, si no puede terminarlo desde la app, usa «Cierre administrativo»; después podrás despachar.':s.dispatchBlock?.action??'';
@@ -53,7 +54,9 @@ function ActiveService({api,service,canOperate,closeAbove=false,onReport,onSaved
  const milestones=service.milestones??[],withoutAccount=service.crew.some(c=>c.hasAccount===false);
  const last=[...milestones].sort((a,b)=>a.occurredAt.localeCompare(b.occurredAt)).at(-1),undo=useAction(api);
  // R7 G-4: the crew undoes a milestone tapped by mistake; the server keeps the window (15 min) and who undid it.
- const undoable=canOperate&&!!last&&last.type!=='finalizado'&&typeof service.version==='number';
+ // S5 (preconditions): only the assigned crew operates the service; the API says so in `allowedActions`.
+ const actions=service.allowedActions??[],crewActions=actions.some(a=>CREW_ACTIONS.includes(a));
+ const undoable=canOperate&&actions.includes('deshacer_hito')&&!!last&&typeof service.version==='number';
  async function undoLast(){if(!last||undo.busy)return;if(await undo.run(`/ambulancia/servicios/${service.id}/hitos/deshacer`,{version:service.version}))onSaved(`Se deshizo «${milestoneNames[last.type]??last.type}»; vuelve a marcarlo cuando ocurra.`);}
  return <section aria-label="Servicio activo"><h2>Servicio activo</h2><dl className="detail-grid">
   <div><dt>Tipo</dt><dd>{typeNames[service.type]??service.type}</dd></div><div><dt>Prioridad</dt><dd><PriorityBadge value={priorityLevel(service.priority)} label={priorityNames[service.priority]??service.priority}/></dd></div>
@@ -64,6 +67,7 @@ function ActiveService({api,service,canOperate,closeAbove=false,onReport,onSaved
   {service.lastLocation&&<div><dt>Última ubicación</dt><dd><a className="row-action" href={mapLink(service.lastLocation)} target="_blank" rel="noopener noreferrer">Ver en el mapa</a> <small className="muted">{formatRelative(service.lastLocation.capturedAt)}</small></dd></div>}
  </dl>
  <ol className="milestone-list" aria-label="Hitos del servicio">{['salida','en_escena','trasladando','en_hospital','finalizado'].map(type=>{const m=milestones.find(x=>x.type===type);return <li key={type} className={m?'done':''}><strong>{milestoneNames[type]}</strong> <span>{m?formatDateTime(m.occurredAt):'Pendiente'}</span></li>;})}</ol>
+ {canOperate&&!crewActions&&<Notice kind="info">No estás en la tripulación de este servicio.</Notice>}
  {undoable&&<p><button type="button" className="secondary-button" disabled={undo.busy} onClick={undoLast}>{undo.busy?'Deshaciendo…':`Deshacer «${milestoneNames[last!.type]??last!.type}»`}</button></p>}
  {undo.error&&<WriteError error={undo.error}/>}
  {onReport&&<button type="button" className="row-action" onClick={onReport}>Ver reporte prehospital</button>}

@@ -134,8 +134,10 @@ const tabNames:Record<Tab,string>={datos:'Datos',citas:'Citas',consultas:'Consul
 function PatientPanel({api,id,profile,version,onClose,onEdit,onState}:{api:Api;id:string;profile:AccessProfile;version:number;onClose:()=>void;onEdit:(p:Patient)=>void;onState:(p:Patient)=>void}){
  const data=useData<Patient>(api,`/pacientes/${id}`,version),[tab,setTab]=useState<Tab>('datos');
  const seesAppointments=can(profile,'citas.ver'),seesClinical=can(profile,'expediente.ver');
- // R7 C-5: a doctor records an exam done elsewhere without a prior order; the API checks the care relationship.
- const [external,setExternal]=useState(false),[externalDone,setExternalDone]=useState(''),recordsExternal=seesClinical&&can(profile,'laboratorio.ordenar');
+ // R7 C-5: a doctor records an exam done elsewhere without a prior order. S4 (preconditions): the button only appears when
+ // the history's `allowedActions` says the POST will pass (care relationship and an own consultation), never to be refused.
+ const mayRecordExternal=seesClinical&&can(profile,'laboratorio.ordenar'),history=useData<ClinicalHistory>(api,`/pacientes/${id}/historial`,version,mayRecordExternal);
+ const [external,setExternal]=useState(false),[externalDone,setExternalDone]=useState(''),recordsExternal=mayRecordExternal&&!!history.data?.allowedActions?.includes('resultado_externo');
  const tabs:Tab[]=['datos',...(seesAppointments?['citas' as Tab]:[]),...(seesClinical?['consultas','laboratorio','ingresos'] as Tab[]:[]),'cambios'];
  return <aside className="cl-detail" aria-label="Ficha de paciente"><button type="button" className="cl-link-button" onClick={onClose}>Cerrar ficha</button><RemoteState state={data}>{p=>{const gaps=profileGaps(p),age='birth'in p?ageFrom(p.birth):null;return <>
   <div className="patient-banner"><span className="mono-label">EXPEDIENTE {p.record}</span><h3>{p.fullName}</h3><p className="patient-banner-meta"><Tag value={p.state}/>{age!==null&&<span>{plural(age,'año','años')} · {sexNames[p.sex]}</span>}</p></div>

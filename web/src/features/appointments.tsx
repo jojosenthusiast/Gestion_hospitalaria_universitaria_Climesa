@@ -10,6 +10,7 @@ import { ChipGroup, LiveSearch, matches } from './listas/chips';
 import { addDays, dayKey, groupAgenda, minutesBetween, shownState, timeRange, weekOf } from './listas/schedule';
 import './listas/lists.css';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
+import { patientRowBlock, type PatientPickerGate, type PickerPatientRow } from './patient-gates';
 import { useQuickAction } from './personal/accion';
 import { CategoryBadges, CategoryGlyph, type CategoryRef } from '../components/category';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
@@ -45,7 +46,7 @@ type SlotState = 'libre' | 'ocupado' | 'sin_turno' | 'pasado';
 type Slot = { start: string; end: string; estado: SlotState; motivo: string | null };
 type Availability = { durationMinutes: number; workPeriods: { start: string; end: string }[]; slots: { start: string; end: string }[]; franjas: Slot[] };
 type CatalogDoctor = { id: string; givenNames: string; surnames: string; specialty?: string | null; area?: string | null; active: boolean; tieneTurno?: boolean | null; motivo?: string | null };
-type PickerPatient = { items: { id: string; record: string; fullName: string; age?: number | null }[]; hasMore: boolean };
+type PickerPatient = { items: PickerPatientRow[]; hasMore: boolean };
 const timeOnly = (value: string) => new Intl.DateTimeFormat('es-SV', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'America/El_Salvador' }).format(new Date(value));
 
 type Range = 'todas' | 'hoy' | 'semana' | 'dia';
@@ -198,9 +199,12 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
 }
 
 /** Búsqueda de pacientes para los selectores: sin tildes, paginada y con solo lo necesario (id, expediente, nombre, edad). */
-export const patientPicker = (api: Api) => async (query: string, offset: number): Promise<PickerPage> => {
+export const patientPicker = (api: Api, gate?: PatientPickerGate) => async (query: string, offset: number): Promise<PickerPage> => {
   const page = await api.request<PickerPatient>(`/pacientes/selector?query=${encodeURIComponent(query)}&limit=10&offset=${offset}`);
-  return { hasMore: page.hasMore, items: page.items.map(p => ({ id: p.id, label: p.fullName, detail: `Expediente ${p.record}${typeof p.age === 'number' ? ` · ${p.age} años` : ''}` })) };
+  return { hasMore: page.hasMore, items: page.items.map(p => {
+    const reason = gate ? patientRowBlock(p, gate) : undefined;
+    return { id: p.id, label: p.fullName, detail: `Expediente ${p.record}${typeof p.age === 'number' ? ` · ${p.age} años` : ''}`, ...(reason ? { disabled: true, reason } : {}) };
+  }) };
 };
 const slotNames: Record<SlotState, string> = { libre: 'Libre', ocupado: 'Ocupado', sin_turno: 'Sin turno', pasado: 'Pasó' };
 
@@ -222,7 +226,7 @@ function AppointmentForm({ api, version, patientId, onClose, onSaved }: { api: A
   async function save(e: FormEvent) { e.preventDefault(); if (!selectedSlot || !patient) return; if (await action.run('/citas', { patientId: patient.id, doctorId, start: selectedSlot.start, end: selectedSlot.end, reason: reason || undefined })) onSaved(); }
   return <Dialog title="Agendar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p className="form-intro">Busca al paciente por nombre, DUI o expediente (sin importar tildes), elige un médico con turno y toca una franja libre de 20 minutos.</p><WriteError error={action.error} onReload={onSaved} />
     <div className="form-grid">{patientId ? <div className="select-field"><span className="eyebrow">Paciente</span><p className="ag-fixed-patient">{patient ? <><strong>{patient.label}</strong> <small>{patient.detail}</small></> : 'Cargando paciente…'}</p></div>
-      : <SearchPicker label="Paciente" value={patient} onChange={setPatient} search={patientPicker(api)} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." />}<Field label="Fecha" type="date" value={date} onChange={value => setDate(value)} hint={/^\d{4}-\d{2}-\d{2}$/.test(date) ? formatShortDay(date) : undefined} required /><DoctorShiftPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Primero los médicos con turno ese día; «Todos» muestra también a los demás." /></div>
+      : <SearchPicker label="Paciente" value={patient} onChange={setPatient} search={patientPicker(api, 'attend')} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." />}<Field label="Fecha" type="date" value={date} onChange={value => setDate(value)} hint={/^\d{4}-\d{2}-\d{2}$/.test(date) ? formatShortDay(date) : undefined} required /><DoctorShiftPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Primero los médicos con turno ese día; «Todos» muestra también a los demás." /></div>
     <section className="slot-section" aria-label="Horarios del día" aria-busy={availabilityLoading}><span className="eyebrow">Horario</span>
       {!doctorId ? <p className="form-hint">Elige un médico para ver sus horarios del día.</p> : availabilityLoading ? <p className="form-hint" role="status">Consultando horarios…</p> : <>
         {availability?.workPeriods.length ? <p className="form-hint">Jornada publicada: {availability.workPeriods.map(period => `${timeOnly(period.start)}–${timeOnly(period.end)}`).join(' · ')}</p> : <p className="form-hint">Este médico no tiene una jornada publicada para esta fecha: prueba con otro día u otro médico.</p>}
