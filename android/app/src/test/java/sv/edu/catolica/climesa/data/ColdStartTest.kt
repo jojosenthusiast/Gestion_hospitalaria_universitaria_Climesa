@@ -1,6 +1,8 @@
 package sv.edu.catolica.climesa.data
 
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -10,6 +12,42 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class ColdStartTest {
+    @Test fun theWakingHintNeedsAServerThatSeemsAsleep() {
+        var now = 1_000_000L
+        val warmth = ServerWarmth { now }
+        // No answer yet in this process: the server may be asleep.
+        assertTrue(warmth.likelyCold())
+        warmth.record(200)
+        assertFalse(warmth.likelyCold())
+        // A 404 is still an answer from the API.
+        now += 60_000; warmth.record(404)
+        assertFalse(warmth.likelyCold())
+        // No answer for more than 14 minutes.
+        now += ColdStart.IDLE_UNTIL_COLD_MS + 1
+        assertTrue(warmth.likelyCold())
+        warmth.answered()
+        // A gateway 503 or a network failure after the last answer.
+        warmth.record(503)
+        assertTrue(warmth.likelyCold())
+        warmth.answered(); warmth.failed()
+        assertTrue(warmth.likelyCold())
+        assertTrue(ColdStart.isLikelyCold(null, false, now))
+        assertFalse(ColdStart.isLikelyCold(now - ColdStart.IDLE_UNTIL_COLD_MS, false, now))
+    }
+
+    @Test fun aSlowCallOnAWarmServerWaitsUntilAnAttemptFails() = runTest {
+        val warmth = ServerWarmth { 0L }
+        warmth.answered()
+        var cold = false
+        val waiter = launch { warmth.awaitLikelyCold(); cold = true }
+        advanceUntilIdle()
+        assertFalse(cold)
+        warmth.failed()
+        advanceUntilIdle()
+        assertTrue(cold)
+        waiter.join()
+    }
+
     @Test fun aReadWithoutAnswerIsRetriedWithAGrowingWait() = runTest {
         var attempts = 0
         val result = ColdStart.retrying {

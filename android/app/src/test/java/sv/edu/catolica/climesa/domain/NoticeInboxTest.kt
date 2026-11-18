@@ -76,10 +76,21 @@ class NoticeInboxTest {
         assertEquals(listOf("Todos", "Sin leer", "Críticos"), NoticeFilter.entries.map { it.label })
         assertEquals(listOf("a", "b", "c"), NoticeInboxRules.filter(parsed.notices, NoticeFilter.ALL).map { it.id })
         assertEquals(listOf("a"), NoticeInboxRules.filter(parsed.notices, NoticeFilter.UNREAD).map { it.id })
-        assertEquals(listOf("a", "c"), NoticeInboxRules.filter(parsed.notices, NoticeFilter.CRITICAL).map { it.id })
+        // Same rule as the API `criticos`: in force, addressed to the account, without "Enterado".
+        assertEquals(listOf("a"), NoticeInboxRules.filter(parsed.notices, NoticeFilter.CRITICAL).map { it.id })
         assertNull(NoticeInboxRules.count(parsed, NoticeFilter.ALL))
         assertEquals(2, NoticeInboxRules.count(parsed, NoticeFilter.UNREAD))
         assertEquals(1, NoticeInboxRules.count(parsed, NoticeFilter.CRITICAL))
+    }
+
+    @Test fun criticalListAgreesWithTheCriticalCount() {
+        val parsed = NoticeInboxParser.parse(inbox(
+            notice("crit", nivel = "critico"), notice("public", nivel = "critico", dirigido = false),
+            notice("done", nivel = "critico", enteradoEn = "2026-11-16T12:10:00.000Z"), notice("info", nivel = "informativo"),
+        ))
+        val listed = NoticeInboxRules.filter(parsed.notices, NoticeFilter.CRITICAL)
+        assertEquals(listOf("crit"), listed.map { it.id })
+        assertEquals(parsed.notices.count(NoticeInboxRules::isPendingCritical), listed.size)
     }
 
     @Test fun acknowledgeForAnyUnreadNoticeAndSnoozeOnlyForATargetedCriticalOne() {

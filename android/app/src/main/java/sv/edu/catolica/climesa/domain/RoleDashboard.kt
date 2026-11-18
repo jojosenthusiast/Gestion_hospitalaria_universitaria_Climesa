@@ -386,12 +386,17 @@ object RoleDashboard {
     }
 }
 
-/** Realtime events that change something a dashboard shows; the dashboard then reads its sources again (no polling). */
+/**
+ * Realtime events that change something a dashboard shows; the dashboard then reads its sources again (no polling).
+ * Names are the `entidad` the API writes to the outbox (`event(...)` in `api/src`, `docs/arquitectura/tiempo-real.md`)
+ * plus type prefixes (`fila.`, `laboratorio.`, `inventario.`, `ambulancia.`, `vinculacion.`). The GPS point
+ * (`ambulancia.ubicacion`, every few seconds) changes no dashboard figure.
+ */
 object DashboardEvents {
     private val entities = arrayOf(
-        "cama", "espacio", "ticket_fila", "fila", "orden_laboratorio", "laboratorio", "admision", "alta", "cita", "consulta",
-        "articulo", "inventario", "ambulancia", "servicio_ambulancia", "solicitud_ambulancia", "turno", "vinculacion",
+        "cama", "espacio", "ticket_fila", "fila", "orden_laboratorio", "laboratorio", "admision", "cita", "consulta",
+        "articulo", "inventario", "ambulancia", "unidad", "solicitud", "servicio", "turno", "vinculacion", "vinculacion_paciente",
     )
 
-    fun matches(event: EventoDominio) = LiveEntities.matches(event, *entities)
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, *entities) && event.type != "ambulancia.ubicacion"
 }
