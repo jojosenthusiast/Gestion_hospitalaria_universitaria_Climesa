@@ -458,6 +458,12 @@ public extension DoctorDayActionRules {
 // MARK: - B4 · Consulta
 
 public enum ConsultationRecordRules {
+    /// Row 5 (MED audit): a new diagnosis starts as principal only when the consultation has none yet, so a single
+    /// diagnosis is principal and a second one never demotes the first by default.
+    public static func defaultPrincipal(_ diagnoses: [ConsultationDetail.Diagnosis]) -> Bool {
+        !diagnoses.contains { $0.principal }
+    }
+
     /// Orders of this consultation from the doctor's order list (gap B-6: the detail does not carry them), oldest first.
     public static func labOrders(_ orders: [LabOrder], consultationId: String) -> [LabOrder] {
         orders.filter { $0.consultationId == consultationId && $0.state != .cancelado }.sorted { $0.createdAt < $1.createdAt }
@@ -519,6 +525,11 @@ public enum ConsultationRecordRules {
         case .recetaExamenes: return prescriptions + labOrders
         case .procedimientos, .cierre: return nil
         }
+    }
+
+    /// Row 17: the exams of a listed order ("Hemograma, Glucosa"); its state goes in a tag next to them.
+    public static func orderExams(_ order: LabOrder) -> String {
+        order.items.map(\.name).joined(separator: ", ")
     }
 
     /// "Hemograma, Glucosa · Pendiente" for a listed order.

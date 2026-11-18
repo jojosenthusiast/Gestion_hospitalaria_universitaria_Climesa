@@ -78,7 +78,8 @@ struct ConsultationView: View {
     @State private var cieQuery = ""
     @State private var cieResults = Loader<[Cie10Entry]>()
     @State private var cieChoice: Cie10Entry?
-    @State private var principal = true
+    /// Row 5: set from the record when it loads (principal only while the consultation has none).
+    @State private var principal = false
     @State private var note = ""
     @State private var codeError: String?
     @State private var lines: [PrescriptionDraft] = [PrescriptionDraft()]
@@ -235,8 +236,15 @@ struct ConsultationView: View {
                 diagnosesSection(value, editable: true)
             case .procedimientos:
                 draftSection(value, editable: true, planOnly: true)
-                if profile.hasPermission("admision.solicitar") && profile.staffId != nil {
-                    AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId)
+                if profile.hasPermission("admision.solicitar") {
+                    if profile.staffId != nil {
+                        AdmissionIndicationCard(consultationId: value.consultation.id, patientId: value.consultation.patientId)
+                    } else {
+                        // Row 12: never hidden silently; the doctor reads why it is not offered.
+                        SectionCard(title: L.text("admission.title")) {
+                            Text(verbatim: AdmissionIndicationRules.noStaffRecord).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
                 }
             case .recetaExamenes:
                 prescriptionSection(value, editable: profile.hasPermission("recetas.emitir"))
@@ -312,7 +320,12 @@ struct ConsultationView: View {
             VStack(alignment: .leading, spacing: Spacing.xs) {
                 Text("lab.ordered.title").font(Typo.label).foregroundStyle(Theme.muted)
                 ForEach(orders) { order in
-                    Text(verbatim: ConsultationRecordRules.orderLine(order)).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    // Row 17: the state is a coloured tag, never plain text after the exams.
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+                        Text(verbatim: ConsultationRecordRules.orderExams(order)).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                        Spacer(minLength: Spacing.s)
+                        MedicoTag(order.state.rawValue, label: order.state.label)
+                    }
                 }
             }
         }
@@ -542,6 +555,7 @@ struct ConsultationView: View {
             let firstFill = prefilledVersion == nil
             reason = summary.reason ?? ""; exam = summary.physicalExam ?? ""; plan = summary.plan ?? ""
             savedNotes = ConsultationDraft(reason: reason, exam: exam, plan: plan)
+            if firstFill { principal = ConsultationRecordRules.defaultPrincipal(detail.value?.diagnoses ?? []) }
             prefilledVersion = summary.version
             // Al volver a la consulta, lo escrito en el dispositivo y no guardado reemplaza lo de la API.
             if firstFill, ConsultationRules.isEditable(summary.state), let key = draftKey,
@@ -635,8 +649,9 @@ struct ConsultationView: View {
         }
         if ok { diagnosisNames[choice.code] = choice.description }
         if ok, let created { diagnosisNames[created.code] = created.description }
-        if ok { cieChoice = nil; cieQuery = ""; cieResults.clear(); note = ""; principal = false }
+        if ok { cieChoice = nil; cieQuery = ""; cieResults.clear(); note = "" }
         await loadDetail()
+        if ok { principal = ConsultationRecordRules.defaultPrincipal(detail.value?.diagnoses ?? []) }
     }
 
     private func prescribe() async {

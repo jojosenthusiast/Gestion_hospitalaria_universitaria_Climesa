@@ -50,8 +50,16 @@ class ClinicalHistoryViewModel @Inject constructor(private val api: ApiGateway, 
         loadJob = viewModelScope.launch {
             try { api.request("/pacientes/$patientId/historial").let { r -> mutable.value = mutable.value.copy(loading = false, history = ClinicalHistoryParser.parse(r)) } }
             catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!silent || mutable.value.history == null) mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar el historial.")) }
+            catch (e: Exception) { if (!silent || mutable.value.history == null) mutable.value = mutable.value.copy(loading = false, error = historyError(e)) }
         }
+    }
+
+    /** Row 23: a 403 reads the same on Android and iOS (`RecordAccess.deniedMessage`), never the raw API text. */
+    private fun historyError(e: Exception): String =
+        if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.statusCode == 403) DENIED else userMessage(e, "No se pudo cargar el historial.")
+
+    companion object {
+        const val DENIED = "Solo el médico tratante puede ver este expediente. Se habilita cuando hay una cita, consulta u hospitalización a tu cargo."
     }
 
     fun close() { loadJob?.cancel(); mutable.value = mutable.value.copy(patientId = null, history = null, error = null, loading = false) }

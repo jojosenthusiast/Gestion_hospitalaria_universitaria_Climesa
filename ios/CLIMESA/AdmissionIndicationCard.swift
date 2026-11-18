@@ -14,6 +14,9 @@ struct AdmissionIndicationCard: View {
     @State private var open = false
     @State private var category: RoomCategory = .semiprivada
     @State private var isolation = false
+    @State private var isolationType: IsolationKind?
+    @State private var unstable = false
+    @State private var postSurgical = false
     @State private var motive = ""
     @State private var motiveError: String?
     @State private var done: AdmissionCommandResult?
@@ -60,6 +63,16 @@ struct AdmissionIndicationCard: View {
             FieldError(text: submission.fieldErrors["requestedCategory"])
         }
         Toggle("admission.isolation", isOn: $isolation).font(Typo.body).tint(Theme.primary).frame(minHeight: Spacing.control)
+        // Row 10: same fields as Android: the isolation type (with isolation on), unstable and post-surgical.
+        if isolation {
+            Picker(selection: $isolationType) {
+                Text(verbatim: "Sin especificar").tag(IsolationKind?.none)
+                ForEach(IsolationKind.allCases, id: \.self) { kind in Text(verbatim: kind.label).tag(Optional(kind)) }
+            } label: { Text(verbatim: "Tipo de aislamiento").font(Typo.body) }
+            .frame(minHeight: Spacing.control)
+        }
+        Toggle(isOn: $unstable) { Text(verbatim: "Paciente inestable").font(Typo.body) }.tint(Theme.primary).frame(minHeight: Spacing.control)
+        Toggle(isOn: $postSurgical) { Text(verbatim: "Posquirúrgico").font(Typo.body) }.tint(Theme.primary).frame(minHeight: Spacing.control)
         VStack(alignment: .leading, spacing: Spacing.xs) {
             MedicoTextArea(label: L.text("admission.reason"), text: $motive, error: motiveError ?? submission.fieldErrors["motive"], lines: 3...6)
             CharacterCounter(count: AdmissionRules.motiveCount(motive), range: AdmissionRules.motiveRange)
@@ -91,7 +104,8 @@ struct AdmissionIndicationCard: View {
     private func submit() async {
         motiveError = AdmissionRules.motiveError(motive)
         guard motiveError == nil else { return }
-        let body = AdmissionBody(patientId: patientId, consultationId: consultationId, category: category, isolation: isolation, motive: motive)
+        let body = AdmissionBody(patientId: patientId, consultationId: consultationId, category: category, isolation: isolation, motive: motive,
+                                 isolationType: isolationType, unstable: unstable, postSurgical: postSurgical)
         var result: AdmissionCommandResult?
         let ok = await submission.run(consultationId, body: body) { key in
             result = try await account.client().send("POST", "/admisiones/indicaciones", body: body, key: key, as: AdmissionCommandResult.self)

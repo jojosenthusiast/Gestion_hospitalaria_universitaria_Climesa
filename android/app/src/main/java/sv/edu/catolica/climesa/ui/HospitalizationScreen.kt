@@ -469,7 +469,8 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             if (row.isolation) FamilyBadge(stringResource(R.string.clin_hosp_aislamiento), null)
         }
         row.attendingDoctorName?.let { LabeledValue(stringResource(R.string.hosp_tratante), it) }
-        if (AdmissionAction.SIGN_DISCHARGE in actions) row.dischargeRequestedAt?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_alta_solicitada, localTime(it))) }
+        // Row 20: the request shows to everyone who sees the row, not only to who can sign (iOS `requestHint`).
+        row.dischargeRequestedAt?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_alta_solicitada, localTime(it))) }
         HospitalizationRules.waitingDischargeHint(row)?.let { NoticeBanner(if (row.attendingDoctorHasAccount) NoticeKind.INFO else NoticeKind.WARNING, it) }
         row.discharge?.takeIf { row.state == "alta_firmada" }?.let { d ->
             val signer = d.signedByName ?: stringResource(R.string.hosp_alta_firmante_desconocido)
@@ -478,6 +479,13 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                     ?: stringResource(R.string.hosp_alta_firmada_sin_tipo, signer, localTime(d.signedAt)),
                 style = MaterialTheme.typography.bodySmall,
             )
+            // Row 7: what is left after the signed discharge and who answers for it (RN-11, iOS `SignedDischarge`).
+            val pending = d.pending
+            when {
+                !pending.isNullOrEmpty() -> pending.forEach { p -> Text(stringResource(R.string.med_alta_pendiente_item, p.description, p.responsible), style = MaterialTheme.typography.bodySmall) }
+                pending == null && d.pendingCount > 0 -> Text(stringResource(R.string.med_alta_pendientes_n, d.pendingCount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                else -> Text(stringResource(R.string.med_alta_sin_pendientes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
         }
         act(AdmissionAction.ASSIGN_BED, stringResource(R.string.hosp_asignar_cama), { model.open(row) }, Icons.Default.Bed)
         act(AdmissionAction.SIGN_DISCHARGE, stringResource(R.string.hosp_firmar_alta), { model.openDischarge(row) })

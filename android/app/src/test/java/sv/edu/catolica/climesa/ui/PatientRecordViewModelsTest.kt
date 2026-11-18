@@ -101,12 +101,12 @@ class PatientRecordViewModelsTest {
         assertNull(vm.state.value.history)
     }
 
-    @Test fun deniedHistoryShowsTheApiMessage() = runTest(dispatcher) {
+    @Test fun deniedHistoryShowsTheSharedWording() = runTest(dispatcher) {
         val api = FakeGateway()
         api.failures["/pacientes/p2/historial"] = AuthRequestException("El historial requiere una relación de atención.", 403)
         val vm = ClinicalHistoryViewModel(api, RecordSignalBus())
         vm.open("p2"); runCurrent()
-        assertEquals("El historial requiere una relación de atención.", vm.state.value.error)
+        assertEquals(ClinicalHistoryViewModel.DENIED, vm.state.value.error)
         assertNull(vm.state.value.history)
     }
 

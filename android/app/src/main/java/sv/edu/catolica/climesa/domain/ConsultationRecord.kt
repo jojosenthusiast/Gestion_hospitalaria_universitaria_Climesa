@@ -9,6 +9,9 @@ data class RecordedDiagnosis(val id: String, val code: String, val principal: Bo
 /** One medication of a prescription already issued (`prescriptions[].items`). */
 data class RecordedMedication(val medication: String, val dose: String, val frequency: String, val duration: String)
 
+/** Row 3: one set of vital signs already taken in this consultation (`vitalSigns` of the detail), usually by the assistant. */
+data class RecordedVitals(val id: String, val takenAt: String, val text: String)
+
 /** A lab order of this consultation (`GET /laboratorio/ordenes` filtered by `consultationId`). */
 data class RecordedLabOrder(val id: String, val state: String, val exams: List<String>, val examIds: Set<String>, val examCodes: Set<String>)
 
@@ -25,6 +28,8 @@ data class ConsultationRecord(
     val orderedIds: Set<String> = emptySet(),
     /** False while this consultation's order list could not be read: ordering waits until it is known. */
     val labOrdersKnown: Boolean = true,
+    /** Vital signs taken in this consultation, newest first. */
+    val vitals: List<RecordedVitals> = emptyList(),
 ) {
     /** Exams of a non-cancelled order of this consultation: the catalog does not offer them again. */
     fun alreadyOrdered(exam: LabExam): Boolean = exam.id in orderedIds || labOrders.any { it.state != "cancelado" && (exam.id in it.examIds || exam.code in it.examCodes) }
@@ -34,6 +39,30 @@ object ConsultationRecordRules {
     fun diagnoses(detail: Any?): List<RecordedDiagnosis> = rows((detail as? JSONObject)?.optJSONArray("diagnoses")).map {
         RecordedDiagnosis(it.optString("id"), it.optString("code"), it.optBoolean("principal"), text(it, "note"))
     }
+
+    /**
+     * Row 3: "PA 120/80 · FC 72 · FR 16 · T 36.8 °C · SpO₂ 98 %" per set of `vitalSigns`, newest first (same text as iOS
+     * `vitalsText`). Temperature, weight and height come as decimal text.
+     */
+    fun vitals(detail: Any?): List<RecordedVitals> = rows((detail as? JSONObject)?.optJSONArray("vitalSigns")).map { v ->
+        val parts = buildList {
+            val sys = int(v, "systolic"); val dia = int(v, "diastolic")
+            if (sys != null && dia != null) add("PA $sys/$dia")
+            int(v, "heartRate")?.let { add("FC $it") }
+            int(v, "respiratoryRate")?.let { add("FR $it") }
+            text(v, "temperature")?.let { add("T $it °C") }
+            int(v, "oxygenSaturation")?.let { add("SpO₂ $it %") }
+            text(v, "weightKg")?.let { add("$it kg") }
+            text(v, "heightCm")?.let { add("$it cm") }
+        }
+        RecordedVitals(v.optString("id"), v.optString("takenAt"), parts.ifEmpty { listOf("—") }.joinToString(" · "))
+    }.sortedByDescending { it.takenAt }
+
+    /**
+     * Row 5: a new diagnosis starts as principal only when the consultation has none yet, so a single diagnosis is principal
+     * and a second one never demotes the first by default. Unknown record (still loading): not principal.
+     */
+    fun defaultPrincipal(record: ConsultationRecord?): Boolean = record?.diagnoses?.none { it.principal } ?: false
 
     fun medications(detail: Any?): List<RecordedMedication> = rows((detail as? JSONObject)?.optJSONArray("prescriptions")).flatMap { prescription ->
         rows(prescription.optJSONArray("items")).map { RecordedMedication(it.optString("medication"), it.optString("dose"), it.optString("frequency"), it.optString("duration")) }
@@ -68,5 +97,6 @@ object ConsultationRecordRules {
 
     private fun plural(n: Int, one: String, many: String) = "$n ${if (n == 1) one else many}"
     private fun rows(array: JSONArray?): List<JSONObject> = array?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } }.orEmpty()
+    private fun int(row: JSONObject, key: String): Int? = if (!row.has(key) || row.isNull(key)) null else row.optDouble(key).takeIf { !it.isNaN() }?.toInt()
     private fun text(row: JSONObject, key: String) = if (row.isNull(key)) null else row.optString(key).takeIf { it.isNotBlank() }
 }

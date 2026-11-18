@@ -140,3 +140,37 @@ final class LocalDayTests: XCTestCase {
         XCTAssertEqual(ClimesaDates.localDay(picked), "2026-11-20")
     }
 }
+
+/// MED audit rows 4, 5 and 10.
+final class DoctorAuditRulesTests: XCTestCase {
+    private func diagnoses(_ json: String) -> [ConsultationDetail.Diagnosis] {
+        try! JSONDecoder().decode([ConsultationDetail.Diagnosis].self, from: Data(json.utf8))
+    }
+
+    func testElPrimerDiagnosticoEsPrincipalYElSegundoNoDegradaAlPrimero() {
+        XCTAssertTrue(ConsultationRecordRules.defaultPrincipal([]))
+        XCTAssertFalse(ConsultationRecordRules.defaultPrincipal(diagnoses(#"[{"id":"d1","code":"J06.9","principal":true,"note":null,"description":null}]"#)))
+        XCTAssertTrue(ConsultationRecordRules.defaultPrincipal(diagnoses(#"[{"id":"d1","code":"J06.9","principal":false,"note":null,"description":null}]"#)))
+    }
+
+    func testLaIndicacionLlevaTipoDeAislamientoYMarcasClinicasSoloCuandoAplican() throws {
+        let plain = AdmissionBody(patientId: "p", consultationId: "c", category: .vip, isolation: false, motive: "Motivo suficiente", isolationType: .gotitas)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONBody.encode(plain)) as? [String: Any])
+        XCTAssertNil(json["isolationType"])
+        XCTAssertNil(json["unstable"])
+        XCTAssertNil(json["postSurgical"])
+        let full = AdmissionBody(patientId: "p", consultationId: "c", category: .vip, isolation: true, motive: "Motivo suficiente", isolationType: .aerea, unstable: true, postSurgical: true)
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONBody.encode(full)) as? [String: Any])
+        XCTAssertEqual(body["isolationType"] as? String, "aerea")
+        XCTAssertEqual(body["unstable"] as? Bool, true)
+        XCTAssertEqual(body["postSurgical"] as? Bool, true)
+    }
+
+    func testElExpedienteMuestraLosUltimosSignosPrimeroElMasReciente() throws {
+        let json = #"{"patientId":"p1","patientName":"Ana","record":"1","age":30,"admissionId":null,"bed":null,"items":["#
+            + (1...4).map { #"{"id":"v\#($0)","takenAt":"2026-11-1\#($0)T10:00:00Z","takenBy":"u","systolic":120,"diastolic":80,"heartRate":null,"respiratoryRate":null,"temperature":"36.5","oxygenSaturation":null,"weightKg":null,"heightCm":null,"pain":2}"# }.joined(separator: ",")
+            + "]}"
+        let history = try JSONDecoder().decode(PatientVitalsHistory.self, from: Data(json.utf8))
+        XCTAssertEqual(PatientVitalsRules.latest(history.items).map(\.id), ["v4", "v3", "v2"])
+    }
+}

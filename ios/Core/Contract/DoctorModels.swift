@@ -379,3 +379,10 @@ public struct PrehospitalView: Decodable, Sendable, Equatable {
     public let allowedActions: [String]?
     public var canReceive: Bool { allowedActions?.contains("recibir") == true }
 }
+
+/// Row 4 (MED audit): `GET /pacientes/{id}/signos` (`PatientVitalsHistoryResponse`); each item carries the same measures as
+/// the consultation detail, so it decodes as `ConsultationDetail.VitalSigns` (extra fields are ignored).
+public struct PatientVitalsHistory: Decodable, Sendable, Equatable {
+    public let patientId: String
+    public let items: [ConsultationDetail.VitalSigns]
+}

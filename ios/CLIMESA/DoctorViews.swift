@@ -383,7 +383,7 @@ struct DoctorDayView: View {
                 let orders = try await Part<[LabOrder]>.load { try await api.get("/laboratorio/ordenes", as: [LabOrder].self) }
                 switch orders {
                 case let .loaded(list):
-                    day.pendingResults = .loaded(ReviewRules.pending(list).count)
+                    day.pendingResults = .loaded(ReviewRules.toReview(list))
                     day.criticalResults = ReviewRules.criticalToReview(list)
                 case let .failed(message):
                     day.pendingResults = .failed(message)
@@ -943,14 +943,17 @@ struct HospitalizedView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[Admission]>()
+    @State private var expanded = false
 
     var body: some View {
         LoadState(loader: loader, retry: load) { admissions in
-            let listed = DischargeRules.listed(admissions)
+            // Row 13: discharge requests first, then signed discharges; two shown, the rest folded.
+            let listed = DischargeRules.ranked(admissions)
             if listed.isEmpty { EmptyStateView(title: L.text("hospitalized.none"), symbol: "bed.double") }
-            ForEach(listed) { admission in
+            ForEach(AttentionFold.shown(listed, expanded: expanded)) { admission in
                 HospitalizedRow(admission: admission, actions: HospitalizedRowActions.of(admission), reload: load)
             }
+            AttentionFoldToggle(count: listed.count, expanded: $expanded)
         }
         .task(id: live.snapshot.version(.admissions)) { await load() }
     }
