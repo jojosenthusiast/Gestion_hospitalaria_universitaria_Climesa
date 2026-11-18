@@ -616,10 +616,12 @@ struct ResultsReviewView: View {
                 }
             }
             // I-32: critical results are tagged on their row (critical first); no extra banner repeating the count.
-            let pending = ReviewRules.pending(orders)
+            // An order already in «Resultados por revisar» is not listed a second time below it.
+            let inInbox = Set((followUps?.value ?? []).map(\.orderId))
+            let pending = ReviewRules.pending(orders).filter { !inInbox.contains($0.id) }
             let inProgress = ReviewRules.cancellable(orders)
-            if pending.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
-            else {
+            if pending.isEmpty && inInbox.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
+            else if !pending.isEmpty {
                 ListCard(items: pending) { order in
                     NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
                         LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order))

@@ -182,6 +182,18 @@ public struct LabItemResult: Decodable, Sendable, Equatable {
     public var relevant: Bool? = nil
 }
 
+/// `LabItemRangeResponse` (C-3): reference and critical limits valid for this patient; only for staff who see values.
+public struct LabItemRange: Decodable, Sendable, Equatable {
+    public let min: Double?
+    public let max: Double?
+    public let criticalLow: Double?
+    public let criticalHigh: Double?
+
+    public init(min: Double?, max: Double?, criticalLow: Double?, criticalHigh: Double?) {
+        self.min = min; self.max = max; self.criticalLow = criticalLow; self.criticalHigh = criticalHigh
+    }
+}
+
 /// `LabOrderItemResponse`
 public struct LabOrderItem: Decodable, Sendable, Identifiable, Equatable {
     public let id: String
@@ -193,6 +205,8 @@ public struct LabOrderItem: Decodable, Sendable, Identifiable, Equatable {
     public let unit: String?
     /// `numerico` o `texto` (`TipoResultadoLaboratorio`); nulo en un servidor anterior.
     public let resultType: String?
+    /// Reference range for doctors and the lab; null for the patient (owner decision) or without a range.
+    public var referenceRange: LabItemRange? = nil
 
     /// The exam takes a number. Without `resultType` (older server) an exam with a unit is numeric, as on Android.
     public var numeric: Bool { resultType.map { $0 == "numerico" } ?? (unit != nil) }
@@ -213,7 +227,8 @@ public enum LabExternalAction: String, Sendable, CaseIterable {
 /// con tolerancia: en un servidor anterior quedan vacíos y no se muestra ninguna acción.
 public struct LabOrder: Decodable, Sendable, Identifiable, Equatable {
     public let id: String
-    public let consultationId: String
+    /// Null for an order of an admission (no consultation): the list must still decode.
+    public let consultationId: String?
     public let patientId: String
     public let doctorId: String
     public let priority: LabPriority
@@ -234,16 +249,20 @@ public struct LabOrder: Decodable, Sendable, Identifiable, Equatable {
     public let externalPlace: String?
     public let externalInstructions: String?
     public let externalActions: [String]
+    /// R7 C1: the doctor's note for the patient; the API sends it only once the results are released.
+    public let patientNote: String?
+    /// Why the order was cancelled; null when it is not cancelled or on an older server.
+    public let cancellationReason: String?
 
     enum CodingKeys: String, CodingKey {
         case id, consultationId, patientId, doctorId, priority, state, createdAt, sampleTakenAt, completedAt, reviewedAt, version, patientName, items
-        case amendedAt, allowedActions, external, externalPlace, externalInstructions, externalActions
+        case amendedAt, allowedActions, external, externalPlace, externalInstructions, externalActions, patientNote, cancellationReason
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
-        consultationId = try container.decode(String.self, forKey: .consultationId)
+        consultationId = (try? container.decodeIfPresent(String.self, forKey: .consultationId)) ?? nil
         patientId = try container.decode(String.self, forKey: .patientId)
         doctorId = try container.decode(String.self, forKey: .doctorId)
         priority = try container.decode(LabPriority.self, forKey: .priority)
@@ -261,6 +280,8 @@ public struct LabOrder: Decodable, Sendable, Identifiable, Equatable {
         externalPlace = (try? container.decodeIfPresent(String.self, forKey: .externalPlace)) ?? nil
         externalInstructions = (try? container.decodeIfPresent(String.self, forKey: .externalInstructions)) ?? nil
         externalActions = ((try? container.decodeIfPresent([String].self, forKey: .externalActions)) ?? nil) ?? []
+        patientNote = (try? container.decodeIfPresent(String.self, forKey: .patientNote)) ?? nil
+        cancellationReason = (try? container.decodeIfPresent(String.self, forKey: .cancellationReason)) ?? nil
     }
 
     /// La API permite esta acción al usuario actual.

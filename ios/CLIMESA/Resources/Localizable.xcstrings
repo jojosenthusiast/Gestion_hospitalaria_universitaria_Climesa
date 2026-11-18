@@ -5753,6 +5753,39 @@
           }
         }
       }
+    },
+    "exams.doctorNote": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota de tu médico: %@"
+          }
+        }
+      }
+    },
+    "exams.cancelReason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo de la cancelación: %@"
+          }
+        }
+      }
+    },
+    "results.range": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Referencia: %@"
+          }
+        }
+      }
     }
   },
   "version": "1.0"

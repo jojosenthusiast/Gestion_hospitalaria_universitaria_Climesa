@@ -927,13 +927,22 @@ struct LabOrderDetail: View {
                 }
             }
             if !showValues && PatientLabRules.awaitsReview(order) && LabExternalRules.patientNote(order) == nil { PatientNotice(text: L.text(ReviewRules.isAmendedPendingReview(order) ? "exams.amended" : "exams.waiting_review")) }
+            if order.state == .cancelado, let reason = order.cancellationReason {
+                Text(verbatim: String(format: L.text("exams.cancelReason"), reason)).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            // R7 C1: the doctor's note for the patient arrives only with the released results.
+            if !staffView, showValues, let note = order.patientNote, !note.isEmpty { PatientNotice(text: String(format: L.text("exams.doctorNote"), note)) }
             ForEach(order.items) { item in
                 SectionCard(title: staffView ? "\(item.name) (\(item.code))" : item.name) {
                     if showValues {
                         HStack {
-                            Text(verbatim: PatientLabRules.valueText(item.result)).font(Typo.heading).foregroundStyle(Theme.ink)
+                            Text(verbatim: PatientLabRules.valueText(item.result, unit: item.unit)).font(Typo.heading).foregroundStyle(Theme.ink)
                             Spacer()
                             if let mark = item.result?.mark { PatientTag(mark.rawValue, label: mark.label) }
+                        }
+                        // C-3: the doctor reviews against the range valid for this patient (the API never sends it to the patient).
+                        if staffView, let range = PatientLabRules.rangeText(item.referenceRange) {
+                            Text(verbatim: String(format: L.text("results.range"), range)).font(Typo.small).foregroundStyle(Theme.muted)
                         }
                         if let observation = LabFollowUpRules.labNote(item.result, staffView: staffView) {
                             Text(verbatim: String(format: L.text(item.result?.relevant == true ? "exams.observation.relevant" : "exams.observation"), observation))
@@ -1178,7 +1187,7 @@ private struct HistoryContent: View {
                             Text(verbatim: item.name).font(Typo.small).foregroundStyle(Theme.ink)
                             Spacer()
                             if let result = item.result {
-                                Text(verbatim: "\(PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark))) \(item.unit ?? "")").font(Typo.mono).foregroundStyle(Theme.ink)
+                                Text(verbatim: PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark), unit: item.unit)).font(Typo.mono).foregroundStyle(Theme.ink)
                                 if let mark = result.mark { PatientTag(mark.rawValue, label: mark.label) }
                             }
                         }
