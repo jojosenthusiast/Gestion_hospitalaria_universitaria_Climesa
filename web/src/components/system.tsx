@@ -46,7 +46,7 @@ export function SectionState<T>({ state, children, rows = 4, compact = false, em
     const denied = state.error.status === 403;
     const title = denied ? 'No tienes acceso a esta información' : 'No pudimos cargar esta información';
     // A 403 with its own reason (e.g. «needs a care relationship») says why; a bare «Forbidden» keeps the generic text.
-    const specific = denied && state.error.message && !/^(forbidden|prohibido|no autorizado)\.?$/i.test(state.error.message.trim());
+    const specific = denied && state.error.message && !/^(forbidden|prohibido|no autorizado|sin permiso)\.?$/i.test(state.error.message.trim());
     const message = denied ? (specific ? state.error.message : 'Tu cuenta no tiene permiso para consultar esta sección.') : state.error.message;
     return <div className={`section-state-error${compact ? ' is-compact' : ''}`} role="alert">
       <Icon name="alert" size={compact ? 16 : 20} />
