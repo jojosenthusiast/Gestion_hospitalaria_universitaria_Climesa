@@ -61,6 +61,7 @@ object MyShifts {
         val label = when (days) {
             0L -> "Hoy"
             1L -> "Mañana"
+            -1L -> "Ayer"
             in 2L..6L -> DateTimeFormatter.ofPattern("EEEE", spanish).format(day)
             else -> DateTimeFormatter.ofPattern("EEE d MMM", spanish).format(day).replace(".", "") + ","
         }

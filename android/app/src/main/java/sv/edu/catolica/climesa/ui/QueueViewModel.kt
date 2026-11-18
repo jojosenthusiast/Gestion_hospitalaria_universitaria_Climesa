@@ -156,7 +156,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     /** B5: the public board of the patient's active ticket; a failure keeps the last board (the number still shows). */
     private suspend fun loadPublic(tickets: List<QueueTicket>) {
         val mine = PatientQueue.current(tickets) ?: return
-        try { mutable.value = mutable.value.copy(publicCalls = PatientQueue.parsePublic(api.request("/publico/fila/${mine.service}"))) }
+        try { api.request("/publico/fila/${mine.service}").let { r -> mutable.value = mutable.value.copy(publicCalls = PatientQueue.parsePublic(r)) } }
         catch (e: CancellationException) { throw e }
         catch (_: Exception) { }
     }
@@ -232,7 +232,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     /** B3: reads the caller's post once so the board and "Llamar siguiente" open on its service and room. */
     fun loadMyPost() {
         viewModelScope.launch {
-            try { mutable.value = mutable.value.copy(myPost = QueueRules.myPost(api.request("/fila/mi-puesto")), myPostError = null) }
+            try { api.request("/fila/mi-puesto").let { r -> mutable.value = mutable.value.copy(myPost = QueueRules.myPost(r), myPostError = null) } }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(myPostError = userMessage(e, "No se pudo leer tu puesto de turno.")) }
         }
@@ -241,7 +241,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     /** Consulting rooms for "Llamar siguiente" (only for accounts with `espacios.ver`); a failure leaves the call without room. */
     fun loadOffices() {
         viewModelScope.launch {
-            try { mutable.value = mutable.value.copy(offices = QueueRules.offices(api.request("/espacios"))) }
+            try { api.request("/espacios").let { r -> mutable.value = mutable.value.copy(offices = QueueRules.offices(r)) } }
             catch (e: CancellationException) { throw e }
             catch (_: Exception) { mutable.value = mutable.value.copy(offices = emptyList()) }
         }

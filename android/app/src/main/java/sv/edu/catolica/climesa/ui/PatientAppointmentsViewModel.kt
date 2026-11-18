@@ -273,7 +273,7 @@ class PatientAppointmentsViewModel @Inject constructor(
     private fun loadDoctors() {
         val date = mutable.value.selectedDate
         viewModelScope.launch {
-            try { mutable.value = mutable.value.copy(doctors = parseDoctors(api.request("/citas/catalogos?date=$date"))) }
+            try { api.request("/citas/catalogos?date=$date").let { r -> mutable.value = mutable.value.copy(doctors = parseDoctors(r)) } }
             catch (e: CancellationException) { throw e } catch (_: Exception) { /* la lista anterior sigue válida */ }
         }
     }
