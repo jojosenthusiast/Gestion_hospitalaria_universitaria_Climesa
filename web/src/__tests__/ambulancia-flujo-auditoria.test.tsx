@@ -45,6 +45,14 @@ describe('aviso de despacho bloqueado', () => {
     expect(within(notice).getByText(/pide a Jefatura su cierre administrativo/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Cierre administrativo' })).toBeNull();
   });
+
+  it('el detalle de una solicitud no repite la instrucción del aviso de arriba', async () => {
+    const request = { id: 'req-1', origin: 'Colonia Ficticia', reason: 'Dolor de pecho', channel: 'telefono', createdAt: '2026-11-18T14:50:00.000Z', state: 'pendiente', version: 1 } as unknown as NonNullable<AmbulanceStatus['pendingRequests']>[number];
+    render(<AmbulancePage api={statusApi({ ...blocked(['cerrar']), pendingRequests: [request] })} profile={profile(['ambulancia.ver_estado', 'ambulancia.despachar', 'ambulancia.mantenimiento'])} version={0} />);
+    const detail = await screen.findByRole('article', { name: 'Detalle de la solicitud' });
+    expect(within(detail).getByText(/Despacha cuando la unidad termine ese servicio/)).toBeTruthy();
+    expect(within(detail).queryByText(/pide a Jefatura/)).toBeNull();
+  });
 });
 
 describe('bitácora', () => {
