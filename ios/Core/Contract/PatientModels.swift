@@ -207,7 +207,7 @@ public struct LabOrderItem: Decodable, Sendable, Identifiable, Equatable {
     public let unit: String?
     /// `numerico` o `texto` (`TipoResultadoLaboratorio`); nulo en un servidor anterior.
     public let resultType: String?
-    /// Reference range for doctors and the lab; null for the patient (owner decision) or without a range.
+    /// Reference range for doctors and the lab. D1: the patient gets only `min`/`max`, and only on released results; null without a range.
     public var referenceRange: LabItemRange? = nil
 
     /// The exam takes a number. Without `resultType` (older server) an exam with a unit is numeric, as on Android.

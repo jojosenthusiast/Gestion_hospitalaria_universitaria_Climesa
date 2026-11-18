@@ -5798,6 +5798,17 @@
         }
       }
     },
+    "exams.outOfRange": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fuera de rango"
+          }
+        }
+      }
+    },
     "results.range": {
       "extractionState": "manual",
       "localizations": {

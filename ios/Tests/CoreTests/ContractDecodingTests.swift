@@ -61,6 +61,22 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(PatientLabRules.valueText(LabItemResult(value: 452, text: nil, mark: nil), unit: "mil/µL"), "452 mil/µL")
     }
 
+    /// D1: a released result reaches the patient with min and max only; the patient label never shows critical limits.
+    func testPacienteVeElRangoSinCriticosYLaMarcaFueraDeRango() throws {
+        let orders = try decode([LabOrder].self, #"[{"id":"o4","consultationId":"k1","patientId":"p1","doctorId":"d1","priority":"rutina","state":"completado","createdAt":"2026-11-19T14:00:00.000Z","sampleTakenAt":null,"completedAt":"2026-11-19T16:00:00.000Z","reviewedAt":"2026-11-19T17:00:00.000Z","version":5,"patientName":null,"patientNote":"Control en un mes.","items":[{"id":"i1","examId":"e1","code":"HB","name":"Hemoglobina","unit":"g/dL","result":{"value":11,"text":null,"mark":"bajo"},"referenceRange":{"min":12,"max":15.5}}]}]"#)
+        let item = orders[0].items[0]
+        XCTAssertEqual(item.referenceRange, LabItemRange(min: 12, max: 15.5, criticalLow: nil, criticalHigh: nil))
+        XCTAssertEqual(PatientLabRules.patientRangeText(item.referenceRange), "12–15.5")
+        XCTAssertEqual(PatientLabRules.patientRangeText(LabItemRange(min: 12, max: 15.5, criticalLow: 7, criticalHigh: 20)), "12–15.5")
+        XCTAssertNil(PatientLabRules.patientRangeText(LabItemRange(min: nil, max: nil, criticalLow: 7, criticalHigh: 20)))
+        XCTAssertNil(PatientLabRules.patientRangeText(nil))
+        XCTAssertTrue(PatientLabRules.outOfRange(item.result?.mark))
+        XCTAssertTrue(PatientLabRules.outOfRange(.criticoAlto))
+        XCTAssertFalse(PatientLabRules.outOfRange(.normal))
+        XCTAssertFalse(PatientLabRules.outOfRange(.sinRango))
+        XCTAssertFalse(PatientLabRules.outOfRange(nil))
+    }
+
     func testHistorialClinico() throws {
         let history = try decode(ClinicalHistory.self, #"""
         {"patient":{"id":"p1","record":"EXP-0000001","fullName":"Paciente Ficticio"},"access":"propio",

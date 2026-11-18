@@ -282,6 +282,19 @@ public enum PatientLabRules {
         return result.text ?? "—"
     }
 
+    /// D1: the range a patient sees next to a released result, never the critical limits (the API does not send them
+    /// to the patient either). «12–15.5»; nil without limits.
+    public static func patientRangeText(_ range: LabItemRange?) -> String? {
+        guard let range else { return nil }
+        return rangeText(LabItemRange(min: range.min, max: range.max, criticalLow: nil, criticalHigh: nil))
+    }
+
+    /// D1: the result fell outside its reference range (high, low or critical); `sin_rango` and `normal` are not.
+    public static func outOfRange(_ mark: ResultMark?) -> Bool {
+        guard let mark else { return false }
+        return [.alto, .bajo, .criticoAlto, .criticoBajo].contains(mark)
+    }
+
     /// «12–15.5 · crítico < 7 o > 20» for doctors; nil without limits.
     public static func rangeText(_ range: LabItemRange?) -> String? {
         guard let range else { return nil }
