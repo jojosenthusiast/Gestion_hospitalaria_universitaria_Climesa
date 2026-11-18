@@ -20,6 +20,8 @@ data class AccessProfile(
     val patientId: String? = null,
     /** Personal clínico enlazado a la cuenta (`staffId` de `/auth/me`): el médico tratante de sus propias indicaciones. */
     val staffId: String? = null,
+    /** Contexts of each permission (`permissions[].context` of `/auth/me`): `x`, `area`, `relacion`, `propio`... */
+    val permissionContexts: Map<String, List<String>> = emptyMap(),
 )
 
 data class AuthenticatedAccount(

@@ -10,6 +10,13 @@ import org.json.JSONObject
 import org.junit.Test
 
 class HospitalizationRulesTest {
+    @Test fun laPlantaVaciaDeEnfermeriaExplicaElTurno() {
+        assertTrue(HospitalizationRules.wardFollowsShift(listOf("area")))
+        assertFalse(HospitalizationRules.wardFollowsShift(listOf("area", "x")))
+        assertFalse(HospitalizationRules.wardFollowsShift(listOf("relacion")))
+        assertFalse(HospitalizationRules.wardFollowsShift(emptyList()))
+    }
+
     private fun row(vararg pairs: Pair<String, Any?>) = JSONObject().apply { pairs.forEach { (k, v) -> put(k, v ?: JSONObject.NULL) } }
 
     @Test fun parsesTheServerFieldsOfEachAdmission() {

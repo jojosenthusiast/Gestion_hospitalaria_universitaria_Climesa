@@ -19,6 +19,8 @@
     <string name="clin_historial_buscar_resultados">Resultados</string>
     <string name="clin_hosp_sin_admisiones">No hay admisiones activas.</string>
     <string name="clin_hosp_sin_admisiones_detalle">Las admisiones nuevas aparecen aquí en tiempo real.</string>
+    <string name="clin_hosp_sin_turno">No tienes pacientes en tu área de turno ahora.</string>
+    <string name="clin_hosp_sin_turno_detalle">Tu planta aparece cuando tienes un turno en curso.</string>
     <string name="clin_hosp_sin_cama">Sin cama asignada</string>
     <string name="clin_hosp_aislamiento">Aislamiento activo</string>
     <string name="clin_hosp_buscando_camas">Buscando camas compatibles…</string>

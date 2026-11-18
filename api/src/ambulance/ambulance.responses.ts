@@ -32,6 +32,11 @@ export class LocationPointResponse {
   @DateTimeProp() capturedAt!: string;
 }
 
+export class ServicePatientResponse {
+  @StrProp() record!: string;
+  @StrProp({ nullable: true, description: 'Nombre completo, o el alias del expediente provisional' }) fullName!: string | null;
+}
+
 export class ActiveServiceResponse {
   @UuidProp() id!: string;
   @UuidProp({ nullable: true }) requestId!: string | null;
@@ -49,6 +54,7 @@ export class ActiveServiceResponse {
   @ClassProp(LocationPointResponse, { nullable: true }) lastLocation!: LocationPointResponse | null;
   @EnumArrayProp(['cerrar', 'hito', 'deshacer_hito', 'reportar'], 'AccionServicioAmbulancia', { description: 'Acciones que el actor puede hacer sobre el servicio. cerrar: cierre administrativo; hito, deshacer_hito y reportar (prehospital): solo la tripulación asignada' }) allowedActions!: string[];
   @EnumArrayProp(ESTADO_FINAL_SERVICIO, 'EstadoFinalServicio', { description: 'Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)' }) finalStates!: string[];
+  @ClassProp(ServicePatientResponse, { nullable: true, description: 'Paciente vinculado; solo para la tripulación asignada y quien despacha (ambulancia.despachar). Null para los demás o sin paciente' }) patient!: ServicePatientResponse | null;
 }
 
 export class PendingAmbulanceRequestResponse {

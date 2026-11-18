@@ -46,8 +46,9 @@ object ParamedicRules {
     /** Pasos cortos de tiempo estimado de llegada; tocar uno evita teclear con guantes. */
     val etaChoices = listOf(5, 10, 15, 20, 30)
 
-    /** Paciente del servicio: la API del estado no trae su nombre, solo si hay un paciente provisional vinculado en este teléfono. */
-    fun patientLabel(provisionalRecord: String?, hasPrehospital: Boolean): String = when {
+    /** Paciente del servicio: el que la API vincula a la tripulación; si no viene, el provisional creado en este teléfono. */
+    fun patientLabel(provisionalRecord: String?, hasPrehospital: Boolean, patient: ServicePatient? = null): String = when {
+        patient != null -> "Paciente: ${patient.fullName.ifBlank { "Sin identificar" }} · ${patient.record}"
         provisionalRecord != null -> "Sin identificar · expediente provisional $provisionalRecord"
         hasPrehospital -> "Reporte prehospital enviado"
         else -> "Sin paciente vinculado"

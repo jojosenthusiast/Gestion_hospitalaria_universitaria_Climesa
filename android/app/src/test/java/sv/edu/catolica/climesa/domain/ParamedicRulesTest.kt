@@ -64,6 +64,14 @@ class ParamedicRulesTest {
         assertEquals("Sin paciente vinculado", ParamedicRules.patientLabel(null, false))
     }
 
+    @Test fun laTripulacionVeAlPacienteVinculadoDelServicio() {
+        val status = AmbulanceParser.status(org.json.JSONObject("""{"unit":{"id":"u","plate":"P-1","state":"en_servicio","version":1},"activeService":{"id":"s","origin":"A","destination":"B","hasPrehospital":false,"patient":{"record":"9900042","fullName":"[DEMO] Ana Pérez"}}}"""))
+        val patient = status!!.activeService!!.patient
+        assertEquals("Paciente: [DEMO] Ana Pérez · 9900042", ParamedicRules.patientLabel(null, false, patient))
+        val hidden = AmbulanceParser.status(org.json.JSONObject("""{"unit":{"id":"u","plate":"P-1","state":"en_servicio","version":1},"activeService":{"id":"s","origin":"A","destination":"B","hasPrehospital":true,"patient":null}}"""))
+        assertEquals("Reporte prehospital enviado", ParamedicRules.patientLabel(null, true, hidden!!.activeService!!.patient))
+    }
+
     @Test fun lasSeccionesDelParamedicoCaenEnSuPantalla() {
         assertTrue(ParamedicRules.handles(AndroidSection.SERVICE, emptyList()))
         assertTrue(ParamedicRules.handles(AndroidSection.UNIT, listOf("ambulancia.operar")))

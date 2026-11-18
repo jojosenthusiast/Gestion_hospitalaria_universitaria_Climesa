@@ -162,7 +162,7 @@ private fun LazyListScope.activeService(
             TriageBadge(service.priority)
             LabeledValue(stringResource(R.string.par_origen), service.origin)
             LabeledValue(stringResource(R.string.par_destino), service.destination)
-            LabeledValue(stringResource(R.string.par_paciente), ParamedicRules.patientLabel(state.provisional?.record, service.hasPrehospital))
+            LabeledValue(stringResource(R.string.par_paciente), ParamedicRules.patientLabel(state.provisional?.record, service.hasPrehospital, service.patient))
             LinearProgressIndicator(progress = { done / total.toFloat() }, modifier = Modifier.fillMaxWidth())
             Text(stringResource(R.string.par_avance, done.coerceAtMost(total), total), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(

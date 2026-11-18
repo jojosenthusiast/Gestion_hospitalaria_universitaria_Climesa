@@ -23,9 +23,11 @@ class BackendAccessRepository(private val apiBaseUrl:String) {
             if(status !in 200..299)throw AuthRequestException(apiErrorMessage(body,status),status)
             val json=JSONObject(body)
             fun strings(key:String)=json.optJSONArray(key)?.let{a->(0 until a.length()).map(a::getString)}?:emptyList()
-            val permissions=json.optJSONArray("permissions")?.let{a->(0 until a.length()).map{a.getJSONObject(it).getString("code")}}?:emptyList()
+            val grants=json.optJSONArray("permissions")?.let{a->(0 until a.length()).map{a.getJSONObject(it)}}?:emptyList()
+            val permissions=grants.map{it.getString("code")}
+            val contexts=grants.groupBy({it.getString("code")},{it.optString("context")})
             if(strings("roles").isEmpty()||"sesion.perfil" !in permissions)throw AuthRequestException("La cuenta no tiene permisos vigentes.",403)
-            AccessProfile(roles=strings("roles"),permissions=permissions,verifiedByBackend=true,platforms=strings("platforms"),channels=strings("channels"),name=json.optString("name"),patientId=json.optString("patientId").takeIf{!json.isNull("patientId")&&it.isNotBlank()},staffId=json.optString("staffId").takeIf{!json.isNull("staffId")&&it.isNotBlank()})
+            AccessProfile(roles=strings("roles"),permissions=permissions,verifiedByBackend=true,platforms=strings("platforms"),channels=strings("channels"),name=json.optString("name"),patientId=json.optString("patientId").takeIf{!json.isNull("patientId")&&it.isNotBlank()},staffId=json.optString("staffId").takeIf{!json.isNull("staffId")&&it.isNotBlank()},permissionContexts=contexts)
         } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){ColdStart.warmth.failed();throw AuthRequestException("No se pudo verificar el acceso. Revisa la conexión e intenta de nuevo.")} finally {c.disconnect()}
     }
 }

@@ -9,6 +9,7 @@ data class AmbulanceMilestone(val type: String, val occurredAt: String)
 data class AmbulanceCrewMember(val staffId: String, val role: String, val name: String)
 /** MA-AMB-02: paramédico o motorista de turno que el despachador puede elegir (`availableCrew`). */
 data class CrewCandidate(val staffId: String, val role: String, val name: String, val hasAccount: Boolean)
+data class ServicePatient(val record: String, val fullName: String)
 data class AmbulanceService(
     val id: String,
     val type: String,
@@ -28,6 +29,8 @@ data class AmbulanceService(
      * send the field (every action stays offered, today's behavior).
      */
     val allowedActions: List<String>? = null,
+    /** Linked patient, sent only to the assigned crew and dispatch; null for everyone else or when no patient is linked. */
+    val patient: ServicePatient? = null,
 ) {
     val canAdvance get() = allowedActions == null || "hito" in allowedActions
     val canUndo get() = allowedActions == null || "deshacer_hito" in allowedActions
@@ -377,6 +380,7 @@ object AmbulanceParser {
                 s.optJSONObject("lastLocation")?.let { AmbulanceLocation(it.optDouble("latitude"), it.optDouble("longitude"), it.text("capturedAt")) },
                 strings(s.optJSONArray("finalStates")),
                 s.optJSONArray("allowedActions")?.let(::strings),
+                s.optJSONObject("patient")?.let { p -> ServicePatient(p.text("record"), p.text("fullName")) }?.takeIf { it.record.isNotBlank() },
             )
         }
         val pending = objects(root.optJSONArray("pendingRequests")).map {

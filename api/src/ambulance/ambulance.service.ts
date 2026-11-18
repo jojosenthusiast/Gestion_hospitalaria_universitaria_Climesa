@@ -45,12 +45,12 @@ export class AmbulanceService {
     return row?.solicitante_usuario_id ?? (row?.paciente_id ? await patientAccount(c, row.paciente_id) : null);
   }
 
-  /** FR-109-01: estado de la única unidad y su servicio activo, sin datos del paciente. Despacho ve además las solicitudes por confirmar. */
+  /** FR-109-01: estado de la única unidad y su servicio activo; el paciente vinculado solo para la tripulación y despacho. Despacho ve además las solicitudes por confirmar. */
   async status(actor: Actor) {
     return this.db.transaction(async c => {
       const unit = (await c.query('SELECT id,placa AS plate,estado AS state,version FROM ambulancia.unidad LIMIT 1')).rows[0];
       if (!unit) throw new NotFoundException('No hay una unidad de ambulancia registrada.');
-      const service = (await c.query(`SELECT id,solicitud_id AS "requestId",tipo AS type,prioridad AS priority,origen AS origin,destino AS destination,municipio AS municipality,despachado_en AS "dispatchedAt",version,
+      const service = (await c.query(`SELECT id,solicitud_id AS "requestId",tipo AS type,prioridad AS priority,origen AS origin,destino AS destination,municipio AS municipality,despachado_en AS "dispatchedAt",version,paciente_id AS "patientId",
           EXISTS(SELECT 1 FROM ambulancia.reporte_prehospital r WHERE r.servicio_id=s.id) AS "hasPrehospital"
         FROM ambulancia.servicio s WHERE unidad_id=$1 AND finalizado_en IS NULL`, [unit.id])).rows[0];
       let activeService = null;
@@ -71,7 +71,18 @@ export class AmbulanceService {
           }
           if (hasPermission(actor, 'ambulancia.reportar_prehospital')) allowedActions.push('reportar');
         }
-        activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(done), lastLocation: location, allowedActions, finalStates: allowedFinalStates(done) };
+        // Paciente vinculado: solo la tripulación asignada (privacidad.md, «Paramédico (servicio)») y quien despacha, que ya ve
+        // nombre y expediente en las solicitudes por confirmar. Nadie más lo recibe, y la lectura queda auditada (regla 7).
+        let patient: { record: string; fullName: string | null } | null = null;
+        const isCrew = !!actor.staffId && crew.some((member: { staffId: string }) => member.staffId === actor.staffId);
+        const patientPermission = isCrew ? 'ambulancia.operar' : hasPermission(actor, 'ambulancia.despachar') ? 'ambulancia.despachar' : null;
+        if (service.patientId && patientPermission) {
+          patient = (await c.query<{ record: string; fullName: string | null }>(`SELECT expediente AS record,coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS "fullName"
+            FROM pacientes.paciente WHERE id=$1`, [service.patientId])).rows[0] ?? null;
+          if (patient) await this.commands.audit(c, actor, { action: 'ambulancia.servicio.paciente.ver', entity: 'servicio', entityId: service.id, patientId: service.patientId, permission: patientPermission });
+        }
+        const { patientId: _patientId, ...serviceFields } = service;
+        activeService = { ...serviceFields, crew, milestones, nextMilestones: nextMilestones(done), lastLocation: location, allowedActions, finalStates: allowedFinalStates(done), patient };
       }
       const duty = await this.onDuty(c, this.clock.now());
       const change = (await c.query<{ motivo: string | null; en: Date }>('SELECT motivo,en FROM ambulancia.cambio_estado WHERE unidad_id=$1 AND hacia=$2 ORDER BY id DESC LIMIT 1', [unit.id, unit.state])).rows[0];

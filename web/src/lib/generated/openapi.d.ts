@@ -6972,6 +6972,11 @@ export interface components {
          * @enum {string}
          */
         EstadoFinalServicio: "completado" | "cancelado" | "sin_traslado" | "rechaza_traslado" | "fallecido" | "desviado";
+        ServicePatientResponse: {
+            record: string;
+            /** @description Nombre completo, o el alias del expediente provisional */
+            fullName: string | null;
+        };
         ActiveServiceResponse: {
             /** Format: uuid */
             id: string;
@@ -6994,6 +6999,8 @@ export interface components {
             allowedActions: components["schemas"]["AccionServicioAmbulancia"][];
             /** @description Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03) */
             finalStates: components["schemas"]["EstadoFinalServicio"][];
+            /** @description Paciente vinculado; solo para la tripulación asignada y quien despacha (ambulancia.despachar). Null para los demás o sin paciente */
+            patient: components["schemas"]["ServicePatientResponse"] | null;
         };
         /** @enum {string} */
         MotivoBloqueoDespacho: "en_servicio" | "en_mantenimiento" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno";

@@ -164,6 +164,9 @@ object MyRoomRules {
 }
 
 object HospitalizationRules {
+    /** The API filters the ward of an `area`-only reader of `admision.ver` by the shift in progress; empty then means no shift now. */
+    fun wardFollowsShift(admissionContexts: List<String>) = admissionContexts.isNotEmpty() && admissionContexts.all { it == "area" }
+
     /** G5: a hospitalized patient (or waiting for a bed) can have signs taken straight from the ward card. */
     fun vitalsSubject(row: HospitalAdmission): QuickSubject? {
         val id = row.patientId ?: return null
