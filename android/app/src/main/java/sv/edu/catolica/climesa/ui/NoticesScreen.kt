@@ -174,22 +174,23 @@ private fun NoticeRow(notice: InboxNotice, onOpen: () -> Unit) {
     ClimesaClickableCard(onOpen) {
         Row(Modifier.fillMaxWidth().heightIn(min = Spacing.touch + Spacing.sm).padding(horizontal = Space4, vertical = Space3), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space3)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space1 + 2.dp)) {
-                // Most notices are informative: the level tag only shows when it changes what to do (important, critical).
-                if (notice.level != NoticeLevel.INFORMATIVE) NoticeLevelBadge(notice.level)
+                // Level and read state as their coloured, textured tags: the owner reads the inbox by these marks at a glance.
+                Row(horizontalArrangement = Arrangement.spacedBy(Space2), verticalAlignment = Alignment.CenterVertically) {
+                    NoticeLevelBadge(notice.level)
+                    FamilyBadge(stringResource(if (read) R.string.aviso_enterado else R.string.aviso_sin_leer), if (read) StatusFamily.LISTO else StatusFamily.ESPERA)
+                }
                 Text(
                     notice.title, style = MaterialTheme.typography.titleMedium, fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
                     color = if (read) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
-                // One quiet line: read state in words, then when it was published and until when, said the way people say it
-                // ("Hoy 23:22", "Jueves 01:53"), never a full date with the year.
+                // Dates said the way people say them ("Ayer 23:22", "Jueves 01:53"), never a full date with the year.
                 val now = java.time.Instant.now()
                 fun near(iso: String?) = iso?.let { runCatching { sv.edu.catolica.climesa.domain.MyShifts.relative(java.time.Instant.parse(it), now) }.getOrNull() }
                 val line = listOfNotNull(
-                    stringResource(if (read) R.string.aviso_enterado else R.string.aviso_sin_leer),
                     near(notice.publishedAt),
                     near(notice.until)?.let { stringResource(R.string.aviso_hasta, it.replaceFirstChar { c -> c.lowercase() }) },
                 ).joinToString(" · ")
-                Text(line, style = MaterialTheme.typography.bodySmall, color = if (read) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.climesa.primaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)
         }
