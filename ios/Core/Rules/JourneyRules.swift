@@ -18,16 +18,26 @@ public enum PatientHomeRules {
     /// today's appointment and the next step; then new results and the shortcuts.
     public enum Block: Equatable, Sendable { case link, ticket, today, next, results, shortcuts }
 
+    /// Unlinked, the API refuses every appointment read (403): no «Próxima cita» block until the record is linked.
     public static func blocks(linked: Bool, hasTicket: Bool, appointmentToday: Bool) -> [Block] {
         var blocks: [Block] = []
         if !linked { blocks.append(.link) }
         if hasTicket { blocks.append(.ticket) }
         if appointmentToday { blocks.append(.today) }
-        blocks.append(.next)
+        if linked { blocks.append(.next) }
         if linked { blocks.append(.results) }
         blocks.append(.shortcuts)
         return blocks
     }
+
+    /// Owner rule (Android `AttentionList`): Inicio shows the two most urgent pending blocks, in the order of `blocks`,
+    /// and folds the rest behind «Ver N pendientes más»; the shortcuts always stay below.
+    public static func shown(_ blocks: [Block], expanded: Bool) -> [Block] {
+        AttentionFold.shown(pending(blocks), expanded: expanded) + blocks.filter { $0 == .shortcuts }
+    }
+
+    /// The pending blocks that count for the fold (everything but the shortcuts).
+    public static func pending(_ blocks: [Block]) -> [Block] { blocks.filter { $0 != .shortcuts } }
 
     /// The first upcoming appointment that falls on today's date in El Salvador ("Hoy tienes cita").
     public static func appointmentToday(_ upcoming: [Appointment], now: Date) -> Appointment? {
@@ -67,7 +77,8 @@ public enum PatientHomeRules {
     public static func shortcuts(linked: Bool, can: (String) -> Bool) -> [Shortcut] {
         Shortcut.allCases.filter { shortcut in
             switch shortcut {
-            case .requestAppointment: return can("citas.solicitar")
+            // Unlinked, `POST /citas/solicitudes-categoria` answers 403 "La cuenta no está vinculada".
+            case .requestAppointment: return linked && can("citas.solicitar")
             case .ambulance: return can("ambulancia.solicitar")
             case .exams: return linked && can("resultados.ver")
             case .hospital: return true
@@ -101,6 +112,80 @@ public enum PatientResultsRules {
 }
 
 // MARK: - A1, A4, A5 · Citas del paciente
+
+/// `GET /citas` with an explicit window (Android `PatientAppointmentRules.listPath`). A bare call only covers the last 7
+/// and next 31 days, so «Anteriores» held one week and a later appointment was missing from «Mis citas» and Inicio.
+/// 59 days back plus 33 ahead stays inside the API's 93-day limit.
+public enum PatientAppointmentRange {
+    public static let pastDays = 59
+    public static let aheadDays = 33
+
+    public static func path(now: Date) -> String {
+        let from = ClimesaDates.localDay(now.addingTimeInterval(-Double(pastDays) * 86_400))
+        let to = ClimesaDates.localDay(now.addingTimeInterval(Double(aheadDays) * 86_400))
+        return "/citas?from=\(from)&to=\(to)"
+    }
+}
+
+/// «Ya tengo médico»: reception may assign any of the next 7 days, so a doctor counts as on shift when they have a
+/// shift on any of them (Android `loadRequestDoctors`). Each doctor once, in first-seen order; the day with a shift wins.
+public enum RequestDoctorRules {
+    public static let days = 7
+
+    public static func week(_ lists: [[AppointmentCatalogs.Doctor]]) -> [AppointmentCatalogs.Doctor] {
+        var order: [String] = []
+        var byId: [String: [AppointmentCatalogs.Doctor]] = [:]
+        for doctor in lists.joined() {
+            if byId[doctor.id] == nil { order.append(doctor.id) }
+            byId[doctor.id, default: []].append(doctor)
+        }
+        return order.compactMap { id in
+            guard let same = byId[id] else { return nil }
+            if var onShift = same.first(where: { $0.hasShift != false }) { onShift.reason = nil; return onShift }
+            return same.first
+        }
+    }
+}
+
+/// «Quién vio mi expediente» grouped by day (El Salvador), newest first. The last week stays open; older days fold.
+public enum AccessLogRules {
+    public static let recentDays = 7
+
+    public struct Day: Equatable, Sendable {
+        public let day: String
+        public let older: Bool
+        public let rows: [MyAccess]
+    }
+
+    public static func byDay(_ rows: [MyAccess], now: Date) -> [Day] {
+        let dated = rows.compactMap { row in ClimesaDates.parse(row.date).map { ($0, row) } }.sorted { $0.0 > $1.0 }
+        var order: [String] = []
+        var groups: [String: [MyAccess]] = [:]
+        for (date, row) in dated {
+            let key = ClimesaDates.localDay(date)
+            if groups[key] == nil { order.append(key) }
+            groups[key, default: []].append(row)
+        }
+        let cutoff = ClimesaDates.localDay(now.addingTimeInterval(-Double(recentDays - 1) * 86_400))
+        return order.map { Day(day: $0, older: $0 < cutoff, rows: groups[$0] ?? []) }
+    }
+
+    public static func olderTitle(_ count: Int) -> String { count == 1 ? "1 acceso anterior" : "\(count) accesos anteriores" }
+}
+
+/// «Mis solicitudes»: pending ones stay in view; assigned, rejected or withdrawn ones fold under one line.
+public enum CategoryRequestFold {
+    public static func split(_ requests: [CategoryRequest]) -> (pending: [CategoryRequest], resolved: [CategoryRequest]) {
+        (requests.filter { $0.state == "pendiente" }, requests.filter { $0.state != "pendiente" })
+    }
+
+    public static func rejection(_ reason: String?) -> String? {
+        guard let text = reason?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else { return nil }
+        return "Motivo del rechazo: \(text)"
+    }
+
+    public static func toggleTitle(_ count: Int, expanded: Bool) -> String { expanded ? "Ocultar resueltas (\(count))" : "Ver resueltas (\(count))" }
+}
 
 /// D-8: the patient cancels with a quick reason and no typing; only «Otro» asks for text (3 characters or more). The
 /// reason goes with its `reasonCode`. An API released before D-8 refuses that field; then the released body
@@ -309,6 +394,15 @@ public enum PatientTurnRules {
         guard let office = office?.trimmingCharacters(in: .whitespacesAndNewlines), !office.isEmpty else { return "Es tu turno" }
         return office.lowercased().hasPrefix("consultorio") ? "Pasa al \(office)" : "Pasa al consultorio \(office)"
     }
+
+    /// Inicio's line for a called ticket: "Es tu turno · Pasa al consultorio 2", or "Es tu turno" without an office.
+    public static func homeLine(office: String?) -> String {
+        let title = calledTitle(office: office)
+        return title == "Es tu turno" ? title : "Es tu turno · \(title)"
+    }
+
+    /// `@AppStorage` key of the call the patient already closed, shared by Inicio and «Mi turno».
+    public static let dismissedKey = "paciente.llamado.cerrado"
 
     /// One full-screen notice per call: calling the same number again (one more call) shows it again.
     public static func callKey(_ ticket: QueueTicket?) -> String? {

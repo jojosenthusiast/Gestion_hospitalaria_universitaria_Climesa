@@ -8,6 +8,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
@@ -15,6 +16,7 @@ import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.HospitalInfo
 import sv.edu.catolica.climesa.domain.HospitalInfoEvents
 import sv.edu.catolica.climesa.domain.HospitalInfoParser
+import sv.edu.catolica.climesa.domain.HospitalInfoPart
 import sv.edu.catolica.climesa.domain.RealtimeProtocol
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 
@@ -31,19 +33,42 @@ class HospitalInfoViewModel @Inject constructor(private val api: ApiGateway, rea
     private val live = LiveSubscription(realtime)
     private var loadJob: Job? = null
 
+    /**
+     * Each part is read on its own (iOS `Part`): one failing endpoint shows its own notice and the others stay. Only when
+     * every part fails does the screen show the error. A silent reload keeps a part that fails now with its last value.
+     * The location (`/publico/hospital`) does not change with events, so it is read once.
+     */
     fun load(silent: Boolean = false) {
-        if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
+        if (!silent) mutable.update { it.copy(loading = true, error = null) }
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            try {
-                val info = HospitalInfo(
-                    occupancy = HospitalInfoParser.occupancy(api.request("/publico/ocupacion")),
-                    doctors = HospitalInfoParser.doctors(api.request("/publico/medicos-de-turno")),
-                    notices = HospitalInfoParser.notices(api.request("/publico/avisos")),
-                )
-                mutable.value = HospitalInfoState(loading = false, info = info)
-            } catch (e: CancellationException) { throw e }
-            catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar la información del hospital.")) }
+            val previous = mutable.value.info
+            var firstError: Exception? = null
+            suspend fun <T> part(path: String, parse: (Any?) -> T): T? = try { parse(api.request(path)) }
+                catch (e: CancellationException) { throw e } catch (e: Exception) { firstError = firstError ?: e; null }
+            val occupancy = part("/publico/ocupacion", HospitalInfoParser::occupancy)
+            val doctors = part("/publico/medicos-de-turno", HospitalInfoParser::doctors)
+            val notices = part("/publico/avisos", HospitalInfoParser::notices)
+            val location = previous.location ?: part("/publico/hospital", HospitalInfoParser::location)
+            if (occupancy == null && doctors == null && notices == null) {
+                // Nothing to show: a silent reload keeps what is on screen; otherwise the screen says why.
+                if (!silent) mutable.update { it.copy(loading = false, error = userMessage(firstError ?: Exception(), "No se pudo cargar la información del hospital.")) }
+                return@launch
+            }
+            // A silent reload keeps the last good value of a part that fails now.
+            val keep = silent && mutable.value.error == null
+            fun <T> kept(now: T?, old: T, part: HospitalInfoPart): T? = now ?: old.takeIf { keep && part !in previous.failed }
+            val occ = kept(occupancy, previous.occupancy, HospitalInfoPart.OCCUPANCY)
+            val docs = kept(doctors, previous.doctors, HospitalInfoPart.DOCTORS)
+            val news = kept(notices, previous.notices, HospitalInfoPart.NOTICES)
+            val info = HospitalInfo(
+                occupancy = occ.orEmpty(), doctors = docs.orEmpty(), notices = news.orEmpty(), location = location,
+                failed = setOfNotNull(
+                    HospitalInfoPart.OCCUPANCY.takeIf { occ == null }, HospitalInfoPart.DOCTORS.takeIf { docs == null },
+                    HospitalInfoPart.NOTICES.takeIf { news == null }, HospitalInfoPart.LOCATION.takeIf { location == null },
+                ),
+            )
+            mutable.update { HospitalInfoState(loading = false, info = info) }
         }
     }
 

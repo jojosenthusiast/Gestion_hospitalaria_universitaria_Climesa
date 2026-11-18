@@ -74,7 +74,7 @@ extension View {
     /// (vence o empieza un aviso, o vuelve un recordatorio). Sin sondeo: salir de la pantalla cancela la espera.
     @MainActor func loadsNoticeInbox(_ model: NoticeInboxModel, account: AccountModel, live: LiveViewModel) -> some View {
         self
-            .task(id: live.snapshot.version(.hospitalInfo)) { await model.load { try account.client() } }
+            .task(id: live.snapshot.version(.notices)) { await model.load { try account.client() } }
             .task(id: model.inbox?.nextChange) {
                 await reloadAt(delay: model.inbox?.refreshDelay(now: Date())) { await model.load { try account.client() } }
             }

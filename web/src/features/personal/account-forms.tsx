@@ -42,15 +42,18 @@ export function InviteForm({ api, staff, person, email: knownEmail, canInviteAdm
     </form>}</Dialog>;
 }
 
-export function RolesForm({ api, user, staff, canInviteAdmin, onClose, onSaved }: { api: Api; user: UserAccount; staff: Staff[]; canInviteAdmin: boolean; onClose: () => void; onSaved: () => void }) {
-  const [roles, setRoles] = useState(user.roles), [staffId, setStaff] = useState(user.staffId ?? ''), [reason, setReason] = useState('');
+/** `linking`: opened from «Vincular» (an account without its staff record): the binding comes first and the reason is prefilled. */
+export function RolesForm({ api, user, staff, canInviteAdmin, onClose, onSaved, linking = false }: { api: Api; user: UserAccount; staff: Staff[]; canInviteAdmin: boolean; onClose: () => void; onSaved: () => void; linking?: boolean }) {
+  const [roles, setRoles] = useState(user.roles), [staffId, setStaff] = useState(user.staffId ?? ''), [reason, setReason] = useState(linking ? 'Vincular la cuenta con su ficha de personal' : '');
   const action = useAction(api);
   async function save(e: FormEvent) { e.preventDefault(); if (await action.run(`/usuarios/${user.id}/roles`, { roles, staffId: staffId || undefined, version: user.version, reason }, 'PATCH')) onSaved(); }
-  return <Dialog title="Cambiar roles" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
+  return <Dialog title={linking ? 'Vincular con su ficha' : 'Cambiar roles'} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p>{user.name || user.email}<span className="form-subtext">{user.email}</span></p>
+    {linking && <p className="form-intro">Elige a la persona del directorio que corresponde a esta cuenta. Sin ficha no se le pueden asignar turnos.</p>}
     <WriteError error={action.error} onReload={onSaved} />
+    {linking && <StaffBinding staff={staff} value={staffId} onChange={setStaff} required />}
     <RoleChecks selected={roles} onChange={setRoles} allowAdmin={canInviteAdmin} />
-    <StaffBinding staff={staff} value={staffId} onChange={setStaff} required={working(roles)} />
+    {!linking && <StaffBinding staff={staff} value={staffId} onChange={setStaff} required={working(roles)} />}
     <Field label="Motivo del cambio" value={reason} onChange={setReason} required minLength={10} maxLength={500} />
     <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} /></div>
   </form></Dialog>;

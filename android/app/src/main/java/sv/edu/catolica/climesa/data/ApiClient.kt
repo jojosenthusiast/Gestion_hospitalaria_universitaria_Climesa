@@ -78,9 +78,10 @@ class ApiClient(
             body?.let { payload -> c.outputStream.use { it.write(payload.toString().toByteArray(Charsets.UTF_8)) } }
             raw?.let { (bytes,_) -> c.outputStream.use { it.write(bytes) } }
             val status=c.responseCode
+            ColdStart.warmth.record(status)
             val text=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
             if(status !in 200..299)throw AuthRequestException(apiErrorMessage(text,status),status,apiErrorCode(text),text)
             return if(text.isBlank())JSONObject()else JSONTokener(text).nextValue()
-        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException(NetworkMessages.forMethod(method))} finally {c.disconnect()}
+        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){ColdStart.warmth.failed();throw AuthRequestException(NetworkMessages.forMethod(method))} finally {c.disconnect()}
     }
 }

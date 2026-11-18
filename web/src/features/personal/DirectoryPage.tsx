@@ -5,10 +5,12 @@ import { CompactHeader, Empty, RemoteState, Select, Tag, useData, type Remote } 
 import { StaffFicha } from '../personnel-ficha';
 import { InvitationActionForm, InviteForm, RolesForm, StateForm } from './account-forms';
 import { useQuickAction } from './accion';
-import { accountOptions, activeStaffFilters, matchesAccount, shiftLabel, shiftOptions, staffEmptyState, staffFilterDefaults, type StaffFilters } from './filters';
+import { accountOptions, activeStaffFilters, matchesAccount, needsStaffLink, shiftLabel, shiftOptions, staffEmptyState, staffFilterDefaults, type StaffFilters } from './filters';
+import { RowMenu, type RowMenuAction } from '../../components/row-menu';
+import { RoleChip } from '../../components/identity';
 import { ActiveFilters, ChipGroup } from '../listas/chips';
 import '../listas/lists.css';
-import { useHashFilters } from '../../lib/hash-params';
+import { readHashParams, useHashFilters, writeHashParams } from '../../lib/hash-params';
 import { StaffForm, type Specialty, type StaffSaved } from './StaffForm';
 
 type Row = { key: string; staff: Staff | null; account: UserAccount | null };
@@ -28,7 +30,7 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   const [query, setQuery] = useState(''), [filters, setFilters] = useHashFilters<keyof StaffFilters>(staffFilterDefaults);
   const { estado: state, funcion: type, cuenta: account, area, turno, rol } = filters;
   const [edit, setEdit] = useState<Staff | null>(null), [staffOpen, setStaffOpen] = useState(false), [ficha, setFicha] = useState<string | null>(null);
-  const [invite, setInvite] = useState<{ person: Staff | null } | null>(null), [roles, setRoles] = useState<UserAccount | null>(null), [accountState, setAccountState] = useState<UserAccount | null>(null), [invitation, setInvitation] = useState<{ user: UserAccount; mode: 'resend' | 'cancel' } | null>(null);
+  const [invite, setInvite] = useState<{ person: Staff | null } | null>(null), [roles, setRoles] = useState<{ user: UserAccount; linking: boolean } | null>(null), [accountState, setAccountState] = useState<UserAccount | null>(null), [invitation, setInvitation] = useState<{ user: UserAccount; mode: 'resend' | 'cancel' } | null>(null);
   const [quick, consumeQuick] = useQuickAction();
   // G1: what the last registration did (notice) and its row (highlighted); addresses typed while registering, by staff id,
   // so a later "Invitar" from the row starts with the address already known.
@@ -44,6 +46,14 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
   }, [quick, canInvite, manage, consumeQuick]);
 
   const staff = staffData.data ?? [], accounts = users.data ?? [];
+  // `#/personal?cuenta=sin_ficha&vincular=<cuenta>` (Inicio, «Cuentas sin personal vinculado»): open the link of that account.
+  const [linkTarget, setLinkTarget] = useState(() => readHashParams().get('vincular'));
+  useEffect(() => {
+    if (!linkTarget || !users.data) return;
+    const user = users.data.find(u => u.id === linkTarget);
+    if (user && can(profile, 'usuarios.asignar_roles')) setRoles({ user, linking: true });
+    setLinkTarget(null); writeHashParams({ vincular: null });
+  }, [linkTarget, users.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const rows = useMemo<Row[]>(() => {
     const byStaff = new Map(accounts.filter(a => a.staffId).map(a => [a.staffId as string, a]));
     const known = new Set(staff.map(p => p.id));
@@ -86,6 +96,22 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
       : `${result.name} registrada`;
     setSaved({ id: result.id, text, ok: result.invited !== false });
   }
+  const canAssign = can(profile, 'usuarios.asignar_roles');
+  /** S13: «Ver ficha» (or «Vincular» for an account without its record) is the row's action; the rest fold under «Más acciones». */
+  const rowActions = (row: Row): RowMenuAction[] => {
+    const account = row.account;
+    const list: (RowMenuAction | false | null | undefined)[] = [
+      row.staff && { key: 'ficha', label: 'Ver ficha', onClick: () => setFicha(row.staff!.id) },
+      account && canAssign && needsStaffLink(account, !!row.staff) && account.id !== profile.id && allows(account, 'roles') && { key: 'vincular', label: 'Vincular con su ficha', onClick: () => setRoles({ user: account, linking: true }) },
+      row.staff && manage && { key: 'editar', label: 'Editar', onClick: () => { setEdit(row.staff); setStaffOpen(true); } },
+      row.staff && !account && canInvite && row.staff.active && { key: 'invitar', label: 'Invitar', onClick: () => setInvite({ person: row.staff }) },
+      account && canAssign && account.id !== profile.id && allows(account, 'roles') && { key: 'roles', label: 'Roles', onClick: () => setRoles({ user: account, linking: false }) },
+      account && canInvite && account.allowedActions?.includes('reenviar_invitacion') && { key: 'reenviar', label: 'Reenviar invitación', onClick: () => setInvitation({ user: account, mode: 'resend' }) },
+      account && canInvite && account.allowedActions?.includes('cancelar_invitacion') && { key: 'cancelar', label: 'Cancelar invitación', onClick: () => setInvitation({ user: account, mode: 'cancel' }) },
+      account && can(profile, 'usuarios.desactivar') && allows(account, account.state === 'activo' ? 'desactivar' : 'reactivar') && { key: 'estado', label: account.state === 'activo' ? 'Desactivar cuenta' : 'Reactivar cuenta', onClick: () => setAccountState(account) },
+    ];
+    return list.filter((a): a is RowMenuAction => !!a);
+  };
   const nameOf = (row: Row) => row.staff ? `${row.staff.givenNames} ${row.staff.surnames}` : row.account?.name || 'Sin nombre registrado';
 
   return <>
@@ -112,27 +138,18 @@ export function PersonnelPage({ api, profile, version }: { api: Api; profile: Ac
           <thead><tr><th>Persona</th><th>{accountsOnly ? 'Roles' : 'Función y roles'}</th>{!accountsOnly && <th>Área</th>}<th>Cuenta</th>{!accountsOnly && <th>Estado</th>}<th>Acción</th></tr></thead>
           <tbody>{filtered.map(row => <tr key={row.key} className={saved && row.staff?.id === saved.id ? 'is-new' : undefined}>
             <td data-label="Persona" className="cell-person"><strong>{nameOf(row)}{row.account?.id === profile.id && <span className="own-account">Tu cuenta</span>}</strong><small>{row.staff ? row.staff.specialty || 'Sin especialidad registrada' : row.account?.email}</small></td>
-            <td data-label={accountsOnly ? 'Roles' : 'Función y roles'}>{row.staff ? staffTypeNames[row.staff.type] ?? row.staff.type : accountsOnly ? null : 'Solo cuenta'}{row.account && <div className="role-tags">{row.account.roles.map(r => <span key={r} title={roleNames[r]}>{r}</span>)}</div>}</td>
+            <td data-label={accountsOnly ? 'Roles' : 'Función y roles'}>{row.staff ? staffTypeNames[row.staff.type] ?? row.staff.type : accountsOnly ? null : 'Solo cuenta'}{row.account && <div className="role-tags">{row.account.roles.map(r => <RoleChip key={r} code={r} />)}</div>}</td>
             {!accountsOnly && <td data-label="Área">{row.staff ? row.staff.area || 'Sin asignar' : '—'}</td>}
             <td data-label="Cuenta">{row.account ? <>{row.account.invitationState && invitationLabels[row.account.invitationState] ? <Tag value={row.account.invitationState === 'enviada' ? 'pendiente' : 'cancelada'} label={invitationLabels[row.account.invitationState]} /> : <Tag value={row.account.state} />}{!accountsOnly && <small>{row.account.email}</small>}</> : <span className="muted cell-nowrap">Sin cuenta</span>}</td>
             {!accountsOnly && <td data-label="Estado"><Tag value={isActive(row) ? 'activo' : 'inactivo'} />{row.staff?.shiftToday && row.staff.active && <small className="shift-today">{shiftLabel(row.staff.shiftToday)}</small>}</td>}
-            <td data-label="Acción"><div className="row-actions">
-              {row.staff && <button className="row-action" aria-label={`Ver ficha de ${nameOf(row)}`} onClick={() => setFicha(row.staff!.id)}>Ver ficha <Icon name="arrow" size={16} /></button>}
-              {row.staff && manage && <button className="row-action" aria-label={`Editar ${nameOf(row)}`} onClick={() => { setEdit(row.staff); setStaffOpen(true); }}>Editar <Icon name="arrow" size={16} /></button>}
-              {row.staff && !row.account && canInvite && row.staff.active && <button className="row-action" aria-label={`Invitar a ${nameOf(row)}`} onClick={() => setInvite({ person: row.staff })}>Invitar <Icon name="mail" size={16} /></button>}
-              {row.account && can(profile, 'usuarios.asignar_roles') && row.account.id !== profile.id && allows(row.account, 'roles') && <button className="row-action" aria-label={`Roles de ${nameOf(row)}`} onClick={() => setRoles(row.account)}>Roles <Icon name="arrow" size={16} /></button>}
-              {row.account && can(profile, 'usuarios.invitar') && row.account.allowedActions?.includes('reenviar_invitacion') && <button className="row-action" aria-label={`Reenviar invitación a ${nameOf(row)}`} onClick={() => setInvitation({ user: row.account!, mode: 'resend' })}>Reenviar invitación <Icon name="mail" size={16} /></button>}
-              {row.account && can(profile, 'usuarios.invitar') && row.account.allowedActions?.includes('cancelar_invitacion') && <button className="row-action" aria-label={`Cancelar invitación de ${nameOf(row)}`} onClick={() => setInvitation({ user: row.account!, mode: 'cancel' })}>Cancelar invitación</button>}
-              {row.account && can(profile, 'usuarios.desactivar') && allows(row.account, row.account.state === 'activo' ? 'desactivar' : 'reactivar') && <button className="row-action" aria-label={`${row.account.state === 'activo' ? 'Desactivar' : 'Reactivar'} cuenta de ${nameOf(row)}`} onClick={() => setAccountState(row.account)}>{row.account.state === 'activo' ? 'Desactivar' : 'Reactivar'}</button>}
-              {row.account && !can(profile, 'usuarios.desactivar') && !row.staff && <span className="muted">Solo consulta</span>}
-            </div></td>
+            <td data-label="Acción" className="cell-actions">{rowActions(row).length ? <RowMenu label={nameOf(row)} actions={rowActions(row)} /> : <span className="muted">Solo consulta</span>}</td>
           </tr>)}</tbody></table>
         : <Empty title={empty.title} description={empty.description} />}</RemoteState>
     </section>
     {fichaPerson && <StaffFicha api={api} profile={profile} person={fichaPerson} version={version} onClose={() => setFicha(null)} onEdit={() => { setFicha(null); setEdit(fichaPerson); setStaffOpen(true); }} onChanged={staffData.refresh} />}
     {staffOpen && <StaffForm api={api} staff={edit} spaces={areas.data ?? []} specialties={specialties.data ?? []} invite={canInvite && canAccounts ? { allowAdmin: !!profile.canInviteAdmin } : undefined} onClose={() => setStaffOpen(false)} onSaved={staffSaved} />}
     {invite && <InviteForm api={api} staff={staff} person={invite.person} email={invite.person ? knownEmails[invite.person.id] : undefined} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setInvite(null)} onSaved={done} />}
-    {roles && <RolesForm api={api} user={roles} staff={staff} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setRoles(null)} onSaved={done} />}
+    {roles && <RolesForm api={api} user={roles.user} linking={roles.linking} staff={staff} canInviteAdmin={!!profile.canInviteAdmin} onClose={() => setRoles(null)} onSaved={done} />}
     {accountState && <StateForm api={api} user={accountState} onClose={() => setAccountState(null)} onSaved={done} />}
     {invitation && <InvitationActionForm api={api} user={invitation.user} mode={invitation.mode} onClose={() => setInvitation(null)} onSaved={done} />}
   </>;

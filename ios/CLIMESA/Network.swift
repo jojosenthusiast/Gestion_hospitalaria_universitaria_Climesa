@@ -86,8 +86,11 @@ actor APIClient {
     private var onUnauthorized: (@Sendable () async -> Void)?
     /// Última respuesta del servidor: sin respuestas recientes se asume dormido (ColdStartPolicy, MA-OPS-01).
     private var lastSuccess: Date?
-    private var inFlight=0
-    private var slowTimer: Task<Void, Never>?
+    /// A call failed without an answer (network or 502-504) after the last answer: the server may be asleep.
+    private var failedSinceSuccess=false
+    /// Calls that waited `slowNoticeAfter` while the server seemed asleep; the notice shows while any is pending.
+    private var slowCalls=Set<UUID>()
+    private var pendingCalls=Set<UUID>()
     init(config: AppConfiguration,auth: AuthService) { self.config=config; self.auth=auth }
     func setUnauthorizedHandler(_ handler: @escaping @Sendable () async -> Void) { onUnauthorized=handler }
     func get<T:Decodable>(_ path: String, as type: T.Type = T.self) async throws -> T {
@@ -145,16 +148,19 @@ actor APIClient {
         }
         if let idempotencyKey { request.setValue(idempotencyKey,forHTTPHeaderField:"Idempotency-Key") }
         let data: Data; let response: URLResponse
-        began(); defer { ended() }
+        let call=UUID()
+        pendingCalls.insert(call)
+        let watcher=watchSlow(call,isUpload:progress != nil)
+        defer { watcher.cancel(); ended(call) }
         do {
             if let body, let progress { (data,response)=try await transport.upload(for:request,from:body,delegate:UploadProgressDelegate(progress)) }
             else { (data,response)=try await transport.data(for:request) }
         }
         catch let error as URLError where error.code == .cancelled { throw CancellationError() }
         catch is CancellationError { throw CancellationError() }
-        catch { throw APIFailure.transport }
+        catch { failedSinceSuccess=true; throw APIFailure.transport }
         guard let http=response as? HTTPURLResponse else { throw APIFailure.transport }
-        if http.statusCode < 502 || http.statusCode > 504 { lastSuccess=Date() }
+        if http.statusCode < 502 || http.statusCode > 504 { lastSuccess=Date(); failedSinceSuccess=false } else { failedSinceSuccess=true }
         guard (200..<300).contains(http.statusCode) else {
             let failure=APIFailure.from(status:http.statusCode,body:data)
             if failure == .sessionExpired { await expire() }
@@ -162,20 +168,23 @@ actor APIClient {
         }
         return data
     }
-    /// A los 5 s sin respuesta la app muestra "El servidor se está activando" (ServerWake); se quita al responder.
-    private func began() {
-        inFlight+=1
-        guard slowTimer == nil else { return }
-        slowTimer=Task {
+    /// "El servidor se está activando" (ServerWake) shows only when this one call has waited 5 s and the server seems
+    /// asleep (`ColdStartPolicy.showsWakingNotice`); a warm server that is merely slow, or an upload, never shows it.
+    private func watchSlow(_ call: UUID, isUpload: Bool) -> Task<Void, Never> {
+        Task { [weak self] in
             try? await Task.sleep(for:.seconds(ColdStartPolicy.slowNoticeAfter))
-            guard !Task.isCancelled else { return }
-            await MainActor.run { ServerWake.shared.waking=true }
+            guard !Task.isCancelled, let self else { return }
+            await self.markSlow(call,isUpload:isUpload)
         }
     }
-    private func ended() {
-        inFlight=max(0,inFlight-1)
-        guard inFlight==0 else { return }
-        slowTimer?.cancel(); slowTimer=nil
+    private func markSlow(_ call: UUID, isUpload: Bool) {
+        guard pendingCalls.contains(call), ColdStartPolicy.showsWakingNotice(lastSuccess:lastSuccess,failedSinceSuccess:failedSinceSuccess,waited:ColdStartPolicy.slowNoticeAfter,isUpload:isUpload,now:Date()) else { return }
+        slowCalls.insert(call)
+        Task { @MainActor in ServerWake.shared.waking=true }
+    }
+    private func ended(_ call: UUID) {
+        pendingCalls.remove(call)
+        guard slowCalls.remove(call) != nil, slowCalls.isEmpty else { return }
         Task { @MainActor in ServerWake.shared.waking=false }
     }
     private func expire() async {
@@ -194,7 +203,7 @@ private final class UploadProgressDelegate: NSObject, URLSessionTaskDelegate, Se
     }
 }
 
-/// Aviso global "El servidor se está activando" mientras una llamada tarda más de 5 s (MA-OPS-01).
+/// Aviso global "El servidor se está activando" mientras una llamada tarda más de 5 s con el servidor dormido (MA-OPS-01).
 @MainActor @Observable final class ServerWake {
     static let shared=ServerWake()
     var waking=false

@@ -5,7 +5,7 @@ import type { Api } from '../lib/api';
 import { AuditPage } from '../features/audit/AuditPage';
 import { describeAction, emptyFilters, pageQuery, defaultSort, removeChip, chips, presets } from '../features/audit/query';
 
-afterEach(() => { cleanup(); });
+afterEach(() => { cleanup(); location.hash = ''; });
 
 const row = (seq: string, extra: Record<string, unknown> = {}) => ({ seq, at: '2026-11-14T16:44:12.000Z', role: 'MED', actor: 'Persona Ficticia', action: 'consulta.leer', entity: 'consulta', entityId: 'c-1', patientRecord: '000412-7', result: 'exito', reason: 'atención', ...extra });
 const detail = { ...row('7'), permission: 'consulta.ver', correlation: 'req-123', detail: { filtros: { persona: true } }, hash: 'a'.repeat(64), previousHash: 'b'.repeat(64), previousSeq: '6', nextSeq: '8' };
@@ -120,5 +120,27 @@ describe('audit/query', () => {
     expect(describeAction('consulta.leer')).toBe('Consulta · lectura');
     expect(describeAction('xyz.abc')).toBe('xyz.abc');
     expect(presets.map(p => p.id)).toEqual(['expedientes-hoy', 'permisos', 'fallos']);
+  });
+});
+
+describe('W32 · enlaces desde el Inicio del DPD', () => {
+  it('?resultado=denegado,fallido abre la auditoría ya filtrada y limpia el parámetro', async () => {
+    location.hash = '#/auditoria?resultado=denegado,fallido';
+    const api = fakeApi();
+    render(<AuditPage api={api} version={0} />);
+    await screen.findByText('Persona Ficticia');
+    await waitFor(() => expect(lastPage(api)).toContain('resultado=denegado%2Cfallido'));
+    expect(location.hash).toBe('#/auditoria');
+  });
+
+  it('?accion=verificar verifica la cadena una vez al abrir', async () => {
+    location.hash = '#/auditoria?accion=verificar';
+    const api = fakeApi();
+    (api.write as ReturnType<typeof vi.fn>).mockResolvedValue({ integra: true, revisados: 12, verificadoEn: '2026-11-14T16:44:12.000Z', primeraFallida: null, motivo: null });
+    Element.prototype.scrollIntoView = vi.fn();
+    render(<AuditPage api={api} version={0} />);
+    expect(await screen.findByText('Cadena íntegra')).toBeTruthy();
+    expect(api.write).toHaveBeenCalledTimes(1);
+    expect(api.write.mock.calls[0][0]).toBe('/auditoria/verificacion');
   });
 });

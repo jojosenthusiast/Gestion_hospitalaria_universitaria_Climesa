@@ -5,7 +5,7 @@ import { StatusBadge, ActionButton, AreaTag, PriorityBadge, type Priority } from
 import { Icon, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api, type Space } from '../lib/api';
 import { MOVE_LABEL, MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
-import { patientPicker } from './appointments';
+import { NO_SHOW_DELAY_MS, patientPicker } from './appointments';
 import { useQuickAction } from './personal/accion';
 import { FrontDeskDialog } from './front-desk';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
@@ -74,6 +74,22 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
     consumeQuick();
   }, [quick, post.loading, post.data, consumeQuick]);
 
+  // D-3, the same as «No asistió» in Citas: «No se presentó» is held 8 s with «Deshacer»; only then is it sent, with the
+  // live version. Leaving the page sends what is pending.
+  const [absences, setAbsences] = useState<Record<string, true>>({});
+  const absenceTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>()), heldTickets = useRef(new Map<string, QueueTicket>());
+  const liveTickets = useRef<QueueTicket[]>([]);
+  liveTickets.current = Array.isArray(data.data) ? data.data : [];
+  const dropAbsence = (id: string) => { clearTimeout(absenceTimers.current.get(id)); absenceTimers.current.delete(id); heldTickets.current.delete(id); setAbsences(current => { const next = { ...current }; delete next[id]; return next; }); };
+  const sendAbsence = useRef<(ticket: QueueTicket) => void>(() => undefined);
+  sendAbsence.current = ticket => { dropAbsence(ticket.id); void move(liveTickets.current.find(t => t.id === ticket.id) ?? ticket, 'cerrado', true); };
+  useEffect(() => () => { for (const [id, timer] of absenceTimers.current) { clearTimeout(timer); const held = heldTickets.current.get(id); if (held) sendAbsence.current(held); } }, []);
+  function holdAbsence(ticket: QueueTicket) {
+    heldTickets.current.set(ticket.id, ticket);
+    setAbsences(current => ({ ...current, [ticket.id]: true }));
+    absenceTimers.current.set(ticket.id, setTimeout(() => sendAbsence.current(ticket), NO_SHOW_DELAY_MS));
+  }
+
   async function transition(ticket: QueueTicket, path: string, method = 'POST', extra: Record<string, unknown> = {}) {
     setMoveError(null); setFailedId(null);
     const result = await action.run<CallResult>(`/fila/${ticket.id}/${path}`, { version: ticket.version, ...extra }, method);
@@ -88,8 +104,8 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   async function move(ticket: QueueTicket, to: BoardColumn, confirmed = false): Promise<boolean> {
     const check = moveFor(ticket, to);
     if (!check.allowed) { setMoveError({ ticketId: ticket.id, text: check.reason }); return false; }
-    // R7 U1: closing a number (no-show or finished) is not undoable: it asks first, naming the patient.
-    if (to === 'cerrado' && !confirmed) { setClosing(ticket); return false; }
+    // R7 U1: completing asks first, naming the patient; «No se presentó» waits 8 s with «Deshacer» (D-3).
+    if (to === 'cerrado' && !confirmed) { if (check.action === 'no_se_presento') holdAbsence(ticket); else setClosing(ticket); return false; }
     setPending(current => ({ ...current, [ticket.id]: to }));
     const done = await transition(ticket, MOVE_PATH[check.action]);
     setPending(current => { const next = { ...current }; delete next[ticket.id]; return next; });
@@ -154,7 +170,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
           {(!failedId || isVersionConflict(action.error)) && <WriteError error={action.error} onReload={refresh} reloadLabel="Recargar la fila" />}
           {moveError && !moveError.ticketId && <Notice kind="info">{moveError.text}</Notice>}
           {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(shown.filter(t => t.column === column), column)} now={now} busy={action.busy} call={call} manage={manage} issue={issue}
-              pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} current={id => all.find(t => t.id === id) ?? null} undos={undos}
+              pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} current={id => all.find(t => t.id === id) ?? null} undos={undos} held={absences} onUndoAbsence={dropAbsence}
               cardError={id => failedId === id && action.error && !isVersionConflict(action.error) ? action.error.message : moveError?.ticketId === id ? moveError.text : null}
               onTransition={transition} onMove={async (ticket, to) => { await move(ticket, to); }} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => void voidTicket(ticket)} />)}</div>
             : <Empty title={all.length ? 'Ningún número coincide con los filtros' : 'La fila está vacía'} description={all.length ? 'Quita algún filtro para ver todos los números del día.' : 'Los números emitidos para este día aparecerán aquí.'} />}
@@ -263,13 +279,13 @@ function stateText(ticket: QueueTicket, call: boolean) {
 
 const DRAG_TYPE = 'application/x-climesa-ticket';
 type LaneProps = { column: Column; tickets: (QueueTicket & { column: Column })[]; now: number; busy: boolean; call: boolean; manage: boolean; issue: boolean; pendingIds: Record<string, BoardColumn>; averageWait: number;
-  current: (id: string) => QueueTicket | null; undos: Record<string, Undo>; cardError: (id: string) => string | null;
+  current: (id: string) => QueueTicket | null; undos: Record<string, Undo>; held: Record<string, true>; onUndoAbsence: (id: string) => void; cardError: (id: string) => string | null;
   onTransition: (ticket: QueueTicket, path: string) => Promise<boolean>; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>;
   onUndo: (item: Undo) => void; onVoid: (ticket: QueueTicket) => void };
 
 const LANE_FOLD = 4;
 const LANE_FOLD_WIDE = 6;
-function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, averageWait, current, undos, cardError, onTransition, onMove, onPriority, onUndo, onVoid }: LaneProps) {
+function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, averageWait, current, undos, held, onUndoAbsence, cardError, onTransition, onMove, onPriority, onUndo, onVoid }: LaneProps) {
   const [over, setOver] = useState(false);
   // #15: a long lane shows its first cards; the rest open on «Ver N más» (the page was 6,800 px tall on a phone, and
   // on a desktop a 16-card lane ran 3,500 px under the sticky dock). A phone folds sooner than a desktop.
@@ -312,13 +328,14 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
       {column === 'cerrado'
         ? <span className="qb-final"><small>{serviceNames[ticket.service] ?? ticket.service}</small><StatusBadge value={ticket.state} /></span>
         : <small>{serviceNames[ticket.service] ?? ticket.service} · {stateText(ticket, call)}</small>}
-      <div className="row-actions">
+      {held[ticket.id] ? <div className="row-actions ag-held" role="status"><small>Se marcará «No se presentó» en unos segundos.</small><button type="button" className="row-action" onClick={() => onUndoAbsence(ticket.id)}><Icon name="retry" size={16} />Deshacer</button></div>
+      : <div className="row-actions">
         {/* R1: only allowed actions; «No se presentó» stays visible (disabled, reason as tooltip) because it is the next step after the calls. */}
-        {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento'} disabled={busy} onClick={() => void onTransition(ticket, actionPath[name])}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
+        {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento'} disabled={busy} onClick={() => void (name === 'no_se_presento' ? onMove(ticket, 'cerrado') : onTransition(ticket, actionPath[name]))}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
         {undos[ticket.id] && ticket.state === 'llamado' && <button type="button" className="row-action" disabled={busy} onClick={() => onUndo(undos[ticket.id])}><Icon name="retry" size={16} />Deshacer llamado</button>}
         {(moves.length > 0 || changingPriority || (call && canRemoveCall(ticket)) || voidable(ticket, issue, now)) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} removeCall={call && canRemoveCall(ticket)} canVoid={voidable(ticket, issue, now)} busy={busy} onMove={onMove} onPriority={onPriority} onRemoveCall={() => void onTransition(ticket, 'deshacer-llamado')} onVoid={() => onVoid(ticket)} />}
-      </div>
+      </div>}
       </li>;
     })}</ul>{shownTickets.length < tickets.length && <button type="button" className="cl-link-button qb-more" onClick={() => setUnfolded(true)}>Ver {tickets.length - shownTickets.length} más</button>}</> : <p className="muted">Nadie por ahora.</p>}</section>;
 }

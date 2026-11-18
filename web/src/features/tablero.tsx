@@ -1,8 +1,11 @@
 import type { ReactNode } from 'react';
-import { can, roleNames, type AccessProfile, type Api } from '../lib/api';
+import { can, type AccessProfile, type Api } from '../lib/api';
 import { Notice } from '../components/ui';
 import { HBarList, StackedBar, type Tone } from '../components/charts';
 import { RemoteState, Tag, formatDateTime, useData } from './common';
+import { useFold } from '../components/fold';
+import type { AreaGap } from './shifts/AreaCoverageAlert';
+import { blockLabel, draftCountLabel, gapCountLabel, pendingGapBlocks } from './shifts/GapCover';
 
 /** Respuesta de `GET /metricas/tablero` (spec 113): solo agregados, sin datos personales. */
 export type MetricsBoard = {
@@ -13,7 +16,11 @@ export type MetricsBoard = {
   ambulancia: { estado: string; paramedicoDeTurno: boolean } | null;
   fila: { emitidos: number; enEspera: number; llamados: number; enAtencion: number; atendidos: number; noSePresento: number };
   laboratorio: { pendiente: number; enProceso: number; completadoHoy: number; canceladoHoy: number };
-  cobertura: { huecos: number; detalle: { area: string; rol: string; inicio: string; fin: string; requeridos: number; actuales: number }[] };
+  cobertura: {
+    huecos: number; detalle: { area: string; rol: string; inicio: string; fin: string; requeridos: number; actuales: number }[];
+    /** Every hole of today that has not ended (uncapped); an older API without it falls back to `detalle`. */
+    vigentes?: { areaId: string; area: string; rol: string; inicio: string; fin: string; requeridos: number; actuales: number; actualesConBorradores: number }[];
+  };
   turnosEnCurso: number;
   pacientesActivos: number;
 };
@@ -49,11 +56,19 @@ function OcupacionPorPlanta({ plantas }: { plantas: MetricsBoard['ocupacionPorPl
   </Tarjeta>;
 }
 
-function CoberturaTurnos({ cobertura }: { cobertura: MetricsBoard['cobertura'] }) {
+/** Today's holes of `GET /metricas/tablero` as `/turnos/cobertura` gaps, so Inicio and Métricas count them with the one rule. */
+export const boardGaps = (cobertura: MetricsBoard['cobertura']): AreaGap[] => (cobertura.vigentes
+  ?? cobertura.detalle.map(g => ({ ...g, areaId: g.area, actualesConBorradores: g.actuales })))
+  .map(g => ({ areaId: g.areaId, area: g.area, role: g.rol, start: g.inicio, end: g.fin, required: g.requeridos, actual: g.actuales, actualConBorradores: g.actualesConBorradores }));
+
+function CoberturaTurnos({ cobertura, now }: { cobertura: MetricsBoard['cobertura']; now: Date }) {
+  const { open, inDraft } = pendingGapBlocks(boardGaps(cobertura), now);
+  const fold = useFold(open, 4);
   return <Tarjeta titulo="Cobertura de turnos" className="board-card-wide">
-    {cobertura.huecos === 0
-      ? <p className="coverage-ok">Cobertura completa para hoy.</p>
-      : <><p className="coverage-count tone-warn">{cobertura.huecos} {cobertura.huecos === 1 ? 'hueco de cobertura' : 'huecos de cobertura'}</p><ul className="coverage-list">{cobertura.detalle.slice(0, 4).map((gap, index) => <li key={`${gap.area}-${gap.rol}-${gap.inicio}-${index}`}><strong>{gap.area} · {roleNames[gap.rol] ?? gap.rol}</strong><span>{gap.actuales} de {gap.requeridos} personas</span></li>)}</ul></>}
+    {open.length === 0 && inDraft.length === 0
+      ? <p className="coverage-ok">Cobertura completa por el resto de hoy.</p>
+      : <><p className={`coverage-count ${open.length ? 'tone-warn' : 'tone-ok'}`}>{gapCountLabel(open.length, 'hoy')}{inDraft.length ? ` · ${draftCountLabel(inDraft.length)}` : ''}</p>
+        {open.length > 0 && <ul className="coverage-list">{fold.shown.map(b => <li key={b.key}><strong>{blockLabel(b)}</strong><span>{b.missing === 1 ? 'Falta 1 persona' : `Faltan ${b.missing} personas`}</span></li>)}</ul>}{fold.more}</>}
   </Tarjeta>;
 }
 
@@ -87,7 +102,7 @@ export function BoardView({ board: t }: { board: MetricsBoard }) {
     </div>
     <div className="board-grid board-grid-detail">
       <OcupacionPorPlanta plantas={t.ocupacionPorPlanta} />
-      <CoberturaTurnos cobertura={t.cobertura} />
+      <CoberturaTurnos cobertura={t.cobertura} now={new Date()} />
     </div>
     <p className="updated-at">Actualizado: {formatDateTime(t.actualizadoEn)}</p>
   </>;

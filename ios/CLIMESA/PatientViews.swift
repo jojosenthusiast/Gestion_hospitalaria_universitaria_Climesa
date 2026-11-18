@@ -11,6 +11,8 @@ struct PatientHome: Sendable {
     var upcoming: Part<[Appointment]>?
     var labs: Part<[LabOrder]>?
     var room: Part<Admission?>?
+    /// Office of a called ticket, from the public board ("Pasa al consultorio 2").
+    var office: String?
 }
 
 /// I04 · Inicio del paciente. S11: los avisos viven en Avisos (Más); aquí solo sale el crítico destacado.
@@ -27,8 +29,13 @@ struct PatientHomeView: View {
     @State private var seenAt: Date?
     @State private var requesting = false
     @State private var requestSent = false
+    /// Owner rule: only the two most urgent pending blocks show; the rest fold behind one line.
+    @State private var expanded = false
+    /// The call already closed with «Entendido» ("id#calls"), shared with «Mi turno» so it is never shown twice.
+    @AppStorage(PatientTurnRules.dismissedKey) private var dismissedCall = ""
 
     private var linked: Bool { profile.patientId != nil }
+    private var calledTicket: QueueTicket? { (loader.value?.ticket?.value ?? nil).flatMap { $0.state == .llamado ? $0 : nil } }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -39,13 +46,14 @@ struct PatientHomeView: View {
                 let upcoming = home.upcoming?.value ?? []
                 let today = PatientHomeRules.appointmentToday(upcoming, now: Date())
                 let hasTicket = home.ticket.map { $0.error != nil || ($0.value ?? nil) != nil } ?? false
-                ForEach(PatientHomeRules.blocks(linked: linked, hasTicket: hasTicket, appointmentToday: today != nil), id: \.self) { block in
+                let blocks = PatientHomeRules.blocks(linked: linked, hasTicket: hasTicket, appointmentToday: today != nil)
+                ForEach(AttentionFold.shown(PatientHomeRules.pending(blocks), expanded: expanded), id: \.self) { block in
                     switch block {
                     case .link:
                         EmptyView()
                     case .ticket:
                         if let ticket = home.ticket {
-                            if let error = ticket.error { failedCard("home.queue", error) } else { HomeQueueCard(ticket: ticket.value ?? nil) { go(.fila) } }
+                            if let error = ticket.error { failedCard("home.queue", error) } else { HomeQueueCard(ticket: ticket.value ?? nil, office: home.office) { go(.fila) } }
                         }
                     case .today:
                         if let today { HomeAppointmentCard(eyebrow: L.text("home.appointment.today"), appointment: today) { go(.citas) } }
@@ -66,9 +74,20 @@ struct PatientHomeView: View {
                         shortcuts
                     }
                 }
+                AttentionFoldToggle(count: PatientHomeRules.pending(blocks).count, expanded: $expanded)
+                if blocks.contains(.shortcuts) { shortcuts }
             }
         }
         .task(id: live.snapshot.version([.queue, .appointments, .laboratory, .hospitalInfo, .admissions])) { await load() }
+        // Called while on Inicio: the same full-screen «Pasa al consultorio N» as «Mi turno».
+        .fullScreenCover(isPresented: Binding(
+            get: { PatientTurnRules.shouldPresent(calledTicket, dismissed: dismissedCall) },
+            set: { shown in if !shown { dismissedCall = PatientTurnRules.callKey(calledTicket) ?? dismissedCall } }
+        )) {
+            if let ticket = calledTicket {
+                CalledCover(ticket: ticket, office: loader.value?.office) { dismissedCall = PatientTurnRules.callKey(ticket) ?? "" }
+            }
+        }
         .onAppear { readSeen() }
         .sheet(isPresented: $requesting) {
             CategoryRequestSheet(reload: load) { requestSent = true }
@@ -135,10 +154,16 @@ struct PatientHomeView: View {
                     let tickets = try await api.get("/fila", as: [QueueTicket].self)
                     return QueueRules.activeTicket(tickets)
                 }
+                // Called: the public board says which office to go to (B5), as «Mi turno» does.
+                if let ticket = home.ticket?.value ?? nil, ticket.state == .llamado,
+                   let board = try? await api.get("/publico/fila/\(ticket.service.rawValue)", as: PublicQueue.self) {
+                    home.office = QueueRules.office(for: ticket.number, called: board.called)
+                }
             }
-            if profile.hasPermission("citas.ver") {
+            // Unlinked, `GET /citas` answers 403: Inicio asks to link instead of showing an error card.
+            if patientId != nil, profile.hasPermission("citas.ver") {
                 home.upcoming = try await Part<[Appointment]>.load {
-                    let list = try await api.get("/citas", as: [Appointment].self)
+                    let list = try await api.get(PatientAppointmentRange.path(now: Date()), as: [Appointment].self)
                     return AppointmentRules.split(list, now: Date()).upcoming
                 }
             }
@@ -200,6 +225,7 @@ private struct HomeCardLink<Content: View>: View {
 
 private struct HomeQueueCard: View {
     let ticket: QueueTicket?
+    var office: String? = nil
     let open: () -> Void
     var body: some View {
         HomeCardLink(eyebrow: L.text("home.queue"), open: open) {
@@ -209,6 +235,10 @@ private struct HomeQueueCard: View {
                         .accessibilityLabel(Text(verbatim: "\(L.text("ds.paciente.queue.number")) \(ticket.number)"))
                     Spacer()
                     PatientTag(ticket.state.rawValue, label: ticket.state.label)
+                }
+                // Android Inicio: "Es tu turno · Pasa al consultorio N" (only the call line when the office is unknown).
+                if ticket.state == .llamado {
+                    Text(verbatim: PatientTurnRules.homeLine(office: office)).font(Typo.subheading).foregroundStyle(Theme.ink)
                 }
             } else {
                 EmptyNote("home.queue.none")
@@ -260,8 +290,9 @@ struct PatientQueueView: View {
     @State private var tickets = Loader<[QueueTicket]>()
     @State private var board = Loader<PublicQueue>()
     @State private var lastState: QueueState?
-    /// The call the patient already closed with «Entendido» ("id#calls"); a new call shows the notice again.
-    @State private var dismissedCall: String?
+    /// The call the patient already closed with «Entendido» ("id#calls"); a new call shows the notice again. Shared
+    /// with Inicio, so a call closed there does not show again here.
+    @AppStorage(PatientTurnRules.dismissedKey) private var dismissedCall = ""
 
     private var active: QueueTicket? { tickets.value.flatMap { QueueRules.activeTicket($0) } }
 
@@ -276,11 +307,11 @@ struct PatientQueueView: View {
         .task(id: live.snapshot.version(.queue)) { await load() }
         .fullScreenCover(isPresented: Binding(
             get: { PatientTurnRules.shouldPresent(active, dismissed: dismissedCall) },
-            set: { shown in if !shown { dismissedCall = PatientTurnRules.callKey(active) } }
+            set: { shown in if !shown { dismissedCall = PatientTurnRules.callKey(active) ?? dismissedCall } }
         )) {
             if let ticket = active {
                 CalledCover(ticket: ticket, office: board.value.flatMap { QueueRules.office(for: ticket.number, called: $0.called) }) {
-                    dismissedCall = PatientTurnRules.callKey(ticket)
+                    dismissedCall = PatientTurnRules.callKey(ticket) ?? ""
                 }
             }
         }
@@ -377,7 +408,16 @@ struct PatientAppointmentsView: View {
     /// The sheet closes on success, so the confirmation lives here (web `MyRequests` `sent`).
     @State private var requestSent = false
 
+    /// Unlinked, the API refuses every appointment read and request (403 "La cuenta no está vinculada").
+    private var linked: Bool { account.profile?.patientId != nil }
+
     var body: some View {
+        if linked { content } else {
+            EmptyStateView(title: L.text("appointments.unlinked.title"), message: L.text("appointments.unlinked.body"), symbol: "link")
+        }
+    }
+
+    @ViewBuilder private var content: some View {
         VStack(alignment: .leading, spacing: Spacing.space4) {
             // Fase 2, flujo A: se pide por motivo, no eligiendo entre todos los médicos; recepción asigna médico y hora.
             // S1 / I-25: «Pedir cita» is the screen's primary action, in the bar (HIG), not a full-width button.
@@ -459,7 +499,7 @@ struct PatientAppointmentsView: View {
     }
 
     private func load() async {
-        await loader.load { try await account.client().get("/citas", as: [Appointment].self) }
+        await loader.load { try await account.client().get(PatientAppointmentRange.path(now: Date()), as: [Appointment].self) }
         await requests.load { try await account.client().get(CategoryRequestRules.path, as: [CategoryRequest].self) }
     }
 
@@ -663,9 +703,30 @@ private struct MyCategoryRequests: View {
     @EnvironmentObject private var account: AccountModel
     @State private var withdrawing: CategoryRequest?
 
+    @State private var resolvedOpen = false
+
     var body: some View {
+        // The withdraw confirmation hangs from the title, which is always on screen with the list.
         SectionTitle("appointments.category.mine")
-        ForEach(requests) { item in
+        .confirmationDialog(L.text("appointments.category.withdraw"), isPresented: Binding(get: { withdrawing != nil }, set: { if !$0 { withdrawing = nil } }), titleVisibility: .visible) {
+            Button(L.text("appointments.category.withdraw"), role: .destructive) { if let item = withdrawing { Task { await withdraw(item) } } }
+        } message: { Text("appointments.category.withdraw.message") }
+        let split = CategoryRequestFold.split(requests)
+        ForEach(split.pending) { item in requestCard(item) }
+        if !split.resolved.isEmpty {
+            Button { resolvedOpen.toggle() } label: {
+                HStack(spacing: Spacing.space1) {
+                    Text(verbatim: CategoryRequestFold.toggleTitle(split.resolved.count, expanded: resolvedOpen)).font(Typo.label)
+                    Image(systemName: resolvedOpen ? "chevron.up" : "chevron.down").font(Typo.small).accessibilityHidden(true)
+                }
+                .foregroundStyle(Theme.primaryText).frame(minHeight: 44).contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            if resolvedOpen { ForEach(split.resolved) { item in requestCard(item) } }
+        }
+    }
+
+    @ViewBuilder private func requestCard(_ item: CategoryRequest) -> some View {
             SectionCard {
                 ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note) {
                     PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
@@ -674,13 +735,9 @@ private struct MyCategoryRequests: View {
                     Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.short(appointment.start)))
                         .font(Typo.small).foregroundStyle(Theme.primary)
                 }
-                if let reason = item.rejectionReason, !reason.isEmpty { Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted) }
+                if let reason = CategoryRequestFold.rejection(item.rejectionReason) { Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted) }
                 if item.canWithdraw { ClimesaButton(title: L.text("appointments.category.withdraw"), kind: .secondary) { withdrawing = item } }
             }
-        }
-        .confirmationDialog(L.text("appointments.category.withdraw"), isPresented: Binding(get: { withdrawing != nil }, set: { if !$0 { withdrawing = nil } }), titleVisibility: .visible) {
-            Button(L.text("appointments.category.withdraw"), role: .destructive) { if let item = withdrawing { Task { await withdraw(item) } } }
-        } message: { Text("appointments.category.withdraw.message") }
     }
 
     private func withdraw(_ item: CategoryRequest) async {
@@ -813,10 +870,21 @@ private struct CategoryRequestSheet: View {
         .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(Theme.controlLine, lineWidth: 1))
     }
 
-    /// Asked for today, so each doctor says whether they have a shift (`tieneTurno`, `motivo`).
+    /// Reception may assign any of the next 7 days, so the catalog is asked for each of them and merged: a doctor is
+    /// «Con turno» when any day has a shift (Android parity). A day that fails is skipped; all failing is an error.
     private func loadCatalog() async {
-        let path = "/citas/catalogos?date=\(ClimesaDates.localDay(Date()))"
-        await catalog.load { try await account.client().get(path, as: AppointmentCatalogs.self) }
+        await catalog.load {
+            let api = try account.client()
+            var lists: [[AppointmentCatalogs.Doctor]] = []
+            var failure: Error?
+            for offset in 0..<RequestDoctorRules.days {
+                let day = ClimesaDates.localDay(Date().addingTimeInterval(Double(offset) * 86_400))
+                do { lists.append(try await api.get("/citas/catalogos?date=\(day)", as: AppointmentCatalogs.self).doctors) }
+                catch { failure = failure ?? error }
+            }
+            if lists.isEmpty, let failure { throw failure }
+            return AppointmentCatalogs(doctors: RequestDoctorRules.week(lists))
+        }
     }
 
     private func loadCategories() async { await categories.load { try await account.client().get(CategoryRequestRules.categoriesPath, as: [AppointmentCategory].self) } }
@@ -1133,10 +1201,10 @@ struct ClinicalHistoryView: View {
             if let denied = RecordAccess.deniedMessage(for: loader.failure, viewerIsPatient: viewerIsPatient) {
                 EmptyStateView(title: L.text("history.forbidden.title"), message: denied, symbol: "lock.shield")
             } else {
-                LoadState(loader: loader, retry: load) { history in HistoryContent(history: history) }
+                LoadState(loader: loader, retry: load) { history in HistoryContent(history: history, viewerIsPatient: viewerIsPatient) }
             }
         }
-        .task(id: live.snapshot.version([.consultations, .laboratory, .admissions, .access, .patient])) { await load() }
+        .task(id: live.snapshot.version([.consultations, .laboratory, .admissions, .patient])) { await load() }
     }
 
     private func load() async {
@@ -1146,6 +1214,8 @@ struct ClinicalHistoryView: View {
 
 private struct HistoryContent: View {
     let history: ClinicalHistory
+    /// The API never returns the patient's own admissions here: «Hospitalizaciones» is only for the doctor (Android parity).
+    var viewerIsPatient = true
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             SectionCard {
@@ -1185,12 +1255,13 @@ private struct HistoryContent: View {
                     }
                 }
             }
-            SectionTitle("history.admissions")
-            if history.admissions.isEmpty { EmptyStateView(title: L.text("history.none"), symbol: "bed.double") }
-            ForEach(history.admissions) { admission in
-                SectionCard {
-                    ListRow(title: ClimesaDates.display(admission.createdAt, .date), subtitle: admission.doctor.name) {
-                        PatientTag(admission.state.rawValue, label: admission.state.label)
+            if !viewerIsPatient && !history.admissions.isEmpty {
+                SectionTitle("history.admissions")
+                ForEach(history.admissions) { admission in
+                    SectionCard {
+                        ListRow(title: ClimesaDates.display(admission.createdAt, .date), subtitle: admission.doctor.name) {
+                            PatientTag(admission.state.rawValue, label: admission.state.label)
+                        }
                     }
                 }
             }
@@ -1373,19 +1444,44 @@ struct MyAccessView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<[MyAccess]>()
+    @State private var olderOpen = false
 
     var body: some View {
         LoadState(loader: loader, retry: load) { rows in
             if rows.isEmpty { EmptyStateView(title: L.text("accesses.none"), symbol: "eye.slash") }
-            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+            // Grouped by day ("Hoy · mié 18 nov"); the last week stays open, older days fold under one line.
+            let now = Date()
+            let days = AccessLogRules.byDay(rows, now: now)
+            let older = days.filter(\.older)
+            ForEach(days.filter { !$0.older }, id: \.day) { day in accessDay(day, now: now) }
+            if !older.isEmpty {
                 SectionCard {
-                    ListRow(title: String(format: L.text("accesses.row"), RoleNames.label(row.role), row.dataType),
-                            subtitle: String(format: L.text("accesses.reason"), row.reason), meta: ClimesaDates.display(row.date))
+                    DisclosureGroup(isExpanded: $olderOpen) {
+                        ForEach(older, id: \.day) { day in accessDay(day, now: now) }
+                    } label: {
+                        Text(verbatim: AccessLogRules.olderTitle(older.reduce(0) { $0 + $1.rows.count })).font(Typo.label).foregroundStyle(Theme.ink).frame(minHeight: 44)
+                    }
+                    .tint(Theme.primaryText)
                 }
             }
         }
-        .task(id: live.snapshot.version(.access)) { await load() }
+        // No event announces a new access: read on entering and again after a reconnection.
+        .task(id: live.snapshot.resyncVersion) { await load() }
+    }
+
+    @ViewBuilder private func accessDay(_ day: AccessLogRules.Day, now: Date) -> some View {
+        ListCard(title: ClimesaDates.shortDay(day.day, now: now), items: Array(day.rows.enumerated()).map { AccessItem(index: $0.offset, row: $0.element) }) { item in
+            ListRow(title: String(format: L.text("accesses.row"), RoleNames.label(item.row.role), item.row.dataType),
+                    subtitle: String(format: L.text("accesses.reason"), item.row.reason), meta: ClimesaDates.display(item.row.date, .time))
+        }
     }
 
     private func load() async { await loader.load { try await account.client().get("/me/accesos", as: [MyAccess].self) } }
+}
+
+/// One row of a day of «Quién vio mi expediente» (rows have no id of their own).
+private struct AccessItem: Identifiable {
+    let index: Int
+    let row: MyAccess
+    var id: Int { index }
 }

@@ -83,11 +83,11 @@ export function useLive(api: Api, profile: AccessProfile, token: string, refresh
       catching = true;
       wasDown = false;
       try {
-        const result = await latest.current.api.request<{ cursor: string; events: { entity: string }[] }>(`/eventos?after=${encodeURIComponent(cursor)}`);
+        const result = await latest.current.api.request<{ cursor: string; events: CatchUpRow[] }>(`/eventos?after=${encodeURIComponent(cursor)}`);
         if (closed) return;
         cursor = String(result.cursor);
         invalidate();
-        if (result.events.some(e => e.entity === 'usuario')) latest.current.refreshProfile();
+        if (catchUpEvents(result.events).some(e => e.entidad === 'usuario')) latest.current.refreshProfile();
         setStatus(allJoined() ? 'live' : navigator.onLine ? 'reconnecting' : 'offline');
       } catch {
         if (closed) return;
@@ -164,4 +164,11 @@ export function useLive(api: Api, profile: AccessProfile, token: string, refresh
   }, [token]);
 
   return { version, signal, status, updatedAt };
+}
+
+/** A `GET /eventos` row: `tipo` and `entidad` (tiempo-real.md), with the deprecated `type` / `entity` aliases. */
+export type CatchUpRow = { tipo?: string; entidad?: string; type?: string; entity?: string; id?: unknown };
+/** Reads `tipo` / `entidad`; the deprecated aliases are only a fallback for an older API. */
+export function catchUpEvents(rows: CatchUpRow[] | undefined) {
+  return (rows ?? []).map(row => ({ tipo: row.tipo || row.type || '', entidad: row.entidad || row.entity || '', id: row.id }));
 }

@@ -3594,6 +3594,8 @@ export interface components {
             end: string;
             required: number;
             actual: number;
+            /** @description En `GET /turnos/cobertura`: personas en esa hora contando también los borradores; si llega a `required`, el hueco está cubierto en borrador (falta publicarlo) */
+            actualConBorradores?: number;
         };
         CoverageResponse: {
             /**
@@ -3872,6 +3874,8 @@ export interface components {
             end: string;
             required: number;
             actual: number;
+            /** @description En `GET /turnos/cobertura`: personas en esa hora contando también los borradores; si llega a `required`, el hueco está cubierto en borrador (falta publicarlo) */
+            actualConBorradores?: number;
             /** @description sin_personal_elegible, fuera_del_patron, franja_ya_iniciada, limite_de_intentos o el código que rechazó a más personas probadas (personal_en_descanso, carga_semanal_excedida...) */
             motivo: string;
             mensaje: string;
@@ -6777,10 +6781,26 @@ export interface components {
             requeridos: number;
             actuales: number;
         };
+        OpenCoverageGapResponse: {
+            area: string;
+            rol: string;
+            /** Format: date-time */
+            inicio: string;
+            /** Format: date-time */
+            fin: string;
+            requeridos: number;
+            actuales: number;
+            /** Format: uuid */
+            areaId: string;
+            /** @description Personas en esa hora contando también los borradores; si llega a `requeridos`, el hueco está cubierto en borrador */
+            actualesConBorradores: number;
+        };
         CoverageSummaryResponse: {
             huecos: number;
             /** @description Primeros diez huecos */
             detalle: components["schemas"]["CoverageGapSummaryResponse"][];
+            /** @description Todos los huecos de hoy que terminan después de ahora, sin tope */
+            vigentes?: components["schemas"]["OpenCoverageGapResponse"][];
         };
         MetricsDashboardResponse: {
             /** Format: date-time */

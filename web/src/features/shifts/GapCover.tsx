@@ -11,29 +11,69 @@ const ROLE_NAMES: Record<string, string> = { MED: 'Medicina', ENF: 'Enfermería'
 const dayFmt = new Intl.DateTimeFormat('es-SV', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/El_Salvador' });
 const hourOf = (iso: string) => Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hourCycle: 'h23', timeZone: 'America/El_Salvador' }).format(new Date(iso)));
 
-/** A coverage hole to fill: contiguous hourly gaps of one area and function joined, cut into shifts of at most 12 h. */
-export type GapBlock = { key: string; areaId: string; area: string; role: string; start: string; end: string; missing: number };
+/**
+ * A coverage hole to fill: contiguous hourly gaps of one area and function joined, cut into shifts of at most 12 h.
+ * `inDraft`: every hour of the piece already reaches the minimum counting drafts (`actualConBorradores`); it only needs publishing.
+ */
+export type GapBlock = { key: string; areaId: string; area: string; role: string; start: string; end: string; missing: number; inDraft?: boolean };
 export type Candidate = { staffId: string; person: string; sameArea: boolean; weekHours: number; advertencias: { codigo: string; horasSemana: number; limite: number }[] };
 export type Rejected = { staffId: string; person: string; codigo: string; mensaje: string };
 type Candidates = { candidatos: Candidate[]; descartados: Rejected[] };
 
 export function gapBlocks(gaps: AreaGap[]): GapBlock[] {
   const sorted = [...gaps].sort((a, b) => a.areaId.localeCompare(b.areaId) || a.role.localeCompare(b.role) || Date.parse(a.start) - Date.parse(b.start));
-  const joined: GapBlock[] = [];
+  const joined: { block: GapBlock; hours: AreaGap[] }[] = [];
   for (const g of sorted) {
     const last = joined.at(-1);
-    if (last && last.areaId === g.areaId && last.role === g.role && last.end === g.start) { last.end = g.end; last.missing = Math.max(last.missing, g.required - g.actual); continue; }
-    joined.push({ key: '', areaId: g.areaId, area: g.area, role: g.role, start: g.start, end: g.end, missing: Math.max(1, g.required - g.actual) });
+    if (last && last.block.areaId === g.areaId && last.block.role === g.role && last.block.end === g.start) { last.block.end = g.end; last.hours.push(g); continue; }
+    joined.push({ block: { key: '', areaId: g.areaId, area: g.area, role: g.role, start: g.start, end: g.end, missing: 1 }, hours: [g] });
   }
-  return joined.flatMap(b => {
+  return joined.flatMap(({ block: b, hours }) => {
     const pieces: GapBlock[] = [];
     for (let from = Date.parse(b.start); from < Date.parse(b.end); from += MAX_BLOCK) {
       const to = Math.min(from + MAX_BLOCK, Date.parse(b.end));
-      pieces.push({ ...b, start: new Date(from).toISOString(), end: new Date(to).toISOString(), key: `${b.areaId}-${b.role}-${from}` });
+      // Each piece reads only its own hours: how many people are missing and whether drafts already cover all of them.
+      const own = hours.filter(g => Date.parse(g.start) < to && Date.parse(g.end) > from);
+      const missing = Math.max(1, ...own.map(g => g.required - g.actual));
+      const inDraft = own.every(g => (g.actualConBorradores ?? g.actual) >= g.required);
+      pieces.push({ ...b, start: new Date(from).toISOString(), end: new Date(to).toISOString(), key: `${b.areaId}-${b.role}-${from}`, missing, inDraft });
     }
     return pieces;
   }).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.area.localeCompare(b.area, 'es'));
 }
+
+/** Shifts start a few minutes ahead (the API does not take a shift that already started): the next 5-minute mark. */
+const STEP = 5 * 60_000;
+const startFrom = (now: number) => Math.ceil(now / STEP) * STEP;
+
+/**
+ * THE gap rule of every screen (Inicio, Turnos, Métricas): the holes whose end is after now, their start clipped to now,
+ * in the same 12 h blocks the gap filler proposes. `open` still has to be filled; `inDraft` is covered by drafts that
+ * are not published yet (it stops counting as «por cubrir» but still has to be published).
+ */
+export function pendingGapBlocks(gaps: AreaGap[], now: Date | number): { open: GapBlock[]; inDraft: GapBlock[] } {
+  const from = startFrom(now.valueOf());
+  const ahead = gaps.filter(g => Date.parse(g.end) > from).map(g => Date.parse(g.start) < from ? { ...g, start: new Date(from).toISOString() } : g);
+  const blocks = gapBlocks(ahead);
+  return { open: blocks.filter(b => !b.inDraft), inDraft: blocks.filter(b => b.inDraft) };
+}
+
+/** One wording for one window: «3 turnos por cubrir hoy», «1 turno por cubrir esta semana». */
+export const gapCountLabel = (count: number, when: string) => `${count} ${count === 1 ? 'turno' : 'turnos'} por cubrir ${when}`;
+export const draftCountLabel = (count: number) => `${count} ${count === 1 ? 'cubierto' : 'cubiertos'} en borrador`;
+
+/** `?hueco=<areaId>:<role>:<start>` of a link that opens «Cubrir hueco» on Turnos (from the Inicio tray). */
+export const gapHref = (b: Pick<GapBlock, 'areaId' | 'role' | 'start'>) => `#/turnos?hueco=${encodeURIComponent(`${b.areaId}:${b.role}:${b.start}`)}`;
+export function parseGapParam(value: string | null): { areaId: string; role: string; at: number } | null {
+  if (!value) return null;
+  const [areaId, role, ...rest] = value.split(':');
+  const at = Date.parse(rest.join(':'));
+  return areaId && role && Number.isFinite(at) ? { areaId, role, at } : null;
+}
+/** The block of a week that holds that hole: the first one of its area and function that ends after it. */
+export const findGapBlock = (blocks: GapBlock[], wanted: { areaId: string; role: string; at: number }) =>
+  blocks.find(b => b.areaId === wanted.areaId && b.role === wanted.role && Date.parse(b.end) > wanted.at);
+
 /** Day shift when it starts between 06:00 and 17:59 local; night otherwise. */
 export const shiftTypeFor = (block: GapBlock) => { const h = hourOf(block.start); return h >= 6 && h < 18 ? 'diurno' : 'nocturno'; };
 export const blockLabel = (b: GapBlock) => `${b.area} · ${ROLE_NAMES[b.role] ?? b.role} · ${dayFmt.format(new Date(b.start))}, ${timeRange(b.start, b.end)}`;

@@ -48,6 +48,24 @@ class RealtimeProtocolTest {
         assertEquals(listOf(EventoDominio("cama.estado_cambiado", "cama", "b1", 3L)), recuperado.events)
     }
 
+    @Test fun laRecuperacionLeeTipoYEntidadYSoloUsaLosAliasComoRespaldo() {
+        val recuperado = RealtimeProtocol.parseCatchUp(JSONObject("""{"cursor":"43","events":[
+            {"seq":"42","tipo":"aviso.publicado","entidad":"aviso","type":"viejo.tipo","entity":"viejo","id":"a1","version":1},
+            {"seq":"43","tipo":"cita.actualizada","entidad":"cita","id":"c1","version":2}]}"""))
+        assertEquals(listOf(EventoDominio("aviso.publicado", "aviso", "a1", 1L), EventoDominio("cita.actualizada", "cita", "c1", 2L)), recuperado.events)
+    }
+
+    @Test fun losFiltrosUsanLasEntidadesQueEmiteLaApi() {
+        // `ambulancia.solicitud_creada` on `solicitud`, `ambulancia.hito` on `servicio`, `ambulancia.estado_cambiado` on `unidad`.
+        assertTrue(DashboardEvents.matches(EventoDominio("ambulancia.hito", "servicio", "s1", 2)))
+        assertTrue(DashboardEvents.matches(EventoDominio("vinculacion.solicitada", "vinculacion_paciente", "v1", 1)))
+        assertTrue(PortalEvents.matches("/ambulancia/unidades", EventoDominio("x.y", "unidad", "u1", 1)))
+        // The GPS point every few seconds does not reload the dashboard or the ambulance view.
+        assertFalse(DashboardEvents.matches(EventoDominio("ambulancia.ubicacion", "servicio", "s1", 3)))
+        assertFalse(PortalEvents.matches("/ambulancia/unidades", EventoDominio("ambulancia.ubicacion", "servicio", "s1", 3)))
+        assertTrue(AdmissionEvents.matches(EventoDominio("admision.actualizada", "admision", "ad1", 4)))
+    }
+
     @Test fun elTableroTambienAtiendeEventosDeEspacio() {
         assertTrue(BedEvents.matches(EventoDominio("espacio.actualizado", "espacio", "e1", 2)))
         assertTrue(BedEvents.matches(EventoDominio("espacio.actualizado", "", "e1", 2)))

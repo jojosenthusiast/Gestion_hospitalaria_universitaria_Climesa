@@ -118,6 +118,20 @@ class PatientCancelU5Test {
         assertEquals("Cita cancelada.", vm.state.value.notice)
     }
 
+    // "Mis citas" reads its appointments over an explicit window and never the doctor catalog: a failing catalog can
+    // no longer hide the list, and a live event does not read it again.
+    @Test fun appointmentsLoadAloneOverTheExplicitWindow() = runTest(dispatcher) {
+        val api = FakeGateway()
+        val path = sv.edu.catolica.climesa.domain.PatientAppointmentRules.listPath(sv.edu.catolica.climesa.domain.ReceptionScheduling.today())
+        api.responses[path] = JSONArray().put(JSONObject().put("id", "a9").put("doctorName", "Dra. Ejemplo").put("start", "2030-12-20T15:00:00Z").put("end", "2030-12-20T15:20:00Z").put("state", "confirmada"))
+        val vm = PatientAppointmentsViewModel(api, quiet)
+        vm.load(); runCurrent()
+        assertEquals(listOf("a9"), vm.state.value.appointments.map { it.id })
+        assertEquals(1, api.gets(path))
+        assertTrue(api.calls.none { it.first.startsWith("/citas/catalogos") })
+        assertFalse(vm.state.value.loading)
+    }
+
     // PAC request: when no day of the doctor catalog can be read, the form says so (never an empty silent list).
     @Test fun aDoctorCatalogThatFailsEveryDayIsShown() = runTest(dispatcher) {
         val api = FakeGateway()

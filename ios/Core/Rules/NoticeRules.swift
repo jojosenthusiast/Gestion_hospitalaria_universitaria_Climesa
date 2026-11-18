@@ -52,13 +52,19 @@ public enum NoticeRules {
         "MED": "Medicina", "LAB": "Laboratorio", "PAR": "Atención prehospitalaria", "DPD": "Protección de datos", "PAC": "Paciente",
     ]
 
+    /// «Críticos» keeps what the API counts in `criticos`: critical notices in force, addressed to the account, without
+    /// «Enterado», so the chip count and the list always agree (web `isPendingCritical`, Android `NoticeInboxRules`).
+    public static func isPendingCritical(_ notice: InboxNotice) -> Bool {
+        notice.state == .vigente && notice.level == .critico && notice.targeted && notice.acknowledgedAt == nil
+    }
+
     /// Lista con el filtro elegido, en el orden del servidor (críticos primero). «Sin leer»: vigentes sin «Enterado»
     /// (los programados y vencidos no se pueden marcar).
     public static func filter(_ notices: [InboxNotice], by filter: NoticeFilter) -> [InboxNotice] {
         switch filter {
         case .todos: return notices
         case .sinLeer: return notices.filter { $0.state == .vigente && $0.acknowledgedAt == nil }
-        case .criticos: return notices.filter { $0.level == .critico }
+        case .criticos: return notices.filter(isPendingCritical)
         }
     }
 

@@ -92,4 +92,30 @@ describe('R7 F3 · Mis turnos', () => {
     expect(screen.queryByText('Luis Enfermero Prueba')).toBeNull();
     expect(location.hash).toBe('#/turnos');
   });
+
+  it('una cuenta sin ficha no ve el hospital entero: dice que no está vinculada, sin alertas de planificación', async () => {
+    location.hash = '#/turnos?persona=yo';
+    mount(profile(['turnos.ver', 'turnos.planificar']));
+    expect(await screen.findByText('Tu cuenta no está vinculada a una ficha')).toBeTruthy();
+    expect(screen.queryByText('Luis Enfermero Prueba')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Cobertura mínima por área' })).toBeNull();
+  });
+});
+
+describe('Regla única de huecos · Inicio abre «Cubrir hueco»', () => {
+  it('#/turnos?hueco=… abre el diálogo de ese hueco, no un turno en blanco', async () => {
+    const hours = Array.from({ length: 12 }, (_, i) => ({ areaId: 'a-1', area: 'Emergencia', role: 'ENF', start: new Date(localMs('2026-12-03', '07:00') + i * 3_600_000).toISOString(), end: new Date(localMs('2026-12-03', '07:00') + (i + 1) * 3_600_000).toISOString(), required: 1, actual: 0 }));
+    location.hash = `#/turnos?hueco=${encodeURIComponent(`a-1:ENF:${iso('2026-12-03', '07:00')}`)}`;
+    const api = {
+      request: vi.fn(async (path: string) => path === '/turnos/catalogo' ? catalog : path.startsWith('/turnos/cobertura') ? { from: '2026-11-30', to: '2026-12-06', gaps: hours } : path.startsWith('/turnos/candidatos') ? { candidatos: [], descartados: [] } : path.startsWith('/turnos?') ? [] : week),
+      write: vi.fn(),
+    };
+    render(<ShiftsPage api={api as unknown as Api} profile={planner} version={0} />);
+    const dialog = await screen.findByRole('dialog', { name: 'Cubrir hueco' });
+    expect(within(dialog).getByText(/Emergencia · Enfermería/)).toBeTruthy();
+    expect(location.hash).toBe('#/turnos');
+    // The alert and the week list say the same count with the same words for this week.
+    expect(screen.getByText(/1 turno por cubrir esta semana\./)).toBeTruthy();
+    expect(screen.getByRole('heading', { name: '1 turno por cubrir esta semana' })).toBeTruthy();
+  });
 });

@@ -66,18 +66,19 @@ class RoleDashboardTest {
             mapOf(
                 DashboardSource.APPOINTMENTS to rows(
                     row("state" to "solicitada", "start" to "2026-11-15T15:00:00Z"),
-                    // A request whose time already passed is "vencida" on the server; a stale "solicitada" in the past is not pending either.
-                    row("state" to "solicitada", "start" to "2026-11-14T13:00:00Z"),
+                    // A request whose time already passed is "vencida" on the server (it sweeps before every read).
                     row("state" to "vencida", "start" to "2026-11-14T13:00:00Z"),
                     row("state" to "confirmada", "start" to "2026-11-15T15:00:00Z"),
                 ),
+                // S8: a pending request by category also waits on Recepción; an assigned one does not.
+                DashboardSource.CATEGORY_REQUESTS to rows(row("state" to "pendiente"), row("state" to "asignada")),
                 DashboardSource.LINKS to rows(row("id" to "a"), row("id" to "b")),
             ),
             now = now,
         )
         // R3 A-28: "1 solicitud de cita" replaces the "Citas por confirmar 1" tile; one row, one action.
         assertTrue(model.kpis.none { it.label == "Citas por confirmar" || it.label == "Vinculaciones por verificar" })
-        assertEquals("1 solicitud de cita", model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.title)
+        assertEquals("2 solicitudes de cita", model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.title)
         assertEquals(QuickAction.REVIEW_REQUESTS, model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.request.action)
         assertTrue(model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.detail.contains("reprograma"))
         assertEquals("2 vinculaciones por verificar", model.attention.first { it.request.section == AndroidSection.LINKING }.title)

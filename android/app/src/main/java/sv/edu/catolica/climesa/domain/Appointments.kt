@@ -48,6 +48,16 @@ data class AppointmentSplit(val upcoming: List<PatientAppointment>, val past: Li
 
 /** `POST /citas/solicitudes`: the patient asks for a slot; Recepción confirms or rejects it. */
 object PatientAppointmentRules {
+    /** Days before and after today that "Mis citas" and Inicio read: 59 + 33 stays inside the API's 93-day limit. */
+    const val PAST_DAYS = 59L
+    const val AHEAD_DAYS = 33L
+
+    /**
+     * `GET /citas` with an explicit window: a bare call only covers the last 7 and next 31 days, so "Anteriores" held one
+     * week and an appointment further ahead was missing from the list and from Inicio.
+     */
+    fun listPath(today: java.time.LocalDate): String = "/citas?from=${today.minusDays(PAST_DAYS)}&to=${today.plusDays(AHEAD_DAYS)}"
+
     private val closed = setOf("cancelada", "atendida", "no_asistio", "rechazada", "vencida", "reprogramada")
 
     /** Upcoming: an open appointment whose end is still ahead, ascending. Past: the rest, most recent first. */
