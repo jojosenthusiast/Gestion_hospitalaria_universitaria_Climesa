@@ -118,7 +118,8 @@ class ReceptionAppointmentsViewModel @Inject constructor(private val api: ApiGat
         }
     }
 
-    fun pickPatient(p: PickerPatient?) { mutable.update { it.copy(patient = p, query = "", results = emptyList(), hasMore = false) } }
+    /** S1: an inactive patient is shown in the results but never chosen. */
+    fun pickPatient(p: PickerPatient?) { if (p != null && sv.edu.catolica.climesa.domain.PatientGate.blockedReason(p, sv.edu.catolica.climesa.domain.PickPurpose.CARE) != null) return; mutable.update { it.copy(patient = p, query = "", results = emptyList(), hasMore = false) } }
 
     fun selectDate(date: LocalDate) {
         mutable.update { it.copy(date = date, slot = null, slots = emptyList()) }

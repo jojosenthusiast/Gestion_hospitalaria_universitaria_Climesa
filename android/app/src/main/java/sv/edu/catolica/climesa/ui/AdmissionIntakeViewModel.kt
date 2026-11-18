@@ -189,7 +189,11 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
         } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(searching = false, error = userMessage(e, "No se pudo buscar.")) } }
     }
     /** Changing the patient drops whatever depended on them (source record and bed). */
-    fun pickPatient(p: PickerPatient?) = mutable.update { it.copy(draft = it.draft.copy(patient = p, origin = null, originRecord = null, bed = null), query = "", results = emptyList(), hasMore = false, origins = emptyList()) }
+    fun pickPatient(p: PickerPatient?) {
+        // S1: inactive or already admitted patients are listed with the reason but never chosen.
+        if (p != null && sv.edu.catolica.climesa.domain.PatientGate.blockedReason(p, sv.edu.catolica.climesa.domain.PickPurpose.ADMISSION) != null) return
+        mutable.update { it.copy(draft = it.draft.copy(patient = p, origin = null, originRecord = null, bed = null), query = "", results = emptyList(), hasMore = false, origins = emptyList()) }
+    }
 
     // 2. Origin and motive
     fun pickOrigin(kind: OriginKind) = update { it.copy(origin = kind, originRecord = null) }

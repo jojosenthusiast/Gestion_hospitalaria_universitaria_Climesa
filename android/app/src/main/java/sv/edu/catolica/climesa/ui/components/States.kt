@@ -146,22 +146,33 @@ internal fun RefreshHint(modifier: Modifier = Modifier) {
 }
 
 /**
- * Load failure with "Reintentar". Pass `forbidden = true` for a 403, which the web shows as a different state
- * ("No tienes acceso a esta información") that can still be retried because access may be granted later.
+ * Load failure with "Reintentar". S8: a 403 (`forbidden`, by default any text that came from a refusal, see
+ * [sv.edu.catolica.climesa.data.ForbiddenMessages]) is not a failure: it is an info state with the server's own message
+ * and no «Reintentar», because repeating the request can never pass. [onRetry] is ignored then.
  */
 @Composable
 internal fun ErrorState(
     message: String?,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
-    forbidden: Boolean = false,
+    forbidden: Boolean = sv.edu.catolica.climesa.data.ForbiddenMessages.isForbidden(message),
     title: String = stringResource(if (forbidden) R.string.ui_sin_acceso_titulo else R.string.ui_error_titulo),
-) = StateLayout(
-    symbol = { StateSymbol(if (forbidden) Icons.Default.Lock else Icons.Default.ErrorOutline, MaterialTheme.climesa.danger, MaterialTheme.climesa.dangerSoft) },
+) = if (forbidden) ForbiddenState(message, modifier, title)
+else StateLayout(
+    symbol = { StateSymbol(Icons.Default.ErrorOutline, MaterialTheme.climesa.danger, MaterialTheme.climesa.dangerSoft) },
     title = title,
-    detail = if (forbidden) stringResource(R.string.ui_sin_acceso_detalle) else message,
+    detail = message,
     modifier = modifier,
     action = { SecondaryButton(stringResource(R.string.ui_reintentar), onRetry, icon = Icons.Default.Refresh) },
+)
+
+/** S8: what a 403 shows: a calm lock, the server message (or the generic access text) and no action. */
+@Composable
+internal fun ForbiddenState(message: String?, modifier: Modifier = Modifier, title: String = stringResource(R.string.ui_sin_acceso_titulo)) = StateLayout(
+    symbol = { StateSymbol(Icons.Default.Lock) },
+    title = title,
+    detail = message?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ui_sin_acceso_detalle),
+    modifier = modifier,
 )
 
 /** Version conflict (HTTP 409 `version_conflicto`): nothing was saved; the only way out is to reload. */

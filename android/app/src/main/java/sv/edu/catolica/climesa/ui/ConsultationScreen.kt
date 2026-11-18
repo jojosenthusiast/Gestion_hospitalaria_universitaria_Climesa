@@ -364,9 +364,8 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
         if (!signed && item.consultationId != null) RowAction(stringResource(R.string.consulta_guardar_borrador), { model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank())
         if (!signed && item.consultationId == null && item.canStart) PrimaryButton(stringResource(R.string.consulta_t_iniciar), { model.start(item, reason) }, enabled = reason.trim().isNotBlank(), loading = busy, fill = false)
         else if (!signed && item.consultationId != null) {
-            // B4: a disabled "Firmar" says why next to it.
-            ConsultationRecordRules.signBlocker(reason.trim(), plan.trim())?.let { Text(it, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            PrimaryButton(stringResource(R.string.consulta_firmar), { confirmSign = true }, enabled = !busy && reason.trim().isNotBlank() && plan.trim().isNotBlank(), fill = false)
+            // B4 / S7: a disabled "Firmar" says why under it, with the shared blocked line.
+            PrimaryButton(stringResource(R.string.consulta_firmar), { confirmSign = true }, enabled = !busy, fill = false, blockedReason = ConsultationRecordRules.signBlocker(reason.trim(), plan.trim()))
         }
         else RowAction(stringResource(R.string.consulta_cerrar), leave, enabled = !busy)
     }

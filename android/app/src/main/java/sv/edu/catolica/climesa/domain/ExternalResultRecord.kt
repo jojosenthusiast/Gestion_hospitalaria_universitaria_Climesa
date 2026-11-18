@@ -24,6 +24,15 @@ object ExternalRecordRules {
     /** Rule 8: the action depends on the permission, never on the role. */
     fun canRecord(permissions: Collection<String>) = PERMISSION in permissions
 
+    const val ACTION = "resultado_externo"
+
+    /**
+     * Preconditions S4: «Registrar resultado externo» shows only when the history's `allowedActions` holds it, so the API's
+     * relation check never refuses it after the tap. A history from an older API (no `allowedActions`) keeps the permission rule.
+     */
+    fun canOffer(permissions: Collection<String>, allowedActions: List<String>?) =
+        canRecord(permissions) && (allowedActions == null || ACTION in allowedActions)
+
     /** Exams one by one, sorted by name; panels are refused by the API ("sin paneles"). */
     fun parseCatalog(value: Any?): List<ExternalExam> {
         val rows = value as? JSONArray ?: return emptyList()

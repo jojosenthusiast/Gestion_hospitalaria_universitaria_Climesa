@@ -58,7 +58,8 @@ fun ClinicalHistoryScreen(
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     // D4: a recorded external result shows up in the laboratory list right away.
     LaunchedEffect(externalState.saved) { if (externalState.saved > 0) patientId?.let { model.open(it, silent = true) } }
-    val canRecordExternal = !own && ExternalRecordRules.canRecord(profile.permissions)
+    // S4: offered only when the history's `allowedActions` says the API would accept it (older API: by permission).
+    val canRecordExternal = !own && ExternalRecordRules.canOffer(profile.permissions, state.history?.allowedActions)
     if (canRecordExternal && patientId != null) state.history?.let { ExternalRecordDialog(it.patientName, externalState, external) }
     PageList(modifier) {
         if (own && profile.patientId == null) {
@@ -73,7 +74,8 @@ fun ClinicalHistoryScreen(
             state.error?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
             if (state.candidates.isNotEmpty()) item { Text(stringResource(R.string.clin_historial_buscar_resultados), style = MaterialTheme.typography.titleLarge) }
             items(state.candidates, key = { it.id }) { candidate ->
-                DataRow(candidate.fullName, meta = stringResource(R.string.historial_expediente, candidate.record), leadingIcon = Icons.Default.Person, onClick = { selectedId = candidate.id })
+                // S2: a patient without a care relation is listed but does not open; the row says when it will.
+                DataRow(candidate.fullName, meta = stringResource(R.string.historial_expediente, candidate.record), leadingIcon = Icons.Default.Person, onClick = { selectedId = candidate.id }, blockedReason = candidate.blockedReason)
             }
             return@PageList
         }

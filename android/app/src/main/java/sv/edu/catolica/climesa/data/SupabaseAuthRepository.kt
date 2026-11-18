@@ -152,4 +152,7 @@ class SupabaseAuthRepository(
 }
 
 /** `body` conserva el problem+json de la API para leer datos extra del error (por ejemplo `candidatos` de `posible_duplicado`). */
-class AuthRequestException(message: String, val statusCode: Int? = null, val code: String? = null, val body: String? = null) : Exception(message)
+class AuthRequestException(message: String, val statusCode: Int? = null, val code: String? = null, val body: String? = null) : Exception(message) {
+    // S8: a refusal's text is remembered so the screen that shows it draws an info state without «Reintentar».
+    init { if (statusCode == 403) ForbiddenMessages.remember(message) }
+}

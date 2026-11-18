@@ -20,6 +20,8 @@ import kotlinx.coroutines.launch
 import org.json.JSONObject
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.data.ApiGateway
+import sv.edu.catolica.climesa.domain.PatientGate
+import sv.edu.catolica.climesa.domain.PickPurpose
 import sv.edu.catolica.climesa.domain.PickerPatient
 import sv.edu.catolica.climesa.domain.ReceptionScheduling
 import java.net.URLEncoder
@@ -42,6 +44,7 @@ internal class PatientSelectorSearch(
     private val api: ApiGateway,
     private val scope: CoroutineScope,
     private val read: () -> PatientSearchState,
+    private val purpose: PickPurpose = PickPurpose.CARE,
     private val write: ((PatientSearchState) -> PatientSearchState) -> Unit,
 ) {
     var debounceMs: Long = ReceptionScheduling.DEBOUNCE_MS
@@ -57,7 +60,11 @@ internal class PatientSelectorSearch(
 
     fun more() { val s = read(); if (!s.hasMore || s.searching) return; job = scope.launch { fetch(s.query.trim(), s.results.size) } }
 
-    fun pick(patient: PickerPatient?) { job?.cancel(); write { it.copy(patient = patient, query = "", results = emptyList(), hasMore = false, searching = false) } }
+    /** S1: a blocked row is never chosen; it shows its reason in the list instead. */
+    fun pick(patient: PickerPatient?) {
+        if (patient != null && PatientGate.blockedReason(patient, purpose) != null) return
+        job?.cancel(); write { it.copy(patient = patient, query = "", results = emptyList(), hasMore = false, searching = false) }
+    }
 
     fun cancel() { job?.cancel() }
 
@@ -77,6 +84,7 @@ internal class PatientSelectorSearch(
 internal fun PatientSearchPicker(
     query: String, results: List<PickerPatient>, searching: Boolean, hasMore: Boolean, chosen: PickerPatient?,
     onQuery: (String) -> Unit, onPick: (PickerPatient?) -> Unit, onMore: () -> Unit, enabled: Boolean = true,
+    purpose: PickPurpose = PickPurpose.CARE,
 ) {
     if (chosen != null) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -92,9 +100,12 @@ internal fun PatientSearchPicker(
     FormField(stringResource(R.string.rec_agendar_buscar), query, onQuery, hint = stringResource(R.string.rec_agendar_buscar_ayuda))
     if (searching && results.isEmpty()) LoadingState()
     results.forEach { p ->
-        TextButton(onClick = { onPick(p) }, enabled = enabled, modifier = Modifier.fillMaxWidth()) {
+        val blocked = PatientGate.blockedReason(p, purpose)
+        TextButton(onClick = { onPick(p) }, enabled = enabled && blocked == null, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth()) {
                 Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                // S1: shown but not choosable, with why and what to do, before the tap.
+                blocked?.let { BlockedReason(it) }
                 // B1: whether the person has an appointment today (time and doctor) decides the counter's primary action.
                 p.appointmentToday?.let { Text(it.chip, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
                 p.ticketToday?.let { Text(stringResource(R.string.u5_ya_tiene_numero, it.code), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }

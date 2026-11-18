@@ -8,7 +8,8 @@ data class HistoryMedication(val medication: String, val dose: String, val route
 data class HistoryConsultation(val id: String, val state: String, val date: String, val doctor: String, val reason: String, val plan: String, val diagnoses: List<HistoryDiagnosis>, val prescriptions: List<HistoryMedication>)
 data class HistoryAdmission(val id: String, val state: String, val date: String, val doctor: String)
 /** Response of `GET /pacientes/{id}/historial` (spec 106). `access`: propio or relacion. */
-data class ClinicalHistory(val patientName: String, val record: String, val access: String, val consultations: List<HistoryConsultation>, val laboratory: List<LaboratoryOrder>, val admissions: List<HistoryAdmission>)
+/** [allowedActions]: preconditions S4, what the caller may do on this record now (`resultado_externo`); null from an older API. */
+data class ClinicalHistory(val patientName: String, val record: String, val access: String, val consultations: List<HistoryConsultation>, val laboratory: List<LaboratoryOrder>, val admissions: List<HistoryAdmission>, val allowedActions: List<String>? = null)
 
 /** Pure parsing of the history so the A08/A22 ViewModel can be tested on the JVM. */
 object ClinicalHistoryParser {
@@ -29,6 +30,7 @@ object ClinicalHistoryParser {
             objects(json.optJSONArray("consultations")).map(::consultation),
             objects(json.optJSONArray("laboratory")).map(::order),
             objects(json.optJSONArray("admissions")).map { HistoryAdmission(it.optString("id"), it.optString("state"), localDay(it.optString("createdAt")), it.optJSONObject("doctor")?.optString("name").orEmpty()) },
+            json.optJSONArray("allowedActions")?.let { a -> (0 until a.length()).map(a::optString) },
         )
     }
 

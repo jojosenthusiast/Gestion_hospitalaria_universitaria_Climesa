@@ -87,11 +87,14 @@ object ConsultationRecordRules {
         ).joinToString(" · ")
     }
 
-    /** Why "Firmar" is disabled, said next to it; null when it can be signed. */
+    /**
+     * Preconditions S7: why «Firmar consulta» is disabled, said under it (same texts as iOS); null when it can be signed.
+     * The API refuses a signature with an empty motive or plan.
+     */
     fun signBlocker(reason: String, plan: String): String? = when {
-        reason.isBlank() && plan.isBlank() -> "Falta el motivo y el plan"
-        reason.isBlank() -> "Falta el motivo"
-        plan.isBlank() -> "Falta el plan"
+        reason.isBlank() && plan.isBlank() -> "Completa el motivo y el plan para firmar."
+        reason.isBlank() -> "Completa el motivo para firmar."
+        plan.isBlank() -> "Completa el plan para firmar."
         else -> null
     }
 

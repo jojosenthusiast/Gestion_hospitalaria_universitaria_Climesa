@@ -23,7 +23,22 @@ data class AmbulanceService(
     val lastLocation: AmbulanceLocation? = null,
     /** MA-AMB-03: final states the API accepts with the milestones already recorded (server-driven finish choices). */
     val finalStates: List<String> = emptyList(),
-)
+    /**
+     * Preconditions S5: `hito`, `deshacer_hito`, `reportar`, sent only to the assigned crew. Null when an older API does not
+     * send the field (every action stays offered, today's behavior).
+     */
+    val allowedActions: List<String>? = null,
+) {
+    val canAdvance get() = allowedActions == null || "hito" in allowedActions
+    val canUndo get() = allowedActions == null || "deshacer_hito" in allowedActions
+    val canReport get() = allowedActions == null || "reportar" in allowedActions
+    /** S5: a paramedic who is not in this service's crew sees it read-only, with [NOT_CREW]. */
+    val readOnly get() = !canAdvance && !canUndo && !canReport
+
+    companion object {
+        const val NOT_CREW = "No estás en la tripulación de este servicio."
+    }
+}
 /** Último punto GPS que la tripulación envió a `POST /ambulancia/ubicacion`. */
 data class AmbulanceLocation(val latitude: Double, val longitude: Double, val capturedAt: String)
 /** Quién pidió (paciente o quien llamó), su expediente si lo tiene y desde cuándo espera (obs. 7). */
@@ -151,6 +166,12 @@ object AmbulanceRules {
     const val REASON_MIN = 5
 
     const val NOTICE_911 = "Si hay riesgo de vida, llama al 911."
+
+    /** Preconditions S6: a patient account without a linked record cannot request (the API refuses it). */
+    const val UNLINKED = "Vincula tu expediente para pedir una ambulancia. En una emergencia llama al 911."
+
+    /** S6: why the request form is not offered, or null when it is. */
+    fun requestBlocker(patientId: String?): String? = UNLINKED.takeIf { patientId.isNullOrBlank() }
     private val phone = Regex("^[0-9+ -]{8,20}$")
 
     fun requestError(address: String, reason: String, contactPhone: String): String? = when {
@@ -355,6 +376,7 @@ object AmbulanceParser {
                 strings(s.optJSONArray("nextMilestones")),
                 s.optJSONObject("lastLocation")?.let { AmbulanceLocation(it.optDouble("latitude"), it.optDouble("longitude"), it.text("capturedAt")) },
                 strings(s.optJSONArray("finalStates")),
+                s.optJSONArray("allowedActions")?.let(::strings),
             )
         }
         val pending = objects(root.optJSONArray("pendingRequests")).map {

@@ -19,8 +19,23 @@ import sv.edu.catolica.climesa.domain.HistoryEvents
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 import java.net.URLEncoder
 
-/** A patient found by `GET /pacientes` (minimal fields) to open the A22 record. */
-data class HistoryCandidate(val id: String, val fullName: String, val record: String)
+/**
+ * A patient found by `GET /pacientes` (minimal fields) to open the A22 record. [careRelation] (preconditions S2): the doctor
+ * has an appointment, consultation or hospitalization with the patient; an older API without the field means true.
+ */
+data class HistoryCandidate(val id: String, val fullName: String, val record: String, val careRelation: Boolean = true) {
+    /** S2: why the record cannot be opened yet, or null. */
+    val blockedReason: String? get() = if (careRelation) null else NO_RELATION
+
+    companion object {
+        const val NO_RELATION = "Se habilita cuando hay una cita, consulta u hospitalización a tu cargo."
+
+        /** S2: patients the doctor attends first; the others keep the server order after them. */
+        fun parse(rows: JSONArray): List<HistoryCandidate> = (0 until rows.length()).mapNotNull(rows::optJSONObject)
+            .map { HistoryCandidate(it.optString("id"), it.optString("fullName"), it.optString("record"), it.optBoolean("careRelation", true)) }
+            .sortedBy { if (it.careRelation) 0 else 1 }
+    }
+}
 data class ClinicalHistoryState(
     val patientId: String? = null,
     val loading: Boolean = false,
@@ -56,7 +71,7 @@ class ClinicalHistoryViewModel @Inject constructor(private val api: ApiGateway, 
 
     /** Row 23: a 403 reads the same on Android and iOS (`RecordAccess.deniedMessage`), never the raw API text. */
     private fun historyError(e: Exception): String =
-        if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.statusCode == 403) DENIED else userMessage(e, "No se pudo cargar el historial.")
+        if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.statusCode == 403) forbiddenText(e, DENIED) else userMessage(e, "No se pudo cargar el historial.")
 
     companion object {
         const val DENIED = "Solo el médico tratante puede ver este expediente. Se habilita cuando hay una cita, consulta u hospitalización a tu cargo."
@@ -70,7 +85,7 @@ class ClinicalHistoryViewModel @Inject constructor(private val api: ApiGateway, 
         viewModelScope.launch {
             try {
                 val rows = api.request("/pacientes?query=" + URLEncoder.encode(query.trim(), "UTF-8") + "&limit=50") as? JSONArray ?: JSONArray()
-                val found = (0 until rows.length()).mapNotNull(rows::optJSONObject).map { HistoryCandidate(it.optString("id"), it.optString("fullName"), it.optString("record")) }
+                val found = HistoryCandidate.parse(rows)
                 mutable.value = mutable.value.copy(searching = false, candidates = found)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(searching = false, error = userMessage(e, "No se pudo buscar.")) }
