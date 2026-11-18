@@ -2790,6 +2790,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/laboratorio/tiempo-entrega": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Tiempo de entrega del laboratorio de los últimos 7 días: promedio y mediana por día y del rango, sin órdenes externas */
+        get: operations["LabTurnaroundController_turnaround"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ambulancia": {
         parameters: {
             query?: never;
@@ -5079,8 +5096,10 @@ export interface components {
         LabItemRangeResponse: {
             min: number | null;
             max: number | null;
-            criticalLow: number | null;
-            criticalHigh: number | null;
+            /** @description Solo para el personal; el paciente nunca recibe los límites críticos */
+            criticalLow?: number | null;
+            /** @description Solo para el personal; el paciente nunca recibe los límites críticos */
+            criticalHigh?: number | null;
         };
         LabOrderItemResponse: {
             /** Format: uuid */
@@ -5095,7 +5114,7 @@ export interface components {
             resultType: components["schemas"]["TipoResultadoLaboratorio"];
             /** @description null sin resultado o si el actor aún no puede ver valores */
             result: components["schemas"]["LabItemResultResponse"] | null;
-            /** @description C-3: rango de referencia y críticos vigentes para este paciente; solo para quien ve valores */
+            /** @description C-3: rango de referencia y críticos vigentes para este paciente, para quien ve valores. D1: el paciente recibe solo min y max, y solo en resultados ya revisados */
             referenceRange?: components["schemas"]["LabItemRangeResponse"] | null;
         };
         /**
@@ -6860,6 +6879,13 @@ export interface components {
             fecha: string;
             valor: number | null;
             muestras: number;
+            /** @description D2: mediana del día; solo en tiempo_laboratorio */
+            mediana?: number | null;
+        };
+        MetricSummaryResponse: {
+            promedio: number | null;
+            mediana: number | null;
+            muestras: number;
         };
         MetricSeriesResponse: {
             indicador: components["schemas"]["IndicadorMetrica"];
@@ -6877,6 +6903,8 @@ export interface components {
             /** Format: date-time */
             actualizadoEn: string;
             serie: components["schemas"]["SeriesPointResponse"][];
+            /** @description D2: resumen del rango; solo en tiempo_laboratorio */
+            resumen?: components["schemas"]["MetricSummaryResponse"];
         };
         AmbulanceUnitResponse: {
             /** Format: uuid */
@@ -20043,6 +20071,61 @@ export interface operations {
             };
             /** @description No encontrado (`no_encontrado`) */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    LabTurnaroundController_turnaround: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricSeriesResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

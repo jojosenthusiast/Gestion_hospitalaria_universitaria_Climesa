@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- D4: resultado externo sin orden desde el expediente del médico (POST /laboratorio/pacientes/{id}/resultado-externo). -->
+    <string name="extres_titulo">Registrar resultado externo</string>
+    <string name="extres_efecto">%1$s trae un examen que se hizo en otro sitio y que no se pidió aquí. Queda unido a su última consulta, completado y esperando tu revisión; el paciente no ve los valores hasta que los liberes.</string>
+    <string name="extres_guardar">Registrar resultado</string>
+    <string name="extres_lugar">Dónde se hizo</string>
+    <string name="extres_lugar_ayuda">Por ejemplo: Laboratorio Ejemplo, San Salvador</string>
+    <string name="extres_examenes">Exámenes y valores del informe</string>
+    <string name="extres_buscar_examen">Buscar examen del catálogo</string>
+    <string name="extres_sin_coincidencias">No hay exámenes con ese nombre.</string>
+    <string name="extres_catalogo_cargando">Cargando el catálogo de exámenes…</string>
+    <string name="extres_catalogo_reintentar">Reintentar</string>
+    <string name="extres_quitar">Quitar</string>
+</resources>

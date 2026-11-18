@@ -55,12 +55,25 @@ struct DoctorAgendaView: View {
 /// Sin relación de atención la API responde 403 y la pantalla explica que solo ve el médico tratante.
 struct PatientRecordScreen: View {
     let patientId: String
+    @EnvironmentObject private var account: AccountModel
+    @State private var externalOpen = false
+    @State private var externalNotice: String?
+    /// D4: goes up after an external result is recorded, so the history (and its lab results) is read again.
+    @State private var historyRefresh = 0
 
     var body: some View {
         ScreenFrame(title: "patients.record") {
             DoctorPatientRoom(patientId: patientId)
             DoctorPatientVitals(patientId: patientId)
-            ClinicalHistoryView(patientId: patientId, viewerIsPatient: false)
+            // D4 · rule 8: the action depends on `laboratorio.ordenar`, never on the role.
+            if ExternalRecordRules.canRecord(account.profile) {
+                ClimesaButton(title: L.text("record.external.open"), kind: .secondary) { externalNotice = nil; externalOpen = true }
+            }
+            if let externalNotice { PatientNotice(text: externalNotice) }
+            ClinicalHistoryView(patientId: patientId, viewerIsPatient: false).id(historyRefresh)
+        }
+        .sheet(isPresented: $externalOpen) {
+            ExternalRecordSheet(patientId: patientId, reload: { historyRefresh += 1 }) { message in externalNotice = message }
         }
     }
 }
@@ -98,6 +111,8 @@ private struct DoctorPatientVitals: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<PatientVitalsHistory?>()
+    @State private var entryOpen = false
+    @State private var notice: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
@@ -111,10 +126,21 @@ private struct DoctorPatientVitals: View {
                         if index > 0 { Divider().overlay(Theme.line) }
                         ListRow(title: ConsultationView.vitalsText(sign), meta: ClimesaDates.short(sign.takenAt))
                     }
+                    // D5 · rule 8: recording depends on `signos.registrar`, never on the role.
+                    if VitalsEntryRules.canRecord(account.profile) {
+                        ClimesaButton(title: L.text("vitals.entry.open"), kind: .secondary) { notice = nil; entryOpen = true }
+                    }
                 }
+                if let notice { PatientNotice(text: notice) }
             }
         }
         .task(id: live.snapshot.version([.consultations, .admissions])) { await load() }
+        .sheet(isPresented: $entryOpen) {
+            VitalsEntrySheet(patientId: patientId, admissionId: (loader.value ?? nil)?.admissionId) { message in
+                notice = message
+                Task { await load() }
+            }
+        }
     }
 
     private func load() async {
@@ -123,6 +149,229 @@ private struct DoctorPatientVitals: View {
             do { return try await account.client().get("/pacientes/\(patientId)/signos", as: PatientVitalsHistory.self) }
             catch let failure as APIFailure where failure.isForbidden { return nil }
         }
+    }
+}
+
+/// D5 · «Registrar signos vitales» from the record: the same measures, limits and messages as Android (`VitalsEntryRules`).
+/// Only filled measures are sent to `POST /pacientes/{id}/signos`, linked to the active admission when there is one.
+private struct VitalsEntrySheet: View {
+    let patientId: String
+    let admissionId: String?
+    let onDone: (String) -> Void
+    @EnvironmentObject private var account: AccountModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var values: [VitalEntryMeasure: String] = [:]
+    @State private var note = ""
+    @State private var problem: String?
+    @State private var submission = Submission()
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "vitals.entry.title", onClose: { if !submission.busy { dismiss() } }) {
+                SectionCard(title: L.text("vitals.entry.measures")) {
+                    Text("vitals.entry.hint").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    ForEach(VitalEntryMeasure.allCases, id: \.self) { measure in
+                        FormField(label: "\(measure.label) (\(measure.unit))", text: binding(measure), hint: measure.rangeText,
+                                  error: VitalsEntryRules.fieldError(measure, values[measure] ?? ""))
+                            .keyboardType(measure.decimals ? .decimalPad : .numberPad)
+                    }
+                }
+                .disabled(submission.busy)
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    MedicoTextArea(label: L.text("vitals.entry.note"), text: $note, error: submission.fieldErrors["note"], lines: 2...4)
+                    CharacterCounter(count: note.count, range: 0...VitalsEntryRules.noteMaximum)
+                }
+                .disabled(submission.busy)
+                if let problem { PatientNotice(text: problem, failure: true) }
+                SubmissionNotice(submission: submission)
+                ClimesaButton(title: L.text("vitals.entry.save"), loading: submission.busy) { Task { await save() } }
+            }
+        }
+        .interactiveDismissDisabled(submission.busy)
+    }
+
+    private func binding(_ measure: VitalEntryMeasure) -> Binding<String> {
+        Binding(get: { values[measure] ?? "" }, set: { values[measure] = String($0.prefix(6)) })
+    }
+
+    private func save() async {
+        problem = VitalsEntryRules.formError(values, note: note)
+        guard problem == nil else { return }
+        let body = VitalsEntryRules.body(values, note: note, admissionId: admissionId)
+        let ok = await submission.run(patientId, body: body) { key in
+            _ = try await account.client().send("POST", VitalsEntryRules.path(patientId), body: body, key: key, as: VitalsEntrySaved.self)
+        }
+        guard ok else { return }
+        onDone(L.text("vitals.entry.done"))
+        dismiss()
+    }
+}
+
+/// D4 · «Registrar resultado externo» (R7 C-5): an exam the patient had done elsewhere without an order. The values and the
+/// file reference go first (`POST /laboratorio/pacientes/{id}/resultado-externo`), then the file with its progress, as
+/// `ExternalResultSheet` does; if the upload fails the values stay saved and «Reintentar» uploads the same bytes.
+private struct ExternalRecordSheet: View {
+    let patientId: String
+    let reload: () -> Void
+    let onDone: (String) -> Void
+    @EnvironmentObject private var account: AccountModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var catalog = Loader<[LabExam]>()
+    @State private var place = ""
+    @State private var query = ""
+    @State private var exams: [LabExam] = []
+    @State private var values: [String: String] = [:]
+    @State private var file: LabExternalFile?
+    @State private var note = ""
+    @State private var problem: String?
+    @State private var flow = ExternalResultFlow()
+    @State private var valuesSubmission = Submission()
+    @State private var upload = FileUpload()
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "record.external.open", onClose: { if !flow.busy { dismiss() } }) {
+                Text("record.external.intro").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                FormField(label: L.text("record.external.place"), text: $place, hint: L.text("record.external.placeHint"))
+                    .disabled(!flow.canEdit)
+                SectionCard(title: L.text("record.external.exams")) {
+                    ForEach(exams) { exam in
+                        HStack(alignment: .bottom, spacing: Spacing.s) {
+                            FormField(label: label(exam), text: binding(exam)).keyboardType(exam.numeric ? .decimalPad : .default)
+                            Button(L.text("record.external.remove")) { remove(exam) }.font(Typo.label).foregroundStyle(Theme.primaryText)
+                                .frame(minHeight: Spacing.control)
+                        }
+                    }
+                    examPicker
+                }
+                .disabled(!flow.canEdit)
+                SectionCard(title: L.text("results.externalLoad.file")) {
+                    ExternalFilePicker(file: $file, problem: $problem).disabled(!flow.canEdit)
+                }
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    MedicoTextArea(label: L.text("results.externalLoad.note"), text: $note, error: valuesSubmission.fieldErrors["note"], lines: 2...4)
+                    CharacterCounter(count: note.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 0...LabExternalRules.noteMaximum)
+                }
+                .disabled(!flow.canEdit)
+                if let problem { PatientNotice(text: problem, failure: true) }
+                status
+                ClimesaButton(title: L.text(flow.filePending ? "results.externalLoad.retry" : "record.external.save"), loading: flow.busy) {
+                    Task { await save() }
+                }
+            }
+        }
+        .interactiveDismissDisabled(flow.busy)
+        .task { await catalog.load { try await account.client().get("/laboratorio/catalogo", as: [LabExam].self) } }
+    }
+
+    @ViewBuilder private var examPicker: some View {
+        if let error = catalog.error {
+            PartError(message: error) { await catalog.load { try await account.client().get("/laboratorio/catalogo", as: [LabExam].self) } }
+        } else if let all = catalog.value {
+            FormField(label: L.text("record.external.search"), text: $query)
+            let typed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+            if typed.count >= 2 {
+                let matches = Array(ExternalRecordRules.options(all, picked: exams, query: typed).prefix(6))
+                if matches.isEmpty { Text("record.external.noMatch").font(Typo.small).foregroundStyle(Theme.muted) }
+                ForEach(matches) { exam in
+                    Button { add(exam) } label: {
+                        Label { Text(verbatim: "\(exam.name) · \(exam.code)") } icon: { Image(systemName: "plus.circle") }
+                            .font(Typo.body).foregroundStyle(Theme.primaryText).frame(maxWidth: .infinity, minHeight: Spacing.control, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        } else {
+            HStack(spacing: Spacing.s) {
+                ProgressView().tint(Theme.primary)
+                Text("record.external.catalogLoading").font(Typo.small).foregroundStyle(Theme.muted)
+            }
+        }
+    }
+
+    @ViewBuilder private var status: some View {
+        switch flow.status {
+        case .saving:
+            UploadProgressRow(progress: nil)
+        case .uploading:
+            UploadProgressRow(progress: upload.progress)
+        case let .failed(message):
+            if flow.filePending {
+                VStack(alignment: .leading, spacing: Spacing.xs) {
+                    Text("results.externalLoad.filePending").font(Typo.label).foregroundStyle(Theme.danger)
+                    Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(Spacing.l).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Theme.dangerSoft, in: RoundedRectangle(cornerRadius: Radius.card))
+                .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.danger, lineWidth: 1))
+                .accessibilityElement(children: .combine)
+            } else {
+                PatientNotice(text: message, failure: true)
+            }
+        case .editing, .done:
+            EmptyView()
+        }
+    }
+
+    private func label(_ exam: LabExam) -> String {
+        guard exam.numeric, let unit = exam.unit, !unit.isEmpty else { return exam.name }
+        return "\(exam.name) (\(unit))"
+    }
+
+    private func binding(_ exam: LabExam) -> Binding<String> {
+        Binding(get: { values[exam.id] ?? "" }, set: { values[exam.id] = String($0.prefix(ExternalRecordRules.textMaximum)) })
+    }
+
+    private func add(_ exam: LabExam) {
+        guard exams.count < ExternalRecordRules.examMaximum, !exams.contains(where: { $0.id == exam.id }) else { return }
+        exams.append(exam); query = ""
+    }
+
+    private func remove(_ exam: LabExam) {
+        exams.removeAll { $0.id == exam.id }; values[exam.id] = nil
+    }
+
+    private func save() async {
+        problem = nil
+        switch flow.next {
+        case .saveValues: await saveValues()
+        case let .upload(attachmentId): await sendFile(attachmentId)
+        case .finished: finish()
+        }
+    }
+
+    private func saveValues() async {
+        problem = ExternalRecordRules.error(place: place, exams: exams, values: values, file: file, note: note)
+        guard problem == nil, let file else { return }
+        let body = ExternalRecordRules.body(place: place, file: file, exams: exams, values: values, note: note)
+        flow.begin()
+        var saved: LabExternalRecordSaved?
+        let ok = await valuesSubmission.run(patientId, body: body) { key in
+            saved = try await account.client().send("POST", ExternalRecordRules.path(patientId), body: body, key: key, as: LabExternalRecordSaved.self)
+        }
+        guard ok, let saved else {
+            flow.fail(valuesSubmission.error ?? L.text("results.externalLoad.failed"))
+            return
+        }
+        flow.valuesSaved(attachmentId: saved.attachmentId)
+        reload()
+        if case let .upload(attachmentId) = flow.next { await sendFile(attachmentId) } else { finish() }
+    }
+
+    private func sendFile(_ attachmentId: String) async {
+        guard let file else { return }
+        flow.begin()
+        if await upload.send(file, attachmentId: attachmentId, account: account) {
+            flow.fileStored()
+            finish()
+        } else {
+            flow.fail(upload.error ?? LabAttachmentRules.uploadFallback)
+        }
+    }
+
+    private func finish() {
+        onDone(L.text(flow.status == .done(withFile: true) ? "record.external.done" : "record.external.doneNoFile"))
+        dismiss()
     }
 }
 

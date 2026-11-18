@@ -1,0 +1,18 @@
+{
+  "method": "POST",
+  "path": "/api/v1/laboratorio/pacientes/{id}/resultado-externo",
+  "body": {
+    "place": "Laboratorio Ejemplo, San Salvador",
+    "attachment": {
+      "fileName": "informe.pdf",
+      "mimeType": "application/pdf",
+      "sizeBytes": 2048,
+      "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    },
+    "results": [
+      { "examId": "77777777-7777-4777-8777-777777777777", "value": 12.9 },
+      { "examId": "66666666-6666-4666-8666-666666666666", "text": "Negativo" }
+    ],
+    "note": "Informe de laboratorio externo"
+  }
+}

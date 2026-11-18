@@ -5908,6 +5908,17 @@
         }
       }
     },
+    "exams.outOfRange": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Fuera de rango"
+          }
+        }
+      }
+    },
     "results.range": {
       "extractionState": "manual",
       "localizations": {
@@ -5992,6 +6003,215 @@
           "stringUnit": {
             "state": "translated",
             "value": "Siguiente paso: Recepción ingresa al paciente en Admisión con origen «Ambulancia»."
+          }
+        }
+      }
+    },
+    "record.external.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrar resultado externo"
+          }
+        }
+      }
+    },
+    "record.external.intro": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El paciente trae un examen que se hizo en otro sitio y que no se pidió aquí. Queda unido a su última consulta, completado y esperando tu revisión; el paciente no ve los valores hasta que los liberes."
+          }
+        }
+      }
+    },
+    "record.external.place": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dónde se hizo"
+          }
+        }
+      }
+    },
+    "record.external.placeHint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por ejemplo: Laboratorio Ejemplo, San Salvador"
+          }
+        }
+      }
+    },
+    "record.external.exams": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Exámenes y valores del informe"
+          }
+        }
+      }
+    },
+    "record.external.search": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar examen del catálogo"
+          }
+        }
+      }
+    },
+    "record.external.noMatch": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No hay exámenes con ese nombre."
+          }
+        }
+      }
+    },
+    "record.external.catalogLoading": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cargando el catálogo de exámenes…"
+          }
+        }
+      }
+    },
+    "record.external.remove": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quitar"
+          }
+        }
+      }
+    },
+    "record.external.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrar resultado"
+          }
+        }
+      }
+    },
+    "record.external.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultado externo registrado con su archivo: queda en «Resultados por revisar» para liberarlo."
+          }
+        }
+      }
+    },
+    "record.external.doneNoFile": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resultado externo registrado: queda en «Resultados por revisar» para liberarlo."
+          }
+        }
+      }
+    },
+    "vitals.entry.open": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrar signos"
+          }
+        }
+      }
+    },
+    "vitals.entry.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Registrar signos vitales"
+          }
+        }
+      }
+    },
+    "vitals.entry.measures": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Medidas"
+          }
+        }
+      }
+    },
+    "vitals.entry.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Llena solo lo que mediste; la presión lleva la sistólica y la diastólica."
+          }
+        }
+      }
+    },
+    "vitals.entry.note": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nota (opcional)"
+          }
+        }
+      }
+    },
+    "vitals.entry.save": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar signos"
+          }
+        }
+      }
+    },
+    "vitals.entry.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Signos vitales registrados."
           }
         }
       }

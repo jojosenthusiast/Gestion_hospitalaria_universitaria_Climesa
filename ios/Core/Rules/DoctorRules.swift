@@ -392,3 +392,136 @@ public enum PatientVitalsRules {
         Array(items.sorted { $0.takenAt > $1.takenAt }.prefix(shown))
     }
 }
+
+// MARK: - D5 · the doctor records vital signs from the record
+
+/// D5: the measures of the vitals form, with the hard limits the API and the database accept (`PatientVitalsDto`).
+/// Same table, messages and rules as Android `VitalMeasure` / `VitalsRules`; the API stays the guarantee.
+public enum VitalEntryMeasure: String, CaseIterable, Sendable {
+    case temperature, heartRate, respiratoryRate, systolic, diastolic, oxygenSaturation, pain, glucoseMgDl, weightKg, heightCm
+
+    public var label: String {
+        switch self {
+        case .temperature: return "Temperatura"
+        case .heartRate: return "Frecuencia cardiaca"
+        case .respiratoryRate: return "Frecuencia respiratoria"
+        case .systolic: return "Presión sistólica"
+        case .diastolic: return "Presión diastólica"
+        case .oxygenSaturation: return "Saturación de oxígeno"
+        case .pain: return "Dolor (0 a 10)"
+        case .glucoseMgDl: return "Glucemia"
+        case .weightKg: return "Peso"
+        case .heightCm: return "Talla"
+        }
+    }
+
+    public var unit: String {
+        switch self {
+        case .temperature: return "°C"
+        case .heartRate: return "lpm"
+        case .respiratoryRate: return "rpm"
+        case .systolic, .diastolic: return "mmHg"
+        case .oxygenSaturation: return "%"
+        case .pain: return "/10"
+        case .glucoseMgDl: return "mg/dL"
+        case .weightKg: return "kg"
+        case .heightCm: return "cm"
+        }
+    }
+
+    public var range: ClosedRange<Double> {
+        switch self {
+        case .temperature: return 30...45
+        case .heartRate: return 20...250
+        case .respiratoryRate: return 4...80
+        case .systolic: return 40...300
+        case .diastolic: return 20...200
+        case .oxygenSaturation: return 40...100
+        case .pain: return 0...10
+        case .glucoseMgDl: return 20...800
+        case .weightKg: return 0.3...400
+        case .heightCm: return 20...250
+        }
+    }
+
+    /// Temperature, weight and height take one decimal; the rest are whole numbers.
+    public var decimals: Bool { self == .temperature || self == .weightKg || self == .heightCm }
+
+    public func format(_ value: Double) -> String {
+        decimals && value.truncatingRemainder(dividingBy: 1) != 0 ? String(format: "%.1f", value) : String(Int(value))
+    }
+
+    public var rangeText: String { "\(format(range.lowerBound)) a \(format(range.upperBound)) \(unit)" }
+}
+
+public enum VitalsEntryRules {
+    public static let permission = "signos.registrar"
+    public static let noteMaximum = 500
+
+    public static func path(_ patientId: String) -> String { "/pacientes/\(patientId)/signos" }
+
+    /// Rule 8: who takes signs is decided by the permission `signos.registrar`, never by the role.
+    public static func canRecord(_ profile: AccessProfile?) -> Bool { profile?.hasPermission(permission) ?? false }
+
+    /// Decimals accept a comma (es-SV keyboards); "nan" or "inf" are not numbers.
+    public static func parse(_ text: String) -> Double? {
+        guard let value = Double(text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")), value.isFinite else { return nil }
+        return value
+    }
+
+    /// Inline error for one field, or nil when it is empty or acceptable.
+    public static func fieldError(_ measure: VitalEntryMeasure, _ text: String) -> String? {
+        if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
+        guard let value = parse(text) else { return "Escribe un número." }
+        if !measure.decimals && value.truncatingRemainder(dividingBy: 1) != 0 { return "Solo números enteros." }
+        return measure.range.contains(value) ? nil : "Fuera de rango: \(measure.rangeText)."
+    }
+
+    /// First blocking problem of the whole form, or nil when it can be sent.
+    public static func formError(_ values: [VitalEntryMeasure: String], note: String) -> String? {
+        for measure in VitalEntryMeasure.allCases {
+            if let error = fieldError(measure, values[measure] ?? "") { return "\(measure.label): \(error)" }
+        }
+        let filled = VitalEntryMeasure.allCases.filter { !(values[$0] ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+        if filled.isEmpty { return "Registra al menos una medida." }
+        let systolic = parse(values[.systolic] ?? ""), diastolic = parse(values[.diastolic] ?? "")
+        if (systolic == nil) != (diastolic == nil) { return "La presión necesita la sistólica y la diastólica." }
+        if let systolic, let diastolic, systolic <= diastolic { return "La sistólica debe ser mayor que la diastólica." }
+        if note.count > noteMaximum { return "La nota no puede pasar de \(noteMaximum) caracteres." }
+        return nil
+    }
+
+    /// Body of `POST /pacientes/{id}/signos`: only filled measures, the trimmed note and the active admission.
+    public static func body(_ values: [VitalEntryMeasure: String], note: String, admissionId: String?) -> VitalsEntryBody {
+        func whole(_ m: VitalEntryMeasure) -> Int? { parse(values[m] ?? "").map { Int($0) } }
+        func decimal(_ m: VitalEntryMeasure) -> Double? { parse(values[m] ?? "") }
+        let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let admission = admissionId?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return VitalsEntryBody(
+            systolic: whole(.systolic), diastolic: whole(.diastolic), heartRate: whole(.heartRate), respiratoryRate: whole(.respiratoryRate),
+            temperature: decimal(.temperature), oxygenSaturation: whole(.oxygenSaturation), weightKg: decimal(.weightKg), heightCm: decimal(.heightCm),
+            pain: whole(.pain), glucoseMgDl: whole(.glucoseMgDl), note: trimmed.isEmpty ? nil : trimmed,
+            admissionId: (admission?.isEmpty ?? true) ? nil : admission)
+    }
+}
+
+/// `PatientVitalsDto`: every key is optional and left out when empty.
+public struct VitalsEntryBody: Encodable, Sendable, Equatable {
+    public let systolic: Int?
+    public let diastolic: Int?
+    public let heartRate: Int?
+    public let respiratoryRate: Int?
+    public let temperature: Double?
+    public let oxygenSaturation: Int?
+    public let weightKg: Double?
+    public let heightCm: Double?
+    public let pain: Int?
+    public let glucoseMgDl: Int?
+    public let note: String?
+    public let admissionId: String?
+}
+
+/// `VitalSignsCreatedResponse`: only the id is read.
+public struct VitalsEntrySaved: Decodable, Sendable, Equatable {
+    public let id: String
+}

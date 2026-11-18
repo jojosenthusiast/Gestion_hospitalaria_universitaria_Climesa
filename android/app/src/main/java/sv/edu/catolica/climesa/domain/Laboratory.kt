@@ -98,6 +98,13 @@ object LaboratoryLabels {
         val limits = listOfNotNull(range.criticalLow?.let { "< ${number(it)}" }, range.criticalHigh?.let { "> ${number(it)}" }).joinToString(" o ")
         return listOfNotNull(normal, limits.takeIf(String::isNotEmpty)?.let { "crítico $it" }).joinToString(" · ").ifEmpty { null }
     }
+    /**
+     * D1: the range a patient sees next to a released result, never the critical limits (the API does not send them
+     * to the patient either). «12–15.5»; null without limits.
+     */
+    fun patientRangeText(range: LabRange?): String? = range?.let { rangeText(it.copy(criticalLow = null, criticalHigh = null)) }
+    /** D1: the result fell outside its reference range (high, low or critical); `sin_rango` and `normal` are not. */
+    fun outOfRange(mark: String?) = mark in setOf("alto", "bajo", "critico_alto", "critico_bajo")
     fun mark(value: String) = mapOf("normal" to "Normal", "alto" to "Alto", "bajo" to "Bajo", "critico_alto" to "Crítico alto", "critico_bajo" to "Crítico bajo", "sin_rango" to "Sin rango")[value] ?: value
 }
 

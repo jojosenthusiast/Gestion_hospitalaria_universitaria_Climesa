@@ -147,6 +147,16 @@ class ContractFixturesTest {
             sv.edu.catolica.climesa.domain.LabExternalRules.resultBody(2, attachment, listOf(item), mapOf(item.id to "12.9"), "Informe de laboratorio externo"), order)
     }
 
+    @Test fun laboratoryExternalRecordWithoutOrder() {
+        val patient = "99999999-9999-4999-8999-999999999999"
+        val numeric = sv.edu.catolica.climesa.domain.ExternalExam("77777777-7777-4777-8777-777777777777", "HB", "Hemoglobina", "g/dL", numeric = true)
+        val text = sv.edu.catolica.climesa.domain.ExternalExam("66666666-6666-4666-8666-666666666666", "VIH", "Prueba de VIH", null, numeric = false)
+        val attachment = sv.edu.catolica.climesa.domain.LabAttachment("informe.pdf", "application/pdf", 2048, "a".repeat(64))
+        assertContract("laboratorio-resultado-externo-paciente", "POST", sv.edu.catolica.climesa.domain.ExternalRecordRules.path(patient),
+            sv.edu.catolica.climesa.domain.ExternalRecordRules.body(" Laboratorio Ejemplo, San Salvador ", attachment, listOf(numeric, text),
+                mapOf(numeric.id to "12,9", text.id to " Negativo "), " Informe de laboratorio externo "), patient)
+    }
+
     @Test fun laboratoryFollowUpReviewed() {
         val followUp = "99999999-9999-4999-8999-999999999999"
         assertContract("laboratorio-pendiente-revisar", "POST", sv.edu.catolica.climesa.domain.LabFollowUpRules.reviewPath(followUp),

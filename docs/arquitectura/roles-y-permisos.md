@@ -288,6 +288,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/laboratorio/seguimientos` | `citas.agendar` | Sin exámenes ni valores | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/laboratorio/seguimientos/{id}/confirmar` | `citas.agendar` | Cita del mismo paciente y médico creada con POST /citas | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/laboratorio/seguimientos/{id}/descartar` | `citas.agendar` | Motivo de 10 o más | R | 4 | · | · | ✔ | · | · | · | · | · | · | · |
+| GET | `/api/v1/laboratorio/tiempo-entrega` | `laboratorio.ver_cola` | Solo agregados; últimos 7 días; sin órdenes externas; mismo cálculo que /metricas/tiempo_laboratorio | R | 5 | · | · | · | · | · | · | ✔ | · | · | · |
 | GET | `/api/v1/catalogo/examenes` | `catalogo.configurar` | Activos e inactivos, con componentes y rangos vigentes | R | 3 | ✔ | · | · | · | · | · | · | · | · | · |
 
 ### Spec 108

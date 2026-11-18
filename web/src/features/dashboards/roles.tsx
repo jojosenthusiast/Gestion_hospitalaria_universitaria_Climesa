@@ -8,12 +8,13 @@ import type { Remote } from '../common';
 import { isUnclosed, milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames, typeNames } from '../ambulance/types';
 import { isPendingCategoryRequest } from '../listas/requests';
 import { shownState } from '../listas/schedule';
+import type { IndicatorSeries } from '../metrics';
 import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source, StockRow } from './data';
 import { unitPlural } from '../inventory/model';
 import { auditActionLabel } from './labels';
 import { coverageTodayGroup } from './coverage-tray';
 import { needsStaffLink } from '../personal/filters';
-import { AttentionList, Panel, PanelState, isToday, localDay, minutesBetween, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
+import { AttentionList, Panel, PanelState, isToday, localDay, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
 export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'AST' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
 export type Ctx = { d: DashboardData; profile: AccessProfile };
@@ -110,9 +111,10 @@ const noBed = (d: DashboardData): TrayGroupSpec => ({
 
 const labCount = (rows: LabOrderRow[], state: string) => rows.filter(o => o.state === state).length;
 const pendingReview = (rows: LabOrderRow[]) => rows.filter(o => o.state === 'completado' && !o.reviewedAt);
-// External reports are done elsewhere: they do not measure this lab's turnaround (same rule as /metricas/tiempo_laboratorio).
-const turnaround = (rows: LabOrderRow[]) => rows.filter(o => o.completedAt && !o.external).map(o => ({ day: localDay(o.completedAt as string), minutes: minutesBetween(o.createdAt, o.completedAt as string) }));
-const average = (values: number[]) => values.length ? Math.round(values.reduce((a, b) => a + b, 0) / values.length) : null;
+// D3: the lab's turnaround comes from GET /laboratorio/tiempo-entrega (same rule as /metricas/tiempo_laboratorio,
+// external reports excluded), never from the completed orders of the list, which is capped to the latest 300.
+const turnaroundDay = (series: IndicatorSeries, day: string) => series.serie?.find(p => p.fecha === day);
+const minutesText = (value: number | null | undefined) => value == null ? null : formatDuration(Math.round(value));
 const occupancy = (b: { camas: { total: number; libres: number } }) => b.camas.total ? Math.round(((b.camas.total - b.camas.libres) / b.camas.total) * 100) : null;
 
 // ───────────────────────────── ADM · administración del sistema (sin contenido clínico)
@@ -322,7 +324,7 @@ const med: RoleDashboard = {
 const LAB_GOAL_MIN = 60;
 const lab: RoleDashboard = {
   title: 'Laboratorio',
-  needs: ['lab', 'stock', 'myShifts'],
+  needs: ['lab', 'labTurnaround', 'stock', 'myShifts'],
   actions: [
     { id: 'muestra', label: 'Tomar muestra', hint: 'Confirma la identidad y pasa la orden a proceso', icon: 'drop', href: '#/laboratorio?accion=muestra', permission: 'laboratorio.procesar' },
     { id: 'inventario', label: 'Ver inventario', hint: 'Reactivos, lotes y mínimos', icon: 'inventory', href: '#/inventario', permission: 'inventario.ver' },
@@ -333,19 +335,19 @@ const lab: RoleDashboard = {
     items: (d.lab.data ?? []).filter(o => o.state === 'pendiente' && !o.external).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2) || a.createdAt.localeCompare(b.createdAt)).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: `${o.items.map(i => i.name).join(', ')} · ${formatRelative(o.createdAt)}`, tone: 'warn' as Tone, href: `#/laboratorio?orden=${o.id}&accion=muestra`, action: 'Tomar muestra', status: o.priority === 'urgente' || o.priority === 'emergencia' ? o.priority : undefined })),
   }, lowStock(d)],
   figures: ({ d }) => {
-    const today = d.lab.data ? turnaround(d.lab.data).filter(t => t.day === localDay()).map(t => t.minutes) : [];
     return [
       fig('lab-proceso', 'En proceso', d.lab, r => labCount(r, 'en_proceso'), { href: '#/laboratorio' }),
-      fig('lab-hoy', 'Completadas hoy', d.lab, () => today.length),
+      fig('lab-hoy', 'Completadas hoy', d.labTurnaround, s => turnaroundDay(s, localDay())?.muestras ?? 0),
       fig('lab-revision', 'Sin revisión médica', d.lab, r => pendingReview(r).length),
-      // W-LAB-2: no «—» card when nothing was completed today.
-      fig('lab-tiempo', 'Tiempo promedio hoy', d.lab, () => { const avg = average(today); return avg === null ? null : formatDuration(avg); }),
+      // W-LAB-2: no «—» card when nothing was completed today. D2: the median sits next to the average.
+      fig('lab-tiempo', 'Tiempo promedio hoy', d.labTurnaround, s => minutesText(turnaroundDay(s, localDay())?.valor)),
+      fig('lab-mediana', 'Mediana hoy', d.labTurnaround, s => minutesText(turnaroundDay(s, localDay())?.mediana)),
     ];
   },
   panels: ({ d }) => {
     const days = Array.from({ length: 7 }, (_, i) => localDay(new Date(Date.now() - (6 - i) * 86400000)));
     return grid(<Panel title="Tiempo de entrega (7 días)" icon="clock">
-      <PanelState state={d.lab}>{r => { const t = turnaround(r); return <BarChart title="Tiempo promedio de entrega por día" unit="min" threshold={{ value: LAB_GOAL_MIN, label: `Meta ${LAB_GOAL_MIN} min` }} empty="Aún no hay órdenes completadas en la semana." data={days.map(day => { const v = average(t.filter(x => x.day === day).map(x => x.minutes)); return { label: `${day.slice(8)}/${day.slice(5, 7)}`, value: v, tone: v == null ? undefined : (v >= LAB_GOAL_MIN * 2 ? 'urgent' : v >= LAB_GOAL_MIN ? 'warn' : 'ok') as Tone }; })} />; }}</PanelState>
+      <PanelState state={d.labTurnaround}>{s => <BarChart title="Tiempo promedio de entrega por día" unit="min" threshold={{ value: LAB_GOAL_MIN, label: `Meta ${LAB_GOAL_MIN} min` }} empty="Aún no hay órdenes completadas en la semana." data={days.map(day => { const v = turnaroundDay(s, day)?.valor ?? null; return { label: `${day.slice(8)}/${day.slice(5, 7)}`, value: v == null ? null : Math.round(v), tone: v == null ? undefined : (v >= LAB_GOAL_MIN * 2 ? 'urgent' : v >= LAB_GOAL_MIN ? 'warn' : 'ok') as Tone }; })} />}</PanelState>
     </Panel>);
   },
 };

@@ -420,6 +420,15 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
             item.result?.let { result -> LabFollowUpRules.labNote(result, ownView)?.let { ObservationLine(it, result.relevant) } }
             // C-3: the doctor reviews against the range valid for this patient (never sent to the patient).
             if (!ownView) LaboratoryLabels.rangeText(item.range)?.let { Text(stringResource(R.string.lab_referencia, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            // D1: once the doctor released the result, the patient sees its range (without critical limits) and whether it fell outside.
+            if (ownView && order.reviewed) item.result?.let { result ->
+                LaboratoryLabels.patientRangeText(item.range)?.let { range ->
+                    Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.lab_referencia, range), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (LaboratoryLabels.outOfRange(result.mark)) LabMarkTag(result.mark, stringResource(R.string.lab_fuera_de_rango))
+                    }
+                }
+            }
         }
         // T07c: the report file of a completed external order. Never in the patient's own view.
         if (!ownView && order.external && order.state == "completado") ExternalReport(order, model)
