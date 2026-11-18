@@ -62,6 +62,8 @@ data class ConsultationState(
     val record: ConsultationRecord? = null,
     /** B4: the success of a step, shown under that step ([RecordSection]) instead of behind the page. */
     val stepNotice: Pair<RecordSection, String>? = null,
+    /** Row 1: the queue number whose call, undo, absence or priority is being sent; only its buttons show progress. */
+    val queueBusy: String? = null,
 )
 
 /** Steps of the consultation whose success shows in place. */
@@ -190,7 +192,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
                 val orders = read ?: previous?.labOrders.orEmpty()
                 val ordered = previous?.orderedIds.orEmpty() + storedOrdered(consultationId)
                 mutable.value = mutable.value.copy(
-                    record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders, ordered, labOrdersKnown = read != null),
+                    record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders, ordered, labOrdersKnown = read != null, vitals = ConsultationRecordRules.vitals(detail)),
                     recordError = ordersError?.let { userMessage(it, "No se pudieron leer las órdenes de laboratorio de esta consulta.") },
                 )
             } catch (e: CancellationException) { throw e
@@ -272,6 +274,31 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         }
     }
 
+    /** Row 1: "Volver a llamar" a called number (`POST /fila/{id}/llamar` at its version). */
+    fun callAgain(ticket: QueueConsultation) = queueWrite(ticket, "/fila/${ticket.ticketId}/llamar", JSONObject().put("version", ticket.version), "Llamaste ${ticket.code} de nuevo.")
+
+    /** Row 1: undo the doctor's own call while the number is still called. */
+    fun undoCall(ticket: QueueConsultation) = queueWrite(ticket, "/fila/${ticket.ticketId}/deshacer-llamado", QueueRules.undoBody(ticket.version), "Llamado de ${ticket.code} deshecho.")
+
+    /** Row 1: "No se presentó", sent after the screen's confirmation (there is no inverse endpoint). */
+    fun markAbsent(ticket: QueueConsultation) = queueWrite(ticket, "/fila/${ticket.ticketId}/no-se-presento", JSONObject().put("version", ticket.version), "${ticket.code} se marcó como no presentado.")
+
+    /** Row 1: clinical priority of the number (`fila.gestionar`). */
+    fun changePriority(ticket: QueueConsultation, priority: String) = queueWrite(ticket, "/fila/${ticket.ticketId}/prioridad", QueueRules.priorityBody(ticket.version, priority), "Prioridad de ${ticket.code}: ${sv.edu.catolica.climesa.domain.QueueLabels.priority(priority)}.")
+
+    private fun queueWrite(ticket: QueueConsultation, path: String, body: JSONObject, notice: String) {
+        if (mutable.value.queueBusy != null || mutable.value.saving) return
+        mutable.value = mutable.value.copy(queueBusy = ticket.ticketId, error = null, notice = null)
+        viewModelScope.launch {
+            try {
+                api.request(path, "POST", body)
+                mutable.value = mutable.value.copy(queueBusy = null, notice = notice)
+                load(silent = true)
+            } catch (e: CancellationException) { throw e
+            } catch (e: Exception) { mutable.value = mutable.value.copy(queueBusy = null, error = message(e)) }
+        }
+    }
+
     fun dismissHandoff() { mutable.value = mutable.value.copy(handoff = null) }
 
     fun signs(item: MedicalAppointment, systolic: String, diastolic: String, heartRate: String, temperature: String, oxygenSaturation: String, onDone: () -> Unit = {}) {
@@ -287,7 +314,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         if (mutable.value.saving) return
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null, stepNotice = null)
         viewModelScope.launch {
-            try { api.request("/consultas/${item.consultationId}/signos", "POST", body); mutable.value = mutable.value.copy(saving = false, stepNotice = RecordSection.SIGNS to "Signos vitales registrados."); onDone() }
+            try { api.request("/consultas/${item.consultationId}/signos", "POST", body); stepDone(item, RecordSection.SIGNS, "Signos vitales registrados."); onDone() }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
         }
@@ -386,7 +413,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
                 val seen = orders.size > before || orders.any { o -> local.examIds.any { it in o.examIds } || local.examCodes.any { it in o.examCodes } }
                 val kept = mutable.value.record?.labOrders.orEmpty().filter { it.id.startsWith("local-") && it.id != local.id }
                 val ordered = mutable.value.record?.orderedIds.orEmpty()
-                mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders + kept + if (seen) emptyList() else listOf(local), ordered))
+                mutable.value = mutable.value.copy(record = ConsultationRecord(consultationId, ConsultationRecordRules.diagnoses(detail), ConsultationRecordRules.medications(detail), orders + kept + if (seen) emptyList() else listOf(local), ordered, vitals = ConsultationRecordRules.vitals(detail)))
             } catch (e: CancellationException) { throw e
             } catch (_: Exception) { }
         }

@@ -150,9 +150,31 @@ public struct AdmissionBody: Encodable, Sendable, Equatable {
     /// Nil se omite del JSON (la API usa al propio médico).
     public let attendingDoctorId: String?
     public let motive: String
-    public init(patientId: String, consultationId: String, category: RoomCategory, isolation: Bool, attendingDoctorId: String? = nil, motive: String) {
+    /// Row 10 (MED audit, Android `AdmissionIndication.body`): isolation type only with isolation on; the two clinical flags
+    /// only when marked. Nil is omitted from the JSON, so an indication without them keeps the same body.
+    public let isolationType: String?
+    public let unstable: Bool?
+    public let postSurgical: Bool?
+    public init(patientId: String, consultationId: String, category: RoomCategory, isolation: Bool, attendingDoctorId: String? = nil, motive: String,
+                isolationType: IsolationKind? = nil, unstable: Bool = false, postSurgical: Bool = false) {
         self.patientId = patientId; self.origin = "consulta"; self.originId = consultationId; self.requestedCategory = category.rawValue
         self.isolation = isolation; self.attendingDoctorId = attendingDoctorId; self.motive = motive.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.isolationType = isolation ? isolationType?.rawValue : nil
+        self.unstable = unstable ? true : nil
+        self.postSurgical = postSurgical ? true : nil
+    }
+}
+
+/// `isolationType` of an admission (`AdmissionIndicationDto`).
+public enum IsolationKind: String, CaseIterable, Sendable, Hashable {
+    case contacto, gotitas, aerea, protector
+    public var label: String {
+        switch self {
+        case .contacto: return "Por contacto"
+        case .gotitas: return "Por gotitas"
+        case .aerea: return "Aérea"
+        case .protector: return "Protector"
+        }
     }
 }
 

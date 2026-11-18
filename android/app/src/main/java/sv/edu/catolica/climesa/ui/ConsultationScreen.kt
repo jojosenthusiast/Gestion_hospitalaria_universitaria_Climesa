@@ -56,6 +56,8 @@ import sv.edu.catolica.climesa.domain.AccessProfile
 import sv.edu.catolica.climesa.domain.DraftRules
 import sv.edu.catolica.climesa.domain.DraftStatus
 import sv.edu.catolica.climesa.domain.QueueConsultation
+import sv.edu.catolica.climesa.domain.ConsultationAgenda
+import sv.edu.catolica.climesa.domain.QueueCardActions
 
 private val sanSalvador = ZoneId.of("America/El_Salvador")
 
@@ -69,6 +71,10 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     // the screen or closing the app as a local draft (DraftStore).
     var selected by rememberSaveable { mutableStateOf<String?>(null) }
     var showPast by rememberSaveable { mutableStateOf(false) }
+    var showLater by rememberSaveable { mutableStateOf(false) }
+    var allUnsigned by rememberSaveable { mutableStateOf(false) }
+    var allReschedules by rememberSaveable { mutableStateOf(false) }
+    var confirmAbsent by remember { mutableStateOf<QueueConsultation?>(null) }
     val permissions = profile?.permissions.orEmpty()
     LaunchedEffect(userId) { userId?.let { model.configure(it, "fila.ver" in permissions && "consulta.iniciar" in permissions, withUnsigned = "consulta.iniciar" in permissions, withReschedules = "citas.ver" in permissions && "consulta.iniciar" in permissions) }; model.load() }
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels) } }
@@ -81,6 +87,14 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     val retry = { model.clearMessages(); model.load() }
     // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
     val canCall = "fila.llamar" in permissions
+    val canManage = "fila.gestionar" in permissions
+    confirmAbsent?.let { ticket ->
+        ConfirmDialog(
+            title = stringResource(R.string.med_fila_ausente_titulo, ticket.code), confirmLabel = stringResource(R.string.med_fila_ausente_confirmar),
+            message = stringResource(R.string.med_fila_ausente_detalle), destructive = true,
+            onConfirm = { confirmAbsent = null; model.markAbsent(ticket) }, onDismiss = { confirmAbsent = null },
+        )
+    }
     val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && canCall,
         canCallWaiting = state.handoff == null && canCall && state.waitingGeneral)
     PageList(modifier) {
@@ -96,7 +110,8 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
         actionState.done?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (state.unsigned.isNotEmpty()) {
             item { Text(stringResource(R.string.clin_sin_firmar_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-            items(state.unsigned, key = { "sf-${it.id}" }) { c ->
+            // Row 14: two pending consultations, the rest folded (the primary one is always among the first).
+            items(ConsultationAgenda.shown(state.unsigned, allUnsigned), key = { "sf-${it.id}" }) { c ->
                 val subtitle = listOfNotNull(stringResource(R.string.clin_sin_firmar_item, formatDateTime(c.startedAt)), c.reason?.let { stringResource(R.string.clin_consulta_motivo, it) }).joinToString("\n")
                 // Only the screen's primary unsigned consultation gets a button; the rest are compact rows that open on tap.
                 if (primary == ConsultationPrimary.ResumeUnsigned(c.id)) SectionCard(c.patientName) {
@@ -105,16 +120,18 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
                 }
                 else DataRow(title = c.patientName, subtitle = subtitle, leadingIcon = Icons.Default.EditNote, onClick = { if (!state.saving) { model.clearMessages(); model.resume(c) } })
             }
+            item { FoldToggle(state.unsigned.size, allUnsigned) { allUnsigned = !allUnsigned } }
         }
         if (state.reschedules.isNotEmpty()) {
             item { Text(stringResource(R.string.clin_reprog_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-            items(state.reschedules, key = { "rp-${it.id}" }) { a ->
+            items(ConsultationAgenda.shown(state.reschedules, allReschedules), key = { "rp-${it.id}" }) { a ->
                 SectionCard(a.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) }) {
                     Text(stringResource(R.string.clin_reprog_detalle, formatDateTime(a.start), a.pendingReschedule?.let { formatDateTime(it.start) }.orEmpty()), style = MaterialTheme.typography.bodySmall)
                     val decisions = listOf(sv.edu.catolica.climesa.domain.AppointmentAction.ACCEPT_RESCHEDULE, sv.edu.catolica.climesa.domain.AppointmentAction.REJECT_RESCHEDULE)
                     AppointmentActionButtons(decisions.filter { it in a.allowedActions }, decisions.filter { it !in a.allowedActions }.mapNotNull { d -> a.blockedActions[d]?.let { d to it } }) { actions.open(a, it) }
                 }
             }
+            item { FoldToggle(state.reschedules.size, allReschedules) { allReschedules = !allReschedules } }
         }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
@@ -123,18 +140,25 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                // "Mi día" opens on today: earlier days stay folded behind one button.
+                // Row 15: "Mi día" opens on today, by day; earlier and later days stay folded behind one button each.
                 val today = java.time.LocalDate.now(sanSalvador)
-                val dayOf = { iso: String -> runCatching { java.time.Instant.parse(iso).atZone(sanSalvador).toLocalDate() }.getOrDefault(today) }
-                val pastDays = state.appointments.map { dayOf(it.start) }.filter { it < today }.distinct().size
-                val foldPast = !showPast && pastDays > 0 && state.appointments.any { dayOf(it.start) >= today }
-                if (foldPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, pastDays), { showPast = true }) }
-                items(state.appointments.filter { !foldPast || dayOf(it.start) >= today }, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }) }
+                val groups = ConsultationAgenda.group(state.appointments, today)
+                if (groups.past.isNotEmpty() && !showPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, groups.past.size), { showPast = true }) }
+                val days = (if (showPast) groups.past else emptyList()) + listOfNotNull(groups.today) + (if (showLater) groups.later else emptyList())
+                if (groups.today == null) item { Text(stringResource(R.string.med_agenda_hoy_vacia), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = Spacing.sm)) }
+                days.forEach { day ->
+                    item(key = "dia-${day.date}") { Text(DayChipLabels.of(day.date, today), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+                    items(day.appointments, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }) }
+                }
+                if (groups.later.isNotEmpty() && !showLater) item { RowAction(stringResource(R.string.med_ver_proximos_dias, groups.later.size), { showLater = true }) }
             }
         }
         if (state.queue.isNotEmpty()) {
             item { Text(stringResource(R.string.clin_fila_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-            items(state.queue, key = { "fila-${it.ticketId}" }) { ticket -> QueueConsultationCard(ticket, opening = state.opening, primary = primary == ConsultationPrimary.ResumeTicket(ticket.ticketId) || primary == ConsultationPrimary.StartTicket(ticket.ticketId), onAttend = { model.attend(ticket) }) }
+            items(state.queue, key = { "fila-${it.ticketId}" }) { ticket ->
+                QueueConsultationCard(ticket, opening = state.opening, primary = primary == ConsultationPrimary.ResumeTicket(ticket.ticketId) || primary == ConsultationPrimary.StartTicket(ticket.ticketId), onAttend = { model.attend(ticket) },
+                    canCall = canCall, canManage = canManage, busy = state.queueBusy, model = model, onAbsent = { confirmAbsent = ticket })
+            }
         }
     }
 }
@@ -157,9 +181,14 @@ private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit)
 }
 
 @Composable
-private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, primary: Boolean, onAttend: () -> Unit) {
+private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, primary: Boolean, onAttend: () -> Unit, canCall: Boolean = false, canManage: Boolean = false, busy: String? = null, model: ConsultationViewModel? = null, onAbsent: () -> Unit = {}) {
     SectionCard(stringResource(R.string.clin_fila_numero, ticket.number), action = { OperacionStatusTag(ticket.state) }) {
-        Text(ticket.patientName, style = MaterialTheme.typography.bodyLarge)
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Text(ticket.patientName, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+            if (ticket.priority != "rutina") PriorityBadge(Priority.of(ticket.priority))
+        }
+        // Row 1: the queue actions the server offers on this number (iOS `rowActions`), next to the consultation button.
+        if (model != null) QueueRowActions(ticket, canCall, canManage, busy, model, onAbsent)
         // B2: another clinician called this number (web `calledElsewhere`): informative only, no "Iniciar consulta".
         if (ticket.calledElsewhere) {
             Text(stringResource(R.string.clin_fila_otro_consultorio), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -193,7 +222,9 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     var diagnosisCode by rememberSaveable(item.key) { mutableStateOf(text("diagnosisCode", "")) }
     var diagnosisDescription by rememberSaveable(item.key) { mutableStateOf(text("diagnosisDescription", "")) }
     var diagnosisNote by rememberSaveable(item.key) { mutableStateOf(text("diagnosisNote", "")) }
-    var diagnosisPrincipal by rememberSaveable(item.key) { mutableStateOf(DraftRules.flag(stored, "diagnosisPrincipal", false)) }
+    // Row 5: unset means "principal when the consultation has none yet"; a tap or the draft fixes the choice.
+    var principalChoice by rememberSaveable(item.key) { mutableStateOf(stored?.takeIf { it.has("diagnosisPrincipal") }?.optBoolean("diagnosisPrincipal")) }
+    val diagnosisPrincipal = principalChoice ?: ConsultationRecordRules.defaultPrincipal(record)
     var medication by rememberSaveable(item.key) { mutableStateOf(text("medication", "")) }
     var dose by rememberSaveable(item.key) { mutableStateOf(text("dose", "")) }
     var route by rememberSaveable(item.key) { mutableStateOf(text("route", "")) }
@@ -205,7 +236,7 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     var labUrgent by rememberSaveable(item.key) { mutableStateOf(DraftRules.flag(stored, "labUrgent", false)) }
     val signed = item.consultationState == "firmada"
     val permissions = profile?.permissions.orEmpty()
-    val values = mapOf<String, Any>("reason" to reason, "physicalExam" to physicalExam, "plan" to plan, "systolic" to systolic, "diastolic" to diastolic, "heartRate" to heartRate, "temperature" to temperature, "oxygenSaturation" to oxygenSaturation, "diagnosisCode" to diagnosisCode, "diagnosisDescription" to diagnosisDescription, "diagnosisNote" to diagnosisNote, "diagnosisPrincipal" to diagnosisPrincipal, "medication" to medication, "dose" to dose, "route" to route, "frequency" to frequency, "duration" to duration, "instructions" to instructions, "labExams" to labExams, "labUrgent" to labUrgent)
+    val values = mapOf<String, Any>("reason" to reason, "physicalExam" to physicalExam, "plan" to plan, "systolic" to systolic, "diastolic" to diastolic, "heartRate" to heartRate, "temperature" to temperature, "oxygenSaturation" to oxygenSaturation, "diagnosisCode" to diagnosisCode, "diagnosisDescription" to diagnosisDescription, "diagnosisNote" to diagnosisNote, "medication" to medication, "dose" to dose, "route" to route, "frequency" to frequency, "duration" to duration, "instructions" to instructions, "labExams" to labExams, "labUrgent" to labUrgent) + listOfNotNull(principalChoice?.let { "diagnosisPrincipal" to it })
     // What the API already has: after "Guardar borrador" the ViewModel updates the item, so only pending fields stay local.
     val baseline = mapOf<String, Any>("reason" to (item.consultationReason ?: item.reason.orEmpty()), "physicalExam" to item.physicalExam.orEmpty(), "plan" to item.plan.orEmpty())
     val dirty = DraftRules.isDirty(values, baseline)
@@ -248,6 +279,12 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
         if (signed) NoticeBanner(NoticeKind.INFO, stringResource(R.string.clin_consulta_firmada_aviso))
         // S9: consultation → procedures → prescription and/or exams → close, in that order (numbered step headings, no prose).
         Text(stringResource(R.string.consulta_paso1), style = MaterialTheme.typography.titleSmall)
+        // Row 3: the vitals already taken (often by the assistant), read from the detail, first thing of step 1.
+        if (item.consultationId != null && record != null) {
+            Text(stringResource(R.string.med_signos_tomados, record.vitals.size), style = MaterialTheme.typography.titleSmall)
+            if (record.vitals.isEmpty()) Text(stringResource(R.string.med_signos_ninguno), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            record.vitals.forEach { v -> RecordLine(v.text, formatDateTime(v.takenAt)) }
+        }
         FormField(stringResource(R.string.consulta_motivo), reason, { reason = it.take(2000) }, enabled = !signed, singleLine = false)
         FormField(stringResource(R.string.consulta_examen), physicalExam, { physicalExam = it.take(10000) }, enabled = !signed, singleLine = false)
         if (item.consultationId != null && "signos.registrar" in permissions) {
@@ -267,8 +304,8 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             // Sweep U6 #5: the code comes from the API CIE-10 search; typed by hand only when the search fails.
             Cie10Picker(diagnosisCode, diagnosisDescription, enabled = !busy, resetKey = item.key, model = cie10) { code, description -> diagnosisCode = code; diagnosisDescription = description }
             FormField(stringResource(R.string.consulta_nota), diagnosisNote, { diagnosisNote = it.take(2000) })
-            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(diagnosisPrincipal, { diagnosisPrincipal = it }); Text(stringResource(R.string.consulta_principal)) }
-            SecondaryButton(stringResource(R.string.consulta_registrar_diagnostico), { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisDescription = ""; diagnosisNote = ""; diagnosisPrincipal = false } }, enabled = !busy && diagnosisCode.trim().isNotBlank())
+            Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) { androidx.compose.material3.Checkbox(diagnosisPrincipal, { principalChoice = it }); Text(stringResource(R.string.consulta_principal)) }
+            SecondaryButton(stringResource(R.string.consulta_registrar_diagnostico), { model.diagnosis(item, diagnosisCode, diagnosisNote, diagnosisPrincipal) { diagnosisCode = ""; diagnosisDescription = ""; diagnosisNote = ""; principalChoice = null } }, enabled = !busy && diagnosisCode.trim().isNotBlank())
             StepNotice(stepNotice, RecordSection.DIAGNOSIS)
         }
         Text(stringResource(R.string.consulta_paso2), style = MaterialTheme.typography.titleSmall)
@@ -331,6 +368,39 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
         else RowAction(stringResource(R.string.consulta_cerrar), leave, enabled = !busy)
     }
     }
+}
+
+/** Row 1: undo own call, call again, no-show and priority; each only when the server and the permission allow it. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun QueueRowActions(ticket: QueueConsultation, canCall: Boolean, canManage: Boolean, busy: String?, model: ConsultationViewModel, onAbsent: () -> Unit) {
+    val undo = QueueCardActions.canUndo(ticket, canCall)
+    val again = QueueCardActions.canCallAgain(ticket, canCall)
+    val absent = QueueCardActions.canMarkAbsent(ticket)
+    val priorities = QueueCardActions.priorities(ticket, canManage)
+    if (!undo && !again && !absent && priorities.isEmpty()) return
+    val sending = busy == ticket.ticketId
+    var menu by remember { mutableStateOf(false) }
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        if (undo) RowAction(stringResource(R.string.med_fila_deshacer), { model.undoCall(ticket) }, enabled = busy == null, loading = sending)
+        if (again) RowAction(stringResource(R.string.med_fila_volver_llamar), { model.callAgain(ticket) }, enabled = busy == null)
+        if (absent) RowAction(stringResource(R.string.med_fila_no_se_presento), onAbsent, enabled = busy == null)
+        if (priorities.isNotEmpty()) androidx.compose.foundation.layout.Box {
+            RowAction(stringResource(R.string.med_fila_prioridad), { menu = true }, enabled = busy == null)
+            androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+                priorities.forEach { p ->
+                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.fila_prioridad_a, sv.edu.catolica.climesa.domain.QueueLabels.priority(p))) }, onClick = { menu = false; model.changePriority(ticket, p) })
+                }
+            }
+        }
+    }
+}
+
+/** Rows 14-15: "Ver 3 más" / "Ver menos" under a list that shows its first two rows; nothing when nothing folds. */
+@Composable
+private fun FoldToggle(count: Int, expanded: Boolean, onToggle: () -> Unit) {
+    if (count <= ConsultationAgenda.VISIBLE) return
+    RowAction(if (expanded) stringResource(R.string.med_ver_menos) else stringResource(R.string.med_ver_mas, count - ConsultationAgenda.VISIBLE), onToggle)
 }
 
 /** One thing the consultation already has: what it is and a short detail. */

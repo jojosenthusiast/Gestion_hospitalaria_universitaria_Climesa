@@ -15,6 +15,12 @@ public enum ReviewRules {
         }
     }
 
+    /// Row 16 (MED audit): what Mi día counts as «Resultados por revisar»: completed, unreviewed and reviewable by this
+    /// doctor (`allowedActions` has `revisar`), like Android's Inicio.
+    public static func toReview(_ orders: [LabOrder]) -> Int {
+        pending(orders).filter { $0.allows(.revisar) }.count
+    }
+
     /// RN-25: órdenes con valor crítico que este médico puede revisar (`allowedActions` incluye `revisar`).
     public static func criticalToReview(_ orders: [LabOrder]) -> Int {
         orders.filter { $0.allows(.revisar) && isCritical($0) }.count
@@ -124,6 +130,9 @@ public enum AdmissionIndicationRules {
     public static func fromThisConsultation(_ admission: Admission, consultationId: String) -> Bool {
         admission.origin == "consulta" && admission.originId == consultationId
     }
+
+    /// Row 12 (MED audit): why «Indicar hospitalización» is missing when the account has no linked staff record.
+    public static let noStaffRecord = "Tu cuenta no está vinculada a un registro de personal, así que no puedes indicar hospitalizaciones. Pide a administración que la vincule."
 }
 
 /// Fase 2R: CIE-10 search of the diagnosis step (`GET /consultas/cie10?q=`, up to 20 rows).
@@ -173,6 +182,18 @@ public enum DischargeRules {
     /// Lista de I24: además de los vigentes, las altas firmadas que aún no salen (para ver el alta y poder revocarla).
     public static func listed(_ admissions: [Admission]) -> [Admission] {
         admissions.filter { $0.state == .hospitalizado || $0.state == .pendienteCama || $0.state == .altaFirmada }
+    }
+
+    /// Row 13 (MED audit): what needs the doctor first: a discharge Recepción asked for, then signed discharges still in the
+    /// bed, then the rest; same rank keeps the API order. I24 shows two and folds the rest (`AttentionFold`).
+    public static func ranked(_ admissions: [Admission]) -> [Admission] {
+        func rank(_ a: Admission) -> Int {
+            if a.state != .altaFirmada && a.dischargeRequestedAt != nil { return 0 }
+            return a.state == .altaFirmada ? 1 : 2
+        }
+        return listed(admissions).enumerated().sorted { l, r in
+            rank(l.element) == rank(r.element) ? l.offset < r.offset : rank(l.element) < rank(r.element)
+        }.map(\.element)
     }
 }
 
@@ -360,5 +381,14 @@ public enum DoctorShiftRules {
     /// Tag of a row: green «Con turno», or the closed reason ("Sin turno ese día").
     public static func tag(_ doctor: AppointmentCatalogs.Doctor) -> (value: String, label: String) {
         onShift(doctor) ? ("disponible", "Con turno") : ("cerrado", doctor.reason ?? "Sin turno")
+    }
+}
+
+/// Row 4 (MED audit): the record shows the latest vital signs, newest first, read-only.
+public enum PatientVitalsRules {
+    public static let shown = 3
+
+    public static func latest(_ items: [ConsultationDetail.VitalSigns]) -> [ConsultationDetail.VitalSigns] {
+        Array(items.sorted { $0.takenAt > $1.takenAt }.prefix(shown))
     }
 }

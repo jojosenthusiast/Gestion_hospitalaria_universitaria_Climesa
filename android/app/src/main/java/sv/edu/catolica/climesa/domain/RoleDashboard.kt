@@ -292,9 +292,10 @@ object RoleDashboard {
             }
             "MED" -> {
                 data[DashboardSource.AGENDA]?.let { agenda ->
-                    val list = rows(agenda)
+                    // Row 8: `/consultas/agenda` spans -7..+31 days; Inicio counts today only (iOS `DoctorDay`).
+                    val list = rows(agenda).filter { instant(text(it, "start"))?.atZone(zone)?.toLocalDate() == today }
                     val started = list.count { text(it, "consultationId") != null }
-                    kpis += DashboardKpi("Citas en mi agenda", list.size.toString(), DashboardTone.PROCESS, target = target(AndroidSection.MEDICAL_DAY))
+                    kpis += DashboardKpi("Citas de hoy", list.size.toString(), DashboardTone.PROCESS, target = target(AndroidSection.MEDICAL_DAY))
                     kpis += DashboardKpi("Consultas iniciadas", started.toString(), DashboardTone.SUCCESS, "de ${list.size}", target = target(AndroidSection.MEDICAL_DAY))
                 }
                 lab?.let {
