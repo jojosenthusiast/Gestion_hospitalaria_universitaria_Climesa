@@ -290,26 +290,24 @@ struct ConsultationView: View {
             Text("consultation.sign.saveFailed").font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
             WriteNotice(submission: saving, reload: loadDetail)
         }
-        // The API signs only with a reason and a plan: say what is missing and take the doctor there, instead of failing.
+        // S7: the API signs only with a reason and a plan: the button stays disabled with what is missing under it, and a
+        // link takes the doctor there, instead of failing.
         let blocker = ConsultationRecordRules.signBlocker(reason: reason, plan: plan)
-        if let blocker {
-            Text(verbatim: blocker).font(Typo.body).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
-            if let target = ConsultationRecordRules.stepFor(reason: reason, plan: plan) {
-                Button { step = target } label: {
-                    Label { Text(verbatim: String(format: L.text("consultation.sign.goTo"), L.text(target.titleKey))) } icon: { Image(systemName: "arrow.left") }
-                        .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
-                }
-                .foregroundStyle(Theme.primaryText)
-            }
-        }
-        ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy) { confirmingSign = true }
-            .disabled(blocker != nil)
+        ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy,
+                      blockedReason: blocker) { confirmingSign = true }
             .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
                 Button(L.text("consultation.sign")) { Task { await sign(value) } }
             } message: {
                 Text(verbatim: ConsultationRecordRules.signRecap(diagnoses: value.diagnoses.count, prescriptions: value.prescriptions.count,
                                                                 labOrders: labOrders?.value?.count, notesPending: notesPending, unsentWork: unsentWork))
             }
+        if blocker != nil, let target = ConsultationRecordRules.stepFor(reason: reason, plan: plan) {
+            Button { step = target } label: {
+                Label { Text(verbatim: String(format: L.text("consultation.sign.goTo"), L.text(target.titleKey))) } icon: { Image(systemName: "arrow.left") }
+                    .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
+            }
+            .foregroundStyle(Theme.primaryText)
+        }
     }
 
     /// This consultation's lab orders, or why they are not known (with «Reintentar»).

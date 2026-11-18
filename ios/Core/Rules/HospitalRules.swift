@@ -309,6 +309,19 @@ public enum RecordAccess {
             ? "Solo puedes ver tu propio expediente."
             : "Solo el médico tratante puede ver este expediente. Se habilita cuando hay una cita, consulta u hospitalización a tu cargo."
     }
+
+    /// S2: why a search result without a care relationship does not open, shown on its row before the tap.
+    public static let unrelatedReason = "Se habilita cuando hay una cita, consulta u hospitalización a tu cargo."
+
+    /// S2: a candidate opens only with a care relationship; `careRelation` absent (older server) keeps every row open.
+    public static func gate(_ candidate: PatientCandidate) -> ActionGate {
+        candidate.careRelation == false ? .blocked(reason: unrelatedReason) : .available
+    }
+
+    /// S2: patients the doctor attends first, the rest after them; the API's order is kept inside each group.
+    public static func ordered(_ candidates: [PatientCandidate]) -> [PatientCandidate] {
+        candidates.filter { gate($0).isAvailable } + candidates.filter { !gate($0).isAvailable }
+    }
 }
 
 /// Estado final de un servicio de ambulancia (`EstadoFinalServicio`).

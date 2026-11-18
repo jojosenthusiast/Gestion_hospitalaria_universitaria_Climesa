@@ -204,3 +204,19 @@ public enum RegistrationRules {
         return errors
     }
 }
+
+/// Preconditions sweep (S0): how a screen offers one action. An action the user can never do is hidden; one blocked by a
+/// temporary precondition shows disabled with a calm reason and the next step, before the tap, so the API never has to
+/// refuse it. `ClimesaButton(blockedReason:)` renders `.blocked`.
+public enum ActionGate: Equatable, Sendable {
+    case hidden
+    case available
+    case blocked(reason: String)
+
+    public var isVisible: Bool { self != .hidden }
+    public var isAvailable: Bool { self == .available }
+    public var blockedReason: String? {
+        if case let .blocked(reason) = self { return reason }
+        return nil
+    }
+}

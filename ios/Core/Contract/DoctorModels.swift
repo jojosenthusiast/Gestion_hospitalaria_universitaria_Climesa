@@ -304,6 +304,9 @@ public struct PatientCandidate: Decodable, Sendable, Identifiable, Equatable {
     public let active: Bool
     public let birth: String?
     public let matchReason: String
+    /// S2: the caller has an appointment, consultation or admission with this patient (the record would open).
+    /// Absent on a server before the preconditions sweep: then every row opens as before.
+    public let careRelation: Bool?
 }
 
 /// `AmbulanceStatusResponse` de `GET /ambulancia` (lo que necesita I25).

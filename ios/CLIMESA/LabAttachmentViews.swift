@@ -29,7 +29,7 @@ struct LabAttachmentsSection: View {
                     Text("lab.attachments.privacy").font(Typo.caption).foregroundStyle(Theme.muted)
                 }
             } else if let error = loader.error {
-                PartError(message: error, retry: load)
+                PartError(message: error, failure: loader.failure, retry: load)
             } else {
                 Skeleton(rows: 1)
             }

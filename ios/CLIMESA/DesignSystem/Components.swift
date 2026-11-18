@@ -224,16 +224,35 @@ struct ClimesaButtonStyle: ButtonStyle {
 }
 
 /// Botón con el estilo de la marca; con `loading` muestra el indicador y no admite otro toque.
+/// Preconditions sweep (S0): with `blockedReason` the button is disabled and says why (and what to do) below it, before
+/// the tap, instead of letting the API refuse it. Pass `ActionGate.blockedReason`.
 struct ClimesaButton: View {
     let title: String
     var kind: ClimesaButtonKind = .primary
     var loading = false
+    var blockedReason: String? = nil
     let action: () -> Void
 
     var body: some View {
-        Button(action: action) { Text(verbatim: title) }
-            .buttonStyle(ClimesaButtonStyle(kind: kind, loading: loading))
-            .disabled(loading)
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Button(action: action) { Text(verbatim: title) }
+                .buttonStyle(ClimesaButtonStyle(kind: kind, loading: loading))
+                .disabled(loading || blockedReason != nil)
+                .accessibilityHint(blockedReason.map { Text(verbatim: $0) } ?? Text(verbatim: ""))
+            if let blockedReason { BlockedReasonLine(text: blockedReason).accessibilityHidden(true) }
+        }
+    }
+}
+
+/// The calm reason of a blocked action (S0): info icon and muted text, never the error colour.
+struct BlockedReasonLine: View {
+    let text: String
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+            Image(systemName: "info.circle").foregroundStyle(Theme.muted).accessibilityHidden(true)
+            Text(verbatim: text).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -265,6 +284,18 @@ struct LoadingStateView: View {
         }
         .frame(maxWidth: .infinity).padding(Spacing.xl)
         .accessibilityElement(children: .combine)
+    }
+}
+
+/// S8: an answer that trying again cannot change (403): the server's message as information, without «Reintentar».
+struct InfoStateView: View {
+    let message: String
+    var symbol = "lock.shield"
+
+    var body: some View {
+        StateLayout(symbol: symbol, tint: Theme.primaryText, tintSoft: Theme.soft) {
+            Text(verbatim: message).font(Typo.body).foregroundStyle(Theme.ink)
+        }
     }
 }
 

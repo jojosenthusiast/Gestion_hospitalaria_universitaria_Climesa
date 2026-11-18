@@ -292,6 +292,16 @@ public enum ExternalRecordRules {
     /// without a care relationship the API answers 403 and the action would only fail after the form is filled.
     public static func canOffer(_ profile: AccessProfile?, historyReadable: Bool) -> Bool { historyReadable && canRecord(profile) }
 
+    /// The action code in the history's `allowedActions` (S4).
+    public static let action = "resultado_externo"
+
+    /// S4: when the history carries `allowedActions`, the API decides (it runs the same relation check as the POST);
+    /// without the field, the client-only gate above stays.
+    public static func canOffer(_ profile: AccessProfile?, history: ClinicalHistory) -> Bool {
+        if let allowed = history.allowedActions { return allowed.contains(action) }
+        return canOffer(profile, historyReadable: true)
+    }
+
     /// A finite number, with the decimal comma people type in El Salvador ("nan" and "inf" are not numbers).
     public static func number(_ value: String) -> Double? {
         guard let parsed = LabExternalRules.number(value), parsed.isFinite else { return nil }

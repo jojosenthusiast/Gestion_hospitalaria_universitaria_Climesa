@@ -564,18 +564,30 @@ struct DoctorPatientsView: View {
                 if rows.isEmpty {
                     EmptyStateView(title: L.text("patients.none"), message: L.text("patients.treating_only"), symbol: "magnifyingglass")
                 } else {
-                    ListCard(items: rows) { patient in
-                        NavigationLink {
-                            PatientRecordScreen(patientId: patient.id)
-                        } label: {
-                            ListRow(title: patient.fullName, meta: patient.record) {
-                                HStack(spacing: Spacing.s) {
+                    // S2: patients the doctor attends first; the rest show why they do not open, with no navigation.
+                    ListCard(items: RecordAccess.ordered(rows)) { patient in
+                        if let reason = RecordAccess.gate(patient).blockedReason {
+                            VStack(alignment: .leading, spacing: Spacing.xs) {
+                                ListRow(title: patient.fullName, meta: patient.record) {
                                     if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
-                                    Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
                                 }
+                                .opacity(0.6)
+                                BlockedReasonLine(text: reason)
                             }
-                            .contentShape(Rectangle())
-                        }.buttonStyle(.plain)
+                            .accessibilityElement(children: .combine)
+                        } else {
+                            NavigationLink {
+                                PatientRecordScreen(patientId: patient.id)
+                            } label: {
+                                ListRow(title: patient.fullName, meta: patient.record) {
+                                    HStack(spacing: Spacing.s) {
+                                        if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
+                                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                    }
+                                }
+                                .contentShape(Rectangle())
+                            }.buttonStyle(.plain)
+                        }
                     }
                 }
             }
