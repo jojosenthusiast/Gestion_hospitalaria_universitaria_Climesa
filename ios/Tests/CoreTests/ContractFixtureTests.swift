@@ -75,6 +75,25 @@ final class ContractFixtureTests: XCTestCase {
         try assertMatches(VersionBody(version: 3), fixture: "queue-undo-call")
     }
 
+    /// D5: the doctor records vital signs from the record with the same body Android sends (`signos-vitales`).
+    func testSignosVitalesDesdeElExpediente() throws {
+        XCTAssertEqual(VitalsEntryRules.path(patient), "/pacientes/\(patient)/signos")
+        let body = VitalsEntryRules.body([.temperature: "37,2", .heartRate: "80", .systolic: "120", .diastolic: "80", .oxygenSaturation: "98"],
+                                         note: " Paciente tranquilo ", admissionId: "66666666-6666-4666-8666-666666666666")
+        try assertMatches(body, fixture: "vital-signs")
+    }
+
+    /// D4: external result without an order, the same body as Android (`laboratorio-resultado-externo-paciente`).
+    func testResultadoExternoSinOrden() throws {
+        XCTAssertEqual(ExternalRecordRules.path(patient), "/laboratorio/pacientes/\(patient)/resultado-externo")
+        let hb = LabExam(id: "77777777-7777-4777-8777-777777777777", code: "HB", name: "Hemoglobina", isPanel: false, unit: "g/dL", resultType: "numerico")
+        let hiv = LabExam(id: "66666666-6666-4666-8666-666666666666", code: "VIH", name: "Prueba de VIH", isPanel: false, unit: nil, resultType: "texto")
+        let file = LabExternalFile(fileName: "informe.pdf", mimeType: "application/pdf", sizeBytes: 2048, sha256: String(repeating: "a", count: 64), data: Data())
+        let body = ExternalRecordRules.body(place: " Laboratorio Ejemplo, San Salvador ", file: file, exams: [hb, hiv],
+                                            values: [hb.id: "12,9", hiv.id: " Negativo "], note: " Informe de laboratorio externo ")
+        try assertMatches(body, fixture: "lab-external-record")
+    }
+
     private func assertMatches<Body: Encodable>(_ body: Body, fixture name: String, file: StaticString = #filePath, line: UInt = #line) throws {
         let url = try XCTUnwrap(Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures/contract"), "Falta Fixtures/contract/\(name).json", file: file, line: line)
         let fixture = try JSONSerialization.jsonObject(with: Data(contentsOf: url)) as? NSDictionary
