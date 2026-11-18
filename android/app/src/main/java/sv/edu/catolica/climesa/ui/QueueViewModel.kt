@@ -28,12 +28,18 @@ import sv.edu.catolica.climesa.domain.PickerPatient
 import sv.edu.catolica.climesa.domain.PatientQueue
 import sv.edu.catolica.climesa.domain.PublicCall
 import sv.edu.catolica.climesa.domain.RealtimeSignal
+import sv.edu.catolica.climesa.domain.ReceptionScheduling
 
 /** Last call, reversible with "Deshacer" (`POST /fila/{id}/deshacer-llamado` with the version the call returned). */
 data class UndoableCall(val ticketId: String, val version: Int, val label: String)
 
 /** B1: the number just issued, shown large where it was issued ("CON 12 · Ana Pérez · 3 antes"). */
-data class IssuedTicket(val ticketId: String, val code: String, val patientName: String, val ahead: Int?)
+data class IssuedTicket(val ticketId: String, val code: String, val patientName: String, val ahead: Int?,
+    /** B-3: version and end of the void window (`voidableUntil`) the issue answered, for "Anular este número". */
+    val version: Int = 1, val voidableUntilMillis: Long? = null)
+
+/** D-1 from Citas: the arrival registered for [appointmentId] and the number it got, shown on that row. */
+data class RegisteredArrival(val appointmentId: String, val text: String)
 
 data class QueueState(
     val loading: Boolean = true, val tickets: List<QueueTicket> = emptyList(), val busy: Boolean = false, val error: String? = null, val notice: String? = null,
@@ -67,6 +73,10 @@ data class QueueState(
     val myPost: sv.edu.catolica.climesa.domain.MyPost? = null,
     /** Why the caller's post could not be read (the board still works, without preselection). */
     val myPostError: String? = null,
+    /** B-3: the code of the number just voided ("Se anuló CON 12"), shown in the counter. */
+    val voided: String? = null,
+    /** D-1: the last arrival registered from an appointment row. */
+    val arrival: RegisteredArrival? = null,
 )
 
 @HiltViewModel
@@ -128,7 +138,8 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
             try {
                 val tickets = QueueRules.parse(api.request("/fila"))
                 val issued = mutable.value.issued?.let { shown -> tickets.firstOrNull { it.id == shown.ticketId }?.let { shown.copy(ahead = QueueRules.ahead(tickets, it)) } ?: shown }
-                val stillCalled = mutable.value.calledByMe.filter { id -> tickets.any { it.id == id && it.state == "llamado" } }.toSet()
+                // The server says whose last call each number has (`calledByMe`), so "Deshacer" survives a restart.
+                val stillCalled = mutable.value.calledByMe.filter { id -> tickets.any { it.id == id && it.state == "llamado" } }.toSet() + QueueRules.calledByMe(tickets)
                 mutable.value = mutable.value.copy(loading = false, tickets = tickets, issued = issued, calledByMe = stillCalled)
                 if (patientMode) loadPublic(tickets)
                 loadNext()
@@ -193,7 +204,49 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     /** Clears the chosen patient when the dialog closes, so the next number starts with a new search. */
     fun resetIssue() { patients.cancel(); mutable.value = mutable.value.copy(issueSearch = PatientSearchState()) }
     /** Leaving the counter panel forgets its last result. */
-    fun closeIssue() { resetIssue(); mutable.value = mutable.value.copy(issued = null) }
+    fun closeIssue() { resetIssue(); mutable.value = mutable.value.copy(issued = null, voided = null) }
+
+    /**
+     * R7 U1 (G2): the patient record opens the counter with that patient already chosen. The selector row is read by the
+     * record number, so the appointment and number of today come with it; without it the bare patient is chosen.
+     */
+    fun preselectIssuePatient(id: String, record: String, name: String) {
+        viewModelScope.launch {
+            val found = try {
+                ReceptionScheduling.pickerPage(api.request("/pacientes/selector?query=${java.net.URLEncoder.encode(record, "UTF-8")}&limit=10&offset=0") as JSONObject).items.firstOrNull { it.id == id }
+            } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+            patients.pick(found ?: PickerPatient(id, record, name, null))
+        }
+    }
+
+    /** B-3: the issuer voids the number just issued, while the server allows it; the counter is ready for another. */
+    fun voidIssued() {
+        val issued = mutable.value.issued ?: return
+        if (!QueueRules.voidable(issued.voidableUntilMillis, "en_espera", clock())) return
+        mutate("/fila/${issued.ticketId}/anular", JSONObject().put("version", issued.version), "Se anuló ${issued.code}. Puedes emitir otro número.", key = ISSUE,
+            intentKey = "/fila/${issued.ticketId}/anular", onDone = { mutable.value = mutable.value.copy(issued = null, voided = issued.code) })
+    }
+
+    /** B-3 on the board: the issuer voids a number issued by mistake while the server window is open. */
+    fun voidTicket(ticket: QueueTicket) {
+        if (!QueueRules.voidable(ticket.voidableUntilMillis, ticket.state, clock())) return
+        mutate("/fila/${ticket.id}/anular", JSONObject().put("version", ticket.version), "Se anuló ${QueueLabels.code(ticket)}.", key = ticket.id)
+    }
+
+    /**
+     * D-1 from an appointment row ("Registrar llegada"), like the web: the number is issued in Consulta general linked to
+     * the appointment; the row then says "Llegó · CON N". One intent per appointment.
+     */
+    fun registerArrivalFor(appointmentId: String, patientId: String, patientName: String) {
+        mutate("/fila", QueueRules.issueBody(ARRIVAL_SERVICE, "rutina", patientId, appointmentId), "Llegada registrada para $patientName.", key = "$ARRIVAL:$appointmentId",
+            intentKey = "/fila:$patientId:$ARRIVAL_SERVICE:$appointmentId", onDone = { result ->
+                val json = result as? JSONObject
+                val code = "${json?.let { ServerText.of(it, "area") } ?: QueueLabels.areaOf(ARRIVAL_SERVICE)} ${json?.optInt("numero", 0) ?: 0}"
+                val ahead = json?.takeIf { it.has("ahead") && !it.isNull("ahead") }?.optInt("ahead")
+                val tail = when (ahead) { null -> ""; 0 -> ", nadie antes"; else -> ", $ahead antes" }
+                mutable.value = mutable.value.copy(arrival = RegisteredArrival(appointmentId, "Llegada registrada: $patientName tiene el número $code$tail."))
+            })
+    }
 
     /**
      * Reception issues the number for the chosen patient; without one nothing is sent. B1: the result stays where it was
@@ -224,7 +277,8 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
             val area = json?.let { ServerText.of(it, "area") } ?: QueueLabels.areaOf(service)
             // The API counts who waits before it (`ahead`); the reload after issuing refreshes it from the board.
             val ahead = json?.takeIf { it.has("ahead") && !it.isNull("ahead") }?.optInt("ahead")
-            mutable.value = mutable.value.copy(lastService = service, issued = json?.optString("id")?.takeIf { it.isNotBlank() && number > 0 }?.let { IssuedTicket(it, "$area $number", patient.name, ahead) })
+            val until = json?.let { ServerText.of(it, "voidableUntil") }?.let { sv.edu.catolica.climesa.domain.parseMillis(it) }
+            mutable.value = mutable.value.copy(lastService = service, voided = null, issued = json?.optString("id")?.takeIf { it.isNotBlank() && number > 0 }?.let { IssuedTicket(it, "$area $number", patient.name, ahead, json?.optInt("version", 1) ?: 1, until) })
             resetIssue()
         })
     }
@@ -310,7 +364,12 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
             onDone(result); load()
         }
         catch (e: CancellationException) { throw e }
-        catch (e: Exception) { mutable.value = mutable.value.copy(busy = false, busyKey = null, error = message(e)) }
+        catch (e: Exception) {
+            mutable.value = mutable.value.copy(busy = false, busyKey = null, error = message(e))
+            // A 409 means the board moved under this person (version conflict, someone else called it): read it again so
+            // the card shows its real state instead of offering the same stale action.
+            if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.statusCode == 409) load(silent = true)
+        }
     }
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
@@ -320,6 +379,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
     companion object {
         const val ISSUE = "emitir"
         const val NEXT = "siguiente"
+        const val ARRIVAL = "llegada"
         /** The API registers an appointment's arrival only in Consulta general. */
         const val ARRIVAL_SERVICE = "consulta_general"
     }

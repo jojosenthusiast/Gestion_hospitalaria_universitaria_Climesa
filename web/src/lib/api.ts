@@ -1,4 +1,5 @@
 import type { components } from './generated/openapi';
+import { recordServerAnswer, recordServerFailure } from './server-warmth';
 export type AccessProfile={canInviteAdmin?:boolean;id:string;user:{id:string;email?:string};email:string;name:string;roles:string[];platforms:string[];rolePlatforms?:{role:string;platforms:string[]}[];permissions:{code:string;context:string}[];channels:string[];patientId:string|null;staffId:string|null};
 export type Patient={id:string;record:string;fullName:string;givenNames:string;surnames:string;state:string;active:boolean;sex:string;birth?:string|null;ageRange?:string|null;birthPrecision?:string;phone?:string|null;dui?:string|null;email?:string|null;address?:string|null;version:number;matchReason?:string;history?:{version:number;at:string;reason:string;changes:Record<string,{before:unknown;after:unknown}>}[]};
 export type Registration={id:string;board:string;number:string;validFrom:string;validTo:string};
@@ -34,12 +35,19 @@ export class ApiError extends Error {constructor(message:string,public status=0,
 const base=(import.meta.env.VITE_API_BASE_URL as string|undefined)?.replace(/\/$/,'')??'http://localhost:3000/api/v1';
 export class HttpApi implements Api {
  private attempts=new Map<string,string>();
- constructor(private readonly token:()=>Promise<string>,private readonly unauthorized?:()=>void){}
- async request<T>(path:string,init:RequestInit={}):Promise<T>{
+ /**
+  * `unauthorized` runs on a 401 with `afterRenewal=false`. When it resolves `true` (the session was renewed) the request
+  * is sent once more with the new token and the same headers, so a write keeps its Idempotency-Key. A second 401 calls it
+  * with `afterRenewal=true`, which must end the session; the 401 is then thrown.
+  */
+ constructor(private readonly token:()=>Promise<string>,private readonly unauthorized?:(afterRenewal:boolean)=>void|boolean|Promise<void|boolean>){}
+ async request<T>(path:string,init:RequestInit={},renewed=false):Promise<T>{
   let response:Response;
-  try{response=await fetch(base+path,{...init,cache:'no-store',headers:{Accept:'application/json',Authorization:`Bearer ${await this.token()}`,...(init.body&&!(init.body instanceof FormData)?{'Content-Type':'application/json'}:{}),...init.headers}});}catch(e){if(e instanceof DOMException&&e.name==='AbortError')throw e;throw new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.');}
+  try{response=await fetch(base+path,{...init,cache:'no-store',headers:{Accept:'application/json',Authorization:`Bearer ${await this.token()}`,...(init.body&&!(init.body instanceof FormData)?{'Content-Type':'application/json'}:{}),...init.headers}});}catch(e){if(e instanceof DOMException&&e.name==='AbortError')throw e;recordServerFailure();throw new ApiError('No se pudo conectar. Revisa tu conexión y vuelve a intentarlo.');}
+  recordServerAnswer(response.status);
+  if(response.status===401&&this.unauthorized&&await this.unauthorized(renewed)===true&&!renewed)return this.request<T>(path,init,true);
   const body=await response.json().catch(()=>({}));
-  if(!response.ok){if(response.status===401)this.unauthorized?.();throw new ApiError(body.detail??body.error?.message??body.message??'No se pudo completar la operación.',response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
+  if(!response.ok){throw new ApiError(body.detail??body.error?.message??body.message??'No se pudo completar la operación.',response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
   return body as T;
  }
  async write<T>(path:string,body:unknown,method='POST'):Promise<T>{

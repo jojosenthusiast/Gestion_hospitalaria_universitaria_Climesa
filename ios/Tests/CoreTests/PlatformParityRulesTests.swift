@@ -86,7 +86,7 @@ final class PlatformParityRulesTests: XCTestCase {
         XCTAssertEqual(decoded.notices.map(NoticeRules.canAcknowledge), [true, false, false])
         XCTAssertEqual(decoded.notices.map(NoticeRules.canSnooze), [true, false, false])
         XCTAssertEqual(NoticeRules.filter(decoded.notices, by: .sinLeer).map(\.id), ["v"])
-        XCTAssertEqual(NoticeRules.filter(decoded.notices, by: .criticos).map(\.id), ["v", "p", "x"])
+        XCTAssertEqual(NoticeRules.filter(decoded.notices, by: .criticos).map(\.id), ["v"])
         XCTAssertEqual(NoticeRules.banner(decoded).map(\.id), ["v"])
     }
 

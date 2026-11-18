@@ -1,4 +1,4 @@
-import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumProp, IntProp, NumProp, StrProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumProp, IntProp, NumProp, StrProp, UuidProp } from '../platform/responses';
 import { ESTADO_AMBULANCIA } from '../platform/states';
 import { INDICATORS } from './metrics.service';
 
@@ -54,9 +54,16 @@ export class CoverageGapSummaryResponse {
   @IntProp() actuales!: number;
 }
 
+/** A hole of today that has not ended yet, with its area id so clients join contiguous hours into the same 12 h blocks. */
+export class OpenCoverageGapResponse extends CoverageGapSummaryResponse {
+  @UuidProp() areaId!: string;
+  @IntProp({ description: 'Personas en esa hora contando también los borradores; si llega a `requeridos`, el hueco está cubierto en borrador' }) actualesConBorradores!: number;
+}
+
 export class CoverageSummaryResponse {
   @IntProp() huecos!: number;
   @ClassArrayProp(CoverageGapSummaryResponse, { description: 'Primeros diez huecos' }) detalle!: CoverageGapSummaryResponse[];
+  @ClassArrayProp(OpenCoverageGapResponse, { optional: true, description: 'Todos los huecos de hoy que terminan después de ahora, sin tope' }) vigentes?: OpenCoverageGapResponse[];
 }
 
 export class MetricsDashboardResponse {

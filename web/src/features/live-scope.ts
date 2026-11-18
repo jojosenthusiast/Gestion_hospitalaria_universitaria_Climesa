@@ -48,7 +48,11 @@ const rules: [RegExp, (match: RegExpMatchArray) => LiveScope][] = [
   // The auditor reads the log on demand (each read is itself audited): it is refreshed by hand or on reconnection, never by other people's events.
   [/^\/auditoria\/(registros|opciones)/, () => []],
   [/^\/publico\/avisos(\?|$)/, () => of('aviso')],
-  [/^\/me\/avisos(\?|$)/, () => of('aviso')],
+  // The bell, the banner and the inbox read `/me/avisos/bandeja`: only notices change them, never a GPS point or a bed.
+  [/^\/me\/avisos(\/bandeja)?(\?|$)/, () => of('aviso')],
+  // "Enterado" counts change with the notices; the reach of a draft depends on the staff accounts it would go to.
+  [/^\/avisos\/estadisticas(\?|$)/, () => of('aviso')],
+  [/^\/avisos\/alcance(\?|$)/, () => of('usuario', 'personal')],
   [/^\/avisos(\?|$)/, () => of('aviso')],
 ];
 

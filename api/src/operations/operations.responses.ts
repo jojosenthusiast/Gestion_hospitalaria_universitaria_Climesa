@@ -185,6 +185,7 @@ export class CoverageGapResponse {
   @DateTimeProp() end!: string;
   @IntProp() required!: number;
   @IntProp() actual!: number;
+  @IntProp({ optional: true, description: 'En `GET /turnos/cobertura`: personas en esa hora contando también los borradores; si llega a `required`, el hueco está cubierto en borrador (falta publicarlo)' }) actualConBorradores?: number;
 }
 
 export class CoverageResponse {

@@ -55,7 +55,7 @@ private val zone = ZoneId.of("America/El_Salvador")
 
 /** A32 Citas de Recepción: lista de citas y flujo para agendar con búsqueda de paciente, médicos con/sin turno y franjas del día. */
 @Composable
-fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, userId: String? = null, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), model: ReceptionAppointmentsViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel(), requests: CategoryRequestsViewModel = viewModel(), followUps: LabProposalsViewModel = viewModel()) {
+fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, modifier: Modifier = Modifier, userId: String? = null, quickAction: QuickAction? = null, onQuickActionHandled: () -> Unit = {}, permissions: Collection<String> = emptyList(), subject: sv.edu.catolica.climesa.domain.QuickSubject? = null, model: ReceptionAppointmentsViewModel = viewModel(), queue: QueueViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel(), requests: CategoryRequestsViewModel = viewModel(), followUps: LabProposalsViewModel = viewModel()) {
     val state by model.state.collectAsStateWithLifecycle()
     val requestState by requests.state.collectAsStateWithLifecycle()
     val followUpState by followUps.state.collectAsStateWithLifecycle()
@@ -71,10 +71,21 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     AppointmentActionDialog(actionState, actions)
     var query by rememberSaveable { mutableStateOf("") }
     var showPast by rememberSaveable { mutableStateOf(false) }
+    // State chips like the web filter, each with the tone of its state badge; "solicitada" keeps the requests filter.
+    var stateFilter by rememberSaveable { mutableStateOf<String?>(null) }
+    val queueState by queue.state.collectAsStateWithLifecycle()
+    val canArrive = "fila.emitir" in permissions
+    LaunchedEffect(queueState.arrival) { if (queueState.arrival != null) model.load() }
+    // The queue model is shared with Fila: its old messages do not belong here.
+    LaunchedEffect(Unit) { queue.clearMessages() }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels); if (canSchedule) { requests.load(); requests.startLive(channels); followUps.load(); followUps.startLive(channels) } }
     LaunchedEffect(quickAction) {
         if (quickAction == null) return@LaunchedEffect
-        if (quickAction == QuickAction.SCHEDULE_APPOINTMENT && canSchedule) model.openScheduling()
+        if (quickAction == QuickAction.SCHEDULE_APPOINTMENT && canSchedule) {
+            model.openScheduling()
+            // R7 U1 (G2): from the patient record the booking starts with that patient chosen.
+            subject?.let { model.pickPatient(sv.edu.catolica.climesa.domain.PickerPatient(it.id, it.detail.orEmpty(), it.name, null)) }
+        }
         if (quickAction == QuickAction.REVIEW_REQUESTS) model.showRequests(true)
         onQuickActionHandled()
     }
@@ -107,9 +118,13 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
             state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.rec_citas_vacio), detail = stringResource(R.string.rec_citas_vacio_detalle), icon = Icons.Default.CalendarMonth) }
             else -> {
-                val visible = state.shown.filter { sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
+                val chosen = if (state.requestsOnly) "solicitada" else stateFilter
+                val visible = state.appointments.filter { (chosen == null || it.state == chosen) && sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
                 item { LiveSearchField(query, { query = it }, stringResource(R.string.rec_citas_buscar)) }
-                item { ChipRow(listOf(Triple(false, stringResource(R.string.cita_todas), state.appointments.size), Triple(true, stringResource(R.string.cita_solo_solicitudes), state.appointments.count { it.isRequest })), state.requestsOnly, { if (it) ChipTone.of("solicitada") else null }, model::showRequests) }
+                val present = APPOINTMENT_STATES.filter { st -> st == chosen || state.appointments.any { it.state == st } }
+                item { ChipRow(listOf(Triple<String?, String, Int?>(null, stringResource(R.string.cita_todas), state.appointments.size)) + present.map { st -> Triple<String?, String, Int?>(st, StatusCatalog.label(st), state.appointments.count { it.state == st }) },
+                    chosen, { it?.let { st -> ChipTone.of(st) } }) { picked -> stateFilter = picked; model.showRequests(picked == "solicitada") } }
+                if (canArrive) queueState.error?.takeIf { queueState.notice == null }?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
                 // Por día y, dentro del día, por hora: cada cita en una sola línea con su rango "08:00 – 08:20".
                 // Past days stay folded behind one button: the list opens on today, where reception works.
@@ -124,7 +139,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                         // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
                         val pending = actionState.pendingNoShows.firstOrNull { it.key == row.id }
                         if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow(row.id) }
-                        else AppointmentRow(row) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
+                        else AppointmentRow(row, arrival = if (canArrive) ArrivalControl(today, queueState, { queue.clearMessages(); queue.registerArrivalFor(row.id, row.patientId, row.patientName.ifBlank { "Paciente" }) }) else null) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
                     }
                 }
             }
@@ -132,14 +147,27 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     }
 }
 
+/** States offered as chips, in the web order (Próximas/Vencidas/Atendidas first, then the rest). */
+private val APPOINTMENT_STATES = listOf("solicitada", "confirmada", "vencida", "atendida", "no_asistio", "reprogramada", "cancelada", "rechazada")
+
+/** D-1 from the row: today's key, the queue counter state and the command that registers the arrival. */
+private class ArrivalControl(val today: String, val queue: QueueState, val register: () -> Unit)
+
 /** One appointment: its state, a pending reschedule request, and one button per action the API accepts now (CITA-04). */
-@Composable private fun AppointmentRow(a: ReceptionAppointment, onAction: (AppointmentAction) -> Unit) {
+@Composable private fun AppointmentRow(a: ReceptionAppointment, arrival: ArrivalControl? = null, onAction: (AppointmentAction) -> Unit) {
     Column {
         DataRow(a.patientName.ifBlank { "Paciente" }, subtitle = "${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(a.start, a.end)} · ${a.doctorName}",
             status = { AppointmentStateTag(a.state) }, titleTrailing = if (a.categories.isEmpty()) null else ({ CategoryMarks(a.categories) }))
         a.pendingReschedule?.let { Text(stringResource(R.string.cita_pide_cambiar, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
         if (a.state == AppointmentActions.EXPIRED) Text(stringResource(R.string.cita_vencida_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (a.state == AppointmentActions.RESCHEDULED) Text(stringResource(R.string.cita_reprogramada_a), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        // D-1, like the web: "Llegó · CON N" once the arrival issued its number; else "Registrar llegada" on today's confirmed one.
+        a.arrival?.let { Text(stringResource(R.string.cita_llego, it.code), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.success) }
+        if (arrival != null && a.canRegisterArrival(arrival.today)) {
+            val key = "${QueueViewModel.ARRIVAL}:${a.id}"
+            RowAction(stringResource(R.string.u5_registrar_llegada), arrival.register, enabled = !arrival.queue.busy, loading = arrival.queue.busyKey == key)
+        }
+        arrival?.queue?.arrival?.takeIf { it.appointmentId == a.id }?.let { NoticeBanner(NoticeKind.SUCCESS, it.text) }
         AppointmentActionButtons(AppointmentActions.available(a), AppointmentActions.blocked(a), onAction)
     }
 }

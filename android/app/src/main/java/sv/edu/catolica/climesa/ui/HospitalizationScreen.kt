@@ -365,6 +365,8 @@ fun HospitalizationScreen(
     onQuickActionHandled: () -> Unit = {},
     /** G5: "Signos" on a ward card opens Signos vitales on that patient; null when the role cannot record signs. */
     onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null,
+    /** R7 U1 (G2): "Ingresar" from the patient record opens the admission guide with this patient chosen. */
+    subject: sv.edu.catolica.climesa.domain.QuickSubject? = null,
     model: HospitalizationViewModel = viewModel(),
     intake: AdmissionIntakeViewModel = viewModel(),
 ) {
@@ -377,6 +379,10 @@ fun HospitalizationScreen(
     LaunchedEffect(quickAction, state.loading, state.admissions) {
         if (quickAction == null || state.loading) return@LaunchedEffect
         if (quickAction == QuickAction.ASSIGN_BED && QuickActions.allowed(QuickAction.ASSIGN_BED, profile?.permissions.orEmpty())) state.admissions.firstOrNull { AdmissionAction.ASSIGN_BED in it.allowedActions }?.let(model::open)
+        if (quickAction == QuickAction.ADMIT && QuickActions.allowed(QuickAction.ADMIT, profile?.permissions.orEmpty())) {
+            intake.open()
+            subject?.let { intake.pickPatient(sv.edu.catolica.climesa.domain.PickerPatient(it.id, it.detail.orEmpty(), it.name, null)) }
+        }
         onQuickActionHandled()
     }
     LaunchedEffect(profile?.channels) { profile?.let { model.startLive(it.channels); intake.startLive(it.channels) } }

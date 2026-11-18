@@ -12,6 +12,7 @@
     <string name="rec_citas_titulo">Citas</string>
     <string name="rec_citas_detalle">Agenda citas para un paciente: búscalo, elige un médico con turno y toca una franja libre de 20 minutos.</string>
     <string name="rec_citas_agendar">Agendar cita</string>
+    <string name="rec_hub_emitir">Emitir número o registrar llegada</string>
     <string name="rec_citas_vacio">No hay citas en el rango actual</string>
     <string name="rec_citas_vacio_detalle">Las solicitudes de pacientes y las citas que agendes aparecerán aquí.</string>
     <string name="rec_agendar_paciente">Paciente</string>
@@ -46,7 +47,19 @@
     <string name="rec_vinc_paso3">3. Aprueba si coinciden; rechaza con un motivo si no.</string>
     <string name="rec_vinc_vacio">No hay vinculaciones pendientes</string>
     <string name="rec_vinc_vacio_detalle">Estás al día. Cuando un paciente pida unir su cuenta con su expediente, la solicitud aparecerá aquí sola.</string>
-    <string name="rec_vinc_resumen">%1$d por revisar · %2$d con expediente que coincide</string>
+    <string name="rec_vinc_resumen">%1$s · %2$d con expediente que coincide · %3$d por revisar a mano</string>
+    <plurals name="rec_vinc_esperan">
+        <item quantity="one">%d solicitud espera tu revisión</item>
+        <item quantity="other">%d solicitudes esperan tu revisión</item>
+    </plurals>
+    <string name="rec_vinc_dio">Lo que dio el paciente: %1$s</string>
+    <string name="rec_vinc_expediente">Expediente candidato: %1$s</string>
+    <string name="rec_vinc_buscar_duplicado">Buscar el DUI en Pacientes</string>
+    <string name="rec_vinc_aprobar_titulo">Aprobar vinculación</string>
+    <string name="rec_vinc_aprobar_confirmar">Aprobar vinculación</string>
+    <string name="rec_vinc_aprobar_mensaje">Vincular %1$s con el expediente %2$s. La cuenta verá el expediente %2$s · %3$s: citas, resultados e historial.</string>
+    <string name="rec_vinc_no_coincide">No coincide: %1$s. Confirma la identidad con un documento antes de aprobar.</string>
+    <string name="rec_vinc_aprobar_verifica">Apruébala solo si verificaste la identidad de la persona.</string>
     <string name="rec_vinc_aprobar">Aprobar</string>
     <string name="rec_vinc_rechazar">Rechazar con motivo</string>
     <string name="rec_vinc_buscar_antes">Buscar antes de crear</string>

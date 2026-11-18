@@ -23,6 +23,22 @@ object MyAccessRules {
         }
     }
 
+    /** Days of the last week stay open; older days fold under one line. */
+    const val RECENT_DAYS = 7L
+
+    /** One day of the log: its date, whether it is older than [RECENT_DAYS], and its rows (newest first). */
+    data class Day(val date: java.time.LocalDate, val older: Boolean, val entries: List<AccessEntry>)
+
+    /** Rows grouped by local day, newest day first; rows without a readable date are left out. */
+    fun byDay(entries: List<AccessEntry>, today: java.time.LocalDate): List<Day> = entries
+        .mapNotNull { e -> runCatching { Instant.parse(e.at) }.getOrNull()?.let { it to e } }
+        .sortedByDescending { it.first }
+        .groupBy { it.first.atZone(zone).toLocalDate() }
+        .map { (day, rows) -> Day(day, day.isBefore(today.minusDays(RECENT_DAYS - 1)), rows.map { it.second }) }
+
+    /** Time of a row inside its day group ("10:32"). */
+    fun time(iso: String): String = runCatching { DateTimeFormatter.ofPattern("HH:mm").withZone(zone).format(Instant.parse(iso)) }.getOrDefault(iso)
+
     /** Local hospital time, for example "14 nov 2026, 10:32"; the raw text if it is not an ISO instant. */
     fun displayDate(iso: String): String = try { formatter.format(Instant.parse(iso)) } catch (e: Exception) { iso }
 }

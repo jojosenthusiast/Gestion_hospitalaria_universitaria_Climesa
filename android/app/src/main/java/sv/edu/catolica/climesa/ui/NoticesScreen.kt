@@ -60,17 +60,24 @@ internal fun noticeInboxModel(account: AuthenticatedAccount): NoticeInboxViewMod
     return model
 }
 
-/** D1: the unread count on the "Avisos" entry, from the same shared inbox; nothing when the role has no "Avisos". */
+/**
+ * D1: the unread count on the "Avisos" entry, from the same shared inbox; nothing when the role has no "Avisos". The
+ * scaffold that draws the badge (`RolePortal`, `ReceptionApp`) also owns the re-read at `proximoCambio`, so the badge
+ * stays right on every section, not only while Inicio or Avisos is open.
+ */
 @Composable
 internal fun noticeBadges(account: AuthenticatedAccount, sections: List<sv.edu.catolica.climesa.domain.AndroidSection>): Map<sv.edu.catolica.climesa.domain.AndroidSection, Int> {
     if (sv.edu.catolica.climesa.domain.AndroidSection.NOTICES !in sections) return emptyMap()
-    val state by noticeInboxModel(account).state.collectAsStateWithLifecycle()
+    val model = noticeInboxModel(account)
+    val state by model.state.collectAsStateWithLifecycle()
+    RefreshAt(state.inbox?.nextChange, model::reload)
     return mapOf(sv.edu.catolica.climesa.domain.AndroidSection.NOTICES to NoticeInboxRules.badge(state.inbox, state.hidden))
 }
 
 /**
  * The one re-read at `proximoCambio` (a notice expires or starts, or a snoozed reminder comes back). It belongs to the
- * screen that shows the inbox and is cancelled with it; a new `proximoCambio` replaces it. No polling.
+ * scaffold that shows the badge (and to Inicio for its banner) and is cancelled with it; a new `proximoCambio` replaces
+ * it, and two of them collapse into one read (the view model cancels the previous load). No polling.
  */
 @Composable
 internal fun RefreshAt(nextChange: String?, onDue: () -> Unit) {
@@ -138,7 +145,7 @@ internal fun CriticalNoticeBanner(account: AuthenticatedAccount, onOpenNotices: 
 fun NoticesScreen(account: AuthenticatedAccount, modifier: Modifier = Modifier) {
     val model = noticeInboxModel(account)
     val state by model.state.collectAsStateWithLifecycle()
-    RefreshAt(state.inbox?.nextChange, model::reload)
+    // The re-read at `proximoCambio` lives in `noticeBadges`, composed by the scaffold around this screen.
     val inbox = state.inbox
     val items = NoticeInboxRules.filter(inbox?.notices.orEmpty(), state.filter)
     val selected = state.selectedId?.let { id -> inbox?.notices?.firstOrNull { it.id == id } }

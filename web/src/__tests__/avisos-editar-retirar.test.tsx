@@ -8,7 +8,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(() => { cleanup(); vi.clearAllMocks(); });
+afterEach(() => { cleanup(); vi.clearAllMocks(); location.hash = ''; });
 
 const jop: AccessProfile = { id: 'jop', user: { id: 'jop' }, email: 'jop@example.test', name: 'Jefatura', roles: ['JOP'], platforms: ['web'], permissions: [{ code: 'avisos.publicar', context: 'x' }], channels: [], patientId: null, staffId: null } as unknown as AccessProfile;
 const base = { cuerpo: 'Texto del aviso.', desde: '2026-11-14T12:00:00.000Z', hasta: '2099-11-20T12:00:00.000Z', prioridad: 'atencion', publico: true, roles: [], publicadoEn: '2026-11-14T12:00:00.000Z', retiradoEn: null, motivoRetiro: null };
@@ -26,6 +26,9 @@ describe('MA-AVI-02 · editar y retirar avisos en la web', () => {
     render(<NoticesPage api={apiDe() as unknown as Api} profile={jop} version={0} />);
     expect(within(await row('Simulacro')).getByRole('button', { name: 'Editar' })).toBeTruthy();
     expect(within(await row('Simulacro')).getByRole('button', { name: 'Retirar' })).toBeTruthy();
+    // Withdrawn and expired notices fold behind the shared «Ver N más».
+    expect(screen.queryByText('Aviso viejo')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Ver 2 más' }));
     expect(within(await row('Aviso viejo')).queryByRole('button', { name: 'Editar' })).toBeNull();
     const retired = await row('Aviso retirado');
     expect(within(retired).queryByRole('button', { name: 'Retirar' })).toBeNull();
@@ -92,5 +95,15 @@ describe('MA-AVI-02 · editar y retirar avisos en la web', () => {
     await userEvent.type(within(dialog).getByLabelText('Motivo del retiro'), ' pero ahora suficiente');
     await userEvent.click(confirm);
     await waitFor(() => expect(api.write).toHaveBeenCalledWith('/avisos/a-1/retirar', { version: 3, motivo: 'corto pero ahora suficiente' }, 'POST'));
+  });
+});
+
+describe('Inicio · «Publicar aviso»', () => {
+  it('?accion=publicar abre «Publicados» con el cursor en el título del aviso nuevo', async () => {
+    location.hash = '#/avisos?accion=publicar';
+    render(<NoticesPage api={apiDe() as unknown as Api} profile={jop} version={0} />);
+    const composer = await screen.findByRole('region', { name: 'Nuevo aviso' });
+    await waitFor(() => expect(composer.contains(document.activeElement)).toBe(true));
+    expect(location.hash).toBe('#/avisos');
   });
 });

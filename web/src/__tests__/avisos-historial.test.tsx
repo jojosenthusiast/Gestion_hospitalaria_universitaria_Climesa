@@ -43,6 +43,21 @@ describe('Avisos · historial como la agenda de citas', () => {
     expect(filterInbox(sample(), 'sin-leer').map(n => n.id)).toEqual(['v-1']);
   });
 
+  it('«Críticos» lists exactly what the API counts: in force, addressed to the account, without «Enterado»', () => {
+    const items = [
+      notice('c-1', 'Crítico pendiente', { nivel: 'critico' }),
+      notice('c-2', 'Crítico leído', { nivel: 'critico', enteradoEn: iso(-1000) }),
+      notice('c-3', 'Crítico vencido', { nivel: 'critico', estado: 'vencido', desde: iso(-5 * day), hasta: iso(-2 * day) }),
+      notice('c-4', 'Crítico de otra audiencia', { nivel: 'critico', dirigido: false }),
+      notice('i-1', 'Informativo'),
+    ];
+    const listed = filterInbox(items, 'criticos');
+    expect(listed.map(n => n.id)).toEqual(['c-1']);
+    // Same rule as the API `criticos` (public.service.ts).
+    const apiCount = items.filter(n => n.estado === 'vigente' && n.nivel === 'critico' && n.dirigido && !n.enteradoEn).length;
+    expect(listed).toHaveLength(apiCount);
+  });
+
   it('short dates leave out the year and say hoy / ayer / mañana like Android', () => {
     const now = new Date('2026-11-18T16:00:00.000Z');
     expect(shortWhen('2026-11-16T15:33:00.000Z', now)).toBe('lun 16 nov, 09:33');

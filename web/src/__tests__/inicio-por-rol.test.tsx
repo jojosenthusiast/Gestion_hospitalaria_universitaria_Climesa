@@ -81,7 +81,7 @@ describe('inicio por rol', () => {
     expect(within(acciones).queryByRole('link', { name: /Registrar paciente/ })).toBeNull();
     expect(within(acciones).queryByRole('link', { name: /Invitar persona/ })).toBeNull();
     // R4a: coverage gaps are a tray group; its count is the only place the number shows.
-    expect(await screen.findByRole('region', { name: 'Huecos de cobertura' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Turnos por cubrir hoy' })).toBeTruthy();
   });
 
   it('ADM: invitar y agregar espacio, sin contenido clínico', async () => {

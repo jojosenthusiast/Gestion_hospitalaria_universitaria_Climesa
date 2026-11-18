@@ -89,8 +89,41 @@ class PatientHomeJourneysTest {
         assertTrue(model.attention.any { it.title == "Resultados nuevos (1)" })
     }
 
-    @Test fun patientShortcutsAreAppointmentAmbulanceExamsAndHospital() {
+    // Inicio adds only what the bar lacks: no "Mi turno" or "Mis exámenes" chip (they are tabs).
+    @Test fun patientShortcutsAreAppointmentAmbulanceAndHospital() {
         val labels = RoleDashboard.build("PAC", permissions, emptyMap(), now = now).actions.map { it.label }
-        assertTrue(labels.containsAll(listOf("Pedir cita", "Pedir ambulancia", "Mis exámenes", "Hospital")))
+        assertEquals(listOf("Pedir cita", "Pedir ambulancia", "Hospital"), labels)
+    }
+
+    // One primary action: with "No tienes citas próximas · Pedir cita" pending, the "Pedir cita" chip is not repeated.
+    @Test fun pedirCitaIsNotRepeatedWhenAPendingRowOffersIt() {
+        val model = RoleDashboard.build("PAC", permissions, mapOf(DashboardSource.APPOINTMENTS to rows()), now = now)
+        assertTrue(model.attention.any { it.actionLabel == "Pedir cita" })
+        assertEquals(listOf("Pedir ambulancia", "Hospital"), model.actions.map { it.label })
+    }
+
+    // Unlinked, the API refuses requests ("La cuenta no está vinculada"): no "Pedir cita" anywhere on Inicio.
+    @Test fun unlinkedPatientIsNotOfferedPedirCita() {
+        val model = RoleDashboard.build("PAC", permissions + "admision.ver", emptyMap(), now = now, linked = false)
+        assertTrue(model.actions.none { it.label == "Pedir cita" })
+        assertTrue(model.attention.none { it.actionLabel == "Pedir cita" })
+    }
+
+    // Inicio reads the same explicit window as "Mis citas"; other roles keep their paths.
+    @Test fun patientDashboardReadsAppointmentsOverTheExplicitWindow() {
+        val today = LocalDate.parse("2026-11-18")
+        assertEquals("/citas?from=2026-09-20&to=2026-12-21", RoleDashboard.path("PAC", DashboardSource.APPOINTMENTS, today))
+        assertEquals("/citas", RoleDashboard.path("REC", DashboardSource.APPOINTMENTS, today))
+        assertTrue(DashboardSource.ADMISSIONS in RoleDashboard.sources("PAC", listOf("citas.ver", "admision.ver")))
+    }
+
+    // «Mi habitación» on Inicio while hospitalized, like iOS.
+    @Test fun hospitalizedPatientSeesTheirBedOnInicio() {
+        val model = RoleDashboard.build("PAC", permissions + "admision.ver", mapOf(
+            DashboardSource.ADMISSIONS to rows(JSONObject().put("id", "ad1").put("state", "hospitalizado").put("bed", "2-04A")),
+        ), now = now)
+        val room = model.kpis.single { it.label == "Mi habitación" }
+        assertEquals("Cama 2-04A", room.value)
+        assertEquals(AndroidSection.MY_ROOM, room.target)
     }
 }

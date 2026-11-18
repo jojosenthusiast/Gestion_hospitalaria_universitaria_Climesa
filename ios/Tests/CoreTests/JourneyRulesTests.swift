@@ -53,7 +53,74 @@ final class JourneyRulesTests: XCTestCase {
         let all = PatientHomeRules.shortcuts(linked: true) { _ in true }
         XCTAssertEqual(all, [.requestAppointment, .ambulance, .exams, .hospital])
         XCTAssertEqual(all.map(\.title), ["Pedir cita", "Pedir ambulancia", "Mis exámenes", "Hospital"])
-        XCTAssertEqual(PatientHomeRules.shortcuts(linked: false) { _ in true }, [.requestAppointment, .ambulance, .hospital])
+        // Unlinked, the API refuses requests: no «Pedir cita» shortcut.
+        XCTAssertEqual(PatientHomeRules.shortcuts(linked: false) { _ in true }, [.ambulance, .hospital])
+    }
+
+    // MARK: - Patient flow audit
+
+    func testCitasSePidenConRangoExplicitoDentroDelLimite() {
+        let wed = ClimesaDates.parse("2026-11-18T15:00:00Z")!
+        XCTAssertEqual(PatientAppointmentRange.path(now: wed), "/citas?from=2026-09-20&to=2026-12-21")
+        // The API spans from 00:00 of `from` to 23:59:59 of `to`: at most 93 days.
+        XCTAssertLessThanOrEqual(PatientAppointmentRange.pastDays + PatientAppointmentRange.aheadDays + 1, 93)
+        XCTAssertGreaterThan(PatientAppointmentRange.aheadDays, 31)
+    }
+
+    func testSinVincularNoHayProximaCitaNiError() {
+        XCTAssertEqual(PatientHomeRules.blocks(linked: false, hasTicket: false, appointmentToday: false), [.link, .shortcuts])
+    }
+
+    func testInicioMuestraDosPendientesYPliegaElResto() {
+        let blocks = PatientHomeRules.blocks(linked: true, hasTicket: true, appointmentToday: true)
+        XCTAssertEqual(PatientHomeRules.shown(blocks, expanded: false), [.ticket, .today, .shortcuts])
+        XCTAssertEqual(PatientHomeRules.shown(blocks, expanded: true), blocks)
+        XCTAssertEqual(AttentionFold.toggleTitle(PatientHomeRules.pending(blocks).count, expanded: false), "Ver 2 pendientes más")
+    }
+
+    func testLlamadoEnInicioDiceConsultorio() {
+        XCTAssertEqual(PatientTurnRules.homeLine(office: "2"), "Es tu turno · Pasa al consultorio 2")
+        XCTAssertEqual(PatientTurnRules.homeLine(office: nil), "Es tu turno")
+    }
+
+    func testYaTengoMedicoUneLaSemana() throws {
+        func doctor(_ id: String, shift: Bool) throws -> AppointmentCatalogs.Doctor {
+            let reason = shift ? "null" : "\"Sin turno ese día\""
+            let json = #"{"id":"\#(id)","givenNames":"Doctora","surnames":"Ficticia","specialty":null,"area":null,"active":true,"tieneTurno":\#(shift),"motivo":\#(reason)}"#
+            return try JSONDecoder().decode(AppointmentCatalogs.Doctor.self, from: Data(json.utf8))
+        }
+        let today = [try doctor("d1", shift: false), try doctor("d2", shift: true)]
+        let thursday = [try doctor("d1", shift: true), try doctor("d2", shift: false)]
+        let week = RequestDoctorRules.week([today, thursday])
+        XCTAssertEqual(week.map(\.id), ["d1", "d2"])
+        XCTAssertEqual(week.map(\.hasShift), [true, true])
+        XCTAssertNil(week[0].reason)
+        XCTAssertEqual(RequestDoctorRules.week([[try doctor("d3", shift: false)]]).first?.hasShift, false)
+    }
+
+    func testAccesosPorDiaYAnterioresPlegados() throws {
+        func row(_ date: String, _ role: String) throws -> MyAccess {
+            try JSONDecoder().decode(MyAccess.self, from: Data(#"{"fecha":"\#(date)","rol":"\#(role)","tipoDato":"Expediente","motivo":"Consulta"}"#.utf8))
+        }
+        let wed = ClimesaDates.parse("2026-11-18T18:00:00Z")!
+        let rows = [try row("2026-11-18T15:00:00Z", "REC"), try row("2026-11-18T16:00:00Z", "MED"), try row("2026-11-12T15:00:00Z", "MED"), try row("2026-11-11T15:00:00Z", "LAB"), try row("sin fecha", "MED")]
+        let days = AccessLogRules.byDay(rows, now: wed)
+        XCTAssertEqual(days.map(\.day), ["2026-11-18", "2026-11-12", "2026-11-11"])
+        XCTAssertEqual(days.map(\.older), [false, false, true])
+        XCTAssertEqual(days[0].rows.map(\.role), ["MED", "REC"])
+        XCTAssertEqual(AccessLogRules.olderTitle(1), "1 acceso anterior")
+    }
+
+    func testSolicitudesResueltasPlegadasYMotivoDelRechazo() throws {
+        func request(_ id: String, _ state: String) throws -> CategoryRequest {
+            try JSONDecoder().decode(CategoryRequest.self, from: Data(#"{"id":"\#(id)","state":"\#(state)","createdAt":"2026-11-18T15:00:00Z","version":1}"#.utf8))
+        }
+        let split = CategoryRequestFold.split([try request("a", "pendiente"), try request("b", "rechazada"), try request("c", "asignada")])
+        XCTAssertEqual(split.pending.map(\.id), ["a"])
+        XCTAssertEqual(split.resolved.map(\.id), ["b", "c"])
+        XCTAssertEqual(CategoryRequestFold.rejection("Sin cupo"), "Motivo del rechazo: Sin cupo")
+        XCTAssertNil(CategoryRequestFold.rejection("  "))
+        XCTAssertEqual(CategoryRequestFold.toggleTitle(2, expanded: false), "Ver resueltas (2)")
     }
 
     func testResultadoLiberadoHoyEsNuevoYBajaACeroAlVerlo() {

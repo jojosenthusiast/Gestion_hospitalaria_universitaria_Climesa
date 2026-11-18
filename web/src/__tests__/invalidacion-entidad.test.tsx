@@ -57,6 +57,19 @@ describe('invalidación por entidad (WEB-01)', () => {
     expect(llamadas('/pacientes?query=ana&limit=20')).toBe(1);
   });
 
+  it('la bandeja de avisos solo se vuelve a pedir con eventos de avisos, no con la ubicación de la ambulancia', async () => {
+    const { llamadas, evento } = montar(['/me/avisos/bandeja']);
+    await evento('servicio', 'servicio:s-1');
+    await evento('cama', 'cama:b-1');
+    expect(llamadas('/me/avisos/bandeja')).toBe(1);
+    await evento('aviso', 'aviso:a-1');
+    expect(llamadas('/me/avisos/bandeja')).toBe(2);
+    expect(liveScope('/me/avisos/bandeja')).toEqual([{ entity: 'aviso' }]);
+    expect(liveScope('/me/avisos')).toEqual([{ entity: 'aviso' }]);
+    expect(liveScope('/avisos/estadisticas')).toEqual([{ entity: 'aviso' }]);
+    expect(liveScope('/avisos/alcance?roles=MED')).toEqual([{ entity: 'usuario' }, { entity: 'personal' }]);
+  });
+
   it('asigna las rutas del cliente a las entidades del catálogo de eventos', () => {
     expect(liveScope('/laboratorio/ordenes')).toEqual([{ entity: 'orden_laboratorio' }]);
     expect(liveScope('/laboratorio/catalogo')).toEqual([]);

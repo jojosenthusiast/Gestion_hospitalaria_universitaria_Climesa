@@ -7,10 +7,34 @@ data class FloorOccupancy(val floor: Int?, val category: String, val beds: Int, 
 data class DoctorOnDuty(val name: String, val specialty: String, val area: String?, val until: String)
 data class PublicNotice(val id: String, val title: String, val body: String, val until: String)
 
+/** `GET /publico/hospital`: name, address and phone of the hospital and its coordinates (iOS «Ubicación»). */
+data class HospitalLocation(
+    val name: String,
+    val address: String,
+    val municipality: String,
+    val department: String,
+    val phone: String,
+    val latitude: Double?,
+    val longitude: Double?,
+) {
+    /** `tel:` with digits only; null when the hospital has no usable phone. */
+    val callUri: String? get() = phone.filter(Char::isDigit).takeIf { it.isNotEmpty() }?.let { "tel:$it" }
+    /** `geo:` at the coordinates with the name as label; a name search when the coordinates are missing. */
+    val mapUri: String get() {
+        val label = java.net.URLEncoder.encode(name, "UTF-8").replace("+", "%20")
+        return if (latitude != null && longitude != null) "geo:$latitude,$longitude?q=$latitude,$longitude($label)" else "geo:0,0?q=$label"
+    }
+}
+
+/** One part of the screen; a part that failed shows its own notice and the rest stays on screen (iOS `Part`). */
+enum class HospitalInfoPart { LOCATION, OCCUPANCY, DOCTORS, NOTICES }
+
 data class HospitalInfo(
     val occupancy: List<FloorOccupancy> = emptyList(),
     val doctors: List<DoctorOnDuty> = emptyList(),
     val notices: List<PublicNotice> = emptyList(),
+    val location: HospitalLocation? = null,
+    val failed: Set<HospitalInfoPart> = emptySet(),
 )
 
 object HospitalInfoParser {
@@ -33,6 +57,13 @@ object HospitalInfoParser {
         return (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.let { r ->
             PublicNotice(r.optString("id"), r.optString("titulo"), r.optString("cuerpo"), r.optString("hasta"))
         } }
+    }
+
+    fun location(value: Any?): HospitalLocation? {
+        val r = value as? JSONObject ?: return null
+        val name = r.optString("nombre").takeIf { it.isNotBlank() } ?: return null
+        fun coordinate(key: String) = if (r.isNull(key) || !r.has(key)) null else r.optDouble(key).takeIf { !it.isNaN() }
+        return HospitalLocation(name, r.optString("direccion"), r.optString("municipio"), r.optString("departamento"), r.optString("telefono"), coordinate("latitud"), coordinate("longitud"))
     }
 
     /** Camas libres de total por planta, sumando los tipos de habitación. */

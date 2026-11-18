@@ -98,6 +98,20 @@ final class ColdStartPolicyTests: XCTestCase {
         XCTAssertEqual(ColdStartPolicy.timeout(path: "/auth/me", lastSuccess: now, now: now), 90)
     }
 
+    func testElAvisoDeServidorActivandoSoloSaleSiPareceDormidoYLaLlamadaTarda() {
+        let recent = now.addingTimeInterval(-60)
+        // Warm server: a slow call does not show the notice.
+        XCTAssertFalse(ColdStartPolicy.showsWakingNotice(lastSuccess: recent, failedSinceSuccess: false, waited: 8, isUpload: false, now: now))
+        // No answer yet, or none for more than 14 minutes, and the call is slow.
+        XCTAssertTrue(ColdStartPolicy.showsWakingNotice(lastSuccess: nil, failedSinceSuccess: false, waited: 5, isUpload: false, now: now))
+        XCTAssertTrue(ColdStartPolicy.showsWakingNotice(lastSuccess: now.addingTimeInterval(-15 * 60), failedSinceSuccess: false, waited: 6, isUpload: false, now: now))
+        // The first attempt failed without an answer.
+        XCTAssertTrue(ColdStartPolicy.showsWakingNotice(lastSuccess: recent, failedSinceSuccess: true, waited: 6, isUpload: false, now: now))
+        // Cold but still fast, or an upload: no notice.
+        XCTAssertFalse(ColdStartPolicy.showsWakingNotice(lastSuccess: nil, failedSinceSuccess: false, waited: 2, isUpload: false, now: now))
+        XCTAssertFalse(ColdStartPolicy.showsWakingNotice(lastSuccess: nil, failedSinceSuccess: true, waited: 30, isUpload: true, now: now))
+    }
+
     func testSoloLasLecturasSeReintentanConEsperaCreciente() {
         XCTAssertTrue(ColdStartPolicy.shouldRetry(method: "GET", failure: .transport, attempt: 0))
         XCTAssertTrue(ColdStartPolicy.shouldRetry(method: "GET", failure: .http(status: 503, problem: nil), attempt: 2))
