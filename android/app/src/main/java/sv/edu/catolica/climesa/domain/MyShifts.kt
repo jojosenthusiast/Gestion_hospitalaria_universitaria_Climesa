@@ -50,6 +50,23 @@ object MyShifts {
     private val clock = DateTimeFormatter.ofPattern("HH:mm").withZone(zone)
     private val dayName = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", spanish)
 
+    /**
+     * A near moment the way people say it: "Hoy 14:00", "Mañana 07:00", "Jueves 07:00" within the week, and
+     * "Jue 26 nov, 07:00" beyond it. Shifts repeat every day, so a full date with the year only adds noise.
+     */
+    fun relative(at: Instant, now: Instant): String {
+        val day = at.atZone(zone).toLocalDate()
+        val days = java.time.temporal.ChronoUnit.DAYS.between(now.atZone(zone).toLocalDate(), day)
+        val time = clock.format(at)
+        val label = when (days) {
+            0L -> "Hoy"
+            1L -> "Mañana"
+            in 2L..6L -> DateTimeFormatter.ofPattern("EEEE", spanish).format(day)
+            else -> DateTimeFormatter.ofPattern("EEE d MMM", spanish).format(day).replace(".", "") + ","
+        }
+        return "${label.replaceFirstChar { it.uppercase(spanish) }} $time"
+    }
+
     fun formatInstant(value: String?): String {
         val text = value?.trim().orEmpty()
         if (text.isEmpty() || text == "null") return MISSING_TIME
