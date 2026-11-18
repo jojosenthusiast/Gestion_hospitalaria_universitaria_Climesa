@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api, type Shift, type Space, type Staff } from '../lib/api';
 import { PersonnelPage } from '../features/personnel';
+import { clickRowAction, rowActionLabels } from './row-actions';
 import { registrationState } from '../features/personnel-ficha';
 
 // jsdom no implementa <dialog>: lo abrimos con el atributo para que sus campos sean accesibles.
@@ -48,7 +49,7 @@ function montar(opciones: Opciones = {}) {
   const api = {
     request: vi.fn(async (path: string) => {
       if (path === '/espacios') return [area];
-      if (path === '/turnos') return opciones.turnos ? opciones.turnos() : turnos;
+      if (path.startsWith('/turnos?from=')) return opciones.turnos ? opciones.turnos() : turnos;
       return opciones.lista ? opciones.lista() : [ana, luis];
     }),
     write: vi.fn(async (path: string, body: unknown, method?: string) => (opciones.escritura ? opciones.escritura(path, body, method) : { id: 'i-9', version: 4 })),
@@ -56,8 +57,8 @@ function montar(opciones: Opciones = {}) {
   render(<PersonnelPage api={api as unknown as Api} profile={opciones.perfil ?? administrador} version={0} />);
   return api;
 }
-async function abrirFicha(nombre = /Ver ficha de Ana/) {
-  await userEvent.click(await screen.findByRole('button', { name: nombre }));
+async function abrirFicha(persona: string | RegExp = /Ana/) {
+  await clickRowAction(persona, 'Ver ficha');
   return screen.findByRole('dialog', { name: /Ficha de/ });
 }
 async function abrirFormulario() {
@@ -118,7 +119,7 @@ describe('W08 · ficha de personal', () => {
 
   it('avisa cuando no hay inscripciones ni turnos próximos', async () => {
     montar();
-    const ficha = await abrirFicha(/Ver ficha de Luis/);
+    const ficha = await abrirFicha(/Luis/);
     expect(within(ficha).getByText('Sin inscripciones registradas')).toBeTruthy();
     expect((await within(ficha).findByRole('table', { name: 'Turnos próximos publicados' }))).toBeTruthy();
   });
@@ -142,7 +143,7 @@ describe('W08 · ficha de personal', () => {
     expect(within(ficha).queryByRole('button', { name: /Registrar inscripción/ })).toBeNull();
     expect(within(ficha).queryByRole('button', { name: /Editar/ })).toBeNull();
     expect(within(ficha).queryByText('Turnos próximos')).toBeNull();
-    expect(api.request.mock.calls.some(([path]) => path === '/turnos')).toBe(false);
+    expect(api.request.mock.calls.some(([path]) => path.startsWith('/turnos'))).toBe(false);
   });
 
   it('JOP ve la ficha pero no registra inscripciones', async () => {

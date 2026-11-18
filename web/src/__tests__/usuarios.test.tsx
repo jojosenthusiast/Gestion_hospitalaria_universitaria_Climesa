@@ -2,6 +2,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api, type UserAccount } from '../lib/api';
+import { clickRowAction, rowActionLabels } from './row-actions';
 import { PersonnelPage } from '../features/personnel';
 
 // WEB-12: Usuarios (W05/W06) — flujo feliz, conflicto 409 y permisos.
@@ -38,7 +39,7 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
   it('desactiva una cuenta con motivo y versión, y recarga la lista', async () => {
     const api = montar(['usuarios.ver', 'usuarios.desactivar']);
     await screen.findByText('Operaciones Ficticia');
-    await userEvent.click(screen.getByRole('button', { name: /Desactivar cuenta de Operaciones Ficticia/ }));
+    await clickRowAction('Operaciones Ficticia', 'Desactivar cuenta');
     const dialogo = await screen.findByRole('dialog', { name: 'Desactivar cuenta' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo'), 'Fin del contrato de prueba');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar cambio/ }));
@@ -85,7 +86,7 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
   it('un 409 de versión al desactivar ofrece cerrar y recargar', async () => {
     const api = montar(['usuarios.ver', 'usuarios.desactivar'], vi.fn(async () => { throw new ApiError('La cuenta cambió.', 409, 'version_conflicto', 4); }) as Api['write']);
     await screen.findByText('Operaciones Ficticia');
-    await userEvent.click(screen.getByRole('button', { name: /Desactivar cuenta de Operaciones Ficticia/ }));
+    await clickRowAction('Operaciones Ficticia', 'Desactivar cuenta');
     const dialogo = await screen.findByRole('dialog', { name: 'Desactivar cuenta' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo'), 'Fin del contrato de prueba');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar cambio/ }));
@@ -108,7 +109,7 @@ describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03
     const api = montarCon([pendiente]);
     await screen.findByText('Persona Invitada');
     expect(screen.getByText('Invitación enviada')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: /Reenviar invitación a Persona Invitada/ }));
+    await clickRowAction('Persona Invitada', 'Reenviar invitación');
     const dialogo = await screen.findByRole('dialog', { name: 'Reenviar invitación' });
     await userEvent.click(within(dialogo).getByRole('button', { name: /Reenviar invitación/ }));
     expect(api.write).toHaveBeenCalledWith('/usuarios/u-9/invitacion/reenvio', {}, 'POST');
@@ -117,7 +118,7 @@ describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03
   it('cancelar una invitación pide motivo', async () => {
     const api = montarCon([pendiente]);
     await screen.findByText('Persona Invitada');
-    await userEvent.click(screen.getByRole('button', { name: /Cancelar invitación de Persona Invitada/ }));
+    await clickRowAction('Persona Invitada', 'Cancelar invitación');
     const dialogo = await screen.findByRole('dialog', { name: 'Cancelar invitación' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo de la cancelación'), 'El correo de la invitación estaba mal');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Cancelar invitación/ }));
@@ -127,8 +128,9 @@ describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03
   it('no ofrece roles ni desactivar cuando el servidor no lo permite (jerarquía de administración)', async () => {
     montarCon([principal]);
     await screen.findByText('Administración Principal');
-    expect(screen.queryByRole('button', { name: /Roles de Administración Principal/ })).toBeNull();
-    expect(screen.queryByRole('button', { name: /Desactivar cuenta de Administración Principal/ })).toBeNull();
+    const labels = await rowActionLabels('Administración Principal');
+    expect(labels).not.toContain('Roles');
+    expect(labels).not.toContain('Desactivar cuenta');
   });
 
   it('la invitación no ofrece el rol de paciente: el paciente se registra en la app', async () => {
@@ -137,5 +139,53 @@ describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03
     const dialogo = await screen.findByRole('dialog', { name: 'Invitar persona' });
     expect(within(dialogo).queryByText('PAC')).toBeNull();
     expect(within(dialogo).getByRole('button', { name: /Enviar invitación/ }).hasAttribute('disabled')).toBe(true);
+  });
+});
+
+describe('Personal · cuentas sin ficha vinculada (Inicio de Administración)', () => {
+  const sinFicha: UserAccount = { id: 'u-5', email: 'rec@example.test', name: 'Recepción Sin Ficha', roles: ['REC'], state: 'activo', version: 2, allowedActions: ['roles', 'desactivar'] };
+  const vinculada: UserAccount = { id: 'u-6', email: 'enf@example.test', name: 'Enfermería Vinculada', roles: ['ENF'], state: 'activo', version: 1, staffId: 's-1', allowedActions: ['roles', 'desactivar'] };
+  const ficha = { id: 's-1', givenNames: 'Enfermería', surnames: 'Vinculada', type: 'enfermero', active: true, version: 1, registrations: [] };
+  const libre = { id: 's-2', givenNames: 'Rosa', surnames: 'Sin Cuenta', type: 'recepcionista', active: true, version: 1, registrations: [] };
+  function montarSinFicha() {
+    const api = { request: vi.fn(async (path: string) => path === '/usuarios' ? [...cuentas, sinFicha, vinculada] : path === '/personal' ? [ficha, libre] : []), write: vi.fn(async () => ({})) } as unknown as Api & { write: ReturnType<typeof vi.fn> };
+    render(<PersonnelPage api={api} profile={perfil(['usuarios.ver', 'usuarios.asignar_roles', 'usuarios.desactivar', 'personal.ver'])} version={0} />);
+    return api;
+  }
+
+  it('?cuenta=sin_ficha deja solo las cuentas de turno sin ficha (no las de Jefatura ni las vinculadas)', async () => {
+    location.hash = '#/personal?cuenta=sin_ficha';
+    montarSinFicha();
+    expect(await screen.findByText('Recepción Sin Ficha')).toBeTruthy();
+    expect(screen.queryByText('Operaciones Ficticia')).toBeNull();
+    expect(screen.queryByText('Enfermería Vinculada')).toBeNull();
+    expect(screen.queryByText('Rosa Sin Cuenta')).toBeNull();
+    expect(screen.getByRole('button', { name: /Cuenta sin ficha vinculada/ })).toBeTruthy();
+  });
+
+  it('las acciones de la fila: una principal y el resto en «Más acciones»; «Vincular con su ficha» abre la vinculación', async () => {
+    const api = montarSinFicha();
+    await screen.findByText('Recepción Sin Ficha');
+    expect(await rowActionLabels('Enfermería Vinculada')).toEqual(['Ver ficha', 'Roles', 'Desactivar cuenta']);
+    expect(await rowActionLabels('Recepción Sin Ficha')).toEqual(['Vincular con su ficha', 'Roles', 'Desactivar cuenta']);
+    await clickRowAction('Recepción Sin Ficha', 'Vincular con su ficha');
+    const dialogo = await screen.findByRole('dialog', { name: 'Vincular con su ficha' });
+    await userEvent.selectOptions(within(dialogo).getByLabelText('Persona del directorio'), 's-2');
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Guardar/ }));
+    expect(api.write).toHaveBeenCalledWith('/usuarios/u-5/roles', { roles: ['REC'], staffId: 's-2', version: 2, reason: 'Vincular la cuenta con su ficha de personal' }, 'PATCH');
+  });
+
+  it('?vincular=<cuenta> desde Inicio abre la vinculación de esa cuenta y limpia el parámetro', async () => {
+    location.hash = '#/personal?cuenta=sin_ficha&vincular=u-5';
+    montarSinFicha();
+    const dialogo = await screen.findByRole('dialog', { name: 'Vincular con su ficha' });
+    expect(within(dialogo).getByText('Recepción Sin Ficha')).toBeTruthy();
+    expect(location.hash).toBe('#/personal?cuenta=sin_ficha');
+  });
+
+  it('los roles de cada cuenta se ven como etiquetas de rol', async () => {
+    montarSinFicha();
+    const row = (await screen.findByText('Recepción Sin Ficha')).closest('tr')!;
+    expect(row.querySelector('.role-tags .identity-chip')).toBeTruthy();
   });
 });

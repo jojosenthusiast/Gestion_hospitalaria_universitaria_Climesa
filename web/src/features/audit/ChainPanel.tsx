@@ -1,19 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Icon } from '../../components/ui';
 import type { Api, ChainCheck } from '../../lib/api';
 import { WriteError, useAction } from '../common';
 import { fullDate } from './query';
 
 /** Verificación de la cadena de hash (FR-110-07): resultado claro y, si falla, el registro exacto donde se rompe. */
-export function ChainPanel({ api, onOpen }: { api: Api; onOpen: (seq: string) => void }) {
+/** `autoRun`: opened from Inicio («Verificar la cadena», `?accion=verificar`): it scrolls into view and verifies once. */
+export function ChainPanel({ api, onOpen, autoRun = false }: { api: Api; onOpen: (seq: string) => void; autoRun?: boolean }) {
   const verify = useAction(api);
   const [check, setCheck] = useState<ChainCheck | null>(null);
+  const panel = useRef<HTMLElement>(null), started = useRef(false);
+  useEffect(() => {
+    if (!autoRun || started.current) return;
+    started.current = true;
+    panel.current?.scrollIntoView?.({ block: 'start' });
+    panel.current?.focus();
+    void run();
+  }, [autoRun]); // eslint-disable-line react-hooks/exhaustive-deps
   async function run() {
     setCheck(null);
     const result = await verify.run<ChainCheck>('/auditoria/verificacion', {});
     if (result) setCheck(result);
   }
-  return <section className={`audit-chain${check ? (check.integra ? ' is-ok' : ' is-broken') : ''}`} aria-label="Verificación de la cadena">
+  return <section ref={panel} tabIndex={-1} className={`audit-chain${check ? (check.integra ? ' is-ok' : ' is-broken') : ''}`} aria-label="Verificación de la cadena">
     <span className="audit-chain-icon" aria-hidden="true"><Icon name={check && !check.integra ? 'alert' : 'shield'} size={24} /></span>
     <div className="audit-chain-text">
       <strong>{!check ? 'Integridad de la cadena' : check.integra ? 'Cadena íntegra' : 'Cadena alterada'}</strong>
