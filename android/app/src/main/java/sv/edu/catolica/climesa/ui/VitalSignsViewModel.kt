@@ -45,6 +45,10 @@ data class VitalSignsState(
     val saving: Boolean = false,
     val notice: String? = null,
     val conflict: Boolean = false,
+    /** ENF/AST audit #15: the API refused the history (403, no care context); shown as information, not as a failure. */
+    val refused: String? = null,
+    /** ENF/AST audit #13: earlier days of the history are folded until opened. */
+    val pastOpen: Boolean = false,
 )
 
 /**
@@ -103,7 +107,8 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
             delay(SEARCH_DEBOUNCE_MS)
             mutable.value = mutable.value.copy(search = mutable.value.search.copy(loading = true, error = null))
             val result = fetch(mutable.value.search.copy(loading = true), "/pacientes/selector?query=${URLEncoder.encode(text.trim(), "UTF-8")}&limit=20", VitalsParser::search)
-            mutable.value = mutable.value.copy(search = result)
+            val inContext = (mutable.value.ward.items + mutable.value.queue.items).map { it.patientId }.toSet()
+            mutable.value = mutable.value.copy(search = result.copy(items = VitalsParser.rankByContext(result.items, inContext)))
         }
     }
 
@@ -112,16 +117,19 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
         // Measures typed for this patient and not saved (app closed, screen left) come back from the local draft.
         val restored = userId?.let { sv.edu.catolica.climesa.domain.FormDrafts.vitals(drafts.load(it, sv.edu.catolica.climesa.domain.FormDrafts.vitalsKey(candidate.patientId))) }
         mutable.value = mutable.value.copy(patientId = candidate.patientId, patientHint = candidate, history = null, error = null, loading = true,
-            form = restored ?: VitalsForm(), formError = null, notice = if (restored != null) "Recuperamos los signos que no habías guardado." else null, conflict = false)
+            form = restored ?: VitalsForm(), formError = null, notice = if (restored != null) "Recuperamos los signos que no habías guardado." else null, conflict = false,
+            refused = null, pastOpen = false)
         loadHistory(silent = false)
     }
 
     fun close() {
         historyJob?.cancel(); intent.reset()
-        mutable.value = mutable.value.copy(patientId = null, patientHint = null, history = null, error = null, loading = false, form = VitalsForm(), formError = null, notice = null, conflict = false)
+        mutable.value = mutable.value.copy(patientId = null, patientHint = null, history = null, error = null, loading = false, form = VitalsForm(), formError = null, notice = null, conflict = false, refused = null, pastOpen = false)
     }
 
     fun reload() = loadHistory(silent = false)
+
+    fun togglePast() { mutable.value = mutable.value.copy(pastOpen = !mutable.value.pastOpen) }
 
     private fun loadHistory(silent: Boolean) {
         val id = mutable.value.patientId ?: return
@@ -129,9 +137,13 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
         historyJob = viewModelScope.launch {
             try {
                 val history = VitalsParser.history(api.request("/pacientes/$id/signos?limit=60"))
-                if (mutable.value.patientId == id) mutable.value = mutable.value.copy(loading = false, history = history, error = if (history == null) "Respuesta inesperada del servidor." else null)
+                if (mutable.value.patientId == id) mutable.value = mutable.value.copy(loading = false, history = history, refused = null, error = if (history == null) "Respuesta inesperada del servidor." else null)
             } catch (e: CancellationException) { throw e }
             catch (e: Exception) {
+                if ((e as? AuthRequestException)?.statusCode == 403 && mutable.value.patientId == id && mutable.value.history == null) {
+                    mutable.value = mutable.value.copy(loading = false, error = null, refused = userMessage(e, "Solo puedes ver los signos de un paciente que atiendes."))
+                    return@launch
+                }
                 // Keep the shown history on a failed silent reload (rule: keep data on API failure).
                 if (mutable.value.patientId == id && (!silent || mutable.value.history == null)) mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar los signos."))
                 else if (mutable.value.patientId == id) mutable.value = mutable.value.copy(loading = false)

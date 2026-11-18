@@ -102,6 +102,8 @@ data class NotesPanel(
     val notes: List<NursingNote> = emptyList(),
     val loadError: String? = null,
     val text: String = "",
+    /** ENF/AST audit #17: "Nota guardada" shows inside the dialog, not behind it. */
+    val saved: String? = null,
 )
 
 data class HospitalizationState(
@@ -298,16 +300,16 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
     }
     fun retryNotes() { mutable.value.notes?.let { loadNotes(it.admissionId, silent = false) } }
     fun closeNotes() { notesJob?.cancel(); mutable.update { it.copy(notes = null, formError = null) } }
-    fun onNoteText(text: String) = mutable.update { s -> s.copy(notes = s.notes?.copy(text = text.take(HospitalizationRules.NOTE_MAX)), formError = null) }
+    fun onNoteText(text: String) = mutable.update { s -> s.copy(notes = s.notes?.copy(text = text.take(HospitalizationRules.NOTE_MAX), saved = null), formError = null) }
     fun addNote(admission: HospitalAdmission) {
         val panel = mutable.value.notes?.takeIf { it.admissionId == admission.id } ?: return
         if (mutable.value.busy) return
         HospitalizationRules.noteError(panel.text)?.let { error -> mutable.update { it.copy(formError = error) }; return }
-        mutable.update { it.copy(busy = true, formError = null, notice = null) }
+        mutable.update { s -> s.copy(busy = true, formError = null, notice = null, notes = s.notes?.copy(saved = null)) }
         viewModelScope.launch {
             try {
                 api.request("/admisiones/${admission.id}/notas-enfermeria", "POST", HospitalizationRules.noteBody(panel.text))
-                mutable.update { s -> s.copy(busy = false, notes = s.notes?.copy(text = ""), notice = "Nota de enfermería guardada.") }
+                mutable.update { s -> s.copy(busy = false, notes = s.notes?.copy(text = "", saved = "Nota de enfermería guardada.")) }
                 loadNotes(admission.id, silent = true)
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 mutable.update { it.copy(busy = false, formError = failure(e)) }
@@ -392,9 +394,12 @@ fun HospitalizationScreen(
     state.transfer?.let { form -> byId(form.admissionId)?.let { TransferDialog(it, form, state, model) } }
     state.notes?.let { panel -> byId(panel.admissionId)?.let { NursingNotesDialog(it, panel, state, model) } }
     val retry = { model.clearMessages(); model.load() }
+    // ENF/AST + MED audit: one ward order (discharge requested, signed discharge, unstable, then bed) and a fold after N rows.
+    val ordered = HospitalizationRules.wardOrder(state.admissions)
+    var wardOpen by rememberSaveable { mutableStateOf(false) }
     PageList(modifier) {
         // One primary per screen: the first admission with a main action; "Ingresar paciente" is primary only when none has one.
-        val primaryRow = HospitalizationRules.primaryAdmission(state.admissions)
+        val primaryRow = HospitalizationRules.primaryAdmission(ordered)
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         if (state.tray.isNotEmpty()) item { IndicatedTray(state.tray, model) }
         if ("admision.crear" in permissions) item {
@@ -408,7 +413,7 @@ fun HospitalizationScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                items(state.admissions, key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals) }
+                foldedItems(ordered, HospitalizationRules.WARD_VISIBLE, wardOpen, { wardOpen = !wardOpen }, foldKey = "planta-fold", key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals) }
             }
         }
     }
@@ -642,13 +647,19 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            panel.saved?.let { NoticeBanner(NoticeKind.SUCCESS, it) }
             FormField(stringResource(R.string.hosp_nota_nueva), panel.text, model::onNoteText, hint = HospitalizationRules.counter(panel.text, HospitalizationRules.NOTE_MAX), enabled = !state.busy, singleLine = false)
             when {
                 panel.loading && panel.notes.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { CircularProgressIndicator(Modifier.size(20.dp)); Text(stringResource(R.string.ui_cargando_titulo), style = MaterialTheme.typography.bodySmall) }
                 panel.loadError != null -> { NoticeBanner(NoticeKind.ERROR, panel.loadError); TextButton(onClick = model::retryNotes) { Text(stringResource(R.string.ui_reintentar)) } }
                 panel.notes.isEmpty() -> Text(stringResource(R.string.hosp_notas_vacio), style = MaterialTheme.typography.bodySmall)
-                else -> panel.notes.forEach { note ->
-                    DataRow(title = note.text, meta = "${note.authorName ?: stringResource(R.string.hosp_nota_autor_desconocido)} · ${localTime(note.createdAt)}", divider = true, container = false)
+                // ENF/AST audit #6: the note is body text, never cut to two lines.
+                else -> panel.notes.forEachIndexed { index, note ->
+                    if (index > 0) HorizontalDivider(color = MaterialTheme.climesa.line)
+                    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                        Text(note.text, style = MaterialTheme.typography.bodyMedium)
+                        Text("${note.authorName ?: stringResource(R.string.hosp_nota_autor_desconocido)} · ${localTime(note.createdAt)}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
                 }
             }
         }

@@ -187,7 +187,21 @@ data class VitalsHistory(
         readings.mapNotNull { it.values[measure] }.take(max).reversed()
 
     fun trendMeasures(): List<VitalMeasure> = VitalMeasure.entries.filter { m -> m.monitored && readings.count { m in it.values } >= 1 }
+
+    /**
+     * ENF/AST audit #13: the history by day, newest first ("Hoy", "Ayer", "mié 18 nov"). The first day stays open and the
+     * earlier ones fold. A take without a time goes into its own last group.
+     */
+    fun days(now: Instant = Instant.now()): List<VitalsDay> {
+        val groups = readings.groupBy { it.takenAt?.let(VitalsFormat::localDate) }
+        return groups.entries.sortedByDescending { it.key?.toEpochDay() ?: Long.MIN_VALUE }.map { (day, list) ->
+            VitalsDay(day?.let { VitalsFormat.dayLabel(it, now) } ?: "Sin fecha", list)
+        }
+    }
 }
+
+/** One day of the vitals history. */
+data class VitalsDay(val label: String, val readings: List<VitalReading>)
 
 /** A patient the user can pick to take signs: from the ward, the queue or the autosuggest search. */
 data class VitalsCandidate(val patientId: String, val name: String, val detail: String?, val record: String? = null)
@@ -230,7 +244,8 @@ object VitalsParser {
     fun ward(value: Any?): List<VitalsCandidate> {
         val rows = value as? JSONArray ?: return emptyList()
         return (0 until rows.length()).mapNotNull { rows.optJSONObject(it) }
-            .filter { it.optString("state") in setOf("hospitalizado", "pendiente_cama") && it.optString("patientId").isNotBlank() }
+            // ENF/AST audit #14: a signed discharge still occupies the bed until the exit.
+            .filter { it.optString("state") in setOf("hospitalizado", "pendiente_cama", "alta_firmada") && it.optString("patientId").isNotBlank() }
             .map {
                 val bed = it.optString("bed")
                 VitalsCandidate(it.optString("patientId"), it.optString("patientName").ifBlank { "Paciente" }, if (bed.isBlank()) "Sin cama asignada" else "Cama $bed")
@@ -249,6 +264,13 @@ object VitalsParser {
             }.distinctBy { it.patientId }
     }
 
+    /**
+     * ENF/AST audit #15: search results with the patients this person attends (ward or queue) first; the rest keep the
+     * server order. Reading the others may be refused (403) without a care context.
+     */
+    fun rankByContext(results: List<VitalsCandidate>, inContext: Set<String>): List<VitalsCandidate> =
+        results.sortedBy { if (it.patientId in inContext) 0 else 1 }
+
     /** `GET /pacientes/selector`: `{items:[{id, record, fullName, age?}]}`. */
     fun search(value: Any?): List<VitalsCandidate> {
         val items = (value as? JSONObject)?.optJSONArray("items") ?: (value as? JSONArray) ?: return emptyList()
@@ -261,9 +283,29 @@ object VitalsParser {
 
 object VitalsFormat {
     private val zone: ZoneId = ZoneId.of("America/El_Salvador")
-    private val full = DateTimeFormatter.ofPattern("d MMM, HH:mm", Locale("es", "SV")).withZone(zone)
-    private val hourOnly = DateTimeFormatter.ofPattern("HH:mm", Locale("es", "SV")).withZone(zone)
-    fun time(at: Instant?): String = at?.let { full.format(it) } ?: "—"
+    private val spanish = Locale("es", "SV")
+    private val hourOnly = DateTimeFormatter.ofPattern("HH:mm", spanish).withZone(zone)
+    private val shortDay = DateTimeFormatter.ofPattern("EEE d MMM", spanish)
+
+    fun localDate(at: Instant): java.time.LocalDate = at.atZone(zone).toLocalDate()
+
+    /** Short day without year: "Hoy", "Ayer", else "mié 18 nov". */
+    fun dayLabel(day: java.time.LocalDate, now: Instant = Instant.now()): String {
+        val today = localDate(now)
+        return when (day) {
+            today -> "Hoy"
+            today.minusDays(1) -> "Ayer"
+            else -> shortDay.format(day).replace(".", "")
+        }
+    }
+
+    /** ENF/AST audit #7: "Hoy 14:05", "Ayer 08:30", else "mié 18 nov, 14:05"; never a bare hour of another day. */
+    fun time(at: Instant?, now: Instant = Instant.now()): String {
+        at ?: return "—"
+        val day = dayLabel(localDate(at), now)
+        return if (day == "Hoy" || day == "Ayer") "$day ${hourOnly.format(at)}" else "$day, ${hourOnly.format(at)}"
+    }
+
     fun hour(at: Instant?): String = at?.let { hourOnly.format(it) } ?: "—"
 }
 

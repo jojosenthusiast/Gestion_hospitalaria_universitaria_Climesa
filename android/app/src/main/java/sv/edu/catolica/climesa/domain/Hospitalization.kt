@@ -147,8 +147,45 @@ object HospitalizationRules {
     /** G5: a hospitalized patient (or waiting for a bed) can have signs taken straight from the ward card. */
     fun vitalsSubject(row: HospitalAdmission): QuickSubject? {
         val id = row.patientId ?: return null
-        if (row.state !in setOf("hospitalizado", "pendiente_cama")) return null
+        // ENF/AST audit #14: a signed discharge is still in the bed until the exit; signs can be taken until then.
+        if (row.state !in setOf("hospitalizado", "pendiente_cama", "alta_firmada")) return null
         return QuickSubject(id, row.patientName, if (row.bed.isBlank()) "Sin cama asignada" else "Cama ${row.bed}")
+    }
+
+    /** Ward rows drawn before "Ver N más" folds the rest. */
+    const val WARD_VISIBLE = 8
+
+    /**
+     * One ward order for nursing and doctors: discharge requested by Recepción first, then signed discharges waiting for the
+     * exit, then unstable patients, then the rest of the active stays; closed rows last. Ties go by bed code (natural order,
+     * no bed last) and name.
+     */
+    fun wardRank(row: HospitalAdmission): Int = when {
+        row.state == "hospitalizado" && row.dischargeRequestedAt != null -> 0
+        row.state == "alta_firmada" -> 1
+        row.unstable && row.state in activeStates -> 2
+        row.state in activeStates -> 3
+        else -> 4
+    }
+
+    fun wardOrder(rows: List<HospitalAdmission>): List<HospitalAdmission> =
+        rows.sortedWith(compareBy<HospitalAdmission> { wardRank(it) }.thenComparator { a, b -> compareBeds(a.bed, b.bed) }.thenBy { it.patientName })
+
+    private val activeStates = setOf("hospitalizado", "pendiente_cama")
+
+    private val bedParts = Regex("\\d+|\\D+")
+
+    /** "C-2" before "C-10"; a row without bed goes after every bed. */
+    internal fun compareBeds(a: String, b: String): Int {
+        if (a.isBlank() || b.isBlank()) return a.isBlank().compareTo(b.isBlank())
+        val left = bedParts.findAll(a).map { it.value }.toList()
+        val right = bedParts.findAll(b).map { it.value }.toList()
+        for (i in 0 until minOf(left.size, right.size)) {
+            val x = left[i]; val y = right[i]
+            val c = if (x[0].isDigit() && y[0].isDigit()) x.toBigInteger().compareTo(y.toBigInteger()) else x.compareTo(y, ignoreCase = true)
+            if (c != 0) return c
+        }
+        return left.size.compareTo(right.size)
     }
 
     /** S13: the main action of an admission's state, the only one drawn as primary; the rest stay secondary. */

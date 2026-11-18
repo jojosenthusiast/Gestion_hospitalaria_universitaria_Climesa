@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Shared "Ver N más" fold (ui/components/FoldMore.kt). -->
+    <string name="fold_ver_mas">Ver %1$d más</string>
+    <string name="fold_ver_menos">Ver menos</string>
+</resources>

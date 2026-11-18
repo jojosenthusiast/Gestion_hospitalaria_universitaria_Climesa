@@ -133,6 +133,12 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     // R3 A-2: back from any section returns to Inicio before leaving the app. Screens compose their own BackHandler later,
     // so an open form or detail closes first.
     BackHandler(enabled=page!=AndroidSection.HOME&&AndroidSection.HOME in sections){selectedName=AndroidSection.HOME.name}
+    // ENF/AST audit #18: Signos opened from another section (the ward card) goes back there, not to Inicio.
+    var vitalsOrigin by rememberSaveable{mutableStateOf<String?>(null)}
+    LaunchedEffect(page){if(page!=AndroidSection.VITAL_SIGNS)vitalsOrigin=null}
+    BackHandler(enabled=page==AndroidSection.VITAL_SIGNS&&vitalsOrigin!=null){selectedName=vitalsOrigin?:AndroidSection.HOME.name;vitalsOrigin=null}
+    // Opens Signos on a patient from the current section; gated by the section (permission), never by role (rule 8).
+    val openVitals:((QuickSubject)->Unit)?=if(AndroidSection.VITAL_SIGNS in sections){subject->vitalsOrigin=page.name;selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null
     val handled={inbox.consume(page)}
     val onDashboardAction:(QuickActionRequest)->Unit={request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}}
     LaunchedEffect(role,page){model.load(path)}
@@ -141,7 +147,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     // Opening the review section is reading the notice.
     LaunchedEffect(page){if(page==AndroidSection.RESULT_REVIEW)model.dismissCriticalLab()}
     PortalScaffold(
-        role=role,sections=sections,selected=page,onSelected={selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
+        role=role,sections=sections,selected=page,onSelected={vitalsOrigin=null;selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
         badges=noticeBadges(account,sections),
     ) {outer->
       Column(Modifier.padding(outer).fillMaxSize()){
@@ -153,7 +159,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         page==AndroidSection.BEDS||page==AndroidSection.CLEANING->BedsScreen(account.profile,Modifier.padding(padding))
         page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
         page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled,
-            onOpenVitals=if(AndroidSection.VITAL_SIGNS in sections&&role!="MED"){subject->selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null)
+            onOpenVitals=openVitals)
         page==AndroidSection.SUPPLIES->InventoryScreen(Modifier.padding(padding),account.profile)
         page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
         page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId)
@@ -162,7 +168,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding))
         page==AndroidSection.MEDICAL_DAY->ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HOSPITAL_INFO->HospitalInfoScreen(Modifier.padding(padding))
-        page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED",userId=account.session.userId,subject=inbox.subjectFor(page),onSubjectHandled=handled)
+        page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=role=="MED",userId=account.session.userId,subject=inbox.subjectFor(page),onSubjectHandled=handled,
+            onExit=vitalsOrigin?.let{origin->{selectedName=origin;vitalsOrigin=null}})
         page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)->AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding))
         else->PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){

@@ -62,6 +62,10 @@ enum class DashboardSource(val path: String, val anyOf: List<String>) {
     MY_LAB("/me/laboratorio", listOf("resultados.ver")),
     ADMISSIONS("/admisiones", listOf("admision.ver")),
     AMBULANCE("/ambulancia", listOf("ambulancia.ver_estado")),
+    /** MA-AMB-04: services the hospital receives (arrived without handover, then the active one); no clinical data. */
+    ARRIVALS("/ambulancia/llegada", listOf("ambulancia.recibir_prehospital")),
+    /** B3: service and room of the caller's shift in progress, so the assistant counts only their own queue. */
+    MY_POST("/fila/mi-puesto", listOf("fila.llamar")),
     AGENDA("/consultas/agenda", listOf("consulta.iniciar")),
     APPOINTMENTS("/citas", listOf("citas.ver")),
     LINKS("/cuentas/vinculaciones", listOf("cuentas.verificar")),
@@ -74,8 +78,8 @@ object RoleDashboard {
 
     private val sourcesByRole: Map<String, List<DashboardSource>> = mapOf(
         "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.LINKS, DashboardSource.APPOINTMENTS, DashboardSource.SHIFTS),
-        "AST" to listOf(DashboardSource.QUEUE, DashboardSource.SHIFTS),
-        "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
+        "AST" to listOf(DashboardSource.QUEUE, DashboardSource.MY_POST, DashboardSource.SHIFTS),
+        "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.ARRIVALS, DashboardSource.SHIFTS),
         "MED" to listOf(DashboardSource.AGENDA, DashboardSource.LAB, DashboardSource.ADMISSIONS, DashboardSource.SHIFTS),
         "PAR" to listOf(DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
         "PAC" to listOf(DashboardSource.QUEUE, DashboardSource.APPOINTMENTS, DashboardSource.MY_LAB),
@@ -179,7 +183,9 @@ object RoleDashboard {
         val today = now.atZone(zone).toLocalDate()
 
         val bedStates = data[DashboardSource.BEDS]?.let { states(it) }
-        val queue = data[DashboardSource.QUEUE]?.let { states(it) }
+        // ENF/AST audit #12: with a shift post (`/fila/mi-puesto`) the queue counts only that service, not the whole hospital.
+        val myService = data[DashboardSource.MY_POST]?.let { QueueRules.myPost(it)?.service }
+        val queue = data[DashboardSource.QUEUE]?.let { value -> if (myService == null) states(value) else rows(value).filter { it.optString("service") == myService }.groupingBy { it.optString("state") }.eachCount() }
         val admissions = data[DashboardSource.ADMISSIONS]?.let { states(it) }
         val lab = (data[DashboardSource.LAB] ?: data[DashboardSource.MY_LAB])?.let { labCounts(it) }
         val stock = data[DashboardSource.STOCK]?.let { stockCounts(it, today) }
@@ -193,8 +199,8 @@ object RoleDashboard {
         fun bedKpis(withCleaning: Boolean = true) {
             val states = bedStates ?: return
             val total = states.values.sum()
-            kpis += DashboardKpi("Camas libres", free.toString(), if (free == 0 && total > 0) DashboardTone.WARNING else DashboardTone.NEUTRAL, "de $total", target = target(AndroidSection.BEDS))
-            if (withCleaning) kpis += DashboardKpi("En limpieza", cleaning.toString(), if (cleaning > 0) DashboardTone.WARNING else DashboardTone.NEUTRAL, target = target(AndroidSection.BEDS))
+            kpis += DashboardKpi("Camas libres", free.toString(), if (free == 0 && total > 0) DashboardTone.WARNING else DashboardTone.NEUTRAL, "de $total", target = target(AndroidSection.BEDS) ?: target(AndroidSection.CLEANING))
+            if (withCleaning) kpis += DashboardKpi("En limpieza", cleaning.toString(), if (cleaning > 0) DashboardTone.WARNING else DashboardTone.NEUTRAL, target = target(AndroidSection.CLEANING) ?: target(AndroidSection.BEDS))
             charts += DashboardChart(
                 "Ocupación de camas", ChartKind.DONUT,
                 listOf(
@@ -279,16 +285,23 @@ object RoleDashboard {
                 }
             }
             "ENF" -> {
+                // ENF/AST audit #16: nursing does not assign beds, so "Admisiones sin cama" is not its tile.
                 admissions?.let { kpis += DashboardKpi("Hospitalizados", (it["hospitalizado"] ?: 0).toString(), DashboardTone.PROCESS, target = target(AndroidSection.WARD)) }
-                if (admissions != null) kpis += DashboardKpi("Admisiones sin cama", pendingBed.toString(), if (pendingBed > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.WARD))
                 bedKpis()
                 stock?.let { kpis += DashboardKpi("Insumos bajo mínimo", it.belowMinimum.toString(), if (it.belowMinimum > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.SUPPLIES)) }
                 shiftKpi()
-                if (cleaning > 0) attention += DashboardAttention(counted(cleaning, "cama en limpieza", "camas en limpieza"), "Cuando estén listas vuelven a quedar libres para admisión.", DashboardTone.WARNING, "Ver mi planta", QuickActionRequest(AndroidSection.WARD), covers = "En limpieza")
-                stockAttention(target(AndroidSection.SUPPLIES))
-                ambulance?.activeService?.takeIf { it.hasPrehospital && AndroidSection.AMBULANCE_RECEPTION in sections }?.let {
-                    attention += DashboardAttention("Ambulancia en camino", "Hay un reporte prehospital: prepara la recepción.", DashboardTone.WARNING, "Recepción", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
+                // ENF/AST audit #1: nursing reads `/ambulancia/llegada` (it has no `ambulancia.ver_estado`).
+                data[DashboardSource.ARRIVALS]?.let { AmbulanceParser.arrivals(it) }?.takeIf { AndroidSection.AMBULANCE_RECEPTION in sections }?.let { list ->
+                    val arrived = list.count { it.arrived }
+                    if (arrived > 0) attention += DashboardAttention(if (arrived == 1) "Ambulancia en el hospital" else "$arrived ambulancias en el hospital", "Recibe al paciente y marca la entrega.", DashboardTone.WARNING, "Recibir", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
+                    else if (list.any { it.active }) attention += DashboardAttention("Ambulancia en camino", "Prepara la recepción del paciente.", DashboardTone.WARNING, "Ver recepción", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
                 }
+                // ENF/AST audit #16: a signed discharge still holds the bed until the exit is registered.
+                val toExit = data[DashboardSource.ADMISSIONS]?.let { value -> rows(value).count { it.optString("state") == "alta_firmada" && it.optJSONArray("allowedActions")?.let { a -> (0 until a.length()).any { i -> a.optString(i) == "registrar_salida" } } == true } } ?: 0
+                if (toExit > 0 && AndroidSection.WARD in sections) attention += DashboardAttention(counted(toExit, "alta firmada sin salida", "altas firmadas sin salida"), "Registra la salida para que la cama pase a limpieza.", DashboardTone.WARNING, "Registrar salida", QuickActionRequest(AndroidSection.WARD))
+                // ENF/AST audit #2: cleaning lives in its own section, not in the ward.
+                if (cleaning > 0) attention += DashboardAttention(counted(cleaning, "cama en limpieza", "camas en limpieza"), "Cuando estén listas vuelven a quedar libres para admisión.", DashboardTone.WARNING, "Ver limpieza", QuickActionRequest(target(AndroidSection.CLEANING) ?: AndroidSection.WARD), covers = "En limpieza")
+                stockAttention(target(AndroidSection.SUPPLIES))
             }
             "MED" -> {
                 data[DashboardSource.AGENDA]?.let { agenda ->
