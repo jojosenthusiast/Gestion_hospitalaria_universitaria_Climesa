@@ -165,13 +165,16 @@ struct MyRoomView: View {
 
     var body: some View {
         LoadState(loader: loader, retry: load) { admissions in
+            let discharge = DischargeSummaryRules.summary(admissions, patientId: profile.patientId)
             if let room = RoomRules.current(admissions, patientId: profile.patientId) {
                 RoomCard(admission: room)
             } else if RoomRules.waiting(admissions, patientId: profile.patientId) != nil {
                 PatientNotice(text: L.text("room.waiting"))
-            } else {
+            } else if discharge == nil {
                 EmptyStateView(title: L.text("room.none"), message: L.text("room.none.body"), symbol: "bed.double")
             }
+            // D7: resumen del alta firmada (también 30 días después de la salida).
+            if let discharge, let summary = discharge.discharge { DischargeSummaryCard(admission: discharge, discharge: summary) }
         }
         .task(id: live.snapshot.version(.admissions)) { await load() }
     }
@@ -190,6 +193,40 @@ struct RoomCard: View {
             HStack(spacing: Spacing.s) {
                 PatientTag(admission.state.rawValue, label: admission.state.label)
                 Text(verbatim: admission.requestedCategory.label + (admission.isolation ? " · " + L.text("hospitalized.isolation") : "")).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+        }
+    }
+}
+
+/// D7: resumen del alta para el paciente (tipo, diagnósticos, indicaciones, pendientes con responsable y seguimiento). Sin PDF.
+struct DischargeSummaryCard: View {
+    let admission: Admission
+    let discharge: Admission.Discharge
+
+    var body: some View {
+        SectionCard(title: L.text("discharge.patient.title"), eyebrow: DischargeSummaryRules.typeLabel(discharge)) {
+            HStack(spacing: Spacing.s) {
+                PatientTag(admission.state.rawValue, label: admission.state.label)
+                Text(verbatim: ClimesaDates.display(discharge.signedAt) + (discharge.signedByName.map { " · " + $0 } ?? "")).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            if admission.state == .egresado { PatientNotice(text: L.text("discharge.patient.closed")) }
+            block(L.text("discharge.patient.diagnoses"), lines: DischargeSummaryRules.diagnoses(discharge).map(DischargeSummaryRules.diagnosisLine), empty: L.text("discharge.patient.diagnoses.none"))
+            block(L.text("discharge.patient.indications"), lines: [discharge.summary].compactMap { $0?.isEmpty == false ? $0 : nil }, empty: L.text("discharge.patient.indications.none"))
+            block(L.text("discharge.patient.pending"), lines: (discharge.pending ?? []).map(DischargeSummaryRules.pendingLine), empty: L.text("discharge.patient.pending.none"))
+            block(L.text("discharge.patient.followup"), lines: [discharge.followUp].compactMap { $0 }.map(DischargeSummaryRules.followUpLine), empty: L.text("discharge.patient.followup.none"))
+        }
+    }
+
+    private func block(_ title: String, lines: [String], empty: String) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Divider()
+            Text(verbatim: title).font(Typo.label).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader)
+            if lines.isEmpty {
+                Text(verbatim: empty).font(Typo.body).foregroundStyle(Theme.muted)
+            } else {
+                ForEach(Array(lines.enumerated()), id: \.offset) { _, line in
+                    Text(verbatim: line).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                }
             }
         }
     }

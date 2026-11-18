@@ -3081,6 +3081,116 @@
         }
       }
     },
+    "discharge.patient.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Resumen de tu alta"
+          }
+        }
+      }
+    },
+    "discharge.patient.closed": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu estancia terminó. Este resumen queda disponible 30 días después del alta."
+          }
+        }
+      }
+    },
+    "discharge.patient.diagnoses": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Diagnósticos"
+          }
+        }
+      }
+    },
+    "discharge.patient.diagnoses.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin diagnósticos registrados en la estancia."
+          }
+        }
+      }
+    },
+    "discharge.patient.indications": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Indicaciones"
+          }
+        }
+      }
+    },
+    "discharge.patient.indications.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu médico no escribió indicaciones."
+          }
+        }
+      }
+    },
+    "discharge.patient.pending": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pendientes"
+          }
+        }
+      }
+    },
+    "discharge.patient.pending.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No quedaron pendientes."
+          }
+        }
+      }
+    },
+    "discharge.patient.followup": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seguimiento"
+          }
+        }
+      }
+    },
+    "discharge.patient.followup.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin cita de control agendada. Pide una en Citas."
+          }
+        }
+      }
+    },
     "room.waiting": {
       "extractionState": "manual",
       "localizations": {

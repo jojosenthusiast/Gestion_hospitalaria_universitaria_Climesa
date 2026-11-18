@@ -170,14 +170,49 @@ public enum OccupancyRules {
 
 /// Habitación asignada: el paciente ve la suya (`admision.ver` propio) y el médico la de sus pacientes (relación).
 public enum RoomRules {
-    /// Hospitalización vigente con cama asignada.
+    /// Hospitalización vigente con cama asignada; con el alta firmada sigue en la cama hasta la salida física.
     public static func current(_ admissions: [Admission], patientId: String? = nil) -> Admission? {
-        admissions.first { $0.state == .hospitalizado && !$0.bed.isEmpty && (patientId == nil || $0.patientId == patientId) }
+        admissions.first { ($0.state == .hospitalizado || $0.state == .altaFirmada) && !$0.bed.isEmpty && (patientId == nil || $0.patientId == patientId) }
     }
 
     /// Hospitalización pedida que todavía espera cama.
     public static func waiting(_ admissions: [Admission], patientId: String? = nil) -> Admission? {
         admissions.first { $0.state == .pendienteCama && (patientId == nil || $0.patientId == patientId) }
+    }
+}
+
+/// D7 "Resumen de tu alta" en Mi habitación (Android `DischargeSummaryRules`): el alta firmada de la estancia propia,
+/// todavía en cama (`alta_firmada`) o cerrada en los últimos 30 días (`egresado`; la API solo entrega la más reciente).
+public enum DischargeSummaryRules {
+    /// La estancia cuyo resumen ve el paciente; nil sin alta firmada o si no llegó su parte clínica.
+    public static func summary(_ admissions: [Admission], patientId: String? = nil) -> Admission? {
+        admissions.first { ($0.state == .altaFirmada || $0.state == .egresado) && $0.discharge?.type != nil && (patientId == nil || $0.patientId == patientId) }
+    }
+
+    /// "Alta médica", "Alta voluntaria"...; el texto crudo si el tipo es nuevo.
+    public static func typeLabel(_ discharge: Admission.Discharge) -> String {
+        "Alta " + (discharge.kind?.label ?? discharge.type ?? "").lowercased()
+    }
+
+    /// Diagnóstico principal primero; después por código.
+    public static func diagnoses(_ discharge: Admission.Discharge) -> [Admission.Discharge.Diagnosis] {
+        (discharge.diagnoses ?? []).sorted { $0.principal != $1.principal ? $0.principal : $0.code < $1.code }
+    }
+
+    /// "J18.9 · Neumonía (principal)".
+    public static func diagnosisLine(_ diagnosis: Admission.Discharge.Diagnosis) -> String {
+        "\(diagnosis.code) · \(diagnosis.description)" + (diagnosis.principal ? " (principal)" : "")
+    }
+
+    /// "Retirar puntos — Responsable: Consulta externa".
+    public static func pendingLine(_ item: Admission.Discharge.Pending) -> String {
+        "\(item.description) — Responsable: \(item.responsible)"
+    }
+
+    /// Fecha local, médico y especialidad; "(por confirmar)" si la cita sigue solicitada.
+    public static func followUpLine(_ followUp: Admission.Discharge.FollowUp) -> String {
+        let parts = [ClimesaDates.display(followUp.at), followUp.doctorName, followUp.specialty].compactMap { $0?.isEmpty == false ? $0 : nil }
+        return parts.joined(separator: " · ") + (followUp.state == "solicitada" ? " (por confirmar)" : "")
     }
 }
 

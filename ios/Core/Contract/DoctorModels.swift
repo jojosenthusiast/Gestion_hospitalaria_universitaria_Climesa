@@ -178,6 +178,21 @@ public struct Admission: Decodable, Sendable, Identifiable, Equatable {
             public let description: String
             public let responsible: String
         }
+        /// D7 `DischargeDiagnosisResponse`: diagnóstico de la estancia (consultas firmadas).
+        public struct Diagnosis: Decodable, Sendable, Equatable {
+            public let code: String
+            public let description: String
+            public let principal: Bool
+            public init(code: String, description: String, principal: Bool) { self.code = code; self.description = description; self.principal = principal }
+        }
+        /// D7 `DischargeFollowUpResponse`: próxima cita del paciente después del alta.
+        public struct FollowUp: Decodable, Sendable, Equatable {
+            public let at: String
+            public let state: String
+            public let doctorName: String?
+            public let specialty: String?
+            public init(at: String, state: String, doctorName: String?, specialty: String?) { self.at = at; self.state = state; self.doctorName = doctorName; self.specialty = specialty }
+        }
         /// `TipoAlta` como texto; `kind` es nil si la API trae un tipo que esta versión no conoce.
         /// D-031: `type` y `pending` llegan nulos a quien no tiene relación de atención; `pendingCount` y
         /// `specialHandling` llegan siempre.
@@ -187,12 +202,18 @@ public struct Admission: Decodable, Sendable, Identifiable, Equatable {
         public let pending: [Pending]?
         public let pendingCount: Int
         public let specialHandling: Bool
+        /// D7: indicaciones, diagnósticos y seguimiento; nulos sin relación de atención (o en un servidor anterior).
+        public let summary: String?
+        public let diagnoses: [Diagnosis]?
+        public let followUp: FollowUp?
         public var kind: DischargeType? { type.flatMap(DischargeType.init(rawValue:)) }
 
-        enum CodingKeys: String, CodingKey { case type, signedAt, signedByName, pending, pendingCount, specialHandling }
-        public init(type: String?, signedAt: String?, signedByName: String?, pending: [Pending]?, pendingCount: Int? = nil, specialHandling: Bool = false) {
+        enum CodingKeys: String, CodingKey { case type, signedAt, signedByName, pending, pendingCount, specialHandling, summary, diagnoses, followUp }
+        public init(type: String?, signedAt: String?, signedByName: String?, pending: [Pending]?, pendingCount: Int? = nil, specialHandling: Bool = false,
+                    summary: String? = nil, diagnoses: [Diagnosis]? = nil, followUp: FollowUp? = nil) {
             self.type = type; self.signedAt = signedAt; self.signedByName = signedByName; self.pending = pending
             self.pendingCount = pendingCount ?? pending?.count ?? 0; self.specialHandling = specialHandling
+            self.summary = summary; self.diagnoses = diagnoses; self.followUp = followUp
         }
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -202,6 +223,9 @@ public struct Admission: Decodable, Sendable, Identifiable, Equatable {
             pending = (try? container.decodeIfPresent([Pending].self, forKey: .pending)) ?? nil
             pendingCount = ((try? container.decodeIfPresent(Int.self, forKey: .pendingCount)) ?? nil) ?? pending?.count ?? 0
             specialHandling = ((try? container.decodeIfPresent(Bool.self, forKey: .specialHandling)) ?? nil) ?? false
+            summary = (try? container.decodeIfPresent(String.self, forKey: .summary)) ?? nil
+            diagnoses = (try? container.decodeIfPresent([Diagnosis].self, forKey: .diagnoses)) ?? nil
+            followUp = (try? container.decodeIfPresent(FollowUp.self, forKey: .followUp)) ?? nil
         }
     }
 
