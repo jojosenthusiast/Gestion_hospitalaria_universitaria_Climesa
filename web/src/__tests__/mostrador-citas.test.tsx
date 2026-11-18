@@ -198,6 +198,18 @@ describe('A4 · cancelar (D-8)', () => {
     expect(api.write).toHaveBeenCalledWith('/citas/c-1/cancelar', { version: 4, reason: 'Paciente llamó para cancelar' }, 'POST');
   });
 
+  it('reception can fill the reason with one tap and still edit it; the text is what the server gets', async () => {
+    const api = mount(rec(), [row({ start: '2026-11-20T16:20:00Z', end: '2026-11-20T16:40:00Z' })]);
+    await userEvent.click(await screen.findByRole('button', { name: 'Cancelar · Ana Ficticia Agenda' }));
+    const dialog = await screen.findByRole('dialog', { name: 'Cancelar cita' });
+    await userEvent.click(within(dialog).getByRole('button', { name: 'El paciente llamó para cancelar' }));
+    const field = within(dialog).getByLabelText(/Motivo de cancelación/) as HTMLInputElement;
+    expect(field.value).toBe('El paciente llamó para cancelar');
+    await userEvent.type(field, ' por viaje');
+    await userEvent.click(within(dialog).getByRole('button', { name: /^Cancelar cita$/ }));
+    expect(api.write).toHaveBeenCalledWith('/citas/c-1/cancelar', { version: 4, reason: 'El paciente llamó para cancelar por viaje' }, 'POST');
+  });
+
   it('a cancelled appointment shows the patient reason to reception', async () => {
     mount(rec(), [row({ state: 'cancelada', allowedActions: [], cancelReasonCode: 'ya_no_lo_necesito', cancelReason: null, start: '2026-11-20T16:20:00Z', end: '2026-11-20T16:40:00Z' })]);
     await userEvent.click(within(await screen.findByRole('group', { name: 'Estado de la cita' })).getByRole('button', { name: /^Todas/ }));

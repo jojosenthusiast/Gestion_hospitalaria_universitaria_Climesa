@@ -216,7 +216,7 @@ function AppointmentForm({ api, version, patientId, onClose, onSaved }: { api: A
   const franjas = availability?.franjas ?? [];
   const selectedSlot = franjas.find(item => item.start === slot && item.estado === 'libre');
   const freeCount = franjas.filter(item => item.estado === 'libre').length;
-  const missing = [!patient && 'el paciente', !doctorId && 'el médico', !selectedSlot && 'una franja libre'].filter(Boolean).join(', ');
+  const missing = new Intl.ListFormat('es', { type: 'conjunction' }).format([!patient && 'el paciente', !doctorId && 'el médico', !selectedSlot && 'una franja libre'].filter((part): part is string => !!part));
   async function save(e: FormEvent) { e.preventDefault(); if (!selectedSlot || !patient) return; if (await action.run('/citas', { patientId: patient.id, doctorId, start: selectedSlot.start, end: selectedSlot.end, reason: reason || undefined })) onSaved(); }
   return <Dialog title="Agendar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p className="form-intro">Busca al paciente por nombre, DUI o expediente (sin importar tildes), elige un médico con turno y toca una franja libre de 20 minutos.</p><WriteError error={action.error} onReload={onSaved} />
     <div className="form-grid">{patientId ? <div className="select-field"><span className="eyebrow">Paciente</span><p className="ag-fixed-patient">{patient ? <><strong>{patient.label}</strong> <small>{patient.detail}</small></> : 'Cargando paciente…'}</p></div>
@@ -252,6 +252,16 @@ export function ReasonCounter({ value, min = 10, max = 500 }: { value: string; m
   return <p className="form-hint" aria-live="polite">{length < min ? `Faltan ${min - length} caracteres (mínimo ${min}).` : `${length}/${max} ✓`}</p>;
 }
 
+/**
+ * Reception still writes the reason (the API keeps the text for the audit), but the usual ones are one tap away: a
+ * phrase fills the field and stays editable. Each phrase has 10 or more characters.
+ */
+const REASON_PRESETS: Record<'rechazar' | 'cancelar' | 'rechazar_reprogramacion', string[]> = {
+  cancelar: ['El paciente llamó para cancelar', 'El médico no estará disponible', 'La cita se agendó por error', 'El paciente ya fue atendido'],
+  rechazar: ['No hay médico disponible en esa fecha', 'El caso necesita ir a Emergencia', 'Solicitud repetida'],
+  rechazar_reprogramacion: ['El horario pedido ya no está libre', 'El médico no atiende en ese horario'],
+};
+
 function ReasonDialog({ api, appointment, action: kind, patientOnly = false, onClose, onSaved }: { api: Api; appointment: Appointment; action: 'rechazar' | 'cancelar' | 'rechazar_reprogramacion'; patientOnly?: boolean; onClose: () => void; onSaved: () => void }) {
   const [reason, setReason] = useState(''), [code, setCode] = useState<CancelCode | ''>('');
   // D-8: the patient cancels with a quick reason (no text, «Otro» asks a few words); reception keeps writing it.
@@ -271,7 +281,8 @@ function ReasonDialog({ api, appointment, action: kind, patientOnly = false, onC
     {quick ? <>
       <fieldset className="fd-chips"><legend>¿Por qué cancelas?</legend>{CANCEL_CODES.map(([value, label]) => <label key={value} className={`fd-chip${code === value ? ' is-on' : ''}`}><input type="radio" name="motivo-cancelacion" value={value} checked={code === value} onChange={() => setCode(value)} />{label}</label>)}</fieldset>
       {code === 'otro' && <Field label="Cuéntanos brevemente" value={reason} onChange={setReason} minLength={3} maxLength={500} required autoFocus />}</>
-      : <><Field label={kind === 'cancelar' ? 'Motivo de cancelación' : 'Motivo del rechazo'} value={reason} onChange={setReason} minLength={10} maxLength={500} required autoFocus /><ReasonCounter value={reason} /></>}
+      : <><div className="fd-chips" role="group" aria-label="Motivos frecuentes">{REASON_PRESETS[kind].map(text => <button key={text} type="button" className={`fd-chip${reason === text ? ' is-on' : ''}`} onClick={() => setReason(text)}>{text}</button>)}</div>
+        <Field label={kind === 'cancelar' ? 'Motivo de cancelación' : 'Motivo del rechazo'} value={reason} onChange={setReason} minLength={10} maxLength={500} required autoFocus /><ReasonCounter value={reason} /></>}
     <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={!ready} label={title} /></div></form></Dialog>;
 }
 
