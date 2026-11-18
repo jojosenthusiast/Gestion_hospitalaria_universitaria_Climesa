@@ -1,4 +1,5 @@
 /** Reglas del ingreso guiado. La API vuelve a comprobar todo al confirmar; aquí solo guiamos a la persona. */
+import { formatShortDateTime } from '../../lib/format';
 export type Category = 'vip' | 'semiprivada';
 export type OriginKind = 'cita' | 'emergencia' | 'ambulancia' | 'consulta';
 
@@ -15,6 +16,8 @@ export type IsolationType = keyof typeof isolationNames;
 export type PickItem = { id: string; label: string };
 export type DoctorPick = PickItem & { available: boolean; reason: string | null };
 export type OriginRecord = { id: string; origin: OriginKind; at: string; label: string; detail: string };
+/** R4: the API label carries the full date («Cita del 19/11/2026»); the screen names the record by kind and short date. */
+export const originRecordLabel = (row: Pick<OriginRecord, 'origin' | 'at'>, now: string | Date = new Date()) => `${originNames[row.origin]} · ${formatShortDateTime(row.at, now)}`;
 export type BedPick = { id: string; version: number; code: string; roomId: string; room: string; floor: number | null; category: Category; capacity: number; state: string; occupiedInRoom: number; compatible: boolean; reason: string | null; suggested: boolean };
 export type CategoryCount = { category: Category; free: number; compatible: number };
 export type Check = { code: string; ok: boolean; message: string };

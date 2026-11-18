@@ -81,7 +81,7 @@ function compare(row: LinkRequest, candidate: Compared | null) {
   return [
     { label: 'Nombre', declared: row.account.name || 'Sin nombre en la cuenta', record: candidate ? `${candidate.fullName} · ${candidate.record}` : '—', ok: !!candidate && !!row.account.name && plain(candidate.fullName) === plain(row.account.name) },
     { label: 'DUI', declared: <span className="mono-data">{row.declared.dui}</span>, record: recordDui ? <span className="mono-data">{recordDui}</span> : candidate ? 'Sin DUI en el expediente' : '—', ok: !!recordDui && digits(recordDui) === digits(row.declared.dui) },
-    { label: 'Nacimiento', declared: formatDate(row.declared.birth), record: candidate ? formatDate(candidate.birth) : '—', ok: !!candidate && candidate.birth === row.declared.birth },
+    { label: 'Nacimiento', declared: formatDate(row.declared.birth, { withYear: true }), record: candidate ? formatDate(candidate.birth, { withYear: true }) : '—', ok: !!candidate && candidate.birth === row.declared.birth },
   ];
 }
 

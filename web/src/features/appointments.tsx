@@ -142,7 +142,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   const [phoneAgenda] = useState(() => typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(max-width: 767px)').matches);
   const [openDoctors, setOpenDoctors] = useState<Record<string, boolean>>({});
   const ahead = agenda.filter(g => g.day >= today), past = agenda.filter(g => g.day < today).reverse();
-  const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: plural(rows.length, 'cita', 'citas'), columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [formatDate(a.start), timeRange(a.start, a.end), a.patientName, a.doctorName, stateName(shownState(a, now)), a.reason ?? '']) });
+  const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: plural(rows.length, 'cita', 'citas'), columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [formatDate(a.start, { withYear: true }), timeRange(a.start, a.end), a.patientName, a.doctorName, stateName(shownState(a, now)), a.reason ?? '']) });
   // #15: on a phone a busy day is a page per doctor; each doctor folds to its header (the first stays open).
   const doctorOpen = (day: string, doctorId: string, index: number) => !phoneAgenda || (openDoctors[`${day}:${doctorId}`] ?? (index === 0 && day === (ahead[0]?.day ?? today)));
   const dayGroup = (group: typeof agenda[number]) => <section className="ag-day" key={group.day} aria-label={formatDayHeading(group.day)}><h3>{formatDayHeading(group.day)}{group.day === today && <small> · hoy</small>}</h3>

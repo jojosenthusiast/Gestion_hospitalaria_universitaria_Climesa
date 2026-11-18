@@ -111,7 +111,7 @@ describe('ingreso guiado · recorrido de seis pasos', { timeout: 30000 }, () => 
     await next();
     // 2. origen y motivo
     await userEvent.click(await within(dialog).findByLabelText(/Cita/));
-    await userEvent.click(within(dialog).getByLabelText(/Cita del 19\/11\/2026/));
+    await userEvent.click(within(dialog).getByLabelText(/^Cita · /));
     expect((within(dialog).getByRole('button', { name: /Siguiente/ }) as HTMLButtonElement).disabled).toBe(true);
     expect((within(dialog).getByLabelText(/Ambulancia/) as HTMLInputElement).disabled).toBe(true);
     await userEvent.type(within(dialog).getByLabelText(/^Motivo del ingreso/), 'Dolor abdominal con fiebre');
@@ -155,7 +155,7 @@ describe('ingreso guiado · recorrido de seis pasos', { timeout: 30000 }, () => 
     await userEvent.click(await within(dialog).findByRole('option', { name: /Paciente Ficticio Nueve/ }));
     await next();
     await userEvent.click(await within(dialog).findByLabelText(/Emergencia/));
-    await userEvent.click(within(dialog).getByLabelText(/Emergencia del 20\/11\/2026/));
+    await userEvent.click(within(dialog).getByLabelText(/^Emergencia · /));
     await userEvent.type(within(dialog).getByLabelText(/^Motivo del ingreso/), 'Trauma por caída desde altura');
     await next();
     await userEvent.click(within(dialog).getByRole('combobox', { name: /Médico tratante/ }));

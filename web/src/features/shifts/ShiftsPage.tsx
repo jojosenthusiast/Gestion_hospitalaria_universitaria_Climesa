@@ -7,6 +7,7 @@ import { statusFilterLook } from '../../components/system';
 import { can, type AccessProfile, type Api, type Shift } from '../../lib/api';
 import { exportName, type ExportTable } from '../../lib/export';
 import { CompactHeader, Dialog, Empty, RemoteState, SaveButton, WriteError, formatDateTime, isVersionConflict, useAction, useData } from '../common';
+import { formatDayHeading } from '../../lib/format';
 import { useQuickAction } from '../personal/accion';
 import { readHashParams, writeHashParams } from '../../lib/hash-params';
 import { Field } from '../../components/ui';
@@ -131,12 +132,12 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const clearAll = () => { setPerson(null); setRole('todos'); setArea('todos'); setState('todos'); };
 
   const table = (): ExportTable => ({
-    filename: exportName('turnos'), title: 'Turnos del personal', subtitle: [`Semana del ${weekLabel(monday)}`, ...active.map(a => a.label)].join(' · '),
+    filename: exportName('turnos'), title: 'Turnos del personal', subtitle: [`Semana del ${weekLabel(monday, { withYear: true })}`, ...active.map(a => a.label)].join(' · '),
     columns: ['Día', 'Persona', 'Rol', 'Área', 'Horario', 'Inicio', 'Fin', 'Tipo', 'Estado', 'Asistencia'],
-    rows: rows.map(t => [dayTitle(localDay(Date.parse(t.start)), today), t.person, roleIdentity(typeOf(t)).label, t.area, timeRange(t.start, t.end), formatDateTime(t.start), formatDateTime(t.end), KIND_LABEL[t.type] ?? t.type, stateName(displayState(t, at)), attendanceLabel(t) ?? '']),
+    rows: rows.map(t => [dayTitle(localDay(Date.parse(t.start)), today), t.person, roleIdentity(typeOf(t)).label, t.area, timeRange(t.start, t.end), formatDateTime(t.start, { withYear: true }), formatDateTime(t.end, { withYear: true }), KIND_LABEL[t.type] ?? t.type, stateName(displayState(t, at)), attendanceLabel(t) ?? '']),
   });
 
-  const jornada = new Intl.DateTimeFormat('es-SV', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'America/El_Salvador' }).format(now);
+  const jornada = formatDayHeading(now).replace(/^./, c => c.toUpperCase());
   const toggle = (current: string, value: string, set: (v: string) => void) => set(current === value ? 'todos' : value);
   const assignSubstitute = (shift: ShiftRow, staffId: string) => { setMarking(null); setEditing(null); setDraft({ areaId: shift.areaId, start: new Date(Math.max(Date.now() + 5 * 60_000, Date.parse(shift.start))).toISOString(), end: shift.end, type: shift.type, staffId }); setOpen(true); data.refresh(); };
   const actions: RowActions = {

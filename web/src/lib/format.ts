@@ -1,6 +1,6 @@
 /**
  * R4a (S5, §4.8): one es-SV formatter for every screen. Hospital time is El Salvador (UTC-6, no DST).
- * Numbers use a decimal comma ("35,7 %"), dates read "16 nov 2026", relative times are capped
+ * Numbers use a decimal comma ("35,7 %"), dates read "16 nov" (the year only when it is not this one), relative times are capped
  * ("hace 2 d", never "hace 4123 min") and counts carry a correct plural ("1 cita", "3 citas").
  */
 export const ZONE = 'America/El_Salvador';
@@ -31,18 +31,24 @@ export function formatNumber(value: number, decimals = 0) {
 export const formatPercent = (value: number, decimals = 0) => `${formatNumber(value, decimals)}${NBSP}%`;
 /** "1 cita" / "3 citas". */
 export const plural = (count: number, one: string, many: string) => `${formatNumber(count)} ${count === 1 ? one : many}`;
-/** "16 nov 2026"; `withYear: false` gives "16 nov". */
-export function formatDate(value: string | Date | null | undefined, { withYear = true } = {}) {
+/**
+ * R4: "16 nov" — user-facing dates never carry the year unless it is not the current one ("3 mar 2025").
+ * `withYear: true` always prints it: audit trails, access history, birth dates, legal ranges and exports.
+ * `withYear: false` never prints it.
+ */
+export type YearMode = boolean | 'auto';
+const showYear = (l: Local, mode: YearMode, now: string | Date) => mode === 'auto' ? l.year !== local(now).year : mode;
+export function formatDate(value: string | Date | null | undefined, { withYear = 'auto', now = new Date() }: { withYear?: YearMode; now?: string | Date } = {}) {
   if (!value) return 'Sin registrar';
   const l = local(value);
-  return `${l.day} ${MONTHS[l.month - 1]}${withYear ? ` ${l.year}` : ''}`;
+  return `${l.day} ${MONTHS[l.month - 1]}${showYear(l, withYear, now) ? ` ${l.year}` : ''}`;
 }
 /** "09:33" (24 h). */
 export const formatTime = (value: string | Date) => { const l = local(value); return `${pad(l.hour)}:${pad(l.minute)}`; };
-/** "16 nov 2026, 09:33"; today it is only "09:33" when `short` is set. */
-export function formatDateTime(value: string | Date, { short = false } = {}) {
-  if (short && localDayKey(value) === localDayKey(new Date())) return formatTime(value);
-  return `${formatDate(value)}, ${formatTime(value)}`;
+/** "16 nov, 09:33" (year only outside the current year, or with `withYear: true`); today it is only "09:33" when `short` is set. */
+export function formatDateTime(value: string | Date, { short = false, withYear = 'auto', now = new Date() }: { short?: boolean; withYear?: YearMode; now?: string | Date } = {}) {
+  if (short && localDayKey(value) === localDayKey(now)) return formatTime(value);
+  return `${formatDate(value, { withYear, now })}, ${formatTime(value)}`;
 }
 /** "sábado 14 de noviembre" (lower case; headings capitalise the first letter with CSS). */
 export function formatDayHeading(value: string | Date) {

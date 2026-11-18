@@ -133,7 +133,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
   const exportTable = () => ({
     filename: 'laboratorio-ordenes', title: 'Órdenes de laboratorio', subtitle: `${rows.length} órdenes`,
     columns: ['Prioridad', 'Paciente', 'Expediente', 'Edad', 'Sexo', 'Exámenes', 'Médico', 'Solicitada', 'Espera', 'Etapa', 'Valores críticos', 'Externa'],
-    rows: rows.map(o => [o.priority === 'urgente' ? 'Urgente' : 'Rutina', o.patientName, o.patientRecord ?? '', o.patientAge ?? o.patientAgeRange ?? '', o.patientSex ? sexShort[o.patientSex] ?? '' : '', o.items.map(i => i.name).join('; '), o.doctorName ?? '', formatDateTime(o.createdAt), formatElapsed(elapsedMinutes(o, now)), STAGE_LABEL[stageOf(o)], isCritical(o) ? 'Sí' : 'No', o.external ? `Sí (${o.externalPlace ?? ''})` : 'No']),
+    rows: rows.map(o => [o.priority === 'urgente' ? 'Urgente' : 'Rutina', o.patientName, o.patientRecord ?? '', o.patientAge ?? o.patientAgeRange ?? '', o.patientSex ? sexShort[o.patientSex] ?? '' : '', o.items.map(i => i.name).join('; '), o.doctorName ?? '', formatDateTime(o.createdAt, { withYear: true }), formatElapsed(elapsedMinutes(o, now)), STAGE_LABEL[stageOf(o)], isCritical(o) ? 'Sí' : 'No', o.external ? `Sí (${o.externalPlace ?? ''})` : 'No']),
   });
   return <>
     <CompactHeader breadcrumb="Atención / Diagnóstico" title="Laboratorio"/>

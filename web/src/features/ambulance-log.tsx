@@ -13,7 +13,7 @@ export type { AmbulanceLogRow };
 
 const rowsOf=(rows:AmbulanceLogRow[]):ExportTable=>({filename:exportName('bitacora-ambulancia'),title:'Bitácora de ambulancia',subtitle:'Servicios con tiempos y destinos; sin datos del paciente (solo expediente enmascarado).',
  columns:['Despachado','Tipo','Prioridad','Origen','Municipio','Destino','Tripulación','Paciente (expediente)','Respuesta (min)','Estado final'],
- rows:rows.map(r=>[formatDateTime(r.dispatchedAt),typeNames[r.type]??r.type,priorityNames[r.priority]??r.priority,r.origin,r.municipality??'',r.destination,r.crew.map(c=>`${c.name} (${roleNames[c.role]??c.role})`).join('; '),r.patientRef??'',r.responseMinutes,finalLabel(r)])});
+ rows:rows.map(r=>[formatDateTime(r.dispatchedAt,{withYear:true}),typeNames[r.type]??r.type,priorityNames[r.priority]??r.priority,r.origin,r.municipality??'',r.destination,r.crew.map(c=>`${c.name} (${roleNames[c.role]??c.role})`).join('; '),r.patientRef??'',r.responseMinutes,finalLabel(r)])});
 /** BL-05: un servicio que Jefatura cerró se marca como "Cierre administrativo", no como cancelación de la tripulación. */
 /** R4a: still open 12 h after dispatch (no final state, no administrative close). */
 const unclosed=(r:AmbulanceLogRow)=>!r.finalState&&!r.administrativeClose&&isUnclosed(r.dispatchedAt);

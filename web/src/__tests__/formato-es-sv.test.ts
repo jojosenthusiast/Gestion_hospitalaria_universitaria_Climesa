@@ -11,13 +11,22 @@ describe('formateador es-SV', () => {
   });
 
   it('fechas cortas sin «de» ni mayúsculas, en hora de El Salvador', () => {
-    expect(formatDate('2026-11-16T22:13:00Z')).toBe('16 nov 2026');
+    const now = '2026-11-18T15:00:00Z';
+    // R4: sin año dentro del año en curso.
+    expect(formatDate('2026-11-16T22:13:00Z', { now })).toBe('16 nov');
     // 03:00 UTC del 17 es todavía el 16 en El Salvador.
-    expect(formatDate('2026-11-17T03:00:00Z')).toBe('16 nov 2026');
-    expect(formatDate('2028-05-31')).toBe('31 may 2028');
-    expect(formatDate('2026-11-16T22:13:00Z', { withYear: false })).toBe('16 nov');
+    expect(formatDate('2026-11-17T03:00:00Z', { now })).toBe('16 nov');
+    // Fuera del año en curso el año sí aparece.
+    expect(formatDate('2028-05-31', { now })).toBe('31 may 2028');
+    expect(formatDate('1990-03-04', { now })).toBe('4 mar 1990');
+    expect(formatDate('2026-11-16T22:13:00Z', { withYear: false, now: '2027-01-02T12:00:00Z' })).toBe('16 nov');
+    // Auditoría, historial de accesos, nacimientos y exportaciones piden el año siempre.
+    expect(formatDate('2026-11-16T22:13:00Z', { withYear: true, now })).toBe('16 nov 2026');
     expect(formatTime('2026-11-16T15:33:00Z')).toBe('09:33');
-    expect(formatDateTime('2026-11-14T07:33:00Z')).toBe('14 nov 2026, 01:33');
+    expect(formatDateTime('2026-11-14T07:33:00Z', { now })).toBe('14 nov, 01:33');
+    expect(formatDateTime('2025-11-14T07:33:00Z', { now })).toBe('14 nov 2025, 01:33');
+    expect(formatDateTime('2026-11-14T07:33:00Z', { withYear: true, now })).toBe('14 nov 2026, 01:33');
+    expect(formatDateTime('2026-11-18T16:00:00Z', { short: true, now })).toBe('10:00');
     expect(formatDayHeading('2026-11-14T18:00:00Z')).toBe('sábado 14 de noviembre');
   });
 
