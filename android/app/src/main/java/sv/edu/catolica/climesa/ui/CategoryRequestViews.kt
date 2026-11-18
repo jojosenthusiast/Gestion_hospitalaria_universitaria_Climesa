@@ -258,21 +258,15 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
         var doctorQuery by rememberSaveable(request.id) { mutableStateOf("") }
         var allDoctors by rememberSaveable(request.id) { mutableStateOf(false) }
         LiveSearchField(doctorQuery, { doctorQuery = it.take(60) }, stringResource(R.string.cat_buscar_medico))
-        val shown = sv.edu.catolica.climesa.domain.DoctorChoices.visible(state.orderedDoctors, doctorQuery, allDoctors, state.doctor?.id)
+        // R1/R3: doctors with a shift first (suggested ones lead each group), each row with its tag.
+        val byShift = sv.edu.catolica.climesa.domain.DoctorShifts.ordered(state.orderedDoctors) { it.hasShift }
+        val shown = sv.edu.catolica.climesa.domain.DoctorChoices.visible(byShift, doctorQuery, allDoctors, state.doctor?.id)
         if (shown.isEmpty()) Text(stringResource(R.string.listas_sin_coincidencias), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         shown.forEach { d ->
-            TextButton(onClick = { model.pickDoctor(d) }, enabled = d.hasShift, modifier = Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Column(Modifier.weight(1f)) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.detail, style = MaterialTheme.typography.bodySmall) }
-                    when {
-                        !d.hasShift -> FamilyBadge(d.reason ?: stringResource(R.string.rec_agendar_sin_turno), StatusFamily.CERRADO)
-                        state.doctor?.id == d.id -> FamilyBadge(stringResource(R.string.cat_elegido), StatusFamily.LISTO)
-                        CategoryRequestRules.isSuggested(request, d) -> FamilyBadge(stringResource(R.string.cat_sugerido), null)
-                    }
-                }
-            }
+            DoctorShiftRow(d.name, d.detail, d.hasShift, d.reason, selected = state.doctor?.id == d.id, onPick = { model.pickDoctor(d) },
+                extra = if (CategoryRequestRules.isSuggested(request, d)) ({ FamilyBadge(stringResource(R.string.cat_sugerido), null) }) else null)
         }
-        val more = sv.edu.catolica.climesa.domain.DoctorChoices.hidden(state.orderedDoctors, doctorQuery, allDoctors)
+        val more = sv.edu.catolica.climesa.domain.DoctorChoices.hidden(byShift, doctorQuery, allDoctors)
         if (more > 0) TextButton(onClick = { allDoctors = true }, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.cat_ver_todos_medicos, more)) }
         when {
             state.doctor == null -> Text(stringResource(R.string.rec_agendar_elige_medico), style = MaterialTheme.typography.bodySmall)

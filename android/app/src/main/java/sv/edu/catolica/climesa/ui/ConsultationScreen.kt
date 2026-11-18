@@ -58,7 +58,6 @@ import sv.edu.catolica.climesa.domain.DraftStatus
 import sv.edu.catolica.climesa.domain.QueueConsultation
 
 private val sanSalvador = ZoneId.of("America/El_Salvador")
-private val appointmentFormatter = DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm")
 
 @Composable
 fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modifier, userId: String? = null, model: ConsultationViewModel = viewModel(), actions: AppointmentActionViewModel = viewModel()) {
@@ -294,7 +293,7 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             val orders = record?.labOrders.orEmpty().filter { it.state != "cancelado" }
             Text(stringResource(R.string.rec7_consulta_examenes, orders.sumOf { it.exams.size }), style = MaterialTheme.typography.titleSmall)
             if (record != null && !record.labOrdersKnown && recordError != null) RecordLoadError(recordError) { model.loadRecord(item.consultationId) }
-            orders.forEach { o -> RecordLine(o.exams.joinToString(), StatusCatalog.label(o.state)) }
+            orders.forEach { o -> RecordLine(o.exams.joinToString(), null, status = o.state) }
             StepNotice(stepNotice, RecordSection.LAB)
             if (signed) return@Column
             if (labCatalog.isEmpty()) Text(stringResource(if (labCatalogLoading) R.string.lab_orden_cargando else R.string.lab_orden_sin_catalogo), style = MaterialTheme.typography.bodySmall)
@@ -336,13 +335,15 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
 
 /** One thing the consultation already has: what it is and a short detail. */
 @Composable
-private fun RecordLine(title: String, detail: String?) {
+private fun RecordLine(title: String, detail: String?, status: String? = null) {
     Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         androidx.compose.material3.Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium)
             detail?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
+        // R1: a state is its badge, never plain text under the title.
+        status?.let { StatusBadge(it) }
     }
 }
 
@@ -362,7 +363,8 @@ private fun StepNotice(notice: Pair<RecordSection, String>?, section: RecordSect
 }
 
 private fun appointmentState(value: String) = StatusCatalog.label(value)
-private fun formatDateTime(value: String) = runCatching { appointmentFormatter.format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault("—")
+/** R4: "Hoy 09:00", "Jue 26 nov, 09:00"; never the year. */
+private fun formatDateTime(value: String) = runCatching { sv.edu.catolica.climesa.domain.MyShifts.relative(Instant.parse(value), Instant.now()) }.getOrDefault("—")
 private fun formatTime(value: String) = runCatching { DateTimeFormatter.ofPattern("HH:mm").format(Instant.parse(value).atZone(sanSalvador)) }.getOrDefault("—")
 
 /** After closing a consultation: who goes next in its area by the server rule, with the call one tap away (S9). */
