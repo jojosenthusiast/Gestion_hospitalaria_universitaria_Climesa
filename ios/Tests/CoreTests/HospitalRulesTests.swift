@@ -168,4 +168,34 @@ final class HospitalRulesTests: XCTestCase {
         let busy = try decode(AmbulanceStatus.self, #"{"unit":{"id":"u1","plate":"P-000","state":"en_servicio"},"activeService":null,"paramedicOnDuty":true,"driverOnDuty":false,"dispatchBlock":{"code":"en_servicio","message":"La unidad está en servicio.","action":"Espera a que termine."}}"#)
         XCTAssertEqual(AmbulanceLogRules.crewNotice(busy), "Sin motorista con turno en curso.")
     }
+
+    func testBitacoraDeAmbulanciaPorDiaPrioridadYCierre() throws {
+        func entry(_ id: String, _ at: String, final: String? = "completado", admin: Bool? = nil) throws -> AmbulanceLogEntry {
+            let adminJSON = admin.map { $0 ? "true" : "false" } ?? "null"
+            let finalJSON = final.map { "\"\($0)\"" } ?? "null"
+            return try decode(AmbulanceLogEntry.self, #"{"id":"\#(id)","type":"emergencia_domicilio","priority":"roja","origin":"A","destination":"B","municipality":null,"dispatchedAt":"\#(at)","finishedAt":null,"finalState":\#(finalJSON),"crew":[],"responseMinutes":null,"milestones":[],"patientRef":null,"administrativeClose":\#(adminJSON)}"#)
+        }
+        let now = try XCTUnwrap(ClimesaDates.parse("2026-11-18T18:00:00Z"))
+        // 2026-11-18T03:00Z is still 17 Nov in El Salvador (UTC-6).
+        let days = AmbulanceLogRules.days([try entry("a", "2026-11-18T15:00:00Z"), try entry("b", "2026-11-18T03:00:00Z"), try entry("c", "2026-11-16T15:00:00Z"), try entry("d", "2026-11-17T20:00:00Z")], now: now)
+        XCTAssertEqual(days.today?.map(\.id), ["a"])
+        XCTAssertEqual(days.past.map(\.day), ["2026-11-17", "2026-11-16"])
+        XCTAssertEqual(days.past[0].entries.map(\.id), ["b", "d"])
+        XCTAssertNil(AmbulanceLogRules.days([try entry("c", "2026-11-16T15:00:00Z")], now: now).today)
+
+        XCTAssertEqual(AmbulanceLogRules.finalTag(try entry("x", "2026-11-18T15:00:00Z", final: "cancelado", admin: true)).label, "Cierre administrativo")
+        XCTAssertEqual(AmbulanceLogRules.finalTag(try entry("y", "2026-11-18T15:00:00Z", final: "cancelado")).label, "Cancelado")
+        XCTAssertEqual(AmbulanceLogRules.finalTag(try entry("z", "2026-11-18T15:00:00Z", final: nil)).value, "en_curso")
+
+        XCTAssertEqual(AmbulanceLogRules.priorityLevel(.roja), .emergencia)
+        XCTAssertEqual(AmbulanceLogRules.priorityLevel(.naranja), .urgente)
+        XCTAssertEqual(AmbulanceLogRules.priorityLevel(.amarilla), .urgente)
+        XCTAssertEqual(AmbulanceLogRules.priorityLevel(.verde), .rutina)
+
+        XCTAssertTrue(AmbulanceLogRules.isUnclosed(dispatchedAt: "2026-11-18T05:00:00Z", now: now))
+        XCTAssertFalse(AmbulanceLogRules.isUnclosed(dispatchedAt: "2026-11-18T07:00:00Z", now: now))
+
+        let status = try decode(AmbulanceStatus.self, #"{"unit":{"id":"u1","plate":"P-000","state":"en_servicio"},"activeService":{"id":"s1","priority":"roja","origin":"A","destination":"B","dispatchedAt":"2026-11-18T15:00:00Z","hasPrehospital":false,"milestones":[{"type":"salida","occurredAt":"2026-11-18T15:02:00Z"}]}}"#)
+        XCTAssertEqual(status.activeService?.milestones?.map(\.type), ["salida"])
+    }
 }

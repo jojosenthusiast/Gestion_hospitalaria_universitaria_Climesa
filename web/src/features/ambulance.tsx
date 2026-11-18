@@ -32,9 +32,9 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Centro de despacho" actions={phoneDesk?<button type="button" className="secondary-button" onClick={()=>setCalling(true)}>Registrar llamada</button>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
   {/* R4a: one readable line for the unit (normal type, code on one line, state as a badge), not a strip of giant numbers. */}
   <div className="amb-unit"><div className="amb-unit-id"><span className="sr-only">Unidad</span><strong className="nowrap-code">{s.unit.plate}</strong><StatusBadge value={s.unit.state} label={stateNames[s.unit.state]}/></div><div className="amb-unit-crew"><CrewCoverage status={s}/></div></div>
-  {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {s.dispatchBlock.action}</Notice>{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
+  {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {blockAction(s)}</Notice>{closeInNotice(s)&&<p className="amb-crew-next"><AdminCloseAction api={api} service={s.activeService!} onSaved={()=>saved(ADMIN_CLOSED)}/></p>}{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
   {done&&<Notice kind="success">{done}</Notice>}
-  {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} onSaved={saved} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
+  {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} closeAbove={dispatcher&&closeInNotice(s)} onSaved={saved} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
   {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
@@ -45,7 +45,11 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  {report&&<PrehospitalDialog api={api} serviceId={report} version={version} onClose={()=>setReport(null)}/>}
  </>;
 }
-function ActiveService({api,service,canOperate,onReport,onSaved}:{api:Api;service:NonNullable<AmbulanceStatus['activeService']>;canOperate:boolean;onReport?:()=>void;onSaved:(message?:string)=>void}){
+const ADMIN_CLOSED='Servicio cerrado por Jefatura; la unidad quedó disponible.';
+/** The unit is busy and this person may close the service: the block notice carries the close itself, not «ask Jefatura». */
+export const closeInNotice=(s:AmbulanceStatus)=>s.dispatchBlock?.code==='en_servicio'&&!!s.activeService?.allowedActions?.includes('cerrar');
+export const blockAction=(s:AmbulanceStatus)=>closeInNotice(s)?'Espera a que la tripulación finalice el servicio o, si no puede terminarlo desde la app, usa «Cierre administrativo»; después podrás despachar.':s.dispatchBlock?.action??'';
+function ActiveService({api,service,canOperate,closeAbove=false,onReport,onSaved}:{api:Api;service:NonNullable<AmbulanceStatus['activeService']>;canOperate:boolean;closeAbove?:boolean;onReport?:()=>void;onSaved:(message?:string)=>void}){
  const milestones=service.milestones??[],withoutAccount=service.crew.some(c=>c.hasAccount===false);
  const last=[...milestones].sort((a,b)=>a.occurredAt.localeCompare(b.occurredAt)).at(-1),undo=useAction(api);
  // R7 G-4: the crew undoes a milestone tapped by mistake; the server keeps the window (15 min) and who undid it.
@@ -63,14 +67,14 @@ function ActiveService({api,service,canOperate,onReport,onSaved}:{api:Api;servic
  {undoable&&<p><button type="button" className="secondary-button" disabled={undo.busy} onClick={undoLast}>{undo.busy?'Deshaciendo…':`Deshacer «${milestoneNames[last!.type]??last!.type}»`}</button></p>}
  {undo.error&&<WriteError error={undo.error}/>}
  {onReport&&<button type="button" className="row-action" onClick={onReport}>Ver reporte prehospital</button>}
- <AdminCloseAction api={api} service={service} onSaved={()=>onSaved('Servicio cerrado por Jefatura; la unidad quedó disponible.')}/>
+ {!closeAbove&&<AdminCloseAction api={api} service={service} onSaved={()=>onSaved(ADMIN_CLOSED)}/>}
  </section>;
 }
 /** FR-109-11: reporte prehospital; la API omite motivo y signos a quien no tiene relación de atención. */
 function PrehospitalDialog({api,serviceId,version,onClose}:{api:Api;serviceId:string;version:number;onClose:()=>void}){
  const data=useData<PrehospitalView>(api,`/ambulancia/servicios/${serviceId}/prehospital`,version);
  return <Dialog title="Reporte prehospital" onClose={onClose}><RemoteState state={data}>{v=><div>{handoverNotice(v)}{v.reports.length?<div>{!v.clinical&&<Notice kind="info">Los datos clínicos solo los ve el equipo que recibe al paciente.</Notice>}{v.reports.map(r=><dl key={r.id} className="detail-grid">
-  <div><dt>Prioridad</dt><dd>{priorityNames[r.priority]??r.priority}</dd></div><div><dt>Hora estimada de llegada</dt><dd>{r.estimatedArrival?formatDateTime(r.estimatedArrival):'Sin estimar'}</dd></div><div><dt>Capturado</dt><dd>{formatDateTime(r.capturedAt)}</dd></div>
+  <div><dt>Prioridad</dt><dd><PriorityBadge value={priorityLevel(r.priority)} label={priorityNames[r.priority]??r.priority}/></dd></div><div><dt>Hora estimada de llegada</dt><dd>{r.estimatedArrival?formatDateTime(r.estimatedArrival):'Sin estimar'}</dd></div><div><dt>Capturado</dt><dd>{formatDateTime(r.capturedAt)}</dd></div>
   {r.reason!==undefined&&<div><dt>Motivo</dt><dd>{r.reason}</dd></div>}
   {r.vitalSigns&&Object.entries(r.vitalSigns).map(([k,val])=><div key={k}><dt>{signNames[k]??k}</dt><dd>{val}</dd></div>)}
  </dl>)}</div>:<p className="muted">Aún no llega un reporte.</p>}</div>}</RemoteState></Dialog>;

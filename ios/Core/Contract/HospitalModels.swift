@@ -69,6 +69,8 @@ public struct AmbulanceLogEntry: Decodable, Sendable, Identifiable, Equatable {
     public let responseMinutes: Double?
     public let milestones: [Milestone]
     public let patientRef: String?
+    /// BL-05: Jefatura closed it administratively; nil from an older API.
+    public let administrativeClose: Bool?
 }
 
 /// `IdVersionResponse` de `PATCH /me/paciente`.

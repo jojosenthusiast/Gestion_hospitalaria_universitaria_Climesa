@@ -1251,6 +1251,8 @@ struct AmbulanceArrivalView: View {
                 MedicoTag("atendido", label: L.text("arrival.received"))
                 Text(verbatim: String(format: L.text("arrival.receivedBy"), done.receivedByName ?? L.text("arrival.clinicalStaff"), ClimesaDates.display(done.receivedAt, .time)))
                     .font(Typo.body).foregroundStyle(Theme.ink)
+                // A54: after the handover comes the admission, which Recepción records with origin «Ambulancia».
+                Text("arrival.nextAdmission").font(Typo.small).foregroundStyle(Theme.muted)
             } else if view.canReceive {
                 ClimesaButton(title: L.text("arrival.receive"), loading: submission.busy) { submission.clearFailure(); confirmingReceive = true }
                     .confirmationDialog(L.text("arrival.receive.confirm"), isPresented: $confirmingReceive, titleVisibility: .visible) {

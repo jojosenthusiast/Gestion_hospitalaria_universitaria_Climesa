@@ -464,6 +464,8 @@ struct StatusFilterChip: View {
     var count: Int?
     /// API status value whose family the chip copies (`StatusFamily.of`); nil is neutral.
     var status: String?
+    /// A priority filter copies the `PriorityBadge` colour and icon instead (used when there is no status family).
+    var priority: Priority?
     let selected: Bool
     let action: () -> Void
 
@@ -471,6 +473,7 @@ struct StatusFilterChip: View {
         let family = status.flatMap(StatusFamily.of)
         let text = count.map { "\(label) (\($0))" } ?? label
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
+        if family == nil, let priority { priorityChip(priority, text: text, shape: shape) } else {
         Button(action: action) {
             HStack(spacing: 6) {
                 if let family { Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true) }
@@ -482,6 +485,30 @@ struct StatusFilterChip: View {
             .frame(minHeight: 44)
             .background { background(family).clipShape(shape) }
             .overlay { border(family) }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(Text(verbatim: text))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
+        }
+    }
+
+    /// Priority look: soft fill and strong border; selected fills strong (emergency is always solid, like its badge).
+    private func priorityChip(_ priority: Priority, text: String, shape: RoundedRectangle) -> some View {
+        let colors = Theme.colors(for: priority)
+        let solid = selected || priority == .emergencia
+        return Button(action: action) {
+            HStack(spacing: 6) {
+                Image(systemName: priority.symbol).imageScale(.small).accessibilityHidden(true)
+                Text(verbatim: text).lineLimit(1)
+            }
+            .font(selected ? Typo.label : Typo.tag)
+            .foregroundStyle(solid ? Theme.onStatus : colors.strong)
+            .padding(.horizontal, Spacing.space3)
+            .frame(minHeight: 44)
+            .background(solid ? colors.strong : colors.soft, in: shape)
+            .overlay(shape.strokeBorder(colors.strong, lineWidth: selected ? 2 : 1))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
@@ -714,8 +741,10 @@ private struct DotGrid: Shape {
 /// Prioridad con ícono y texto. El rojo crítico solo en emergencia (relleno sólido).
 struct PriorityBadge: View {
     let priority: Priority
+    /// Text instead of the level name (for example «Sin cierre» on the urgent look), like the web `label`.
+    var label: String?
 
-    init(_ priority: Priority) { self.priority = priority }
+    init(_ priority: Priority, label: String? = nil) { self.priority = priority; self.label = label }
     /// Valor de la API; lo desconocido se muestra como rutina.
     init(_ value: String?) { self.priority = Priority.of(value) }
 
@@ -725,7 +754,7 @@ struct PriorityBadge: View {
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
         HStack(spacing: 6) {
             Image(systemName: priority.symbol).imageScale(.small).accessibilityHidden(true)
-            Text(verbatim: priority.label).lineLimit(1)
+            Text(verbatim: label ?? priority.label).lineLimit(1)
         }
         .font(Typo.tag)
         .foregroundStyle(emergency ? Theme.onStatus : colors.strong)
@@ -733,7 +762,7 @@ struct PriorityBadge: View {
         .background(colors.soft, in: shape)
         .overlay(shape.strokeBorder(colors.strong, lineWidth: 1))
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: "Prioridad \(priority.label)"))
+        .accessibilityLabel(Text(verbatim: label ?? "Prioridad \(priority.label)"))
     }
 }
 

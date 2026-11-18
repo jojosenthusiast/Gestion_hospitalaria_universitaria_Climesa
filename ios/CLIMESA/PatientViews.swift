@@ -1353,7 +1353,11 @@ struct AmbulanceRequestView: View {
             .foregroundStyle(Theme.danger).background(Theme.dangerSoft, in: RoundedRectangle(cornerRadius: Radius.card))
             .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(Theme.danger, lineWidth: 1))
             LoadState(loader: loader, retry: load) { requests in
-                if let active = AmbulanceRules.active(requests) { activeCard(active) } else { form }
+                if let active = AmbulanceRules.active(requests) { activeCard(active) } else {
+                    // How the last request ended (discarded and why, cancelled, finished) sits above the new-request form.
+                    if let last = AmbulanceRules.latestResolved(requests) { activeCard(last) }
+                    form
+                }
             }
         }
         .task(id: live.snapshot.version(.ambulance)) { await load() }
@@ -1362,10 +1366,14 @@ struct AmbulanceRequestView: View {
     }
 
     private func activeCard(_ request: OwnAmbulanceRequest) -> some View {
-        SectionCard(eyebrow: L.text("ambulance.status")) {
-            PatientTag(request.state.rawValue, label: request.state.label)
+        let tag = AmbulanceRules.tagValue(request)
+        return SectionCard(eyebrow: L.text(request.isActive ? "ambulance.status" : "ambulance.last")) {
+            PatientTag(tag.value, label: tag.label)
             Text(verbatim: AmbulanceRules.progress(request)).font(Typo.body).foregroundStyle(Theme.ink)
             Text(verbatim: request.address).font(Typo.small).foregroundStyle(Theme.muted)
+            if request.state == .descartada, let why = request.discardReason, !why.isEmpty {
+                Text(verbatim: "\(L.text("ambulance.discardReason")): \(why)").font(Typo.small).foregroundStyle(Theme.ink)
+            }
             if let service = request.service {
                 ForEach(["salida", "en_escena", "trasladando", "en_hospital"], id: \.self) { type in
                     let done = service.milestones.first { $0.type == type }

@@ -339,11 +339,53 @@ public struct AmbulanceLogQuery: Equatable, Sendable {
     }
 }
 
+/// One local day of the ambulance log (`yyyy-MM-dd`) with its services in the server's order.
+public struct AmbulanceLogDay: Identifiable, Equatable, Sendable {
+    public let day: String
+    public let entries: [AmbulanceLogEntry]
+    public var id: String { day }
+}
+
 /// Bitácora de ambulancia: textos de resumen.
 public enum AmbulanceLogRules {
     public static func finalStateLabel(_ code: String?) -> String {
         guard let code else { return "En curso" }
         return AmbulanceFinalState(rawValue: code)?.label ?? code.replacingOccurrences(of: "_", with: " ")
+    }
+
+    /// One tag per entry: an administrative close reads «Cierre administrativo», not «Cancelado» (BL-05).
+    public static func finalTag(_ entry: AmbulanceLogEntry) -> (value: String, label: String) {
+        if entry.administrativeClose == true { return ("cerrado", "Cierre administrativo") }
+        return (AmbulanceFinalState.statusValue(entry.finalState), finalStateLabel(entry.finalState))
+    }
+
+    /// Triage colour on the shared priority scale, like the web `priorityLevel`: red is the only emergency.
+    public static func priorityLevel(_ priority: AmbulancePriority) -> Priority {
+        switch priority {
+        case .roja: return .emergencia
+        case .naranja, .amarilla: return .urgente
+        case .verde, .desconocido: return .rutina
+        }
+    }
+
+    /// R4a: a service still open 12 h after dispatch was most likely never closed; it gets a «Sin cierre» flag.
+    public static let unclosedHours: Double = 12
+    public static func isUnclosed(dispatchedAt: String, now: Date = Date()) -> Bool {
+        guard let at = ClimesaDates.parse(dispatchedAt) else { return false }
+        return now.timeIntervalSince(at) > unclosedHours * 3600
+    }
+
+    /// Entries by local day of dispatch (`yyyy-MM-dd`), newest day first; today apart so the screen folds the past days.
+    public static func days(_ entries: [AmbulanceLogEntry], now: Date = Date()) -> (today: [AmbulanceLogEntry]?, past: [AmbulanceLogDay]) {
+        let today = ClimesaDates.localDay(now)
+        var order: [String] = [], groups: [String: [AmbulanceLogEntry]] = [:]
+        for entry in entries {
+            let day = ClimesaDates.parse(entry.dispatchedAt).map(ClimesaDates.localDay) ?? ""
+            if groups[day] == nil { order.append(day) }
+            groups[day, default: []].append(entry)
+        }
+        let sorted = order.sorted(by: >)
+        return (groups[today], sorted.filter { $0 != today }.map { AmbulanceLogDay(day: $0, entries: groups[$0] ?? []) })
     }
 
     public static func typeLabel(_ code: String) -> String {

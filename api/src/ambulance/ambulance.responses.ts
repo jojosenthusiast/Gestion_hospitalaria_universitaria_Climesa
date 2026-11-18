@@ -222,6 +222,7 @@ export class OwnAmbulanceRequestResponse {
   @StrProp() address!: string;
   @StrProp() reason!: string;
   @DateTimeProp() createdAt!: string;
+  @StrProp({ optional: true, nullable: true, description: 'Motivo con el que despacho descartó la solicitud; solo en estado descartada' }) discardReason?: string | null;
   @IntProp() version!: number;
   @ClassProp(OwnRequestServiceResponse, { nullable: true, description: 'Servicio despachado para la solicitud; null si aún no se confirma' }) service!: OwnRequestServiceResponse | null;
   @EnumArrayProp(['cancelar'], 'AccionSolicitudAmbulancia', { description: 'cancelar: quien pidió puede cancelarla (solo por confirmar)' }) allowedActions!: string[];

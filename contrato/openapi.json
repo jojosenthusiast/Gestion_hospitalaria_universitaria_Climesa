@@ -19783,6 +19783,7 @@
             "name": "finalState",
             "required": false,
             "in": "query",
+            "description": "Estado final del servicio, o en_curso para los que siguen sin cierre",
             "schema": {
               "type": "string"
             }
@@ -33497,6 +33498,11 @@
           "createdAt": {
             "type": "string",
             "format": "date-time"
+          },
+          "discardReason": {
+            "type": "string",
+            "nullable": true,
+            "description": "Motivo con el que despacho descartó la solicitud; solo en estado descartada"
           },
           "version": {
             "type": "integer"

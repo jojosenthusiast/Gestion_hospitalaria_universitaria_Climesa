@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
 import { AmbulancePage, type AmbulanceStatus } from '../features/ambulance';
 import { AmbulanceLogPage, type AmbulanceLogRow } from '../features/ambulance-log';
+import { formatTime } from '../lib/format';
 
 // R4a (Ambulancia y Bitácora): normal-size type, the unit code on one line, a readable «En servicio» badge, priority
 // as a label, coordinates only behind a map link, crew names or «Sin asignar», and «Sin cierre» past 12 h.
@@ -50,9 +51,12 @@ describe('Ambulancia · estado y servicio (R4a)', () => {
 describe('Bitácora · servicios (R4a)', () => {
   const row = (id: string, dispatchedAt: string, crew: AmbulanceLogRow['crew'] = []): AmbulanceLogRow => ({ id, type: 'emergencia_domicilio', priority: 'amarilla', origin: 'Calle 1', destination: 'Hospital', dispatchedAt, finalState: null, responseMinutes: null, crew });
   it('«En curso» de más de 12 h lleva «Sin cierre»; uno reciente no', async () => {
-    render(<AmbulanceLogPage api={{ request: vi.fn(async () => [row('viejo', hoursAgo(20)), row('nuevo', hoursAgo(1))]) } as unknown as Api} version={0} />);
+    const old = hoursAgo(20), recent = hoursAgo(1);
+    render(<AmbulanceLogPage api={{ request: vi.fn(async () => [row('viejo', old), row('nuevo', recent)]) } as unknown as Api} version={0} />);
+    // The log groups by day (the 20 h old one may sit under «Días anteriores»), so find each service by its time.
     const items = await screen.findAllByRole('listitem', { name: /Servicio/ });
-    expect(within(items[0]).getByText('Sin cierre')).toBeTruthy();
-    expect(within(items[1]).queryByText('Sin cierre')).toBeNull();
+    const at = (iso: string) => items.find(i => within(i).queryByText(formatTime(iso)))!;
+    expect(within(at(old)).getByText('Sin cierre')).toBeTruthy();
+    expect(within(at(recent)).queryByText('Sin cierre')).toBeNull();
   });
 });

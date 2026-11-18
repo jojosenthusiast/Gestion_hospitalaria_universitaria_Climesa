@@ -133,7 +133,7 @@ export class AmbulanceService {
   async ownRequests(actor: Actor) {
     return this.db.transaction(async c => {
       const since = new Date(this.clock.now().getTime() - 7 * 24 * 3600_000);
-      const rows = (await c.query<{ id: string; state: string; channel: string; address: string; reason: string; createdAt: Date; version: number; mine: boolean; patient: string | null; serviceId: string | null; dispatchedAt: Date | null; finalState: string | null; finishedAt: Date | null }>(`SELECT s.id,s.estado AS state,s.canal AS channel,s.direccion AS address,s.motivo AS reason,s.creada_en AS "createdAt",s.version,
+      const rows = (await c.query<{ id: string; state: string; channel: string; address: string; reason: string; discardReason: string | null; createdAt: Date; version: number; mine: boolean; patient: string | null; serviceId: string | null; dispatchedAt: Date | null; finalState: string | null; finishedAt: Date | null }>(`SELECT s.id,s.estado AS state,s.canal AS channel,s.direccion AS address,s.motivo AS reason,s.motivo_descarte AS "discardReason",s.creada_en AS "createdAt",s.version,
           (s.solicitante_usuario_id=$1) AS mine,s.paciente_id AS patient,v.id AS "serviceId",v.despachado_en AS "dispatchedAt",v.estado_final AS "finalState",v.finalizado_en AS "finishedAt"
         FROM ambulancia.solicitud s LEFT JOIN ambulancia.servicio v ON v.solicitud_id=s.id
         WHERE (s.solicitante_usuario_id=$1 OR ($2::uuid IS NOT NULL AND s.paciente_id=$2::uuid)) AND s.creada_en>=$3
@@ -143,7 +143,7 @@ export class AmbulanceService {
         const milestones = row.serviceId ? (await c.query('SELECT tipo AS type,ocurrido_en AS "occurredAt" FROM ambulancia.hito WHERE servicio_id=$1 ORDER BY ocurrido_en,registrado_en', [row.serviceId])).rows : [];
         const service = row.serviceId ? { dispatchedAt: row.dispatchedAt, milestones, finalState: row.finalState, finishedAt: row.finishedAt } : null;
         if (row.patient) await this.commands.audit(c, actor, { action: 'ambulancia.solicitud.ver_propia', entity: 'solicitud', entityId: row.id, patientId: row.patient, permission: 'ambulancia.solicitar' });
-        result.push({ id: row.id, state: row.state, channel: row.channel, address: row.address, reason: row.reason, createdAt: row.createdAt, version: row.version, service, allowedActions: row.mine && row.state === 'por_confirmar' ? ['cancelar'] : [], notice: NOTICE_911 });
+        result.push({ id: row.id, state: row.state, channel: row.channel, address: row.address, reason: row.reason, discardReason: row.state === 'descartada' ? row.discardReason : null, createdAt: row.createdAt, version: row.version, service, allowedActions: row.mine && row.state === 'por_confirmar' ? ['cancelar'] : [], notice: NOTICE_911 });
       }
       return result;
     });
@@ -316,7 +316,9 @@ export class AmbulanceService {
       const unitVersion = unit.estado === 'en_servicio' ? await this.setUnit(c, actor, unit, 'disponible', `Cierre administrativo: ${reason}`) : unit.version;
       const account = await this.requesterAccount(c, service.solicitud_id);
       await this.commands.audit(c, actor, { action: 'ambulancia.cerrar', entity: 'servicio', entityId: id, patientId: service.paciente_id ?? undefined, permission: 'ambulancia.mantenimiento', reason, detail: { finalState: 'cancelado' } });
-      await this.commands.event(c, 'ambulancia.hito', 'servicio', id, version, ['ambulancia', ...(account ? [`usuario:${account}`] : [])]);
+      // Como el hito `finalizado`, quien recibe (Enfermería no lee el tablero) deja de esperar el traslado cerrado.
+      const receivers = await channelsFor(c, ['ambulancia.recibir_prehospital']);
+      await this.commands.event(c, 'ambulancia.hito', 'servicio', id, version, ['ambulancia', ...receivers, ...(account ? [`usuario:${account}`] : [])]);
       await this.commands.event(c, 'ambulancia.estado_cambiado', 'unidad', unit.id, unitVersion, ['ambulancia']);
       return { id, finalState: 'cancelado', version, unitState: 'disponible', unitVersion };
     });
@@ -464,7 +466,8 @@ export class AmbulanceService {
       if (filters.to) add('s.despachado_en<?::timestamptz', businessDayRange(filters.to).end);
     } catch { throw new ProblemException('validacion', 400, 'Las fechas deben tener el formato yyyy-MM-dd.', 'from'); }
     if (filters.type) { if (!serviceTypes.includes(filters.type as never)) throw new ProblemException('validacion', 400, 'Tipo de servicio no válido.', 'type'); add('s.tipo=?', filters.type); }
-    if (filters.finalState) { if (!finalStates.includes(filters.finalState as never)) throw new ProblemException('validacion', 400, 'Estado final no válido.', 'finalState'); add('s.estado_final=?', filters.finalState); }
+    if (filters.finalState === 'en_curso') where.push('s.estado_final IS NULL');
+    else if (filters.finalState) { if (!finalStates.includes(filters.finalState as never)) throw new ProblemException('validacion', 400, 'Estado final no válido.', 'finalState'); add('s.estado_final=?', filters.finalState); }
     if (filters.priority) { if (!priorities.includes(filters.priority as never)) throw new ProblemException('validacion', 400, 'Prioridad no válida.', 'priority'); add('s.prioridad=?', filters.priority); }
     if (filters.crewId) { if (!/^[0-9a-f-]{36}$/i.test(filters.crewId)) throw new ProblemException('validacion', 400, 'Tripulación no válida.', 'crewId'); add('EXISTS(SELECT 1 FROM ambulancia.tripulacion t WHERE t.servicio_id=s.id AND t.persona_id=?::uuid)', filters.crewId); }
     if (filters.municipality) add('s.municipio ILIKE ?', filters.municipality.trim());

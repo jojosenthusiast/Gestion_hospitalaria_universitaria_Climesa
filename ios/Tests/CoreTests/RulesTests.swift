@@ -133,6 +133,31 @@ final class DatesAndLiveTopicTests: XCTestCase {
     }
 
     /// MA-AMB-05: la solicitud propia sale del servidor; la pantalla sigue la activa y solo ofrece cancelar si la API lo permite.
+    func testSinSolicitudActivaSeMuestraLaUltimaConSuMotivoDeDescarte() throws {
+        let json = """
+        [{"id":"r2","state":"descartada","channel":"app_paciente","address":"Colonia Ficticia","reason":"Caída","createdAt":"2026-11-15T14:00:00Z","version":2,
+          "service":null,"allowedActions":[],"notice":"x","discardReason":"Se resolvió por teléfono"},
+         {"id":"r1","state":"cancelada","channel":"app_paciente","address":"A","reason":"B","createdAt":"2026-11-14T10:00:00Z","version":2,"service":null,"allowedActions":[],"notice":"x"}]
+        """
+        let requests = try JSONDecoder().decode([OwnAmbulanceRequest].self, from: Data(json.utf8))
+        XCTAssertNil(AmbulanceRules.active(requests))
+        let last = try XCTUnwrap(AmbulanceRules.latestResolved(requests))
+        XCTAssertEqual(last.id, "r2")
+        XCTAssertEqual(last.discardReason, "Se resolvió por teléfono")
+        XCTAssertNil(requests[1].discardReason)
+        XCTAssertEqual(AmbulanceRules.progress(last), "Despacho no pudo atender esta solicitud: Se resolvió por teléfono. Si hay riesgo de vida, llama al 911.")
+        XCTAssertEqual(AmbulanceRules.progress(requests[1]), "Cancelaste esta solicitud.")
+        XCTAssertEqual(AmbulanceRules.tagValue(last).value, "descartada")
+        let finished = """
+        [{"id":"r3","state":"confirmada","channel":"app_paciente","address":"A","reason":"B","createdAt":"2026-11-15T14:00:00Z","version":2,
+          "service":{"dispatchedAt":"2026-11-15T14:05:00Z","milestones":[],"finalState":"completado","finishedAt":"2026-11-15T15:00:00Z"},"allowedActions":[],"notice":"x"},
+         {"id":"r0","state":"por_confirmar","channel":"app_paciente","address":"A","reason":"B","createdAt":"2026-11-14T10:00:00Z","version":1,"service":null,"allowedActions":[],"notice":"x"}]
+        """
+        let withActive = try JSONDecoder().decode([OwnAmbulanceRequest].self, from: Data(finished.utf8))
+        XCTAssertNil(AmbulanceRules.latestResolved(withActive))
+        XCTAssertEqual(AmbulanceRules.tagValue(withActive[0]).value, "completado")
+    }
+
     func testSolicitudPropiaDeAmbulancia() throws {
         let json = """
         [{"id":"r2","state":"confirmada","channel":"app_paciente","address":"Colonia Ficticia","reason":"Caída","createdAt":"2026-11-15T14:00:00Z","version":2,

@@ -7039,6 +7039,8 @@ export interface components {
             reason: string;
             /** Format: date-time */
             createdAt: string;
+            /** @description Motivo con el que despacho descartó la solicitud; solo en estado descartada */
+            discardReason?: string | null;
             version: number;
             /** @description Servicio despachado para la solicitud; null si aún no se confirma */
             service: components["schemas"]["OwnRequestServiceResponse"] | null;
@@ -21133,6 +21135,7 @@ export interface operations {
                 municipality?: string;
                 crewId?: string;
                 priority?: string;
+                /** @description Estado final del servicio, o en_curso para los que siguen sin cierre */
                 finalState?: string;
                 type?: string;
                 /** @description Último día local, yyyy-MM-dd */

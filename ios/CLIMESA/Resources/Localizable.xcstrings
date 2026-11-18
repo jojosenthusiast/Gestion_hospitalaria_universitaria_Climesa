@@ -5830,6 +5830,61 @@
           }
         }
       }
+    },
+    "ambulance.last": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tu última solicitud"
+          }
+        }
+      }
+    },
+    "ambulance.discardReason": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Motivo de despacho"
+          }
+        }
+      }
+    },
+    "ambulance.unclosed": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sin cierre"
+          }
+        }
+      }
+    },
+    "ambulance.log.pastDays": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Días anteriores · %lld servicios"
+          }
+        }
+      }
+    },
+    "arrival.nextAdmission": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Siguiente paso: Recepción ingresa al paciente en Admisión con origen «Ambulancia»."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
