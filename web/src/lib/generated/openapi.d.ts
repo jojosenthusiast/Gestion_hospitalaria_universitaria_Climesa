@@ -4158,6 +4158,11 @@ export interface components {
             numero: number;
             state: components["schemas"]["EstadoFila"];
         };
+        CategoryRefResponse: {
+            code: string;
+            name: string;
+            icon: string;
+        };
         /**
          * @description Acciones que el servidor acepta ahora para quien lee
          * @enum {string}
@@ -4209,6 +4214,8 @@ export interface components {
             cancelReason: string | null;
             /** @description Número de fila con el que Recepción registró la llegada (D-1) */
             arrival: components["schemas"]["AppointmentArrivalResponse"] | null;
+            /** @description Categorías que el paciente eligió al pedir la cita por motivo (vacío si recepción la agendó directo) */
+            categories?: components["schemas"]["CategoryRefResponse"][];
             /** @description Acciones que el servidor acepta ahora para quien lee */
             allowedActions: components["schemas"]["AccionCita"][];
             /** @description Acciones del rol bloqueadas ahora, con su motivo */
@@ -4305,6 +4312,8 @@ export interface components {
             startedAt: string | null;
             /** Format: date-time */
             signedAt: string | null;
+            /** @description Categorías que el paciente eligió al pedir la cita por motivo (vacío si recepción la agendó directo) */
+            categories?: components["schemas"]["CategoryRefResponse"][];
             /** @description iniciar_consulta solo el día de la cita y sin consulta previa */
             allowedActions: components["schemas"]["AccionCita"][];
             blockedActions: components["schemas"]["BlockedAppointmentActionResponse"][];
@@ -4469,6 +4478,8 @@ export interface components {
             appointmentDoctorName: string | null;
             /** @description true si el número se emitió al registrar la llegada de la cita (D-1) */
             arrivalFromAppointment: boolean;
+            /** @description Categorías de la cita del número cuando nació de una solicitud por motivo; vacío sin cita o si recepción la agendó directo */
+            categories?: components["schemas"]["CategoryRefResponse"][];
             /**
              * Format: date-time
              * @description Hasta cuándo quien lo emitió puede anularlo (B-3); null para los demás o si ya no espera
@@ -4934,11 +4945,6 @@ export interface components {
             specialties: string[];
             /** @description Palabras sin tildes para la búsqueda por texto */
             keywords: string;
-        };
-        CategoryRefResponse: {
-            code: string;
-            name: string;
-            icon: string;
         };
         /** @enum {string} */
         FranjaSolicitudCita: "manana" | "tarde" | "cualquiera";
