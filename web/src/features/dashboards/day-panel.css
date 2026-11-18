@@ -53,3 +53,9 @@
 .compact-header .quick-actions .quick-icon { width: auto; height: auto; background: transparent; color: var(--primary-text); display: inline-grid; }
 @media (hover: hover) and (pointer: fine) { .compact-header .quick-actions a:hover { border-color: var(--primary-text); background: var(--soft); } }
 .lab-follow-up { margin: 0 0 var(--space-6); display: grid; gap: var(--space-3); }
+
+/* Groups past the two most urgent fold into one line each: name, count and the way to their section. */
+.tray-folded { margin: 0; padding: var(--space-3) 0 0; list-style: none; display: grid; border-top: 1px solid var(--line); }
+.tray-folded li { min-height: 44px; display: flex; align-items: center; gap: var(--space-2); }
+.tray-folded li > span:first-child { font-weight: 600; }
+.tray-folded .row-action { margin-left: auto; }

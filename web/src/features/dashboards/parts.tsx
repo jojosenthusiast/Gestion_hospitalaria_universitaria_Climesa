@@ -67,12 +67,27 @@ export function TrayGroup({ group }: { group: TrayGroupSpec }) {
 }
 
 const settled = (group: TrayGroupSpec) => !group.state || (!!group.state.data && !group.state.error);
-/** The ONE pending tray of Inicio: every group that waits on this account; one quiet line when everything is clear. */
+const OPEN_GROUPS = 2, OPEN_ROWS = 2;
+/** Out of stock is as urgent as a red tone: nothing left to work with. */
+const itemRank = (i: AttentionItem) => i.tone === 'urgent' || i.status === 'agotado' ? 0 : i.tone === 'warn' ? 1 : 2;
+const urgency = (group: TrayGroupSpec) => Math.min(2, ...group.items.map(itemRank));
+/**
+ * The ONE pending tray of Inicio. A heavy shift can pile up many groups that only clear after real work, so the first
+ * glance is what to do now: the two most urgent groups open with their first rows, every other group folds into one
+ * line (name, count, «Ver») that leads to its section. Loading or failed groups keep their place and state.
+ */
 export function PendingTray({ groups, children, othersClear = true }: { groups: TrayGroupSpec[]; children?: ReactNode; othersClear?: boolean }) {
   const clear = othersClear && groups.every(g => settled(g) && g.items.length === 0);
+  const ready = groups.filter(g => settled(g) && g.items.length > 0);
+  const open = new Set([...ready].sort((a, b) => urgency(a) - urgency(b)).slice(0, OPEN_GROUPS).map(g => g.id));
+  const folded = ready.filter(g => !open.has(g.id));
   return <section className="pending-tray" aria-label="Pendientes">
     <h2 className="pending-tray-title">Pendientes</h2>
-    {groups.map(group => <TrayGroup key={group.id} group={group} />)}
+    {groups.filter(g => !settled(g) || open.has(g.id)).map(group => <TrayGroup key={group.id} group={open.has(group.id) ? { ...group, items: [...group.items].sort((a, b) => itemRank(a) - itemRank(b)), limit: Math.min(group.limit ?? OPEN_ROWS, OPEN_ROWS) } : group} />)}
+    {folded.length > 0 && <ul className="tray-folded" aria-label="Otros pendientes">{folded.map(g => <li key={g.id}>
+      <span>{g.title}</span><span className="tray-count">{formatNumber(g.items.length)}</span>
+      <a className="row-action" href={g.href}>Ver<Icon name="arrow" size={16} /></a>
+    </li>)}</ul>}
     {children}
     {clear && <p className="section-empty" role="status">Al día: nada pendiente.</p>}
   </section>;
