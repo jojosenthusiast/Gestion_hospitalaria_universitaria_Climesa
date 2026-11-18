@@ -281,8 +281,8 @@ final class JourneyRulesTests: XCTestCase {
     }
 
     func testFirmarDiceLoQueFaltaYResume() {
-        XCTAssertEqual(ConsultationRecordRules.signBlocker(reason: "", plan: ""), "Para firmar falta el motivo de consulta y el plan.")
-        XCTAssertEqual(ConsultationRecordRules.signBlocker(reason: "Tos", plan: " "), "Para firmar falta el plan.")
+        XCTAssertEqual(ConsultationRecordRules.signBlocker(reason: "", plan: ""), "Completa el motivo y el plan para firmar.")
+        XCTAssertEqual(ConsultationRecordRules.signBlocker(reason: "Tos", plan: " "), "Completa el plan para firmar.")
         XCTAssertEqual(ConsultationRecordRules.stepFor(reason: "Tos", plan: ""), .procedimientos)
         XCTAssertNil(ConsultationRecordRules.signBlocker(reason: "Tos", plan: "Reposo"))
         let recap = ConsultationRecordRules.signRecap(diagnoses: 2, prescriptions: 1, labOrders: 1, notesPending: false, unsentWork: false)

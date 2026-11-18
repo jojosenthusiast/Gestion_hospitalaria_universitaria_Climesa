@@ -380,6 +380,8 @@ public struct ClinicalHistory: Decodable, Sendable, Equatable {
     public let consultations: [Consultation]
     public let laboratory: [LabOrder]
     public let admissions: [Admission]
+    /// S4: what the caller may do from this history now (`resultado_externo`). Absent on an older server.
+    public let allowedActions: [String]?
 }
 
 /// `LinkRequestResponse` de `POST /cuentas/vinculacion`.

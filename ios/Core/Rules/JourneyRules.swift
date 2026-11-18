@@ -497,11 +497,16 @@ public enum ConsultationRecordRules {
     public static func orderedKey(_ consultationId: String) -> String { "examenes-\(consultationId)" }
 
     /// The API signs only with a reason and a plan: «Firmar» says what is missing instead of failing.
+    /// S7: the reason shows under the disabled button (`ClimesaButton(blockedReason:)`).
     public static func signBlocker(reason: String, plan: String) -> String? {
-        var missing: [String] = []
-        if reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { missing.append("el motivo de consulta") }
-        if plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { missing.append("el plan") }
-        return missing.isEmpty ? nil : "Para firmar falta \(spokenList(missing))."
+        let noReason = reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        let noPlan = plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        switch (noReason, noPlan) {
+        case (true, true): return "Completa el motivo y el plan para firmar."
+        case (true, false): return "Completa el motivo para firmar."
+        case (false, true): return "Completa el plan para firmar."
+        case (false, false): return nil
+        }
     }
 
     /// The step that holds the missing field, so «Firmar» can take the doctor there.

@@ -73,6 +73,9 @@ public enum APIFailure: Error, Equatable, Sendable {
     public var isVersionConflict: Bool { code == "version_conflicto" }
     public var isForbidden: Bool { status == 403 || code == "sin_permiso" }
 
+    /// S8: a 403 does not change by trying again, so its message is an info state without «Reintentar».
+    public var offersRetry: Bool { !isForbidden }
+
     /// La consulta ya estaba iniciada por este médico (otro toque, la web): su id para retomarla en vez de fallar.
     public var resumableConsultationId: String? {
         guard code == "consulta_ya_iniciada", let id = problem?.consultationId, !id.isEmpty else { return nil }

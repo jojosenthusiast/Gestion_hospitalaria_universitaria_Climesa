@@ -98,6 +98,16 @@ public enum AppointmentRules {
         case tooLate(deadline: Date)
         /// El servidor la bloquea (`blockedActions`) con un motivo propio que se muestra tal cual.
         case blocked(reason: String)
+
+        /// The shared gate (S0): too late and server-blocked both show the reason instead of a silent gap.
+        public var gate: ActionGate {
+            switch self {
+            case .hidden: return .hidden
+            case .allowed: return .available
+            case .tooLate: return .blocked(reason: AppointmentRules.cancelTooLateText())
+            case let .blocked(reason): return .blocked(reason: reason)
+            }
+        }
     }
 
     /// Cuando la API manda `allowedActions` (CITA-04), ella decide; el cálculo local queda para respuestas anteriores.
@@ -163,6 +173,15 @@ public enum AppointmentRules {
 
 /// I09: solicitud de ambulancia (`AmbulanceRequestDto`).
 public enum AmbulanceRules {
+    /// S6: the API takes a request only from an account with a linked record, so an unlinked patient sees why and
+    /// what to do instead of a form that would be refused. Without the permission the action does not exist.
+    public static let unlinkedReason = "Vincula tu expediente para pedir una ambulancia. En una emergencia llama al 911."
+
+    public static func requestGate(_ profile: AccessProfile?) -> ActionGate {
+        guard let profile, profile.hasPermission(AppSection.ambulancia.requiredPermission ?? "") else { return .hidden }
+        return profile.patientId == nil ? .blocked(reason: unlinkedReason) : .available
+    }
+
     public static func errors(address: String, reason: String, phone: String) -> [String: String] {
         var errors: [String: String] = [:]
         let place = address.trimmingCharacters(in: .whitespacesAndNewlines).count

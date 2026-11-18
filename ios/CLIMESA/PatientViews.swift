@@ -546,9 +546,10 @@ private struct AppointmentRow: View {
             case let .allowed(deadline):
                 Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { Image(systemName: "clock") }
                     .font(Typo.small).foregroundStyle(Theme.muted)
-            case .tooLate:
-                Text(verbatim: AppointmentRules.cancelTooLateText()).font(Typo.small).foregroundStyle(Theme.muted)
-            case .hidden, .blocked:
+            case .tooLate, .blocked:
+                // S0: the shared gate's reason (too late, or the server's own reason) instead of a silent gap.
+                if let reason = option.gate.blockedReason { BlockedReasonLine(text: reason) }
+            case .hidden:
                 EmptyView()
             }
             // CITA-02: el estado de una solicitud de cambio de horario (pendiente, rechazada) sí importa al paciente.
@@ -1226,7 +1227,8 @@ struct ClinicalHistoryView: View {
                 EmptyStateView(title: L.text("history.forbidden.title"), message: denied, symbol: "lock.shield")
             } else {
                 LoadState(loader: loader, retry: load) { history in
-                    let offer = !viewerIsPatient && ExternalRecordRules.canOffer(account.profile, historyReadable: true)
+                    // S4: the history's `allowedActions` decide when present; otherwise the permission, as before.
+                    let offer = !viewerIsPatient && ExternalRecordRules.canOffer(account.profile, history: history)
                     HistoryContent(history: history, viewerIsPatient: viewerIsPatient, recordExternal: offer ? recordExternal : nil)
                 }
             }
@@ -1372,7 +1374,12 @@ struct AmbulanceRequestView: View {
                 if let active = AmbulanceRules.active(requests) { activeCard(active) } else {
                     // How the last request ended (discarded and why, cancelled, finished) sits above the new-request form.
                     if let last = AmbulanceRules.latestResolved(requests) { activeCard(last) }
-                    form
+                    // S6: without a linked record the API refuses the request, so the form is replaced by what to do.
+                    if let reason = AmbulanceRules.requestGate(account.profile).blockedReason {
+                        SectionCard { BlockedReasonLine(text: reason) }
+                    } else {
+                        form
+                    }
                 }
             }
         }

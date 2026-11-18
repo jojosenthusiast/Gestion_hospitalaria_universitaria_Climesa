@@ -143,17 +143,21 @@ struct PartFailure: Identifiable {
     var id: String { title }
 }
 
-/// Error de una parte del tablero, dentro de su tarjeta, con «Reintentar».
+/// Error de una parte del tablero, dentro de su tarjeta, con «Reintentar». S8: with a 403 `failure` the message is
+/// information (trying again cannot change it), so there is no «Reintentar».
 struct PartError: View {
     let message: String
+    var failure: APIFailure? = nil
     let retry: () async -> Void
     var body: some View {
+        let retryable = failure?.offersRetry ?? true
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack(alignment: .top, spacing: Spacing.s) {
-                Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.danger).accessibilityHidden(true)
+                Image(systemName: retryable ? "exclamationmark.triangle.fill" : "info.circle")
+                    .foregroundStyle(retryable ? Theme.danger : Theme.muted).accessibilityHidden(true)
                 Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             }
-            ClimesaButton(title: L.text("ds.retry"), kind: .secondary) { Task { await retry() } }
+            if retryable { ClimesaButton(title: L.text("ds.retry"), kind: .secondary) { Task { await retry() } } }
         }
         .accessibilityElement(children: .contain)
     }
@@ -226,7 +230,8 @@ struct LoadState<Value: Sendable, Content: View>: View {
         VStack(alignment: .leading, spacing: Spacing.space4) {
             // Con datos en caché, una revalidación fallida es una línea compacta; el contenido válido sigue visible.
             if let error = loader.error {
-                if loader.value != nil { PartError(message: error, retry: retry) }
+                if loader.value != nil { PartError(message: error, failure: loader.failure, retry: retry) }
+                else if loader.failure?.offersRetry == false { InfoStateView(message: error) }
                 else { ErrorStateView(message: error) { Task { await retry() } } }
             }
             if let value = loader.value { content(value) }

@@ -88,7 +88,7 @@ private struct DoctorPatientRoom: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             // CH-02: si la lectura falla se dice, en vez de parecer que el paciente no está hospitalizado.
             if let error = loader.error {
-                SectionCard(title: L.text("room.eyebrow")) { PartError(message: error, retry: load) }
+                SectionCard(title: L.text("room.eyebrow")) { PartError(message: error, failure: loader.failure, retry: load) }
             } else if let room = loader.value.flatMap({ RoomRules.current($0, patientId: patientId) }) {
                 RoomCard(admission: room)
                 Text("room.treating_only").font(Typo.caption).foregroundStyle(Theme.muted)
@@ -116,7 +116,7 @@ private struct DoctorPatientVitals: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             if let error = loader.error {
-                SectionCard(title: L.text("consultation.vitals")) { PartError(message: error, retry: load) }
+                SectionCard(title: L.text("consultation.vitals")) { PartError(message: error, failure: loader.failure, retry: load) }
             } else if let history = loader.value ?? nil {
                 let items = PatientVitalsRules.latest(history.items)
                 SectionCard(title: L.text("consultation.vitals")) {
