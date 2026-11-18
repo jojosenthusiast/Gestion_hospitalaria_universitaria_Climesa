@@ -5,7 +5,7 @@ import { roleNames, staffTypeNames, type AccessProfile, type Appointment, type A
 import { formatDate, formatDuration, formatPercent, formatRelative, formatTime, joinParts, minutesSince, plural } from '../../lib/format';
 import { StatusBadge } from '../../components/system';
 import type { Remote } from '../common';
-import { milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames } from '../ambulance/types';
+import { isUnclosed, milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames, typeNames } from '../ambulance/types';
 import { isPendingCategoryRequest } from '../listas/requests';
 import { shownState } from '../listas/schedule';
 import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source, StockRow } from './data';
@@ -74,6 +74,13 @@ const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
   id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
   items: (d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: `${r.address} · ${formatRelative(r.createdAt)}`, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Despachar', area: 'AMB' as const })),
 });
+/** A service still open 12 h after dispatch blocks every new dispatch; whoever may close it (Jefatura) sees it on Inicio. */
+export const unclosedAmbulance = (d: DashboardData): TrayGroupSpec => {
+  const s = d.ambulance.data?.activeService;
+  const stuck = s && s.allowedActions?.includes('cerrar') && isUnclosed(s.dispatchedAt) ? [s] : [];
+  return { id: 'ambulancia-sin-cierre', title: 'Servicio de ambulancia sin cierre', href: '#/ambulancia', masculine: true, state: asRemote(d.ambulance),
+    items: stuck.map(x => ({ id: `u-${x.id}`, title: `${typeNames[x.type] ?? x.type} · ${x.origin}`, detail: `Despachado ${formatRelative(x.dispatchedAt)}; la unidad no puede salir a otro servicio`, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Cerrar', area: 'AMB' as const, tag: 'Sin cierre', status: 'vencido' })) };
+};
 /** R7 G3: an admission the doctor indicated in the consultation; Recepción only picks the bed. */
 const indicated = (a: AdmissionRow) => a.state === 'pendiente_cama' && a.origin === 'consulta';
 const indicatedAdmissions = (d: DashboardData): TrayGroupSpec => ({
@@ -140,7 +147,7 @@ const jop: RoleDashboard = {
   tray: ({ d }) => [
     { id: 'huecos', title: 'Huecos de cobertura', href: '#/turnos', masculine: true, state: asRemote(d.board),
       items: (d.board.data?.cobertura.detalle ?? []).map((g, i) => ({ id: `gap-${i}`, title: `${g.area} · ${roleNames[g.rol] ?? g.rol}`, detail: `${timeLabel(g.inicio)}–${timeLabel(g.fin)} · ${g.actuales} de ${plural(g.requeridos, 'persona', 'personas')}`, tone: 'warn' as Tone, href: '#/turnos?accion=planificar', action: 'Planificar' })) },
-    indicatedAdmissions(d), noBed(d), pendingAmbulance(d), lowStock(d),
+    indicatedAdmissions(d), noBed(d), unclosedAmbulance(d), pendingAmbulance(d), lowStock(d),
   ],
   figures: ({ d }) => [
     fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined }),

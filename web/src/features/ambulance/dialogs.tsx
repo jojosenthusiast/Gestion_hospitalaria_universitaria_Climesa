@@ -39,7 +39,8 @@ const joinNames=(names:string[])=>names.length>1?`${names.slice(0,-1).join(', ')
 /**
  * FR-109-03: recepción registra una solicitud recibida por teléfono; queda por confirmar.
  * S13: if the call is about a registered patient, choosing them copies the caller, phone and address from the record into
- * empty fields the person has not edited, and the notice names only what was copied. The patient is not sent to the API.
+ * empty fields the person has not edited, and the notice names only what was copied. The patient goes with the request so
+ * the service is linked to the record (and can be the origin of an admission).
  */
 export function PhoneRequestForm({api,profile,onClose,onSaved}:{api:Api;profile:AccessProfile;onClose:()=>void;onSaved:()=>void}){
  const [address,setAddress]=useState(''),[municipality,setMunicipality]=useState(''),[reason,setReason]=useState(''),[phone,setPhone]=useState(''),[caller,setCaller]=useState(''),[problem,setProblem]=useState(''),action=useAction(api);
@@ -63,7 +64,7 @@ export function PhoneRequestForm({api,profile,onClose,onSaved}:{api:Api;profile:
   if(address.trim().length<5||reason.trim().length<5){setProblem('Indica la dirección y el motivo, de al menos 5 caracteres cada uno.');return;}
   if(caller.trim()&&caller.trim().length<2){setProblem('El nombre de quien llama debe tener al menos 2 caracteres.');return;}
   if(!/^[0-9+ -]{8,20}$/.test(phone.trim())){setProblem('Indica un teléfono de contacto de 8 a 20 dígitos.');return;}
-  setProblem('');if(await action.run('/ambulancia/solicitudes',{address:address.trim(),reason:reason.trim(),contactPhone:phone.trim(),...(caller.trim()?{callerName:caller.trim()}:{}),...(municipality.trim()?{municipality:municipality.trim()}:{})}))onSaved();}
+  setProblem('');if(await action.run('/ambulancia/solicitudes',{address:address.trim(),reason:reason.trim(),contactPhone:phone.trim(),...(patient?{patientId:patient.id}:{}),...(caller.trim()?{callerName:caller.trim()}:{}),...(municipality.trim()?{municipality:municipality.trim()}:{})}))onSaved();}
  return <Dialog title="Registrar llamada" onClose={onClose} busy={busy}><form className="module-form" onSubmit={save} noValidate aria-busy={busy}>{problem&&<Notice kind="error">{problem}</Notice>}<WriteError error={action.error}/>
   <Notice kind="info">Si hay riesgo de vida, indica a la persona que llame al 911.</Notice>
   {canPick&&<SearchPicker label="Paciente · opcional" value={patient} onChange={item=>void pick(item)} search={patientPicker(api)} hint="Si la llamada es por un paciente con expediente, elígelo para copiar sus datos de contacto." emptyText="No hay pacientes con ese nombre, DUI o expediente."/>}

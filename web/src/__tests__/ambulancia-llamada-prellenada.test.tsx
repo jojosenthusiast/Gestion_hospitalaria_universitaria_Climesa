@@ -51,6 +51,16 @@ describe('llamada de ambulancia prellenada (S13)', () => {
     expect(screen.getByLabelText('Dirección')).toHaveProperty('value', 'Colonia Ficticia, casa 1');
   });
 
+  it('la llamada por un paciente elegido va ligada a su expediente (patientId)', async () => {
+    const a = api();
+    render(<PhoneRequestForm api={a} profile={conFicha} onClose={() => {}} onSaved={() => {}} />);
+    await elegirPaciente();
+    await screen.findByText(/Copiamos del expediente/);
+    await userEvent.type(screen.getByLabelText(/^Motivo/), 'Dolor de pecho');
+    await userEvent.click(screen.getByRole('button', { name: 'Registrar solicitud' }));
+    expect(a.write).toHaveBeenLastCalledWith('/ambulancia/solicitudes', expect.objectContaining({ patientId: 'p1', address: 'Colonia Ficticia, casa 1', contactPhone: '7000-0000' }), 'POST');
+  });
+
   it('no vuelve a llenar un campo que la persona vació y el aviso solo nombra lo llenado', async () => {
     render(<PhoneRequestForm api={api()} profile={conFicha} onClose={() => {}} onSaved={() => {}} />);
     const quien = screen.getByLabelText('Nombre de quien llama');
