@@ -29,6 +29,15 @@ function mount(permissions: string[], list: unknown = requests, write: (path: st
 }
 
 describe('W27 · vinculaciones por verificar (FR-101-08 a FR-101-11)', () => {
+  it('con más de un expediente posible dice qué puede hacer Recepción y no ofrece aprobar ni registrar', async () => {
+    mount(['cuentas.verificar', 'pacientes.registrar'], [{ ...requests[1], id: 'v-3', candidates: 2 }]);
+    const card = await screen.findByRole('listitem', { name: 'Solicitud de josue@example.test' });
+    expect(within(card).getByText(/Recepción no fusiona expedientes/)).toBeTruthy();
+    expect(within(card).getByRole('link', { name: 'búscalos en Pacientes' }).getAttribute('href')).toBe('#/pacientes');
+    expect(within(card).getAllByText('07788990-1')).toHaveLength(2);
+    expect(within(card).queryByRole('button', { name: /Aprobar|Registrar paciente/ })).toBeNull();
+  });
+
   it('compara lo que dio el paciente con el expediente candidato y aprueba con la versión', async () => {
     const api = mount(['cuentas.verificar']);
     const card = await screen.findByRole('listitem', { name: 'Solicitud de paola@example.test' });

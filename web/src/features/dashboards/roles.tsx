@@ -205,7 +205,7 @@ const rec: RoleDashboard = {
         ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `${formatDate(a.start, { withYear: false })}, ${timeLabel(a.start)} · ${a.doctorName}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Por confirmar', status: 'solicitada' })),
       ] },
     { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),
-      items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
+      items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name || l.account.email, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d),
   ],
   figures: ({ d }) => [

@@ -1,8 +1,9 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
 import { QueuePage } from '../features/queue';
+import { NO_SHOW_DELAY_MS } from '../features/appointments';
 
 // R7 U1 (odd/tasks/fase2-recorridos-auditoria.md), journeys B1-B3: the front desk issues and shows the number,
 // registers the arrival of a booked patient in one click, and the board keeps undo, errors and closing per card.
@@ -101,7 +102,9 @@ describe('B1 · mostrador', () => {
     montar();
     const dialog = await openDesk();
     await pick(dialog, /Marta Ficticia Con Número/);
-    expect(within(dialog).getByText(/ya tiene el número LAB 4 \(en espera\)/)).toBeTruthy();
+    const notice = within(dialog).getByText(/ya tiene el número LAB 4/);
+    // The state of the held number is a coloured tag (StatusBadge), not plain text.
+    expect(notice.querySelector('.status-badge.status-en_espera')?.textContent).toBe('En espera');
     expect(within(dialog).queryByRole('button', { name: /Emitir número|Registrar llegada/ })).toBeNull();
   });
 
@@ -179,19 +182,36 @@ describe('B2-B3 · tablero', () => {
     expect(api.write).toHaveBeenCalledWith(expect.stringMatching(/^\/fila\/t-[78]\/deshacer-llamado$/), { version: 3 }, 'POST');
   });
 
-  it('dropping on «Terminados» asks first, naming the patient, and uses the live version', async () => {
+  it('dropping a called number on «Terminados» holds «No se presentó» 8 s with «Deshacer», then sends the live version', async () => {
     const api = montar([ticket({ state: 'llamado', llamados: 3, version: 5, allowedActions: ['atender', 'no_se_presento'] })]);
     const card = within(await screen.findByRole('region', { name: 'Llamados' })).getByRole('listitem');
     const data = new Map<string, string>();
     const transfer = { setData: (k: string, v: string) => data.set(k, v), getData: (k: string) => data.get(k) ?? '', get types() { return [...data.keys()]; }, effectAllowed: 'move' };
     fireEvent.dragStart(card, { dataTransfer: transfer });
     expect(JSON.parse(data.get('application/x-climesa-ticket')!)).toEqual({ id: 't-7' });
-    fireEvent.drop(screen.getByRole('region', { name: 'Terminados' }), { dataTransfer: transfer });
-    const confirm = await screen.findByRole('dialog', { name: 'Cerrar número' });
-    expect(within(confirm).getByText(/CON 7 · Paciente Ficticio Uno/)).toBeTruthy();
-    expect(api.write).not.toHaveBeenCalled();
-    await userEvent.click(within(confirm).getByRole('button', { name: 'No se presentó' }));
-    expect(api.write).toHaveBeenCalledWith('/fila/t-7/no-se-presento', { version: 5 }, 'POST');
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      fireEvent.drop(screen.getByRole('region', { name: 'Terminados' }), { dataTransfer: transfer });
+      expect(screen.getByText('Se marcará «No se presentó» en unos segundos.')).toBeTruthy();
+      expect(screen.queryByRole('dialog', { name: 'Cerrar número' })).toBeNull();
+      await act(async () => { vi.advanceTimersByTime(NO_SHOW_DELAY_MS - 100); });
+      expect(api.write).not.toHaveBeenCalled();
+      await act(async () => { vi.advanceTimersByTime(200); });
+      expect(api.write).toHaveBeenCalledWith('/fila/t-7/no-se-presento', { version: 5 }, 'POST');
+    } finally { vi.useRealTimers(); }
+  });
+
+  it('«Deshacer» keeps the number in the line and sends nothing', async () => {
+    const api = montar([ticket({ state: 'llamado', llamados: 3, version: 5, allowedActions: ['atender', 'no_se_presento'] })]);
+    const button = await screen.findByRole('button', { name: 'No se presentó' });
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    try {
+      fireEvent.click(button);
+      fireEvent.click(screen.getByRole('button', { name: /Deshacer/ }));
+      await act(async () => { vi.advanceTimersByTime(NO_SHOW_DELAY_MS + 100); });
+      expect(api.write).not.toHaveBeenCalled();
+      expect(screen.getByRole('button', { name: 'No se presentó' })).toBeTruthy();
+    } finally { vi.useRealTimers(); }
   });
 
   it('a failed card action shows its message on that card', async () => {

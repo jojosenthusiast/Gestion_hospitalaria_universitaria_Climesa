@@ -360,7 +360,7 @@ const CategoryList = ({ categories }: { categories: CategoryRef[] }) => <ul clas
  * same count as «Solicitadas»: requests by category (assign doctor and time, prefilled) and appointments the patient
  * asked with a doctor and time (confirm or reject, server actions). Oldest first.
  */
-const PHONE = '(max-width: 767px)', TRAY_FOLD = 3;
+const TRAY_FOLD = 3;
 function RequestInbox({ api, version, requests, asked, busy, onDirect, onDialog, onAssigned }: { api: Api; version: number; requests: Remote<CategoryRequest[]>; asked: Appointment[]; busy: boolean; onDirect: (row: Appointment, name: AppointmentAction) => void; onDialog: (row: Appointment, name: Dialogued) => void; onAssigned: () => void }) {
   // #9: Inicio links «Asignar» as #/citas?asignar=<id>; that request opens here and the address is cleaned.
   const [linked] = useState(() => readHashParams().get('asignar'));
@@ -369,10 +369,9 @@ function RequestInbox({ api, version, requests, asked, busy, onDirect, onDialog,
   const pending = (requests.data ?? []).filter(isPendingCategoryRequest);
   const total = pending.length + asked.length;
   useEffect(() => { if (linked && pending.some(r => r.id === linked)) document.getElementById(`rq-${linked}`)?.scrollIntoView?.({ block: 'center' }); }, [linked, pending.length]);
-  // #15: on a phone a long tray folds to its first rows, so the agenda is not pushed thousands of pixels down.
-  const [phone] = useState(() => typeof window.matchMedia === 'function' && window.matchMedia(PHONE).matches);
+  // #15: a long tray folds to its first rows on every width, so the agenda is not pushed far down («Ver N más»).
   const [expanded, setExpanded] = useState(!!linked);
-  const limit = phone && !expanded && total > TRAY_FOLD ? TRAY_FOLD : Infinity;
+  const limit = !expanded && total > TRAY_FOLD ? TRAY_FOLD : Infinity;
   const shownPending = pending.slice(0, limit), shownAsked = asked.slice(0, Math.max(0, limit - shownPending.length));
   const finish = (message: string) => { setOpen(null); setRejecting(null); setDone(message); requests.refresh(); onAssigned(); };
   return <section className="rq-inbox" aria-label="Solicitudes por asignar">
@@ -380,7 +379,7 @@ function RequestInbox({ api, version, requests, asked, busy, onDirect, onDialog,
     {done && <Notice kind="success">{done}</Notice>}
     <RemoteState state={requests} skeletonRows={2}>{() => total ? <><ol className="rq-list">{shownPending.map(r => <li key={r.id} id={`rq-${r.id}`} className="rq-row">
       <div className="rq-main">
-        <p className="rq-who"><strong>{r.patientName ?? 'Paciente'}</strong>{r.record && <code>{r.record}</code>}<small className="muted">{formatRelative(r.createdAt)}</small></p>
+        <p className="rq-who"><strong>{r.patientName ?? 'Paciente'}</strong>{r.record && <code>{r.record}</code>}<Tag value="pendiente" label="Por asignar" /><small className="muted">{formatRelative(r.createdAt)}</small></p>
         <CategoryList categories={r.categories} />
         {r.note && <p className="rq-note">{r.note}</p>}
         <p className="rq-meta">Prefiere: <strong>{FRANJA_LABEL[r.franja]}</strong>{r.preferredDoctorName && <> · con {r.preferredDoctorName}</>}</p>
@@ -393,7 +392,7 @@ function RequestInbox({ api, version, requests, asked, busy, onDirect, onDialog,
     </li>)}
     {shownAsked.map(a => <li key={a.id} className="rq-row">
       <div className="rq-main">
-        <p className="rq-who"><strong>{a.patientName}</strong><small className="muted">{formatDate(a.start, { withYear: false })}, {timeOnly(a.start)}</small></p>
+        <p className="rq-who"><strong>{a.patientName}</strong><Tag value="solicitada" label="Por confirmar" /><small className="muted">{formatDate(a.start, { withYear: false })}, {timeOnly(a.start)}</small></p>
         {a.doctorName && <p className="rq-meta">Con <strong>{a.doctorName}</strong></p>}
         {/* The reason is its own line (like a request's note): inline after «· » it wrapped into a line that began with «·». */}
         {a.reason?.trim() && <p className="rq-note">{a.reason}</p>}
@@ -401,7 +400,7 @@ function RequestInbox({ api, version, requests, asked, busy, onDirect, onDialog,
       <div className="row-actions">
         {(['confirmar', 'rechazar'] as const).map(name => <ActionButton key={name} action={name} allowed={a.allowedActions ?? []} blocked={a.blockedActions ?? []} disabled={busy} className={name === 'confirmar' ? 'row-action rq-primary' : 'row-action'} aria-label={`${ACTION_LABEL[name]} · ${a.patientName}`} onClick={() => name === 'confirmar' ? onDirect(a, name) : onDialog(a, name)}>{ACTION_LABEL[name]}</ActionButton>)}
       </div>
-    </li>)}</ol>{limit < total && <button type="button" className="cl-link-button rq-more" onClick={() => setExpanded(true)}>Ver las {total - limit} restantes</button>}</> : <p className="rq-empty" role="status"><Icon name="check" size={18} />Al día: no hay solicitudes por asignar.</p>}</RemoteState>
+    </li>)}</ol>{limit < total && <button type="button" className="cl-link-button rq-more fold-more" onClick={() => setExpanded(true)}>Ver {total - limit} más</button>}</> : <p className="rq-empty" role="status"><Icon name="check" size={18} />Al día: no hay solicitudes por asignar.</p>}</RemoteState>
     {rejecting && <RejectRequestDialog api={api} request={rejecting} onClose={() => setRejecting(null)} onSaved={() => finish('Solicitud rechazada; el paciente verá el motivo.')} />}
   </section>;
 }
