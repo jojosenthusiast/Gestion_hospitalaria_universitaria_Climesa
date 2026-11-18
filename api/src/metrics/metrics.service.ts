@@ -63,7 +63,11 @@ export class MetricsService {
         ambulancia: unit ? { estado: unit.estado, paramedicoDeTurno: paramedic } : null,
         fila: queue,
         laboratorio: lab,
-        cobertura: { huecos: coverage.gaps.length, detalle: coverage.gaps.slice(0, 10).map(g => ({ area: g.area, rol: g.role, inicio: g.start, fin: g.end, requeridos: g.required, actuales: g.actual })) },
+        cobertura: {
+          huecos: coverage.gaps.length, detalle: coverage.gaps.slice(0, 10).map(g => ({ area: g.area, rol: g.role, inicio: g.start, fin: g.end, requeridos: g.required, actuales: g.actual })),
+          // Every hole of today still ahead (its end after now), uncapped: the clients count them with one rule (12 h blocks).
+          vigentes: coverage.gaps.filter(g => Date.parse(g.end) > now.valueOf()).map(g => ({ areaId: g.areaId, area: g.area, rol: g.role, inicio: g.start, fin: g.end, requeridos: g.required, actuales: g.actual, actualesConBorradores: g.actualConBorradores ?? g.actual })),
+        },
         turnosEnCurso: shifts,
         pacientesActivos: patients,
       };

@@ -155,6 +155,13 @@ describe('Spec 113 · tablero y métricas agregadas', () => {
     expect(response.body.fila.enEspera).toBeGreaterThanOrEqual(1);
     expect(response.body.laboratorio).toEqual({ pendiente: expect.any(Number), enProceso: expect.any(Number), completadoHoy: expect.any(Number), canceladoHoy: expect.any(Number) });
     expect(typeof response.body.cobertura.huecos).toBe('number');
+    // One gap rule for every screen: `vigentes` holds every hole of today whose end is after now, uncapped, with its area id.
+    const open = response.body.cobertura.vigentes as any[];
+    expect(Array.isArray(open)).toBe(true);
+    for (const gap of open) {
+      expect(Date.parse(gap.fin)).toBeGreaterThan(Date.parse(response.body.actualizadoEn));
+      expect(gap).toEqual({ areaId: expect.any(String), area: expect.any(String), rol: expect.any(String), inicio: expect.any(String), fin: expect.any(String), requeridos: expect.any(Number), actuales: expect.any(Number), actualesConBorradores: expect.any(Number) });
+    }
     expectNoPersonalData(response.body, ['Filomenaria', patientId]);
   });
 

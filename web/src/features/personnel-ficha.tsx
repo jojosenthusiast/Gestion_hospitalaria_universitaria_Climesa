@@ -2,10 +2,13 @@ import { useState,type FormEvent } from 'react';
 import { Field,Icon,Notice } from '../components/ui';
 import { can,staffTypeNames,type AccessProfile,type Api,type Registration,type RegistrationInput,type Shift,type Staff } from '../lib/api';
 import { Dialog,Empty,RemoteState,SaveButton,Select,Tag,WriteError,formatDate,formatDateTime,isVersionConflict,useAction,useData } from './common';
+import { useFold } from '../components/fold';
 
 /** Aviso de vencimiento: no hay regla escrita en la spec 103; se usa una ventana fija de 30 días, pendiente de confirmar con el negocio. */
 export const DIAS_AVISO_VENCIMIENTO=30;
 const DAY=86400000;
+/** Turnos próximos: los 31 días desde hoy (el rango máximo de `GET /turnos`), no toda la ventana del hospital. */
+const UPCOMING_DAYS=30,UPCOMING_SHOWN=5;
 const boards:Record<string,string>={JVPM:'JVPM · Medicina',JVPE:'JVPE · Enfermería',JVPL:'JVPL · Laboratorio',JVPO:'JVPO · Odontología',otra:'Otra junta'};
 const shiftTypes:Record<string,string>={diurno:'Diurno',nocturno:'Nocturno',guardia:'Guardia'};
 export type RegistrationState='vigente'|'por_vencer'|'vencida'|'proxima';
@@ -24,9 +27,11 @@ export function registrationState(r:Pick<Registration,'validFrom'|'validTo'>,tod
 /** W08 · Ficha de personal: datos, inscripciones con vencimiento y turnos próximos. */
 export function StaffFicha({api,profile,person,version,onClose,onEdit,onChanged}:{api:Api;profile:AccessProfile;person:Staff;version:number;onClose:()=>void;onEdit:()=>void;onChanged:()=>void}){
  const [adding,setAdding]=useState(false),manage=can(profile,'personal.gestionar'),viewShifts=can(profile,'turnos.ver');
- const shifts=useData<Shift[]>(api,'/turnos',version,viewShifts),today=businessToday(),now=Date.now();
+ const today=businessToday(),now=Date.now(),until=businessToday(new Date(now+UPCOMING_DAYS*DAY));
+ const shifts=useData<Shift[]>(api,`/turnos?from=${today}&to=${until}`,version,viewShifts);
  const registrations=person.registrations??[];
  const upcoming=(shifts.data??[]).filter(s=>s.staffId===person.id&&['publicado','en_curso'].includes(s.state)&&Date.parse(s.end)>now).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));
+ const fold=useFold(upcoming,UPCOMING_SHOWN);
  return <Dialog title={`Ficha de ${person.givenNames} ${person.surnames}`} onClose={onClose}>
   <div className="module-form">
    <section aria-labelledby="ficha-datos"><h3 id="ficha-datos">Datos</h3>
@@ -46,7 +51,7 @@ export function StaffFicha({api,profile,person,version,onClose,onEdit,onChanged}
     {manage&&adding&&<RegistrationForm api={api} person={person} onCancel={()=>setAdding(false)} onSaved={()=>{setAdding(false);onChanged();}} onStale={()=>{setAdding(false);onChanged();}}/>}
    </section>
    {viewShifts&&<section aria-labelledby="ficha-turnos"><h3 id="ficha-turnos">Turnos próximos</h3>
-    <RemoteState state={shifts}>{()=>upcoming.length?<table className="record-table"><caption className="sr-only">Turnos próximos publicados</caption><thead><tr><th>Inicio</th><th>Fin</th><th>Área</th><th>Tipo</th></tr></thead><tbody>{upcoming.map(s=><tr key={s.id}><td data-label="Inicio">{formatDateTime(s.start)}</td><td data-label="Fin">{formatDateTime(s.end)}</td><td data-label="Área">{s.area}</td><td data-label="Tipo">{shiftTypes[s.type]??s.type}</td></tr>)}</tbody></table>
+    <RemoteState state={shifts}>{()=>upcoming.length?<><table className="record-table"><caption className="sr-only">Turnos próximos publicados</caption><thead><tr><th>Inicio</th><th>Fin</th><th>Área</th><th>Tipo</th></tr></thead><tbody>{fold.shown.map(s=><tr key={s.id}><td data-label="Inicio">{formatDateTime(s.start)}</td><td data-label="Fin">{formatDateTime(s.end)}</td><td data-label="Área">{s.area}</td><td data-label="Tipo">{shiftTypes[s.type]??s.type}</td></tr>)}</tbody></table>{fold.more}</>
      :<Empty title="Sin turnos próximos" description="Esta persona no tiene turnos publicados por venir."/>}</RemoteState>
    </section>}
    <div className="dialog-actions"><button type="button" className={manage?'secondary-button':'primary-button'} onClick={onClose}>Cerrar</button>{manage&&<button type="button" className="primary-button" onClick={onEdit}>Editar datos</button>}</div>

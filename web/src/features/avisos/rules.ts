@@ -47,9 +47,15 @@ export type NoticeStats = { avisoId: string; enterados: number; destinatarios: n
 export type InboxFilter = 'todos' | 'sin-leer' | 'criticos';
 /** `status`: the look of what each filter keeps («Sin leer» badge, «Crítico» level badge), so the button matches it. */
 export const inboxFilters: { id: InboxFilter; label: string; status?: string }[] = [{ id: 'todos', label: 'Todos' }, { id: 'sin-leer', label: 'Sin leer', status: 'pendiente' }, { id: 'criticos', label: 'Críticos', status: 'emergencia' }];
+/**
+ * «Críticos» keeps what the API counts in `criticos`: critical notices in force, addressed to the account, without
+ * «Enterado». The chip count and the list always agree (same rule on Android and iOS).
+ */
+export const isPendingCritical = (n: Pick<InboxNotice, 'estado' | 'nivel' | 'dirigido' | 'enteradoEn'>) =>
+  inboxState(n) === 'vigente' && n.nivel === 'critico' && n.dirigido && !n.enteradoEn;
 /** «Sin leer» keeps only notices in force without «Enterado»: expired and scheduled ones cannot be acknowledged. */
 export const filterInbox = (items: InboxNotice[], filter: InboxFilter) =>
-  filter === 'sin-leer' ? items.filter(n => inboxState(n) === 'vigente' && !n.enteradoEn) : filter === 'criticos' ? items.filter(n => n.nivel === 'critico') : items;
+  filter === 'sin-leer' ? items.filter(n => inboxState(n) === 'vigente' && !n.enteradoEn) : filter === 'criticos' ? items.filter(isPendingCritical) : items;
 
 /** Tag of a notice that is not in force, with the shared status families: scheduled waits, expired is closed. */
 export const inboxStateTag: Record<Exclude<InboxState, 'vigente'>, { value: string; label: string }> = { programado: { value: 'pendiente', label: 'Programado' }, vencido: { value: 'inactivo', label: 'Vencido' } };

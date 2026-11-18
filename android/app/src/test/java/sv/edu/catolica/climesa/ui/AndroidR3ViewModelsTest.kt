@@ -140,13 +140,15 @@ class AndroidR3ViewModelsTest {
         assertEquals("No se pudo cargar la información.", vm.state.value.error)
     }
 
-    // A-6: the patient sees only their own ticket: the active one first, else the latest of the day.
+    // A-6: the patient's number is only an active ticket; a finished one is never shown as "my number".
     @Test fun patientQueueShowsOnlyTheOwnActiveTicket() {
         fun t(id: String, state: String, at: Long) = sv.edu.catolica.climesa.domain.QueueTicket(id, "consulta_general", 1, "Ana", state, 0, 1, issuedAtMillis = at)
         val tickets = listOf(t("a", "atendido", 1), t("b", "llamado", 2), t("c", "no_se_presento", 3))
         assertEquals("b", sv.edu.catolica.climesa.domain.PatientQueue.current(tickets)?.id)
         assertEquals(listOf("a", "c"), sv.edu.catolica.climesa.domain.PatientQueue.others(tickets).map { it.id })
-        assertEquals("c", sv.edu.catolica.climesa.domain.PatientQueue.current(listOf(t("a", "atendido", 1), t("c", "atendido", 3)))?.id)
+        val finished = listOf(t("a", "atendido", 1), t("c", "atendido", 3))
+        assertNull(sv.edu.catolica.climesa.domain.PatientQueue.current(finished))
+        assertEquals(listOf("a", "c"), sv.edu.catolica.climesa.domain.PatientQueue.others(finished).map { it.id })
         assertNull(sv.edu.catolica.climesa.domain.PatientQueue.current(emptyList()))
     }
 

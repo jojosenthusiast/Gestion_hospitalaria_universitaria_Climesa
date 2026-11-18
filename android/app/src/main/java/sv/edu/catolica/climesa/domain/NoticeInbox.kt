@@ -115,11 +115,18 @@ object NoticeInboxRules {
     fun acknowledgePath(id: String) = "/me/avisos/$id/enterado"
     fun snoozePath(id: String) = "/me/avisos/$id/posponer"
 
+    /**
+     * "Críticos" keeps what the API counts in `criticos`: critical notices in force, addressed to the account, without
+     * "Enterado". The chip count and the list always agree (web `isPendingCritical`).
+     */
+    fun isPendingCritical(n: InboxNotice) =
+        n.state == NoticeState.CURRENT && n.level == NoticeLevel.CRITICAL && n.targeted && n.acknowledgedAt == null
+
     /** The list with the chosen filter, in the server order (highlighted and critical first). "Sin leer": in force, no "Enterado". */
     fun filter(notices: List<InboxNotice>, filter: NoticeFilter) = when (filter) {
         NoticeFilter.ALL -> notices
         NoticeFilter.UNREAD -> notices.filter { it.state == NoticeState.CURRENT && it.acknowledgedAt == null }
-        NoticeFilter.CRITICAL -> notices.filter { it.level == NoticeLevel.CRITICAL }
+        NoticeFilter.CRITICAL -> notices.filter(::isPendingCritical)
     }
 
     /** Count next to the filter (the API computes it); "Todos" has none. */

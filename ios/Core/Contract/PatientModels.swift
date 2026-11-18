@@ -155,6 +155,8 @@ public struct AppointmentCatalogs: Decodable, Sendable, Equatable {
         enum CodingKeys: String, CodingKey { case id, givenNames, surnames, specialty, area, active, hasShift = "tieneTurno", reason = "motivo" }
     }
     public let doctors: [Doctor]
+    /// The merged week of «Ya tengo médico» (`RequestDoctorRules.week`).
+    public init(doctors: [Doctor]) { self.doctors = doctors }
 }
 
 /// `PeriodResponse`

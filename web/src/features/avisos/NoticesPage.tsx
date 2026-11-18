@@ -1,4 +1,6 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useFold } from '../../components/fold';
+import { useQuickAction } from '../personal/accion';
 import { AreaTag, statusFilterLook } from '../../components/system';
 import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
@@ -30,6 +32,13 @@ export function NoticesPage({ api, profile, version }: { api: Api; profile: Acce
   const [filter, setFilter] = useState<InboxFilter>(filterFromHash);
   const mine = view === 'mios' || !publisher;
   const inbox = useData<Inbox>(api, '/me/avisos/bandeja', version, mine);
+  // `?accion=publicar` (Inicio, «Publicar aviso»): «Publicados» with the cursor in the composer's title.
+  const [quick, consumeQuick] = useQuickAction();
+  useEffect(() => {
+    if (!quick) return;
+    if (quick === 'publicar' && publisher) { setView('publicados'); setTimeout(() => { const title = document.querySelector<HTMLInputElement>('.notice-composer input'); title?.scrollIntoView?.({ block: 'start' }); title?.focus(); }, 0); }
+    consumeQuick();
+  }, [quick, publisher, consumeQuick]);
   const views = publisher && <div className="segmented-control" role="group" aria-label="Vista">
     <button type="button" aria-pressed={mine} onClick={() => setView('mios')}>Para mí</button>
     <button type="button" aria-pressed={!mine} onClick={() => setView('publicados')}>Publicados</button>
@@ -116,6 +125,10 @@ function PublishedNotices({ api, profile, version }: { api: Api; profile: Access
   const statsOf = (id: string) => Array.isArray(stats.data) ? stats.data.find(s => s.avisoId === id) : undefined;
   const [editing, setEditing] = useState<NoticeListItem | null>(null), [withdrawing, setWithdrawing] = useState<NoticeListItem | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  // In force and scheduled first; withdrawn and expired fold behind «Ver N más» (newest first inside each group).
+  const rows = list.data ?? [], past = (n: NoticeListItem) => n.estado === 'retirado' || n.estado === 'vencido';
+  const current = rows.filter(n => !past(n));
+  const fold = useFold([...current, ...rows.filter(past)], current.length);
   const edit = (notice: NoticeListItem) => { setMessage(null); setEditing(notice); document.querySelector('.notice-composer')?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); };
   return <>
     <NoticeComposer key={editing ? `${editing.id}-${editing.version}` : 'nuevo'} api={api} profile={profile} editing={editing} onDone={() => { if (editing) setMessage(`Cambios guardados en «${editing.titulo}». Ya se ven donde se publica.`); setEditing(null); list.refresh(); stats.refresh(); }} onCancel={() => setEditing(null)} onReload={() => { setEditing(null); list.refresh(); }} />
@@ -123,8 +136,8 @@ function PublishedNotices({ api, profile, version }: { api: Api; profile: Access
     <section className="data-workbench notice-history" aria-label="Avisos publicados">
       <div className="table-caption">Publicados<span>Los más recientes primero. Un aviso vencido o retirado deja de verse solo.</span></div>
       <RemoteState state={list}>{rows => rows.length
-        ? <table className="record-table"><caption className="sr-only">Avisos publicados</caption><thead><tr><th>Aviso</th><th>Nivel</th><th>Dónde se ve</th><th>Vigencia</th><th>Enterado</th><th>Estado</th><th>Acciones</th></tr></thead>
-          <tbody>{rows.map(a => { const count = statsOf(a.id); return <tr key={a.id}>
+        ? <><table className="record-table"><caption className="sr-only">Avisos publicados</caption><thead><tr><th>Aviso</th><th>Nivel</th><th>Dónde se ve</th><th>Vigencia</th><th>Enterado</th><th>Estado</th><th>Acciones</th></tr></thead>
+          <tbody>{fold.shown.map(a => { const count = statsOf(a.id); return <tr key={a.id}>
             <td data-label="Aviso"><strong>{a.titulo}</strong><small>{a.cuerpo}</small></td>
             <td data-label="Nivel"><NoticeLevelBadge level={a.nivel} /></td>
             <td data-label="Dónde se ve">{audienceText(a)}</td>
@@ -138,7 +151,7 @@ function PublishedNotices({ api, profile, version }: { api: Api; profile: Access
                 {a.allowedActions.includes('retirar') && <button type="button" className="row-action" onClick={() => { setMessage(null); setWithdrawing(a); }}>Retirar</button>}
               </div>
               : <small className="muted">—</small>}</td>
-          </tr>; })}</tbody></table>
+          </tr>; })}</tbody></table>{fold.more}</>
         : <Empty title="Todavía no hay avisos" description="Publica el primero con el formulario de arriba." />}</RemoteState>
     </section>
     {withdrawing && <WithdrawDialog api={api} notice={withdrawing} onClose={() => setWithdrawing(null)} onDone={() => { setMessage(`Aviso «${withdrawing.titulo}» retirado. Ya no se ve en ninguna parte.`); setWithdrawing(null); if (editing?.id === withdrawing.id) setEditing(null); list.refresh(); }} onReload={() => { setWithdrawing(null); list.refresh(); }} />}

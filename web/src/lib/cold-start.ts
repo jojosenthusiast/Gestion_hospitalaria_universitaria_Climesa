@@ -1,4 +1,7 @@
 import { ApiError } from './api';
+import { IDLE_UNTIL_COLD_MS, recordServerFailure, serverLikelyCold } from './server-warmth';
+
+export { isLikelyCold, recordServerAnswer, recordServerFailure, resetServerWarmth, serverLikelyCold } from './server-warmth';
 
 /**
  * MA-OPS-01 / E-01: the free Render plan sleeps the API, and the first request after a while takes up to a minute.
@@ -6,7 +9,7 @@ import { ApiError } from './api';
  * after `slowHintMs` the screen explains that the server is waking up. Writes are not retried here: their Idempotency-Key
  * already makes the person's own retry safe. Same values as Android (`ColdStart.kt`) and iOS (`ColdStart.swift`).
  */
-export const COLD_START = { backoffMs: [2_000, 5_000, 10_000], slowHintMs: 5_000 } as const;
+export const COLD_START = { backoffMs: [2_000, 5_000, 10_000], slowHintMs: 5_000, idleUntilColdMs: IDLE_UNTIL_COLD_MS } as const;
 export const SLOW_SERVER_MESSAGE = 'El servidor se está activando. La primera conexión del día puede tardar hasta un minuto.';
 
 export const coldStartRetryable = (error: unknown) =>
@@ -14,11 +17,21 @@ export const coldStartRetryable = (error: unknown) =>
 
 const wait = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms));
 
+/**
+ * `onSlow` runs only when the call has waited `slowHintMs` and the server seems asleep: right then, or as soon as a
+ * later attempt fails without an answer. A warm server that is merely slow never shows the hint.
+ */
 export async function retryColdStart<T>(call: () => Promise<T>, onSlow?: () => void): Promise<T> {
-  const timer = onSlow ? setTimeout(onSlow, COLD_START.slowHintMs) : undefined;
+  let due = false, shown = false;
+  const show = () => { if (!shown && onSlow) { shown = true; onSlow(); } };
+  const timer = onSlow ? setTimeout(() => { due = true; if (serverLikelyCold()) show(); }, COLD_START.slowHintMs) : undefined;
   try {
     for (const delay of COLD_START.backoffMs) {
-      try { return await call(); } catch (error) { if (!coldStartRetryable(error)) throw error; }
+      try { return await call(); } catch (error) {
+        if (!coldStartRetryable(error)) throw error;
+        recordServerFailure();
+        if (due) show();
+      }
       await wait(delay);
     }
     return await call();

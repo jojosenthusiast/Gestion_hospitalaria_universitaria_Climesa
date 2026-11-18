@@ -18,6 +18,7 @@ class BackendAccessRepository(private val apiBaseUrl:String) {
         }
         try {
             val status=c.responseCode
+            ColdStart.warmth.record(status)
             val body=(if(status in 200..299)c.inputStream else c.errorStream)?.bufferedReader()?.use{it.readText()}.orEmpty()
             if(status !in 200..299)throw AuthRequestException(apiErrorMessage(body,status),status)
             val json=JSONObject(body)
@@ -25,6 +26,6 @@ class BackendAccessRepository(private val apiBaseUrl:String) {
             val permissions=json.optJSONArray("permissions")?.let{a->(0 until a.length()).map{a.getJSONObject(it).getString("code")}}?:emptyList()
             if(strings("roles").isEmpty()||"sesion.perfil" !in permissions)throw AuthRequestException("La cuenta no tiene permisos vigentes.",403)
             AccessProfile(roles=strings("roles"),permissions=permissions,verifiedByBackend=true,platforms=strings("platforms"),channels=strings("channels"),name=json.optString("name"),patientId=json.optString("patientId").takeIf{!json.isNull("patientId")&&it.isNotBlank()},staffId=json.optString("staffId").takeIf{!json.isNull("staffId")&&it.isNotBlank()})
-        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){throw AuthRequestException("No se pudo verificar el acceso. Revisa la conexión e intenta de nuevo.")} finally {c.disconnect()}
+        } catch(e:AuthRequestException){throw e} catch(_:java.io.IOException){ColdStart.warmth.failed();throw AuthRequestException("No se pudo verificar el acceso. Revisa la conexión e intenta de nuevo.")} finally {c.disconnect()}
     }
 }

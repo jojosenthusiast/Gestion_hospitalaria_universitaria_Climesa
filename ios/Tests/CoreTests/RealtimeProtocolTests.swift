@@ -130,6 +130,10 @@ final class LiveStateTests: XCTestCase {
         let next = LiveReducer.apply(.resync, to: LiveSnapshot())
         XCTAssertEqual(next.version, 1)
         XCTAssertEqual(next.shiftsVersion, 1)
+        XCTAssertEqual(next.resyncVersion, 1)
+        // An ordinary event does not touch the counter of what is only read again after reconnecting.
+        let event = DomainEvent(type: "cita.actualizada", entity: "cita", id: "c1", version: 2)
+        XCTAssertEqual(LiveReducer.apply(.event(event), to: next).resyncVersion, 1)
     }
 
     func testUnEventoDeUsuarioPideVerificarElPerfil() {
@@ -148,7 +152,11 @@ final class LiveStateTests: XCTestCase {
         XCTAssertEqual(topics("consulta.actualizada", "consulta"), [.consultations])
         XCTAssertEqual(topics("laboratorio.critico", "orden_laboratorio"), [.laboratory])
         XCTAssertEqual(topics("turno.publicado", "turno"), [.shifts, .hospitalInfo])
-        XCTAssertEqual(topics("aviso.publicado", "aviso"), [.hospitalInfo])
+        XCTAssertEqual(topics("aviso.publicado", "aviso"), [.hospitalInfo, .notices])
+        // The inbox is not read again because of a bed, a shift or the metrics.
+        XCTAssertFalse(topics("cama.estado_cambiado", "cama").contains(.notices))
+        XCTAssertFalse(topics("turno.publicado", "turno").contains(.notices))
+        XCTAssertFalse(topics("metricas.actualizadas", "metricas").contains(.notices))
         XCTAssertEqual(topics("cama.estado_cambiado", "publico"), [.admissions, .hospitalInfo])
         XCTAssertEqual(topics("ambulancia.hito", "servicio"), [.ambulance])
         XCTAssertEqual(topics("signos.registrados", "paciente"), [.patient, .consultations, .admissions])

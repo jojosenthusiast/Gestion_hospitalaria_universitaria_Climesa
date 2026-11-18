@@ -29,15 +29,16 @@ private class PublicSignalBus : RealtimeRepository {
 }
 
 /** Public endpoints double: [free] is the semiprivate free bed count on floor 2. */
-private class PublicGateway(var free: Int = 4, var fail: Boolean = false) : ApiGateway {
+private class PublicGateway(var free: Int = 4, var fail: Boolean = false, val failing: MutableSet<String> = mutableSetOf()) : ApiGateway {
     val calls = mutableListOf<String>()
     override suspend fun request(path: String, method: String, body: JSONObject?): Any {
         calls += path
-        if (fail) throw IllegalStateException("Sin conexión")
+        if (fail || path in failing) throw IllegalStateException("Sin conexión")
         return when (path) {
             "/publico/ocupacion" -> JSONObject("""{"ocupacion":[{"planta":2,"categoria":"semiprivada","camas":10,"libres":$free,"ocupadas":${10 - free}},{"planta":3,"categoria":"vip","camas":2,"libres":1,"ocupadas":1}]}""")
             "/publico/medicos-de-turno" -> JSONObject("""{"medicos":[{"nombre":"Ana Ficticia","especialidad":"Pediatría","area":"Consulta externa","hasta":"2026-11-15T20:00:00.000Z"}],"proximoCambio":null}""")
             "/publico/avisos" -> JSONObject("""{"avisos":[{"id":"a-1","titulo":"Laboratorio cerrado","cuerpo":"Laboratorio cerrado el domingo.","desde":"2026-11-15T00:00:00.000Z","hasta":"2026-11-17T00:00:00.000Z"}],"proximoCambio":null}""")
+            "/publico/hospital" -> JSONObject("""{"nombre":"Hospital Ficticio","direccion":"Calle 1","municipio":"Santa Ana","departamento":"Santa Ana","telefono":"2440-0000","latitud":13.99,"longitud":-89.55}""")
             else -> error("Ruta inesperada: $path")
         }
     }
@@ -56,7 +57,8 @@ class HospitalInfoViewModelTest {
         val state = vm.state.value
         assertFalse(state.loading)
         assertNull(state.error)
-        assertEquals(listOf("/publico/ocupacion", "/publico/medicos-de-turno", "/publico/avisos"), api.calls)
+        assertEquals(listOf("/publico/ocupacion", "/publico/medicos-de-turno", "/publico/avisos", "/publico/hospital"), api.calls)
+        assertEquals("Hospital Ficticio", state.info.location?.name)
         assertEquals("Ana Ficticia", state.info.doctors.single().name)
         assertEquals("Laboratorio cerrado", state.info.notices.single().title)
         assertEquals(listOf(Triple<Int?, Int, Int>(2, 4, 10), Triple<Int?, Int, Int>(3, 1, 2)), HospitalInfoParser.byFloor(state.info.occupancy))
@@ -78,9 +80,22 @@ class HospitalInfoViewModelTest {
         val vm = HospitalInfoViewModel(api, bus)
         vm.startLive(); vm.load(); runCurrent()
         bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("paciente.actualizado", "paciente", "p-1", 2))); runCurrent()
-        assertEquals(3, api.calls.size)
+        assertEquals(4, api.calls.size)
+        // The location does not change with events: a reload reads only the three live parts.
         bus.signals.tryEmit(RealtimeSignal.Event(EventoDominio("aviso.publicado", "aviso", "a-2", 1))); runCurrent()
-        assertEquals(6, api.calls.size)
+        assertEquals(7, api.calls.size)
+    }
+
+    // One failing endpoint no longer blanks the screen: its part says so and the others stay.
+    @Test fun unaParteQueFallaNoBorraLasDemas() = runTest(dispatcher) {
+        val api = PublicGateway(failing = mutableSetOf("/publico/medicos-de-turno"))
+        val vm = HospitalInfoViewModel(api, PublicSignalBus())
+        vm.load(); runCurrent()
+        val state = vm.state.value
+        assertNull(state.error)
+        assertEquals(setOf(sv.edu.catolica.climesa.domain.HospitalInfoPart.DOCTORS), state.info.failed)
+        assertEquals("Laboratorio cerrado", state.info.notices.single().title)
+        assertEquals(2, state.info.occupancy.size)
     }
 
     @Test fun unErrorSeMuestraYUnaRecargaEnVivoFallidaConservaLoMostrado() = runTest(dispatcher) {

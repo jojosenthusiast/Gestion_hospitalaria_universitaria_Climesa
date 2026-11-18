@@ -16,7 +16,13 @@ export const shiftLabel = (value: string) => ({ de_turno: 'De turno ahora', mas_
 export const accountOptions = [
   { value: 'todas', label: 'Con o sin cuenta' }, { value: 'con', label: 'Con cuenta' }, { value: 'activa', label: 'Cuenta activa' },
   { value: 'desactivada', label: 'Cuenta desactivada' }, { value: 'invitacion', label: 'Invitación pendiente' }, { value: 'sin', label: 'Sin cuenta todavía' },
+  { value: 'sin_ficha', label: 'Cuenta sin ficha vinculada' },
 ] as const;
+
+/** Roles that work shifts: their account must be linked to a staff record (ADM, JOP and DPD may live without one). */
+const WORKING_ROLES = ['REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'];
+/** An active account of a working role with no staff record linked: Inicio's «Cuentas sin personal vinculado» and `?cuenta=sin_ficha`. */
+export const needsStaffLink = (account: UserAccount | null, hasStaff = false) => !!account && !hasStaff && !account.staffId && account.state === 'activo' && account.roles.some(r => WORKING_ROLES.includes(r));
 
 export function matchesAccount(account: UserAccount | null, hasStaff: boolean, filter: string) {
   switch (filter) {
@@ -25,6 +31,7 @@ export function matchesAccount(account: UserAccount | null, hasStaff: boolean, f
     case 'activa': return account?.state === 'activo' && account.invitationState !== 'enviada';
     case 'desactivada': return !!account && account.state !== 'activo';
     case 'invitacion': return account?.invitationState === 'enviada';
+    case 'sin_ficha': return needsStaffLink(account, hasStaff);
     default: return true;
   }
 }
@@ -51,6 +58,7 @@ export function staffEmptyState(filters: StaffFilters, context: { accountsOnly: 
   if (filters.turno === 'ausente') return { title: 'Sin ausencias hoy', description: `Nadie tiene una ausencia marcada hoy con estos filtros.` };
   if (filters.turno === 'libre') return { title: 'Nadie libre hoy', description: `Todas las personas de esta vista tienen turno hoy. ${widen}` };
   if (filters.cuenta === 'invitacion') return { title: 'Sin invitaciones pendientes', description: 'Todas las invitaciones de esta vista fueron aceptadas, canceladas o vencieron.' };
+  if (filters.cuenta === 'sin_ficha') return { title: 'Todas las cuentas tienen ficha', description: 'Cada cuenta de esta vista que trabaja turnos ya está vinculada con su ficha de personal.' };
   if (filters.cuenta === 'sin') return { title: 'Todos tienen cuenta', description: 'Cada persona de esta vista ya tiene su cuenta de acceso.' };
   if (filters.rol) return { title: 'Nadie con este rol', description: `Ninguna cuenta de esta vista tiene el rol ${roleNames[filters.rol] ?? filters.rol}. ${widen}` };
   if (filters.area) return { title: 'Nadie en esta área', description: `No hay personas asignadas a esta área con estos filtros. ${widen}` };

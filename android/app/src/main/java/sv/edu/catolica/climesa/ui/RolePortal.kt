@@ -105,7 +105,7 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
         }
     }}
 }
-private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";else->null}
+private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";AndroidSection.MY_ROOM->"/admisiones";else->null}
 private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En servicio","en_mantenimiento" to "En mantenimiento")
 @Composable fun HospitalClock(){
     var now by remember { mutableStateOf(Instant.now()) }
@@ -123,7 +123,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     val data by model.state.collectAsStateWithLifecycle()
     var selectedName by rememberSaveable(role){mutableStateOf(AndroidSection.HOME.name)};var query by rememberSaveable{mutableStateOf("")}
     var pastShiftsOpen by rememberSaveable{mutableStateOf(false)}
-    val sections=AndroidSections.visible(role,account.profile.permissions)
+    val sections=AndroidSections.forAccount(role,account.profile)
     val page=sections.firstOrNull{it.name==selectedName}?:sections.firstOrNull()?:return
     val path=sectionPath(page)
     // Every role lands on its dashboard ("Inicio"); a role without one falls back to Perfil.
@@ -151,12 +151,12 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         page==AndroidSection.HOME->RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding),onOpenNotices={if(AndroidSection.NOTICES in sections)selectedName=AndroidSection.NOTICES.name})
         page==AndroidSection.NOTICES->NoticesScreen(account,Modifier.padding(padding))
         page==AndroidSection.BEDS||page==AndroidSection.CLEANING->BedsScreen(account.profile,Modifier.padding(padding))
-        page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled)
+        page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,linked=account.profile.patientId!=null)
         page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled,
             onOpenVitals=if(AndroidSection.VITAL_SIGNS in sections&&role!="MED"){subject->selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null)
         page==AndroidSection.SUPPLIES->InventoryScreen(Modifier.padding(padding),account.profile)
         page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
-        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId)
+        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId,onOpenVitals=if(AndroidSection.VITAL_SIGNS in sections&&role!="MED"){subject->selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null)
         page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW->LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page,userId=account.session.userId)
         page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding))
         page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding))
@@ -186,14 +186,31 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                     if(unit?.hasService!=true)Text(stringResource(R.string.unidad_sin_servicio),style=MaterialTheme.typography.bodyMedium) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${unit.serviceOrigin.orEmpty()} → ${unit.serviceDestination.orEmpty()}")}
                 }}
                 if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.state))item{MaintenanceControl(model,unit.state,unit.version,unit.paramedicOnDuty,unit.driverOnDuty)}
+            }else if(page==AndroidSection.MY_ROOM){
+                val admissions=AdmissionParser.admissions(data.data)
+                val room=MyRoomRules.current(admissions,account.profile.patientId)
+                when{
+                    room!=null->item{MyRoomCard(room)}
+                    MyRoomRules.waiting(admissions,account.profile.patientId)!=null->item{NoticeBanner(NoticeKind.INFO,stringResource(R.string.pac_habitacion_espera))}
+                    else->item{EmptyState(stringResource(R.string.pac_habitacion_ninguna),detail=stringResource(R.string.pac_habitacion_ninguna_detalle),icon=Icons.Default.KingBed)}
+                }
             }else if(page==AndroidSection.SHIFTS){
                 val shifts=MyShifts.parse(data.data)
-                if(shifts.isEmpty())item{EmptyState("No tienes turnos publicados.")}
+                if(shifts.isEmpty())item{EmptyState(stringResource(R.string.turnos_vacio))}
                 else myShiftDays(shifts,pastShiftsOpen){pastShiftsOpen=!pastShiftsOpen}
             }else item{EmptyState(stringResource(R.string.portal_seccion_no_disponible))}
         }
         }}
       }
+    }
+}
+/** «Mi habitación»: the assigned bed, its state tag, the room type and isolation (iOS `RoomCard`). */
+@Composable private fun MyRoomCard(room:HospitalAdmission){
+    SectionCard(stringResource(R.string.pac_habitacion_titulo),action={StatusTag(room.state)}){
+        Text(stringResource(R.string.pac_habitacion_cama,room.bed),style=MaterialTheme.typography.headlineSmall)
+        val kind=listOfNotNull(HospitalInfoParser.categoryLabels[room.bedCategory?:room.category]?:room.category.takeIf{it.isNotBlank()},stringResource(R.string.pac_habitacion_aislamiento).takeIf{room.isolation})
+        if(kind.isNotEmpty())Text(kind.joinToString(" · "),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
+        room.attendingDoctorName?.let{Text(stringResource(R.string.pac_habitacion_medico,it),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
 }
 /** RN-25: app-wide notice of a critical lab value, above the current section, with a shortcut to the review list. */

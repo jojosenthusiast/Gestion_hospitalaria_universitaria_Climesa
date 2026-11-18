@@ -71,6 +71,10 @@ fun QueueScreen(
     quickAction: QuickAction? = null,
     onQuickActionHandled: () -> Unit = {},
     userId: String? = null,
+    /** R7 U1 (G2): the patient record opens "Emitir número" with this patient already chosen. */
+    subject: sv.edu.catolica.climesa.domain.QuickSubject? = null,
+    /** G5: "Tomar signos" on a called card opens Signos vitales on that patient; null when the role cannot record signs. */
+    onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null,
     model: QueueViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -85,6 +89,8 @@ fun QueueScreen(
     val readOnly = !canIssue && !canCall && !canManage
     var service by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
+    var showClosed by rememberSaveable { mutableStateOf(false) }
+    var showAllWaiting by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { model.load() }
     // The chosen area also selects whose "who goes next" proposal is shown on top (RN-FILA-SIGUIENTE).
     LaunchedEffect(service) { model.chooseArea(service) }
@@ -106,7 +112,7 @@ fun QueueScreen(
     // A dashboard asked to "issue a number" or "call next": open the matching dialog once the day's queue is loaded.
     LaunchedEffect(quickAction, state.loading, state.tickets) {
         if (quickAction == null || state.loading) return@LaunchedEffect
-        if (quickAction == QuickAction.ISSUE_NUMBER && canIssue) issueOpen = true
+        if (quickAction == QuickAction.ISSUE_NUMBER && canIssue) { subject?.let { model.preselectIssuePatient(it.id, it.detail.orEmpty(), it.name) }; issueOpen = true }
         if (quickAction == QuickAction.CALL_NEXT && canCall) callNextOpen = true
         onQuickActionHandled()
     }
@@ -123,6 +129,11 @@ fun QueueScreen(
     // large in place and the search is cleared for the next patient; back returns to the board.
     if (issueOpen) { IssuePanel(state, model, modifier, onClose = { issueOpen = false; model.closeIssue() }); return }
     // R3 A-6: a patient follows only their own number, never the reception board.
+    // An unlinked patient (read-only, may link) has no number to follow: never the reception board.
+    if (readOnly && profile.patientId == null && "cuenta.vincular" in profile.permissions) {
+        PageList(modifier) { item { EmptyState(stringResource(R.string.pac_fila_sin_vincular), detail = stringResource(R.string.pac_fila_sin_vincular_detalle)) } }
+        return
+    }
     if (readOnly && profile.patientId != null) {
         LaunchedEffect(Unit) { model.followOwnTicket(); model.load(silent = true) }
         PatientTicketView(state, modifier, onRetry = { model.clearMessages(); model.load() }); return
@@ -166,8 +177,18 @@ fun QueueScreen(
                 QueueColumn.entries.forEach { column ->
                     val inColumn = QueueBoard.sorted(visible.filter { QueueBoard.column(it) == column })
                     if (inColumn.isNotEmpty()) {
-                        item(key = "h-${column.name}") { Text("${column.label} (${inColumn.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                        items(inColumn, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state, model, now) }
+                        // "Terminados" grows all day: it starts folded. "En espera" shows the first numbers and "Ver N más".
+                        val closed = column == QueueColumn.CLOSED
+                        val open = if (closed) showClosed || query.isNotBlank() else showAllWaiting || query.isNotBlank() || column != QueueColumn.WAITING
+                        val shown = when { closed && !open -> emptyList(); !open -> inColumn.take(QueueRules.WAITING_FOLD); else -> inColumn }
+                        item(key = "h-${column.name}") {
+                            if (closed) Row(Modifier.fillMaxWidth().padding(top = Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+                                Text("${column.label} (${inColumn.size})", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall)
+                                if (query.isBlank()) RowAction(stringResource(if (showClosed) R.string.fila_ocultar_terminados else R.string.fila_ver_terminados), { showClosed = !showClosed })
+                            } else Text("${column.label} (${inColumn.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
+                        }
+                        items(shown, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state, model, now, canIssue, onOpenVitals) }
+                        if (shown.size < inColumn.size && !closed) item(key = "m-${column.name}") { RowAction(stringResource(R.string.fila_ver_n_mas, inColumn.size - shown.size), { showAllWaiting = true }) }
                     }
                 }
             }
@@ -286,7 +307,7 @@ private fun UndoRow(label: String, busy: Boolean, onUndo: () -> Unit) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, state: QueueState, model: QueueViewModel, now: Long) {
+private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, state: QueueState, model: QueueViewModel, now: Long, canIssue: Boolean = false, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null) {
     val busy = state.busy
     // B3: only the card being sent shows "Un momento…"; the rest only stop taking taps.
     val sending = state.busyKey == ticket.id
@@ -306,6 +327,8 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Bo
         QueueBoard.waitMinutes(ticket, now)?.takeIf { QueueBoard.waitLevel(ticket, now) != SlaLevel.NONE }?.let { minutes ->
             Text(stringResource(R.string.fila_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(QueueBoard.waitLevel(ticket, now)))
         }
+        // G5: a called or attended number opens Signos vitales on its patient, like the ward card.
+        if (onOpenVitals != null) QueueRules.vitalsSubject(ticket)?.let { subject -> RowAction(stringResource(R.string.rec7_hosp_signos), { onOpenVitals(subject) }, enabled = !busy) }
         // D-3: "No se presentó" waits on its own card with "Deshacer" before it is sent.
         val absence = state.pendingAbsences.firstOrNull { it.key == ticket.id }
         if (absence != null) {
@@ -321,6 +344,8 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Bo
             QueueActionButton(ticket, QueueAction.ATTEND, "Iniciar atención", busy, sending) { model.attend(ticket) }
             QueueActionButton(ticket, QueueAction.COMPLETE, "Completar", busy, sending) { model.complete(ticket) }
             QueueActionButton(ticket, QueueAction.ABSENT, "No se presentó", busy, false) { model.absent(ticket) }
+            // B-3: the issuer may void a number issued by mistake while the server window is open (like the web card menu).
+            if (canIssue && QueueRules.voidable(ticket.voidableUntilMillis, ticket.state, now)) RowAction(stringResource(R.string.fila_anular), { model.voidTicket(ticket) }, enabled = !busy, loading = sending)
             CardMenu(ticket, canCall, canManage, busy, model)
         }
     }
@@ -452,8 +477,11 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
                     Text(stringResource(R.string.rec7_numero_emitido), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     Text(issued.code, style = MaterialTheme.typography.displaySmall.copy(fontWeight = FontWeight.Bold))
                     Text(listOfNotNull(issued.patientName, issued.ahead?.let { androidx.compose.ui.res.pluralStringResource(R.plurals.rec7_antes, it, it) }).joinToString(" · "), style = MaterialTheme.typography.bodyLarge)
+                    // B-3: "Anular" only while the server window is open (10 min); the clock is read when the panel is drawn.
+                    if (QueueRules.voidable(issued.voidableUntilMillis, "en_espera", System.currentTimeMillis())) RowAction(stringResource(R.string.fila_anular_este), { model.voidIssued() }, enabled = !state.busy, loading = sending)
                 }
             }
+            state.voided?.let { NoticeBanner(NoticeKind.SUCCESS, stringResource(R.string.fila_anulado, it)) }
             state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
             val search = state.issueSearch
             Text(stringResource(R.string.rec_agendar_paciente), style = MaterialTheme.typography.titleSmall)

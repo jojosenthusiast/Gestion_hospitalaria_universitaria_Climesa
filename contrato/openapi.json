@@ -21890,6 +21890,10 @@
           },
           "actual": {
             "type": "integer"
+          },
+          "actualConBorradores": {
+            "type": "integer",
+            "description": "En `GET /turnos/cobertura`: personas en esa hora contando también los borradores; si llega a `required`, el hueco está cubierto en borrador (falta publicarlo)"
           }
         },
         "required": [
@@ -22682,6 +22686,10 @@
           },
           "actual": {
             "type": "integer"
+          },
+          "actualConBorradores": {
+            "type": "integer",
+            "description": "En `GET /turnos/cobertura`: personas en esa hora contando también los borradores; si llega a `required`, el hueco está cubierto en borrador (falta publicarlo)"
           },
           "motivo": {
             "type": "string",
@@ -32606,6 +32614,49 @@
           "actuales"
         ]
       },
+      "OpenCoverageGapResponse": {
+        "type": "object",
+        "properties": {
+          "area": {
+            "type": "string"
+          },
+          "rol": {
+            "type": "string"
+          },
+          "inicio": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "fin": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "requeridos": {
+            "type": "integer"
+          },
+          "actuales": {
+            "type": "integer"
+          },
+          "areaId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "actualesConBorradores": {
+            "type": "integer",
+            "description": "Personas en esa hora contando también los borradores; si llega a `requeridos`, el hueco está cubierto en borrador"
+          }
+        },
+        "required": [
+          "area",
+          "rol",
+          "inicio",
+          "fin",
+          "requeridos",
+          "actuales",
+          "areaId",
+          "actualesConBorradores"
+        ]
+      },
       "CoverageSummaryResponse": {
         "type": "object",
         "properties": {
@@ -32617,6 +32668,13 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/CoverageGapSummaryResponse"
+            }
+          },
+          "vigentes": {
+            "description": "Todos los huecos de hoy que terminan después de ahora, sin tope",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OpenCoverageGapResponse"
             }
           }
         },

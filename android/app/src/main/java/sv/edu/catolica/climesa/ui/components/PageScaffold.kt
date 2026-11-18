@@ -119,7 +119,8 @@ internal fun PortalScaffold(
                     if (AndroidSection.NOTICES in sections && selected != AndroidSection.NOTICES) {
                         val unread = badges[AndroidSection.NOTICES] ?: 0
                         androidx.compose.material3.IconButton(onClick = { onSelected(AndroidSection.NOTICES) }) {
-                            androidx.compose.material3.BadgedBox(badge = { if (unread > 0) androidx.compose.material3.Badge { Text(if (unread > 99) "99+" else unread.toString()) } }) {
+                            // Same "9+" cap as the navigation badges, iOS and the web.
+                            androidx.compose.material3.BadgedBox(badge = { sv.edu.catolica.climesa.domain.NoticeInboxRules.badgeText(unread)?.let { androidx.compose.material3.Badge { Text(it) } } }) {
                                 Icon(Icons.Default.Notifications, contentDescription = if (unread > 0) "Avisos, $unread sin leer" else "Avisos")
                             }
                         }

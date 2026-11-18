@@ -295,6 +295,12 @@
     <string name="fila_nadie_espera">Nadie espera en este servicio.</string>
     <string name="fila_regla">Regla: %1$s</string>
     <string name="fila_deshacer">Deshacer</string>
+    <string name="fila_anular">Anular</string>
+    <string name="fila_anular_este">Anular este número</string>
+    <string name="fila_anulado">Se anuló %1$s. Puedes emitir otro número.</string>
+    <string name="fila_ver_terminados">Ver</string>
+    <string name="fila_ocultar_terminados">Ocultar</string>
+    <string name="fila_ver_n_mas">Ver %1$d más</string>
     <string name="fila_quitar_llamado">Quitar un llamado (van %1$d)</string>
     <string name="fila_mover">Mover o cambiar prioridad</string>
     <string name="fila_mover_a">Mover a %1$s (%2$s)</string>

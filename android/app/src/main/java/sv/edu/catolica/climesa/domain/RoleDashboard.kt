@@ -64,6 +64,8 @@ enum class DashboardSource(val path: String, val anyOf: List<String>) {
     AMBULANCE("/ambulancia", listOf("ambulancia.ver_estado")),
     AGENDA("/consultas/agenda", listOf("consulta.iniciar")),
     APPOINTMENTS("/citas", listOf("citas.ver")),
+    /** S8: requests by category (no doctor yet) also wait on Recepción; same source and permission as the web Inicio. */
+    CATEGORY_REQUESTS("/citas/solicitudes-categoria", listOf("citas.agendar")),
     LINKS("/cuentas/vinculaciones", listOf("cuentas.verificar")),
     STOCK("/inventario/existencias", listOf("inventario.ver")),
     SHIFTS("/turnos/mios", listOf("turnos.ver")),
@@ -73,19 +75,27 @@ object RoleDashboard {
     private val zone: ZoneId = ZoneId.of("America/El_Salvador")
 
     private val sourcesByRole: Map<String, List<DashboardSource>> = mapOf(
-        "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.LINKS, DashboardSource.APPOINTMENTS, DashboardSource.SHIFTS),
+        "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.LINKS, DashboardSource.APPOINTMENTS, DashboardSource.CATEGORY_REQUESTS, DashboardSource.SHIFTS),
         "AST" to listOf(DashboardSource.QUEUE, DashboardSource.SHIFTS),
         "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
         "MED" to listOf(DashboardSource.AGENDA, DashboardSource.LAB, DashboardSource.ADMISSIONS, DashboardSource.SHIFTS),
         "PAR" to listOf(DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
-        "PAC" to listOf(DashboardSource.QUEUE, DashboardSource.APPOINTMENTS, DashboardSource.MY_LAB),
+        "PAC" to listOf(DashboardSource.QUEUE, DashboardSource.APPOINTMENTS, DashboardSource.MY_LAB, DashboardSource.ADMISSIONS),
     )
+
+    /** Path of [source] for [role]: the patient reads their appointments over the same window as «Mis citas». */
+    fun path(role: String, source: DashboardSource, today: LocalDate): String =
+        if (role == "PAC" && source == DashboardSource.APPOINTMENTS) PatientAppointmentRules.listPath(today) else source.path
 
     /** What to read for [role]: only the sources the account may read. */
     fun sources(role: String, permissions: Collection<String>): List<DashboardSource> =
         sourcesByRole[role].orEmpty().filter { source -> source.anyOf.any { it in permissions } }
 
     fun builds(role: String) = role in sourcesByRole
+
+    /** S8: one count of appointment requests for Inicio and Citas (web `appointmentRequestCount`). */
+    fun appointmentRequestCount(appointments: List<JSONObject>, categoryRequests: List<JSONObject>): Int =
+        appointments.count { it.optString("state") == "solicitada" } + categoryRequests.count { it.optString("state") == "pendiente" }
 
     // --- parsing ---------------------------------------------------------------------------------------------------
 
@@ -247,9 +257,11 @@ object RoleDashboard {
         when (role) {
             "REC" -> {
                 queueKpis()
-                // Only requests still ahead in time: a past one is "vencida" (the server marks it) and nobody can confirm it.
+                // S8, the same rule as the web (`appointmentRequestCount`): asked appointments ("solicitada") plus requests by
+                // category ("pendiente") both wait on Recepción, one count. A past request is never "solicitada": the server
+                // marks it "vencida" before every read.
                 val appointments = data[DashboardSource.APPOINTMENTS]?.let { rows(it) }
-                val requested = appointments?.count { it.optString("state") == "solicitada" && instant(text(it, "start"))?.isAfter(now) == true } ?: 0
+                val requested = appointments?.let { appointmentRequestCount(it, data[DashboardSource.CATEGORY_REQUESTS]?.let { r -> rows(r) }.orEmpty()) } ?: 0
                 val requestsAction = QuickAction.REVIEW_REQUESTS.takeIf { QuickActions.allowed(it, permissions) }
                 appointments?.let { kpis += DashboardKpi("Citas por confirmar", requested.toString(), if (requested > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.APPOINTMENTS), action = requestsAction) }
                 val links = data[DashboardSource.LINKS]?.let { rows(it).size }
@@ -353,10 +365,27 @@ object RoleDashboard {
                     if (recent > 0 && AndroidSection.RESULTS in sections) attention += DashboardAttention("Resultados nuevos ($recent)", "Tu médico ya los revisó; puedes verlos.", DashboardTone.SUCCESS, "Ver resultados", QuickActionRequest(AndroidSection.RESULTS))
                 }
                 labChart("Mis exámenes")
+                // «Mi habitación» while hospitalized (iOS Inicio shows the same card); a stay waiting for a bed says so.
+                data[DashboardSource.ADMISSIONS]?.let { value ->
+                    val admissions = AdmissionParser.admissions(value)
+                    val room = MyRoomRules.current(admissions)
+                    if (room != null) kpis += DashboardKpi("Mi habitación", "Cama ${room.bed}", DashboardTone.PROCESS, target = target(AndroidSection.MY_ROOM))
+                    else if (MyRoomRules.waiting(admissions) != null) kpis += DashboardKpi("Mi habitación", "En espera de cama", DashboardTone.PROCESS, target = target(AndroidSection.MY_ROOM))
+                }
             }
         }
         val covered = attention.mapNotNull { it.covers }.toSet()
-        return DashboardModel(kpis.filter { it.label !in covered }, charts.filter { it.total > 0 }, attention, QuickActions.forRole(role, permissions), unavailable)
+        return DashboardModel(kpis.filter { it.label !in covered }, charts.filter { it.total > 0 }, attention, actions(role, permissions, attention, linked), unavailable)
+    }
+
+    /**
+     * Shortcuts under the pending rows. One primary action per screen: the patient's shortcut is dropped when a pending row
+     * already offers the same thing ("No tienes citas próximas" · "Pedir cita"), and "Pedir cita" needs a linked record.
+     */
+    fun actions(role: String, permissions: Collection<String>, attention: List<DashboardAttention>, linked: Boolean): List<DashboardAction> {
+        val all = QuickActions.forRole(role, permissions)
+        if (role != "PAC") return all
+        return all.filterNot { action -> attention.any { it.request == action.request } || (!linked && action.request.action == QuickAction.REQUEST_APPOINTMENT) }
     }
 
     /** G6: today's appointment of the patient ("09:20 · Dra. Ejemplo"), confirmed or requested and not yet over. */
@@ -386,12 +415,17 @@ object RoleDashboard {
     }
 }
 
-/** Realtime events that change something a dashboard shows; the dashboard then reads its sources again (no polling). */
+/**
+ * Realtime events that change something a dashboard shows; the dashboard then reads its sources again (no polling).
+ * Names are the `entidad` the API writes to the outbox (`event(...)` in `api/src`, `docs/arquitectura/tiempo-real.md`)
+ * plus type prefixes (`fila.`, `laboratorio.`, `inventario.`, `ambulancia.`, `vinculacion.`). The GPS point
+ * (`ambulancia.ubicacion`, every few seconds) changes no dashboard figure.
+ */
 object DashboardEvents {
     private val entities = arrayOf(
-        "cama", "espacio", "ticket_fila", "fila", "orden_laboratorio", "laboratorio", "admision", "alta", "cita", "consulta",
-        "articulo", "inventario", "ambulancia", "servicio_ambulancia", "solicitud_ambulancia", "turno", "vinculacion",
+        "cama", "espacio", "ticket_fila", "fila", "orden_laboratorio", "laboratorio", "admision", "cita", "consulta",
+        "articulo", "inventario", "ambulancia", "unidad", "solicitud", "servicio", "turno", "vinculacion", "vinculacion_paciente",
     )
 
-    fun matches(event: EventoDominio) = LiveEntities.matches(event, *entities)
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, *entities) && event.type != "ambulancia.ubicacion"
 }

@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
 import { Tablero, type MetricsBoard } from '../features/tablero';
+const dentroDe = (horas: number) => new Date(Math.ceil(Date.now() / 3_600_000) * 3_600_000 + horas * 3_600_000).toISOString();
 
 afterEach(cleanup);
 
@@ -20,7 +21,9 @@ const tablero = (cambios: Partial<MetricsBoard> = {}): MetricsBoard => ({
   ambulancia: { estado: 'en_servicio', paramedicoDeTurno: true },
   fila: { emitidos: 4, enEspera: 2, llamados: 1, enAtencion: 0, atendidos: 1, noSePresento: 0 },
   laboratorio: { pendiente: 3, enProceso: 2, completadoHoy: 5, canceladoHoy: 0 },
-  cobertura: { huecos: 1, detalle: [{ area: 'Emergencia', rol: 'ENF', inicio: '2026-11-15T14:00:00Z', fin: '2026-11-15T22:00:00Z', requeridos: 2, actuales: 1 }] },
+  // Today's hole still ahead (the card counts with the one gap rule: end after now, 12 h blocks).
+  cobertura: { huecos: 1, detalle: [{ area: 'Emergencia', rol: 'ENF', inicio: dentroDe(1), fin: dentroDe(3), requeridos: 2, actuales: 1 }],
+    vigentes: [{ areaId: 'a-emg', area: 'Emergencia', rol: 'ENF', inicio: dentroDe(1), fin: dentroDe(3), requeridos: 2, actuales: 1, actualesConBorradores: 1 }] },
   turnosEnCurso: 4, pacientesActivos: 38,
   ...cambios,
 });
@@ -51,17 +54,17 @@ describe('W03 · tablero inicial sobre GET /metricas/tablero', () => {
     const plantas = tarjeta('Ocupación por planta');
     expect(within(plantas).getByText('6 no disponibles de 12')).toBeTruthy();
     expect(within(plantas).getByRole('img', { name: /^Planta 3: 80% de camas no disponibles/ })).toBeTruthy();
-    expect(within(tarjeta('Cobertura de turnos')).getByText('1 hueco de cobertura')).toBeTruthy();
+    expect(within(tarjeta('Cobertura de turnos')).getByText('1 turno por cubrir hoy')).toBeTruthy();
     expect(within(tarjeta('Cobertura de turnos')).getByText(/Emergencia · Enfermería/)).toBeTruthy();
     expect(screen.getByText(/Actualizado:/)).toBeTruthy();
   });
 
   it('dice qué falta en lugar de mostrar ceros sin contexto', async () => {
-    montar(async () => tablero({ camas: { total: 0, libres: 0, ocupadas: 0, limpieza: 0, bloqueadas: 0, reservadas: 0 }, ocupacionPorPlanta: [], ambulancia: null, fila: { emitidos: 0, enEspera: 0, llamados: 0, enAtencion: 0, atendidos: 0, noSePresento: 0 }, cobertura: { huecos: 0, detalle: [] } }));
+    montar(async () => tablero({ camas: { total: 0, libres: 0, ocupadas: 0, limpieza: 0, bloqueadas: 0, reservadas: 0 }, ocupacionPorPlanta: [], ambulancia: null, fila: { emitidos: 0, enEspera: 0, llamados: 0, enAtencion: 0, atendidos: 0, noSePresento: 0 }, cobertura: { huecos: 0, detalle: [], vigentes: [] } }));
     expect(within(await screen.findByRole('region', { name: 'Camas' })).getByText('Todavía no hay camas registradas.')).toBeTruthy();
     expect(within(tarjeta('Ambulancia')).getByText('No hay una unidad registrada.')).toBeTruthy();
     expect(within(tarjeta('Números en fila')).getByText('Todavía no se han emitido números hoy.')).toBeTruthy();
-    expect(within(tarjeta('Cobertura de turnos')).getByText('Cobertura completa para hoy.')).toBeTruthy();
+    expect(within(tarjeta('Cobertura de turnos')).getByText('Cobertura completa por el resto de hoy.')).toBeTruthy();
   });
 
   it('en el tablero solo hay agregados: ningún nombre, DUI ni expediente', async () => {

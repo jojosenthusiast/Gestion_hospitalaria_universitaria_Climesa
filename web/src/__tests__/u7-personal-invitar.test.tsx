@@ -2,6 +2,7 @@ import { cleanup, render, screen, waitFor, within } from '@testing-library/react
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api, type Staff, type UserAccount } from '../lib/api';
+import { clickRowAction, rowActionLabels } from './row-actions';
 import { PersonnelPage } from '../features/personnel';
 
 // U7 (odd/tasks/fase2-recorridos-auditoria.md, G1): register a person and invite the account in one act.
@@ -80,7 +81,7 @@ describe('G1 · registrar e invitar en un solo acto', () => {
     const dialog = await fill();
     await userEvent.click(await within(dialog).findByRole('button', { name: 'Cerrar sin invitar' }));
     expect(await screen.findByText(/Ana Pérez Ficticia registrada · La invitación no se envió/)).toBeTruthy();
-    await userEvent.click(await screen.findByRole('button', { name: 'Invitar a Ana Pérez Ficticia' }));
+    await clickRowAction('Ana Pérez Ficticia', 'Invitar');
     const invite = await screen.findByRole('dialog', { name: 'Invitar persona' });
     expect((within(invite).getByLabelText('Correo electrónico') as HTMLInputElement).value).toBe('ana@example.test');
   });

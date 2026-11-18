@@ -5754,6 +5754,28 @@
         }
       }
     },
+    "appointments.unlinked.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Vincula tu expediente para ver y pedir citas."
+          }
+        }
+      }
+    },
+    "appointments.unlinked.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Abre «Vincular expediente» en Más; recepción revisa tu solicitud."
+          }
+        }
+      }
+    },
     "exams.doctorNote": {
       "extractionState": "manual",
       "localizations": {

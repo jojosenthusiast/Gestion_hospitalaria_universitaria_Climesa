@@ -67,6 +67,7 @@ import sv.edu.catolica.climesa.domain.LabExternalRules
 import sv.edu.catolica.climesa.domain.LabFollowUp
 import sv.edu.catolica.climesa.domain.LabFollowUpRules
 import sv.edu.catolica.climesa.domain.LabInbox
+import sv.edu.catolica.climesa.domain.LabGroup
 import sv.edu.catolica.climesa.domain.LabGroups
 import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
@@ -132,6 +133,8 @@ fun LaboratoryScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+                // The patient filters by stage too, with the badge each chip filters (no search: the list is short).
+                if (ownResults) item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter, FilterTones::lab) { filterName = it.name } }
                 if (!ownResults && !inboxOnly) {
                     item { LiveSearchField(query, { query = it }, stringResource(R.string.lab_buscar)) }
                     item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter, FilterTones::lab) { filterName = it.name } }
@@ -144,20 +147,6 @@ fun LaboratoryScreen(
                 val now = System.currentTimeMillis()
                 val visible = LabWorklist.sorted(state.orders.filter { filter.matches(it) && (!urgentOnly || LabWorklist.isUrgent(it)) && LabWorklist.matches(it, query) })
                 if (visible.isEmpty() && !inboxOnly) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
-                if (ownResults) {
-                    // Closed results beyond the newest few fold under "Ver N más".
-                    val (shown, folded) = LabPatientList.fold(visible)
-                    items(shown, key = { it.id }) { order -> LaboratoryOrderCard(order, true, order.id in state.busyIds, model, now) }
-                    if (folded.isNotEmpty()) {
-                        val open = "mis-pasados" in openGroups
-                        if (open) items(folded, key = { it.id }) { order -> LaboratoryOrderCard(order, true, order.id in state.busyIds, model, now) }
-                        item(key = "mis-pasados-toggle") {
-                            TextButton(onClick = { openGroups = if (open) openGroups - "mis-pasados" else openGroups + "mis-pasados" }) {
-                                Text(if (open) stringResource(R.string.lab_ver_menos) else stringResource(R.string.lab_ver_mas, folded.size))
-                            }
-                        }
-                    }
-                }
                 // R3 A-9: "Resultados por revisar" is an inbox: only the orders this doctor can review, no queue filters.
                 else if (inboxOnly) {
                     // An order already in the follow-up inbox is not listed twice; critical first, then urgent and the oldest.
@@ -176,15 +165,17 @@ fun LaboratoryScreen(
                 }
                 else {
                     // S10: grouped by what comes next; closed groups start folded unless the person filters or searches.
+                    // The patient keeps released results open (they are what they came for) and folds only cancelled ones.
                     val foldable = filter == LabFilter.ALL && query.isBlank()
                     LabGroups.group(visible).forEach { (group, orders) ->
-                        val open = !group.folded || !foldable || group.name in openGroups
+                        val folded = if (ownResults) group == LabGroup.CANCELLED else group.folded
+                        val open = !folded || !foldable || group.name in openGroups
                         item(key = "g-${group.name}") {
-                            LabGroupHeader(group.label, orders.size, if (group.folded && foldable) open else null) {
+                            LabGroupHeader(group.label, orders.size, if (folded && foldable) open else null) {
                                 openGroups = if (group.name in openGroups) openGroups - group.name else openGroups + group.name
                             }
                         }
-                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now) }
+                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, ownResults, order.id in state.busyIds, model, now) }
                     }
                 }
             }

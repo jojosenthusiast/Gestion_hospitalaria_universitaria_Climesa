@@ -21,7 +21,8 @@ export const daytimeHours=(a:number,b:number)=>{let total=0;for(let day=Math.flo
 // en su horario (política turnos.horario_servicios); cada área de hospitalización con camas ocupadas, las 24 h.
 const COVERAGE_AREAS:Record<string,string>={'P1-EMG':'emergencia','P1-REC':'recepcion_horario','P1-LAB':'laboratorio_horario'};
 const STAFF_TYPE_NAMES:Record<string,string>={medico:'Médico',enfermero:'Enfermería',asistente:'Asistencia',recepcionista:'Recepción',laboratorista:'Laboratorio',paramedico:'Paramédico',motorista:'Motorista',limpieza:'Limpieza',administrativo:'Administración',otro:'Otro'};
-export type CoverageGap={areaId:string;area:string;role:string;start:string;end:string;required:number;actual:number};
+/** `actualConBorradores`: with `draftsApart`, the same hour counting the drafts too (the hole is «cubierto en borrador» when it reaches `required`). */
+export type CoverageGap={areaId:string;area:string;role:string;start:string;end:string;required:number;actual:number;actualConBorradores?:number};
 /** Turnos que trabajan: los cancelados y los ausentes no cuentan como cobertura, descanso ni carga (ASIS-01). */
 const WORKING="t.estado NOT IN ('cancelado','ausente')";
 /** CARGA-01: horas que cuentan para la carga; un borrador no cuenta hasta publicarse (y al publicarse se revisa). */
@@ -128,13 +129,15 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     }catch{throw new BadRequestException('Indica un rango de fechas válido, con el fin igual o posterior al inicio y de máximo 31 días.');}
   }
   /** FR-103-08 / CARGA-03: huecos por área, rol y hora frente al mínimo vigente; los turnos cancelados o ausentes no cuentan. */
-  private async gaps(c:PoolClient,start:Date,end:Date,areaId?:string,withDrafts=false):Promise<CoverageGap[]> {
+  // `withDrafts` counts drafts as coverage (a batch being validated); `draftsApart` keeps the published count and adds
+  // `actualConBorradores` so a planner sees a hole already covered by a draft that is not published yet.
+  private async gaps(c:PoolClient,start:Date,end:Date,areaId?:string,withDrafts=false,draftsApart=false):Promise<CoverageGap[]> {
     const policy=await this.policies.value<Record<string,Record<string,number>>>(c,'turnos.cobertura_minima',start);
     const hours=(await c.query("SELECT valor FROM plataforma.politica WHERE clave='turnos.horario_servicios' AND vigencia @> $1::timestamptz",[start])).rows[0]?.valor as Record<string,{desde:number;hasta:number}>|undefined;
     // Áreas con regla propia por código y áreas de hospitalización con alguna cama ocupada ahora (planta_con_ocupacion).
     const areas=(await c.query(`SELECT e.id,e.codigo,e.nombre,CASE WHEN e.codigo=ANY($1::text[]) THEN NULL ELSE 'planta_con_ocupacion' END AS regla FROM infra.espacio e
       WHERE e.activo AND ($2::uuid IS NULL OR e.id=$2) AND (e.codigo=ANY($1::text[]) OR (e.tipo='area' AND EXISTS(SELECT 1 FROM hospitalizacion.ocupacion_cama o JOIN infra.espacio h ON h.id=o.habitacion_id WHERE h.padre_id=e.id AND upper_inf(o.periodo))))`,[Object.keys(COVERAGE_AREAS),areaId??null])).rows;
-    const shifts=(await c.query(`SELECT t.area_id,p.tipo,lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE ${WORKING} AND ($4 OR t.estado<>'borrador') AND t.area_id=ANY($1::uuid[]) AND t.periodo && tstzrange($2,$3)`,[areas.map(a=>a.id),start,end,withDrafts])).rows.map(s=>({...s,start:new Date(s.start).valueOf(),end:new Date(s.end).valueOf()}));
+    const shifts=(await c.query(`SELECT t.area_id,p.tipo,t.estado='borrador' AS draft,lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id WHERE ${WORKING} AND ($4 OR t.estado<>'borrador') AND t.area_id=ANY($1::uuid[]) AND t.periodo && tstzrange($2,$3)`,[areas.map(a=>a.id),start,end,withDrafts||draftsApart])).rows.map(s=>({...s,draft:draftsApart&&s.draft,start:new Date(s.start).valueOf(),end:new Date(s.end).valueOf()}));
     const gaps:CoverageGap[]=[];
     for(const area of areas){
       const rule=area.regla??COVERAGE_AREAS[area.codigo];
@@ -145,10 +148,11 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
         for(let h=start.valueOf();h<end.valueOf();h+=HOUR){
           const local=new Date(h-LOCAL_OFFSET).getUTCHours();
           if(open&&(local<open.desde||local>=open.hasta)){gap=undefined;continue;}
-          const actual=mine.filter(s=>s.start<=h&&s.end>=h+HOUR).length;
+          const working=mine.filter(s=>s.start<=h&&s.end>=h+HOUR),actual=working.filter(s=>!s.draft).length;
           if(actual>=required){gap=undefined;continue;}
-          if(gap&&gap.actual===actual)gap.end=new Date(h+HOUR).toISOString();
-          else gaps.push(gap={areaId:area.id,area:area.nombre,role,start:new Date(h).toISOString(),end:new Date(h+HOUR).toISOString(),required,actual});
+          const drafted=draftsApart?{actualConBorradores:working.length}:{};
+          if(gap&&gap.actual===actual&&gap.actualConBorradores===drafted.actualConBorradores)gap.end=new Date(h+HOUR).toISOString();
+          else gaps.push(gap={areaId:area.id,area:area.nombre,role,start:new Date(h).toISOString(),end:new Date(h+HOUR).toISOString(),required,actual,...drafted});
         }
       }
     }
@@ -159,7 +163,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
     if(areaId&&!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(areaId))throw new BadRequestException('Selecciona un área válida.');
     await this.advanceSafely();
 
-    return {from,to,gaps:await this.db.transaction(c=>this.gaps(c,start,end,areaId))};
+    return {from,to,gaps:await this.db.transaction(c=>this.gaps(c,start,end,areaId,false,true))};
   }
   /** FR-103-09: publica los borradores del rango; con huecos publica igual, advierte y deja registrado quién publicó. */
   async publish(actor:Actor,dto:PublishDto,key?:string) {
