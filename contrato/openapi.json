@@ -33210,6 +33210,23 @@
         ],
         "description": "Estados finales que admite el hito finalizado con los hitos ya registrados (MA-AMB-03)"
       },
+      "ServicePatientResponse": {
+        "type": "object",
+        "properties": {
+          "record": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre completo, o el alias del expediente provisional"
+          }
+        },
+        "required": [
+          "record",
+          "fullName"
+        ]
+      },
       "ActiveServiceResponse": {
         "type": "object",
         "properties": {
@@ -33296,6 +33313,16 @@
             "items": {
               "$ref": "#/components/schemas/EstadoFinalServicio"
             }
+          },
+          "patient": {
+            "nullable": true,
+            "description": "Paciente vinculado; solo para la tripulación asignada y quien despacha (ambulancia.despachar). Null para los demás o sin paciente",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ServicePatientResponse"
+              }
+            ]
           }
         },
         "required": [
@@ -33314,7 +33341,8 @@
           "nextMilestones",
           "lastLocation",
           "allowedActions",
-          "finalStates"
+          "finalStates",
+          "patient"
         ]
       },
       "MotivoBloqueoDespacho": {

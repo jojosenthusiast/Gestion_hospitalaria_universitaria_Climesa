@@ -415,6 +415,8 @@ fun HospitalizationScreen(
         when {
             state.loading && state.admissions.isEmpty() -> item { LoadingState() }
             state.error != null && state.admissions.isEmpty() -> item { ErrorState(state.error, retry) }
+            state.admissions.isEmpty() && HospitalizationRules.wardFollowsShift(profile?.permissionContexts?.get("admision.ver").orEmpty()) ->
+                item { EmptyState(stringResource(R.string.clin_hosp_sin_turno), detail = stringResource(R.string.clin_hosp_sin_turno_detalle), icon = Icons.Default.Bed) }
             state.admissions.isEmpty() -> item { EmptyState(stringResource(R.string.clin_hosp_sin_admisiones), detail = stringResource(R.string.clin_hosp_sin_admisiones_detalle), icon = Icons.Default.Bed) }
             else -> {
                 if (state.loading) item { RefreshHint() }

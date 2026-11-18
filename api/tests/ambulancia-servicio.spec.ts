@@ -155,6 +155,15 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     expect(report.status).toBe(201);
     expect(report.body.patientLinked).toBe(true);
     expect((await t.one('SELECT paciente_id FROM ambulancia.servicio WHERE id=$1', [service.body.id])).paciente_id).toBe(nn.body.id);
+    // The unit status names the linked patient only to the assigned crew (and dispatch); a reader without that relation gets null.
+    const linked = await t.one<{ expediente: string; alias_provisional: string | null }>('SELECT expediente,alias_provisional FROM pacientes.paciente WHERE id=$1', [nn.body.id]);
+    const crewView = await t.call('PAR', 'GET', '/ambulancia');
+    expect(crewView.body.activeService.patient).toEqual({ record: linked.expediente, fullName: linked.alias_provisional });
+    const outsider = await t.call('MED', 'GET', '/ambulancia');
+    expect(outsider.status).toBe(200);
+    expect(outsider.body.activeService.id).toBe(service.body.id);
+    expect(outsider.body.activeService.patient).toBeNull();
+    expect(JSON.stringify(outsider.body)).not.toContain(linked.expediente);
     const other = await t.call('PAR', 'POST', `/ambulancia/servicios/${service.body.id}/prehospital`, { reason: 'Otro paciente', priority: 'verde', capturedAt: at('08:00').toISOString(), patientId: await t.patient() });
     expect(other.body.codigo).toBe('paciente_ya_vinculado');
     const noReason = await milestone(service.body.id, { type: 'finalizado', finalState: 'rechaza_traslado' });
