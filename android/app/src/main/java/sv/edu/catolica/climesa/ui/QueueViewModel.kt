@@ -215,7 +215,10 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
             val found = try {
                 ReceptionScheduling.pickerPage(api.request("/pacientes/selector?query=${java.net.URLEncoder.encode(record, "UTF-8")}&limit=10&offset=0") as JSONObject).items.firstOrNull { it.id == id }
             } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
-            patients.pick(found ?: PickerPatient(id, record, name, null))
+            // S1: an inactive patient is not chosen; the counter says why instead of letting the API refuse the number.
+            val blocked = found?.let { sv.edu.catolica.climesa.domain.PatientGate.blockedReason(it, sv.edu.catolica.climesa.domain.PickPurpose.CARE) }
+            if (blocked != null) mutable.value = mutable.value.copy(issueSearch = mutable.value.issueSearch.copy(error = blocked))
+            else patients.pick(found ?: PickerPatient(id, record, name, null))
         }
     }
 

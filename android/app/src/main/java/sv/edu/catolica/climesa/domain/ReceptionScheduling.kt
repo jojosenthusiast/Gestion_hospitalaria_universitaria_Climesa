@@ -13,10 +13,36 @@ data class PickerPatient(
     val appointmentToday: TodayAppointment? = null,
     /** B-2: the patient's live queue number of today (`ticketToday`). */
     val ticketToday: TodayTicket? = null,
+    /** Preconditions S1: `active`; an older API without the field means active (today's behavior). */
+    val active: Boolean = true,
+    /** Preconditions S1: `activeAdmission`, the patient already has an admission that is not closed. */
+    val activeAdmission: Boolean = false,
+    /** Preconditions S1: `careContext`, the caller attends this patient (same rule the API uses for vital signs). */
+    val careContext: Boolean = true,
 ) {
     val detail get() = "Expediente $record" + (age?.let { " · $it años" } ?: "")
     /** B1 "Registrar llegada": an appointment today whose arrival is not registered yet with a live number. */
     val canRegisterArrival get() = appointmentToday != null && ticketToday?.appointmentId != appointmentToday.id
+}
+
+/** What a patient is picked for; each purpose has its own precondition (preconditions sweep S1). */
+enum class PickPurpose { CARE, ADMISSION, VITALS }
+
+/**
+ * Preconditions S1: why a selector row cannot be picked for [PickPurpose], said before the tap; null when it can. The API
+ * refuses the same cases (inactive patient on queue/appointments/admission, a second active admission, vitals without a
+ * care context), so the row is shown disabled with the reason instead.
+ */
+object PatientGate {
+    const val INACTIVE = "Paciente inactivo: actívalo en Pacientes para atenderlo."
+    const val ACTIVE_ADMISSION = "Ya tiene una admisión activa."
+    const val NO_CARE_CONTEXT = "Solo puedes registrar signos de pacientes que atiendes."
+
+    fun blockedReason(patient: PickerPatient, purpose: PickPurpose): String? = when (purpose) {
+        PickPurpose.CARE -> INACTIVE.takeIf { !patient.active }
+        PickPurpose.ADMISSION -> if (!patient.active) INACTIVE else ACTIVE_ADMISSION.takeIf { patient.activeAdmission }
+        PickPurpose.VITALS -> NO_CARE_CONTEXT.takeIf { !patient.careContext }
+    }
 }
 
 /** `appointmentToday` of a selector row: the appointment and its doctor. */
@@ -113,6 +139,9 @@ object ReceptionScheduling {
                 ticketToday = it.optJSONObject("ticketToday")?.let { t ->
                     t.text("id")?.let { id -> TodayTicket(id, t.optString("service"), t.optInt("numero"), t.optString("state"), t.text("appointmentId")) }
                 },
+                active = it.optBoolean("active", true),
+                activeAdmission = it.optBoolean("activeAdmission", false),
+                careContext = it.optBoolean("careContext", true),
             )
         },
         json.optBoolean("hasMore"),

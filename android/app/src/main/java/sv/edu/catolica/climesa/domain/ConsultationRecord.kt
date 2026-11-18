@@ -87,13 +87,11 @@ object ConsultationRecordRules {
         ).joinToString(" · ")
     }
 
-    /** Why "Firmar" is disabled, said next to it; null when it can be signed. */
-    fun signBlocker(reason: String, plan: String): String? = when {
-        reason.isBlank() && plan.isBlank() -> "Falta el motivo y el plan"
-        reason.isBlank() -> "Falta el motivo"
-        plan.isBlank() -> "Falta el plan"
-        else -> null
-    }
+    /** Preconditions S7: the reason under a disabled «Firmar consulta» (same text on iOS and web). */
+    const val SIGN_BLOCKED = "Completa el motivo y el plan para firmar."
+
+    /** Why "Firmar" is disabled, said under it; null when it can be signed (the API refuses an empty motive or plan). */
+    fun signBlocker(reason: String, plan: String): String? = SIGN_BLOCKED.takeIf { reason.isBlank() || plan.isBlank() }
 
     private fun plural(n: Int, one: String, many: String) = "$n ${if (n == 1) one else many}"
     private fun rows(array: JSONArray?): List<JSONObject> = array?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } }.orEmpty()

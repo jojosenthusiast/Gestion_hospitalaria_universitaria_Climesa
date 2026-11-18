@@ -172,7 +172,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.candidateSection(
         list.items.isEmpty() -> item { EmptyState(stringResource(emptyTitle), detail = stringResource(emptyDetail), icon = emptyIcon) }
         else -> {
             if (list.error != null) item { NoticeBanner(NoticeKind.WARNING, list.error) }
-            items(list.items, key = { it.patientId }) { c -> DataRow(c.name, subtitle = c.detail, leadingIcon = rowIcon, onClick = { model.open(c) }) }
+            items(list.items, key = { it.patientId }) { c -> DataRow(c.name, subtitle = c.detail, leadingIcon = rowIcon, onClick = { model.open(c) }, blockedReason = c.blockedReason) }
         }
     }
 }

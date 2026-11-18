@@ -211,7 +211,8 @@ data class VitalsHistory(
 data class VitalsDay(val label: String, val readings: List<VitalReading>)
 
 /** A patient the user can pick to take signs: from the ward, the queue or the autosuggest search. */
-data class VitalsCandidate(val patientId: String, val name: String, val detail: String?, val record: String? = null)
+/** [blockedReason]: preconditions S1, the row is shown but cannot be opened (no care context); null opens it. */
+data class VitalsCandidate(val patientId: String, val name: String, val detail: String?, val record: String? = null, val blockedReason: String? = null)
 
 object VitalsParser {
     private val keys = mapOf(
@@ -276,14 +277,15 @@ object VitalsParser {
      * server order. Reading the others may be refused (403) without a care context.
      */
     fun rankByContext(results: List<VitalsCandidate>, inContext: Set<String>): List<VitalsCandidate> =
-        results.sortedBy { if (it.patientId in inContext) 0 else 1 }
+        results.sortedBy { if (it.patientId in inContext) 0 else if (it.blockedReason == null) 1 else 2 }
 
-    /** `GET /pacientes/selector`: `{items:[{id, record, fullName, age?}]}`. */
+    /** `GET /pacientes/selector`: `{items:[{id, record, fullName, age?, careContext?}]}`; `careContext=false` blocks the row (S1). */
     fun search(value: Any?): List<VitalsCandidate> {
         val items = (value as? JSONObject)?.optJSONArray("items") ?: (value as? JSONArray) ?: return emptyList()
         return (0 until items.length()).mapNotNull { items.optJSONObject(it) }.map {
             val age = if (it.isNull("age") || !it.has("age")) null else it.optInt("age")
-            VitalsCandidate(it.optString("id"), it.optString("fullName"), listOfNotNull("Exp. ${it.optString("record")}", age?.let { a -> "$a años" }).joinToString(" · "), it.optString("record"))
+            VitalsCandidate(it.optString("id"), it.optString("fullName"), listOfNotNull("Exp. ${it.optString("record")}", age?.let { a -> "$a años" }).joinToString(" · "), it.optString("record"),
+                blockedReason = PatientGate.NO_CARE_CONTEXT.takeIf { _ -> !it.optBoolean("careContext", true) })
         }
     }
 }

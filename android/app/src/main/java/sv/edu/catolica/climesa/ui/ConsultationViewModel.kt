@@ -223,7 +223,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     /** Saves the notes, then signs at the version the save returned; `saving` spans both writes so a second tap sends nothing. */
     fun sign(item: MedicalAppointment, reason: String, physicalExam: String, plan: String, onDone: () -> Unit = {}) {
         if (mutable.value.saving) return
-        if (reason.trim().isBlank() || plan.trim().isBlank()) { mutable.value = mutable.value.copy(error = "Completa el motivo y el plan antes de firmar."); return }
+        sv.edu.catolica.climesa.domain.ConsultationRecordRules.signBlocker(reason.trim(), plan.trim())?.let { mutable.value = mutable.value.copy(error = it); return }
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try {

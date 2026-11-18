@@ -78,7 +78,8 @@ internal fun StatTile(value: String, label: String, modifier: Modifier = Modifie
 
 /**
  * List item: leading icon or avatar, title, optional subtitle, optional trailing tag and chevron when `onClick` is set.
- * Use it for every row that shows a record (patient, bed, order, shift).
+ * Use it for every row that shows a record (patient, bed, order, shift). A non-null [blockedReason] (preconditions S0)
+ * keeps the row visible but not tappable, dims the title and says why with the shared [BlockedReason] line.
  */
 @Composable
 internal fun DataRow(
@@ -94,7 +95,9 @@ internal fun DataRow(
     container: Boolean = true,
     /** Small marks drawn right after the title (for example the categories of an appointment); null draws nothing. */
     titleTrailing: (@Composable () -> Unit)? = null,
+    blockedReason: String? = null,
 ) {
+    @Suppress("NAME_SHADOWING") val onClick = onClick.takeIf { blockedReason == null }
     val body: @Composable () -> Unit = {
         Column {
             Row(
@@ -108,13 +111,14 @@ internal fun DataRow(
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-                    if (titleTrailing == null) Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (titleTrailing == null) Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis, color = if (blockedReason != null) MaterialTheme.colorScheme.onSurfaceVariant else androidx.compose.ui.graphics.Color.Unspecified)
                     else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(title, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                         titleTrailing()
                     }
                     subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
                     meta?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+                    blockedReason?.let { BlockedReason(it) }
                 }
                 status?.invoke()
                 if (onClick != null) Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)

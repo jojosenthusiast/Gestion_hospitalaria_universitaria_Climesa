@@ -113,6 +113,7 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
     }
 
     fun open(candidate: VitalsCandidate) {
+        if (candidate.blockedReason != null) return // S1: no care context, the row only says why.
         if (candidate.patientId != mutable.value.patientId) intent.reset()
         // Measures typed for this patient and not saved (app closed, screen left) come back from the local draft.
         val restored = userId?.let { sv.edu.catolica.climesa.domain.FormDrafts.vitals(drafts.load(it, sv.edu.catolica.climesa.domain.FormDrafts.vitalsKey(candidate.patientId))) }

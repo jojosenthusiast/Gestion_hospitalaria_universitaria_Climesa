@@ -101,7 +101,10 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         // G4: the request form and the dispatch dialogs show their own error next to their button.
         if (section != AndroidSection.AMBULANCE_REQUEST && section != AndroidSection.DISPATCH) state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
-        if (state.loading) item { LoadingState() }
+        // S6: a patient without a linked record is told what to do before any form or refused read.
+        val requestBlocker = if (section == AndroidSection.AMBULANCE_REQUEST) AmbulanceRules.requestBlocker(profile.patientId) else null
+        if (requestBlocker != null) item { NoticeBanner(NoticeKind.INFO, requestBlocker) }
+        else if (state.loading) item { LoadingState() }
         else if (state.error != null) item { ErrorState(state.error, onRetry = { model.open(modeOf(section), readsStatus) }) }
         else when (section) {
             AndroidSection.AMBULANCE_REQUEST -> requestContent(state, model)

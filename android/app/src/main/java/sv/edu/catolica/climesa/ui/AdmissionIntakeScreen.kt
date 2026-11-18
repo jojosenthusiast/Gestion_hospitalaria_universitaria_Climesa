@@ -105,7 +105,12 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
     }
 }
 @Composable private fun PatientResult(p: PickerPatient, pick: () -> Unit) {
-    TextButton(onClick = pick, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) { Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) } }
+    // S1: an inactive patient or one already admitted is listed with the reason, not choosable.
+    val blocked = sv.edu.catolica.climesa.domain.PatientGate.blockedReason(p, sv.edu.catolica.climesa.domain.PickPurpose.ADMISSION)
+    TextButton(onClick = pick, enabled = blocked == null, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) {
+        Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        blocked?.let { BlockedReason(it) }
+    } }
 }
 
 @Composable private fun OriginStep(state: AdmissionIntakeState, model: AdmissionIntakeViewModel) = Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {

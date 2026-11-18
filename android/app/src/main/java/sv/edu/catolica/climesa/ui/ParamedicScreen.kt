@@ -120,7 +120,8 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
             }
         }
     }
-    when (ParamedicSheet.valueOf(sheet)) {
+    // S5: the report sheets are crew-only; a deep link from another section opens nothing for the rest.
+    when (if (service?.canReport == false) ParamedicSheet.NONE else ParamedicSheet.valueOf(sheet)) {
         ParamedicSheet.PREHOSPITAL -> ModalBottomSheet(onDismissRequest = { sheet = ParamedicSheet.NONE.name }) { PrehospitalSheet(state, model, service, close = { sheet = ParamedicSheet.NONE.name }) }
         ParamedicSheet.UNIDENTIFIED -> ModalBottomSheet(onDismissRequest = { sheet = ParamedicSheet.NONE.name }) { UnidentifiedSheet(state, model, close = { sheet = ParamedicSheet.NONE.name }) }
         ParamedicSheet.NONE -> Unit
@@ -170,13 +171,17 @@ private fun LazyListScope.activeService(
             )
         }
     }
-    item { NextStepButton(service, state.busy, model, state.pendingMilestone, state.formError) }
+    // S5: a paramedic outside this service's crew follows it read-only; the API would refuse every write.
+    if (service.readOnly) item { NoticeBanner(NoticeKind.INFO, AmbulanceService.NOT_CREW) }
+    if (service.canAdvance || service.canUndo) item { NextStepButton(service, state.busy, model, state.pendingMilestone, state.formError) }
     item {
         SectionCard(stringResource(R.string.par_acciones)) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                SecondaryButton(stringResource(R.string.par_reporte), { sheetOpen(ParamedicSheet.PREHOSPITAL) }, icon = Icons.Default.Description)
-                SecondaryButton(stringResource(R.string.par_sin_identidad), { sheetOpen(ParamedicSheet.UNIDENTIFIED) }, icon = Icons.Default.PersonAdd)
-                LocationButton(state.busy, locationFix, locationFail)
+                if (service.canReport) {
+                    SecondaryButton(stringResource(R.string.par_reporte), { sheetOpen(ParamedicSheet.PREHOSPITAL) }, icon = Icons.Default.Description)
+                    SecondaryButton(stringResource(R.string.par_sin_identidad), { sheetOpen(ParamedicSheet.UNIDENTIFIED) }, icon = Icons.Default.PersonAdd)
+                }
+                if (!service.readOnly) LocationButton(state.busy, locationFix, locationFail)
                 OpenMap(service.origin)
             }
         }
@@ -193,15 +198,15 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
     CloseWhenDone(busy, sent, error) { finishing = false }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         // G4: one tap records the next milestone; for 10 s the button becomes "Deshacer" instead of a confirm dialog.
-        if (pending != null && pending.key == service.id) PendingUndoRow(pending.label) { model.undoMilestone() }
-        else if (next != null) {
+        if (pending != null && pending.key == service.id) { if (service.canUndo) PendingUndoRow(pending.label) { model.undoMilestone() } }
+        else if (next != null && service.canAdvance) {
             val early = next == "finalizado" && AmbulanceRules.finishNeedsReason(service)
             PrimaryButton(
                 ParamedicRules.stepLabel(next), { if (early) finishing = true else model.advance(service, next, notice = "Registrado: ${ParamedicRules.stepLabel(next)}.", undoable = true) },
                 Modifier.heightIn(min = 72.dp), enabled = !busy, loading = busy,
             )
         }
-        if (ParamedicRules.canFinishEarly(service)) SecondaryButton(stringResource(R.string.amb_terminar_sin_traslado), { finishing = true }, enabled = !busy && pending == null)
+        if (service.canAdvance && ParamedicRules.canFinishEarly(service)) SecondaryButton(stringResource(R.string.amb_terminar_sin_traslado), { finishing = true }, enabled = !busy && pending == null)
     }
     if (finishing) {
         // MA-AMB-03: only the final states the API accepts for the milestones recorded so far.
