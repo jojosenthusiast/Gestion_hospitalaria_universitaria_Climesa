@@ -65,7 +65,8 @@ describe('W13 · admisiones con acciones según allowedActions (D-02)', () => {
     expect(within(hospitalized).getByText('Esperando alta médica: la firma Dra. Ficticia Tratante desde la app')).toBeTruthy();
     expect(within(hospitalized).getByText('Alta solicitada hace 10 min')).toBeTruthy();
     const orphan = await rowOf('Paciente Ficticio Cuatro');
-    expect(within(orphan).getByText('El médico tratante no tiene cuenta en la app; reasígnalo')).toBeTruthy();
+    // Without «reasignar_tratante» the row says who can fix it instead of an order this user cannot carry out.
+    expect(within(orphan).getByText('El médico tratante no tiene cuenta en la app; Jefatura de operaciones debe reasignarlo')).toBeTruthy();
   });
 
   it('solicita el alta al médico tratante con la versión y la nota opcional', async () => {

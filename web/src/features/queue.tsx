@@ -205,7 +205,7 @@ const PRIORITY_LABEL: Record<Priority, string> = { emergencia: 'Emergencia', urg
 function stateText(ticket: QueueTicket, call: boolean) {
   const room = ticket.officeCode ? ` · ${ticket.officeCode}` : '';
   if (ticket.state === 'en_espera') return call ? 'En espera' : 'Esperando a que el médico llame';
-  if (ticket.state === 'llamado') return `Llamado ${ticket.llamados}${ticket.maxCalls ? ` de ${ticket.maxCalls}` : ''} ${ticket.llamados === 1 ? 'vez' : 'veces'}${room}`;
+  if (ticket.state === 'llamado') return `Llamado ${ticket.llamados} ${ticket.maxCalls ? `de ${ticket.maxCalls}` : ticket.llamados === 1 ? 'vez' : 'veces'}${room}`;
   if (ticket.state === 'en_atencion') return `Presente, en atención${room}`;
   return finalNames[ticket.state] ?? ticket.state;
 }

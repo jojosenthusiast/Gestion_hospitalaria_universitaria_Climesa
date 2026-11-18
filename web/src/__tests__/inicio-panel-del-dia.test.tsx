@@ -131,6 +131,17 @@ describe('Inicio · panel del día', () => {
     expect(within(await screen.findByRole('region', { name: 'Huecos de cobertura' })).getByText(/0 de 1 persona$/)).toBeTruthy();
   });
 
+  it('LAB: un artículo con varios lotes aparece una sola vez, y «kit» se lee «kits»', async () => {
+    // The endpoint returns one row per lot and warehouse; the article columns repeat on each row.
+    const tubo = { articulo_id: 't', codigo: 'TUBO', nombre: 'Tubo de muestra tapón verde', tipo: 'insumo', unidad: 'unidad', minimo: 200, disponible: 500, vencido: 150, bajo_minimo: false };
+    const kit = { articulo_id: 'k', codigo: 'CREA', nombre: 'Reactivo de creatinina', tipo: 'reactivo', unidad: 'kit', minimo: 4, disponible: 2, vencido: 0, bajo_minimo: true };
+    const api = { request: vi.fn(async (path: string) => path.startsWith('/inventario/existencias') ? [tubo, tubo, kit] : respuestas[path.split('?')[0]] ?? []), write: vi.fn() } as unknown as Api;
+    render(<Dashboard api={api} profile={perfil('LAB')} version={0} />);
+    const inventario = await screen.findByRole('region', { name: 'Inventario bajo el mínimo' });
+    expect(await within(inventario).findAllByText('Tubo de muestra tapón verde')).toHaveLength(1);
+    expect(within(inventario).getByText('2 de 4 kits')).toBeTruthy();
+  });
+
   it('DPD: acciones con nombre legible, nunca el código del permiso', async () => {
     montar('DPD');
     await screen.findByRole('region', { name: 'Eventos denegados o fallidos' });

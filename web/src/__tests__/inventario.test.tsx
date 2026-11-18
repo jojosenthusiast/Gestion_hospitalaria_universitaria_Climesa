@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
 import { InventoryPage } from '../features/inventory';
-import { articleExport, daysUntil, emptyFilters, expiryText, filterArticles, gaugePercent, movementBody, movementTypesFor, emptyMovement, sortArticles, validateMovement, type ArticleDetail, type ArticleSummary } from '../features/inventory/model';
+import { articleExport, daysUntil, quantityText, emptyFilters, expiryText, filterArticles, gaugePercent, movementBody, movementTypesFor, emptyMovement, sortArticles, validateMovement, type ArticleDetail, type ArticleSummary } from '../features/inventory/model';
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
@@ -24,6 +24,16 @@ const detail: ArticleDetail = { ...rows[0], lotList: [
 movements: [{ id: 'm-1', type: 'consumo', lotNumber: 'DL-26-A', quantity: 20, reason: 'Consumo ficticio', originWarehouseCode: 'BOD-CEN', destinationWarehouseCode: null, authorName: 'Enfermera Ficticia', registeredAt: '2026-11-13T15:00:00Z' }] };
 
 describe('inventario · modelo', () => {
+  it('la cantidad lleva la unidad en plural salvo con 1, y las abreviaturas no cambian', () => {
+    expect(quantityText(0, 'caja')).toBe('0 cajas');
+    expect(quantityText(1, 'tableta')).toBe('1 tableta');
+    expect(quantityText(260, 'Tableta')).toBe('260 Tabletas');
+    expect(quantityText(4, 'unidad')).toBe('4 unidades');
+    expect(quantityText(2, 'kit')).toBe('2 kits');
+    expect(quantityText(3, 'frasco')).toBe('3 frascos');
+    expect(quantityText(1.5, 'ml')).toBe('1.5 ml');
+  });
+
   it('busca sin tildes, filtra por categoría y estado y ordena por urgencia', () => {
     expect(filterArticles(rows, { ...emptyFilters, query: 'creatinína'.replace('í', 'i') }).map(a => a.id)).toEqual(['a-2']);
     expect(filterArticles(rows, { ...emptyFilters, types: ['reactivo'] }).map(a => a.id)).toEqual(['a-2', 'a-3']);

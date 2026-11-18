@@ -78,7 +78,16 @@ export const ratio = (a: Pick<ArticleSummary, 'available' | 'minimum'>) => a.min
 export const gaugePercent = (a: Pick<ArticleSummary, 'available' | 'minimum'>) => a.minimum > 0 ? Math.max(0, Math.min(100, Math.round((a.available / (a.minimum * 2)) * 100))) : a.available > 0 ? 100 : 0;
 export const minimumMarkPercent = (a: Pick<ArticleSummary, 'minimum'>) => a.minimum > 0 ? 50 : 0;
 
-export const quantityText = (n: number, unit: string) => `${new Intl.NumberFormat('es-SV', { maximumFractionDigits: 4 }).format(n)} ${unit}`;
+/**
+ * Spanish plural of a unit: a vowel or a loanword consonant (kit, set) takes «s»; l, r, n, d, j take «es»; z becomes
+ * «ces». Abbreviations (ml, mg, g: no vowel or up to 2 letters) never change.
+ */
+export const unitPlural = (unit: string) => {
+  if (unit.length <= 2 || !/[aeiouáéíóú]/i.test(unit)) return unit;
+  if (/z$/i.test(unit)) return `${unit.slice(0, -1)}ces`;
+  return /[lrndj]$/i.test(unit) ? `${unit}es` : `${unit}s`;
+};
+export const quantityText = (n: number, unit: string) => `${new Intl.NumberFormat('es-SV', { maximumFractionDigits: 4 }).format(n)} ${Number(n) === 1 ? unit : unitPlural(unit)}`;
 
 /** Días hasta el vencimiento (negativo = ya venció); null si el lote no vence. */
 export function daysUntil(expiresAt: string | null, today: string): number | null {

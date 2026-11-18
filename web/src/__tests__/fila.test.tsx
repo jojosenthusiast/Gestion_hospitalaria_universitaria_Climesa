@@ -86,7 +86,8 @@ describe('Fila del día · acciones según el servidor (FILA-01, FILA-02)', () =
     expect(boton.getAttribute('aria-disabled')).toBe('true');
     expect(document.getElementById(boton.getAttribute('aria-describedby')!)!.textContent).toBe('Disponible después de 3 llamados (van 1).');
     expect(document.querySelector('.form-hint')?.textContent ?? '').not.toMatch(/Disponible después/);
-    expect(screen.getByText(/Llamado 1 de 3 vez/)).toBeTruthy();
+    expect(screen.getByText(/Llamado 1 de 3/)).toBeTruthy();
+    expect(screen.queryByText(/de 3 vez/)).toBeNull();
   });
 
   it('recepción ve el estado real de quien espera y no tiene acciones que el servidor rechazaría', async () => {
