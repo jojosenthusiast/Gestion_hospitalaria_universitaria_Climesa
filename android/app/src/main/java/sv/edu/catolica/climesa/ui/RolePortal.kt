@@ -188,7 +188,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                 if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.state))item{MaintenanceControl(model,unit.state,unit.version,unit.paramedicOnDuty,unit.driverOnDuty)}
             }else if(page==AndroidSection.SHIFTS){
                 val shifts=MyShifts.parse(data.data)
-                if(shifts.isEmpty())item{EmptyState("No tienes turnos publicados.")}
+                if(shifts.isEmpty())item{EmptyState(stringResource(R.string.turnos_vacio))}
                 else myShiftDays(shifts,pastShiftsOpen){pastShiftsOpen=!pastShiftsOpen}
             }else item{EmptyState(stringResource(R.string.portal_seccion_no_disponible))}
         }
