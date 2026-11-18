@@ -69,6 +69,15 @@ describe('W13 · admisiones con acciones según allowedActions (D-02)', () => {
     expect(within(orphan).getByText('El médico tratante no tiene cuenta en la app; Jefatura de operaciones debe reasignarlo')).toBeTruthy();
   });
 
+  it('un hospitalizado recién ingresado, sin alta pedida, no dice que espera el alta', async () => {
+    const rows = admissionsFixture().map(r => r.id === 'a-2' ? { ...r, dischargeRequestedAt: null } : r);
+    mount(['admision.ver'], {}, undefined, rows);
+    const hospitalized = await rowOf('Paciente Ficticio Dos');
+    expect(within(hospitalized).getByText('El alta la firma Dra. Ficticia Tratante desde la app')).toBeTruthy();
+    expect(within(hospitalized).queryByText(/Esperando alta médica/)).toBeNull();
+    expect(within(hospitalized).queryByText(/Alta solicitada/)).toBeNull();
+  });
+
   it('solicita el alta al médico tratante con la versión y la nota opcional', async () => {
     const api = mount(['admision.ver'], {}, async () => ({ id: 'a-2', state: 'hospitalizado', version: 3 }));
     await userEvent.click(within(await rowOf('Paciente Ficticio Dos')).getByRole('button', { name: /Solicitar alta al médico tratante/ }));
