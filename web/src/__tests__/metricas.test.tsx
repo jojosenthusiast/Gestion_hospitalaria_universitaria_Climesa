@@ -39,6 +39,21 @@ describe('W33 · métricas por rango', () => {
     expect(screen.getAllByRole('menuitem').map(m => m.textContent)).toEqual([expect.stringContaining('CSV'), expect.stringContaining('Excel'), expect.stringContaining('PDF')]);
   });
 
+  it('D2: el tiempo de laboratorio muestra la mediana del rango junto al promedio; los demás indicadores no', async () => {
+    const api = { request: vi.fn(async (path: string) => {
+      const indicador = path.split('?')[0].split('/').pop();
+      const base = { indicador, unidad: 'minutos', desde: '2026-11-14', hasta: '2026-11-15', actualizadoEn: '', serie: [{ fecha: '2026-11-14', valor: 70, muestras: 3 }] };
+      return indicador === 'tiempo_laboratorio' ? { ...base, serie: [{ fecha: '2026-11-14', valor: 70, mediana: 40, muestras: 3 }], resumen: { promedio: 70, mediana: 40, muestras: 3 } } : base;
+    }), write: vi.fn() };
+    render(<MetricsPage api={api as unknown as Api} profile={perfil(['metricas.ver'])} version={0} />);
+    const lab = await screen.findByRole('region', { name: 'Tiempo de laboratorio (orden a completado)' });
+    expect(await within(lab).findByText('Mediana del rango')).toBeTruthy();
+    expect(within(lab).getByText('Mediana del rango').nextElementSibling?.textContent).toBe('40 min');
+    expect(within(lab).getByText('Promedio del rango').nextElementSibling?.textContent).toBe('70 min');
+    const ambulance = screen.getByRole('region', { name: 'Tiempo de respuesta de la ambulancia' });
+    expect(within(ambulance).queryByText('Mediana del rango')).toBeNull();
+  });
+
   it('sin metricas.ver no pide nada', () => {
     const api = { request: vi.fn(), write: vi.fn() };
     render(<MetricsPage api={api as unknown as Api} profile={perfil([])} version={0} />);

@@ -9,7 +9,12 @@ import { StatusBadge } from '../components/system';
 import { formatDate } from '../lib/format';
 
 /** Respuesta de `GET /metricas/{indicador}` (FR-113-05). */
-export type IndicatorSeries = { indicador: string; unidad: string; desde: string; hasta: string; actualizadoEn: string; serie: { fecha: string; valor: number | null; muestras: number }[] };
+export type IndicatorSeries = {
+  indicador: string; unidad: string; desde: string; hasta: string; actualizadoEn: string;
+  /** D2: `mediana` del día y `resumen` del rango solo llegan en tiempo_laboratorio. */
+  serie: { fecha: string; valor: number | null; muestras: number; mediana?: number | null }[];
+  resumen?: { promedio: number | null; mediana: number | null; muestras: number };
+};
 export type Indicator = {
   id: string; label: string;
   /** Qué mide, en una línea. */
@@ -47,9 +52,11 @@ const stats = (series: IndicatorSeries) => {
   return values.length ? { avg: Math.round(avg * 10) / 10, min: Math.min(...values), max: Math.max(...values), last: [...series.serie].reverse().find(p => p.valor != null)!.valor as number } : null;
 };
 const fmt = (value: number | null, unit: string) => value == null ? 'Sin datos' : `${new Intl.NumberFormat('es-SV', { maximumFractionDigits: 1 }).format(value)} ${unit}`;
+const hasMedian = (series: IndicatorSeries) => series.resumen !== undefined;
 const tableOf = (spec: Indicator, series: IndicatorSeries): ExportTable => ({
   filename: exportName(`metrica-${spec.id}`), title: spec.label, subtitle: `Del ${formatDate(series.desde, { withYear: true })} al ${formatDate(series.hasta, { withYear: true })}. ${spec.what}`,
-  columns: ['Fecha', `Valor (${units[series.unidad] ?? series.unidad})`, 'Muestras'], rows: series.serie.map(p => [p.fecha, p.valor, p.muestras]),
+  columns: hasMedian(series) ? ['Fecha', `Promedio (${units[series.unidad] ?? series.unidad})`, `Mediana (${units[series.unidad] ?? series.unidad})`, 'Muestras'] : ['Fecha', `Valor (${units[series.unidad] ?? series.unidad})`, 'Muestras'],
+  rows: series.serie.map(p => hasMedian(series) ? [p.fecha, p.valor, p.mediana ?? null, p.muestras] : [p.fecha, p.valor, p.muestras]),
 });
 
 function IndicatorCard({ spec, state }: { spec: Indicator; state: Remote<IndicatorSeries> }) {
@@ -65,6 +72,8 @@ function IndicatorCard({ spec, state }: { spec: Indicator; state: Remote<Indicat
         {summary
           ? <div className="metric-summary">
             <div className={`metric-figure tone-${toneKey(tone)}`}><span>Promedio del rango</span><strong>{fmt(summary.avg, unit)}</strong><StatusBadge value={toneStatus[toneKey(tone)]} label={toneWord[toneKey(tone)]} /></div>
+            {/* D2: the median next to the average; a few very slow orders move the average, not the median. */}
+            {s.resumen && <div><span>Mediana del rango</span><strong>{fmt(s.resumen.mediana, unit)}</strong></div>}
             <div><span>Último dato</span><strong>{fmt(summary.last, unit)}</strong></div>
             <div><span>Mínimo</span><strong>{fmt(summary.min, unit)}</strong></div>
             <div><span>Máximo</span><strong>{fmt(summary.max, unit)}</strong></div>
