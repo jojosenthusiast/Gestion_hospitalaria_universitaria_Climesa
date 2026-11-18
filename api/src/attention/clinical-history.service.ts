@@ -1,9 +1,10 @@
 import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { Actor, contextsOf } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
+import { careRelationPatients, externalResultConsultation, externalResultRelation } from '../platform/care-context';
 
 type Row = Record<string, any>;
 export type HistoryAccess = 'propio' | 'relacion';
@@ -20,16 +21,7 @@ export class ClinicalHistoryService {
   constructor(private readonly db: DatabaseService, private readonly commands: CommandService, private readonly clock: Clock) {}
 
   private async access(c: PoolClient, actor: Actor, patientId: string): Promise<HistoryAccess | null> {
-    const contexts = contextsOf(actor, 'expediente.ver');
-    const now = this.clock.now();
-    if (actor.staffId && contexts.includes('relacion')) {
-      const related = (await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz
-        UNION ALL SELECT 1 FROM atencion.consulta WHERE paciente_id=$1 AND medico_id=$2 AND estado='abierta'
-        UNION ALL SELECT 1 FROM hospitalizacion.admision WHERE paciente_id=$1 AND medico_tratante_id=$2 AND estado IN ('pendiente_cama','hospitalizado','alta_firmada') LIMIT 1`, [patientId, actor.staffId, now])).rowCount;
-      if (related) return 'relacion';
-    }
-    if (actor.patientId === patientId && contexts.includes('propio_revisado')) return 'propio';
-    return null;
+    return (await careRelationPatients(c, actor, [patientId], this.clock.now())).get(patientId) ?? null;
   }
 
   async history(actor: Actor, patientId: string) {
@@ -61,7 +53,11 @@ export class ClinicalHistoryService {
         FROM hospitalizacion.admision a LEFT JOIN personal.persona m ON m.id=a.medico_tratante_id WHERE a.paciente_id=$1 ORDER BY a.creado_en DESC LIMIT 100`, [patientId])).rows;
       await this.commands.audit(c, actor, { action: 'expediente.leer', entity: 'paciente', entityId: patientId, patientId, permission: 'expediente.ver',
         detail: { access, consultations: consultations.length, orders: laboratory.length } });
-      return { patient: { id: patient.id, record: patient.expediente, fullName: patient.nombre }, access, consultations, laboratory, admissions };
+      // S4 (preconditions): «Registrar resultado externo» only when its POST would pass the relation and consultation checks.
+      const allowedActions: string[] = [];
+      if (actor.staffId && hasPermission(actor, 'laboratorio.ordenar') && await externalResultRelation(c, actor.staffId, patientId, this.clock.now())
+        && await externalResultConsultation(c, actor.staffId, patientId)) allowedActions.push('resultado_externo');
+      return { patient: { id: patient.id, record: patient.expediente, fullName: patient.nombre }, access, consultations, laboratory, admissions, allowedActions };
     });
   }
 }

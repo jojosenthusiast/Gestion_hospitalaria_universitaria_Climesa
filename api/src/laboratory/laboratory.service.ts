@@ -8,6 +8,7 @@ import { ClinicalFileStorage } from '../platform/clinical-storage';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
+import { externalResultConsultation, externalResultRelation } from '../platform/care-context';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { auditLabReads } from './lab-read-audit';
 import { MAX_ATTACHMENT_BYTES, LabAmendDto, LabCancelDto, LabExternalRecordDto, LabExternalResultDto, LabFollowUpReviewDto, LabOrderDto, LabPriority, LabProposalConfirmDto, LabProposalDiscardDto, LabResultBatchDto, LabResultBatchItemDto, LabResultDto, LabReviewDto, LabSampleDto, LabSendExternalDto, LabVersionDto } from './laboratory.dto';
@@ -523,14 +524,11 @@ export class LaboratoryService {
     if (!actor.staffId) throw new ForbiddenException('La cuenta no está vinculada a personal clínico.');
     return this.commands.run(actor, `laboratorio.ordenar:paciente:${patientId}:externo`, key, dto, async c => {
       const now = this.clock.now();
-      const related = (await c.query(`SELECT 1 FROM personal.persona d WHERE d.id=$2 AND d.tipo='medico' AND d.activo AND (
-          EXISTS (SELECT 1 FROM atencion.relacion_atencion r WHERE r.paciente_id=$1 AND r.profesional_id=$2 AND r.vigencia @> $3::timestamptz)
-          OR EXISTS (SELECT 1 FROM hospitalizacion.admision a WHERE a.paciente_id=$1 AND a.medico_tratante_id=$2 AND a.estado IN ${ACTIVE_ADMISSION}))`, [patientId, actor.staffId, now])).rowCount;
+      const related = await externalResultRelation(c, actor.staffId!, patientId, now);
       if (!related) throw new ForbiddenException('Solo el médico con relación de atención vigente con el paciente registra un resultado externo sin orden.');
       // Only a consultation of this doctor: ordering on another doctor's consultation is 403 in POST /laboratorio/ordenes.
-      const consultation = (await c.query(`SELECT id FROM atencion.consulta WHERE paciente_id=$1 AND medico_id=$2 AND estado IN ('abierta','firmada')
-        ORDER BY iniciada_en DESC LIMIT 1`, [patientId, actor.staffId])).rows[0] as Row | undefined;
-      if (!consultation) throw new ProblemException('sin_consulta', 409, 'Para registrar un resultado externo necesitas una consulta tuya con este paciente.');
+      const consultationId = await externalResultConsultation(c, actor.staffId!, patientId);
+      if (!consultationId) throw new ProblemException('sin_consulta', 409, 'Para registrar un resultado externo necesitas una consulta tuya con este paciente.');
       const examIds = dto.results.map(r => r.examId);
       if (new Set(examIds).size !== examIds.length) throw new ProblemException('validacion', 400, 'Cada examen va una sola vez.', 'results');
       for (const examId of examIds) {
@@ -538,7 +536,7 @@ export class LaboratoryService {
         if (!exam?.activo || exam.leaves?.length !== 1 || exam.leaves[0] !== examId) throw new ProblemException('validacion', 400, 'Elige exámenes activos del catálogo, uno por uno (sin paneles).', 'results');
       }
       const order = (await c.query(`INSERT INTO laboratorio.orden(consulta_id,paciente_id,medico_id,prioridad,externa,lugar_externo,instrucciones_externas,externa_desde,externa_por)
-        VALUES($1,$2,$3,'rutina',true,$4,$5,$6,$3) RETURNING id`, [consultation.id, patientId, actor.staffId, dto.place.trim(), 'Examen ya realizado; resultado traído por el paciente.', now])).rows[0];
+        VALUES($1,$2,$3,'rutina',true,$4,$5,$6,$3) RETURNING id`, [consultationId, patientId, actor.staffId, dto.place.trim(), 'Examen ya realizado; resultado traído por el paciente.', now])).rows[0];
       const results = [];
       for (const value of dto.results) {
         const item = (await c.query('INSERT INTO laboratorio.orden_item(orden_id,examen_id,pedido_como) VALUES($1,$2,$2) RETURNING id', [order.id, value.examId])).rows[0];
@@ -546,7 +544,7 @@ export class LaboratoryService {
       }
       const old = await this.order(c, order.id, true);
       const loaded = await this.loadExternal(c, actor, old, { results, attachment: dto.attachment, note: dto.note }, 'laboratorio.ordenar', 'laboratorio.resultado_externo_sin_orden');
-      return { ...loaded, consultationId: consultation.id as string };
+      return { ...loaded, consultationId };
     });
   }
 

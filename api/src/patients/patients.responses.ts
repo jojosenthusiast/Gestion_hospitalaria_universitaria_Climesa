@@ -16,6 +16,7 @@ export class PatientCandidateResponse {
   @StrProp({ optional: true, nullable: true, description: 'Rango de edad en lugar de la fecha (contexto rango, por ejemplo Laboratorio): 30-39 o 90+' }) ageRange?: string | null;
   @IntProp() version!: number;
   @StrProp() matchReason!: string;
+  @BoolProp({ description: 'El actor puede abrir su historial clínico (misma regla que GET /pacientes/{id}/historial): relación de atención vigente, consulta abierta suya, admisión activa a su cargo o su propio expediente' }) careRelation!: boolean;
 }
 
 export class PatientSearchRecordResponse {
@@ -89,6 +90,9 @@ export class PatientPickerItemResponse {
   @StrProp({ description: 'Número de expediente' }) record!: string;
   @StrProp() fullName!: string;
   @IntProp({ optional: true, description: 'Edad en años; solo si el rol puede ver la fecha de nacimiento' }) age?: number | null;
+  @BoolProp({ description: 'Paciente activo o provisional; uno inactivo se lista pero no se atiende (fila, cita, consulta, admisión)' }) active!: boolean;
+  @BoolProp({ description: 'Tiene una admisión activa (pendiente de cama, hospitalizado o alta firmada): no admite otra' }) activeAdmission!: boolean;
+  @BoolProp({ description: 'El actor tiene contexto de atención con el paciente (misma regla que registrar signos vitales fuera de consulta)' }) careContext!: boolean;
   @ClassProp(PatientAppointmentTodayResponse, { optional: true, nullable: true, description: 'Cita confirmada de hoy (B-2); solo con citas.ver global' }) appointmentToday?: PatientAppointmentTodayResponse | null;
   @ClassProp(PatientTicketTodayResponse, { optional: true, nullable: true, description: 'Número de fila vigente de hoy; solo con fila.ver global' }) ticketToday?: PatientTicketTodayResponse | null;
 }

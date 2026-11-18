@@ -61,6 +61,16 @@ export class AmbulanceService {
         // BL-05: Jefatura cierra administrativamente un servicio que la tripulación no puede finalizar.
         const allowedActions = hasPermission(actor, 'ambulancia.mantenimiento') ? ['cerrar'] : [];
         const done = milestones.map((m: { type: string }) => m.type);
+        // S5 (preconditions): only the assigned crew operates the service (`crewService`), so only it is offered the actions.
+        if (actor.staffId && crew.some((member: { staffId: string }) => member.staffId === actor.staffId)) {
+          if (hasPermission(actor, 'ambulancia.operar')) {
+            if (nextMilestones(done).length) allowedActions.push('hito');
+            const last = (await c.query<{ tipo: string; registrado_en: Date }>('SELECT tipo,registrado_en FROM ambulancia.hito WHERE servicio_id=$1 ORDER BY array_position($2::text[],tipo)', [service.id, [...milestoneTypes]])).rows.at(-1);
+            const received = !!(await c.query('SELECT 1 FROM ambulancia.servicio WHERE id=$1 AND recibido_por IS NOT NULL', [service.id])).rowCount;
+            if (!undoMilestoneError(last, received, this.clock.now())) allowedActions.push('deshacer_hito');
+          }
+          if (hasPermission(actor, 'ambulancia.reportar_prehospital')) allowedActions.push('reportar');
+        }
         activeService = { ...service, crew, milestones, nextMilestones: nextMilestones(done), lastLocation: location, allowedActions, finalStates: allowedFinalStates(done) };
       }
       const duty = await this.onDuty(c, this.clock.now());

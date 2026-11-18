@@ -4,7 +4,8 @@ import { channelsFor } from '../platform/channels';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ageOn, searchShowsBirth } from '../patients/patient.privacy';
-import { Clock, businessDate, businessDayRange } from '../platform/clock';
+import { Clock } from '../platform/clock';
+import { careContextPatients } from '../platform/care-context';
 import { PatientVitalsDto } from './patient-vitals.dto';
 
 const MEASURES = ['systolic', 'diastolic', 'heartRate', 'respiratoryRate', 'temperature', 'oxygenSaturation', 'weightKg', 'heightCm', 'pain', 'glucoseMgDl'] as const;
@@ -33,16 +34,8 @@ export class PatientVitalsService {
    * consultation or treating admission of the actor; a current admission; an ambulance service in progress or of today;
    * or activity of the patient in the hospital today (queue number, appointment, consultation or a vitals take).
    */
-  private async hasCareContext(c: { query: (sql: string, values?: unknown[]) => Promise<{ rowCount: number | null }> }, actor: Actor, patientId: string) {
-    const now = this.clock.now(), { start, end } = businessDayRange(businessDate(now));
-    const found = await c.query(`SELECT 1 FROM atencion.relacion_atencion WHERE paciente_id=$1 AND profesional_id=$2 AND vigencia @> $3::timestamptz
-      UNION ALL SELECT 1 FROM atencion.consulta WHERE paciente_id=$1 AND (estado='abierta' OR iniciada_en >= $4)
-      UNION ALL SELECT 1 FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ('pendiente_cama','hospitalizado','alta_firmada')
-      UNION ALL SELECT 1 FROM ambulancia.servicio WHERE paciente_id=$1 AND (finalizado_en IS NULL OR finalizado_en >= $4)
-      UNION ALL SELECT 1 FROM atencion.ticket_fila WHERE paciente_id=$1 AND fecha=$6::date
-      UNION ALL SELECT 1 FROM atencion.cita WHERE paciente_id=$1 AND estado IN ('confirmada','atendida') AND horario && tstzrange($4,$5,'[)')
-      UNION ALL SELECT 1 FROM atencion.signos_vitales WHERE paciente_id=$1 AND tomado_en >= $4 LIMIT 1`, [patientId, actor.staffId, now, start, end, businessDate(now)]);
-    return !!found.rowCount;
+  private async hasCareContext(c: { query: (sql: string, values?: unknown[]) => Promise<{ rows: any[] }> }, actor: Actor, patientId: string) {
+    return (await careContextPatients(c, actor.staffId, [patientId], this.clock.now())).has(patientId);
   }
 
   async history(actor: Actor, patientId: string, limit = 30) {
