@@ -7,6 +7,7 @@ import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, Tag, Wri
 import { newIntentKey, withIntentKey } from './intent';
 import { ActionButton, AreaTag, PriorityBadge } from '../components/system';
 import type { NextProposal } from './queue';
+import { CategoryBadges, type CategoryRef } from '../components/category';
 
 export type Consultation = {
   appointmentId: string;
@@ -16,6 +17,7 @@ export type Consultation = {
   end: string;
   reason?: string | null;
   appointmentState: string;
+  categories?: CategoryRef[];
   consultationId?: string | null;
   consultationState?: string | null;
   consultationReason?: string | null;
@@ -94,7 +96,7 @@ export function ConsultationsPage({ api, profile, version }: { api: Api; profile
     <CompactHeader breadcrumb="Atención / Medicina" title="Mi consultorio"/>
     {handoff && <NextPatientHandoff api={api} profile={profile} handoff={handoff} onDone={() => { setHandoff(null); queue.refresh(); }} />}
     <section className="data-workbench">
-      <RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Agenda del médico</caption><thead><tr><th>Horario</th><th>Paciente</th><th>Cita</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.appointmentId}><td data-label="Horario"><strong>{formatDateTime(row.start)}</strong><small>{formatDateTime(row.end)}</small></td><td data-label="Paciente">{row.patientName}</td><td data-label="Cita"><Tag value={row.appointmentState} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción"><div className="row-actions">{/* R1: the start is the row's next step, so a blocked start stays visible with its reason as a tooltip, never as text. */}<ActionButton action="iniciar_consulta" allowed={row.consultationId || !row.allowedActions ? ['iniciar_consulta'] : row.allowedActions} blocked={row.blockedActions ?? []} showBlocked onClick={() => setSelected(row)}>{row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Continuar' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></ActionButton>{historyAllowed && <button className="row-action" aria-label={`Historial clínico de ${row.patientName}`} onClick={() => setHistory(row)}>Historial</button>}</div></td></tr>)}</tbody></table> : <Empty title="No hay citas en tu agenda" description="Las citas confirmadas aparecerán aquí para iniciar su atención." />}</RemoteState>
+      <RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Agenda del médico</caption><thead><tr><th>Horario</th><th>Paciente</th><th>Cita</th><th>Consulta</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.appointmentId}><td data-label="Horario"><strong>{formatDateTime(row.start)}</strong><small>{formatDateTime(row.end)}</small></td><td data-label="Paciente">{row.patientName}<CategoryBadges categories={row.categories} /></td><td data-label="Cita"><Tag value={row.appointmentState} /></td><td data-label="Consulta"><Tag value={row.consultationState ?? 'pendiente'} /></td><td data-label="Acción"><div className="row-actions">{/* R1: the start is the row's next step, so a blocked start stays visible with its reason as a tooltip, never as text. */}<ActionButton action="iniciar_consulta" allowed={row.consultationId || !row.allowedActions ? ['iniciar_consulta'] : row.allowedActions} blocked={row.blockedActions ?? []} showBlocked onClick={() => setSelected(row)}>{row.consultationState === 'firmada' ? 'Ver consulta' : row.consultationId ? 'Continuar' : 'Iniciar consulta'} <Icon name="arrow" size={16} /></ActionButton>{historyAllowed && <button className="row-action" aria-label={`Historial clínico de ${row.patientName}`} onClick={() => setHistory(row)}>Historial</button>}</div></td></tr>)}</tbody></table> : <Empty title="No hay citas en tu agenda" description="Las citas confirmadas aparecerán aquí para iniciar su atención." />}</RemoteState>
     </section>
     {queueAllowed && <section className="data-workbench" aria-labelledby="consultorio-fila"><h2 id="consultorio-fila">Fila del día: llamados y en atención</h2>
       <WriteError error={startError} onReload={queue.refresh} reloadLabel="Recargar la fila" />

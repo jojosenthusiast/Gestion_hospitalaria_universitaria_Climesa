@@ -10,6 +10,7 @@ import { addDays, dayKey, groupAgenda, minutesBetween, shownState, timeRange, we
 import './listas/lists.css';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
 import { useQuickAction } from './personal/accion';
+import { CategoryBadges, CategoryGlyph, type CategoryRef } from '../components/category';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
 import { can, type AccessProfile, type Api, type Appointment as BaseAppointment } from '../lib/api';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from './common';
@@ -19,7 +20,7 @@ import './front-desk.css';
 /** CITA-04: actions the server accepts now for the reader, and the blocked ones with their reason (contract `AccionCita`). */
 export type AppointmentAction = 'confirmar' | 'rechazar' | 'cancelar' | 'reprogramar' | 'no_asistio' | 'aceptar_reprogramacion' | 'rechazar_reprogramacion' | 'iniciar_consulta';
 type Reschedule = { id: string; start: string; end: string; state: string; origin: string; reason?: string | null; rejectionReason?: string | null; version: number };
-type Appointment = BaseAppointment & { allowedActions?: AppointmentAction[]; blockedActions?: { action: AppointmentAction; reason: string }[]; cancelableUntil?: string | null; reschedule?: Reschedule | null; rescheduledFromId?: string | null; rescheduledToId?: string | null;
+type Appointment = BaseAppointment & { categories?: CategoryRef[]; allowedActions?: AppointmentAction[]; blockedActions?: { action: AppointmentAction; reason: string }[]; cancelableUntil?: string | null; reschedule?: Reschedule | null; rescheduledFromId?: string | null; rescheduledToId?: string | null;
   /** R7 U1: the queue number of the arrival (D-1) and the cancel reason (D-8). */
   arrival?: { id: string; numero: number; state: string } | null; cancelReasonCode?: CancelCode | null; cancelReason?: string | null };
 /** D-8: the patient's quick cancel reasons (`AppointmentCancelDto.reasonCode`). */
@@ -150,7 +151,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
         : <header><strong><Icon name="steth" size={16} /> {d.doctorName}</strong><small>{plural(d.items.length, 'cita', 'citas')}</small></header>}
       {open && d.items.map(row => { const shown = shownState(row, now); return <div className={`ag-slot${shown !== row.state ? ' is-overdue' : ''}`} key={row.id}>
         <span className="ag-time">{timeRange(row.start, row.end)}<small>{minutesBetween(row.start, row.end)} min</small></span>
-        <span className="ag-who"><strong>{row.patientName}</strong>{row.reason && <small>{row.reason}</small>}
+        <span className="ag-who"><strong>{row.patientName}<CategoryBadges categories={row.categories} /></strong>{row.reason && <small>{row.reason}</small>}
           {row.state === 'cancelada' && (row.cancelReasonCode || row.cancelReason) && <small>Motivo: {[CANCEL_CODES.find(([code]) => code === row.cancelReasonCode)?.[1], row.cancelReason].filter(Boolean).join(' · ')}</small>}</span>
         <StatusBadge value={shown} />
         {noShows[row.id]
@@ -334,7 +335,6 @@ const SlotLegend = () => <ul className="slot-legend" aria-label="Leyenda"><li><i
 // ───────────── Fase 2, flujo A (S8): solicitud de cita por motivo y bandeja de Recepción ─────────────
 
 type Franja = 'manana' | 'tarde' | 'cualquiera';
-type CategoryRef = { code: string; name: string; icon: string };
 type Category = CategoryRef & { description: string; specialties: string[]; keywords: string };
 type RequestAction = 'asignar' | 'rechazar' | 'cancelar';
 type CategoryRequest = {
@@ -352,26 +352,6 @@ const REQUEST_STATE: Record<CategoryRequest['state'], { value: string; label: st
   rechazada: { value: 'rechazada', label: 'Rechazada' }, cancelada: { value: 'cancelada', label: 'Retirada' },
 };
 
-/** Ícono de cada motivo (clave estable de la API); mismo trazo que `Icon`. Las claves desconocidas usan el estetoscopio. */
-const GLYPHS: Record<string, ReactNode> = {
-  nino: <><path d="M9 12h.01M15 12h.01M10 16c.5.3 1.2.5 2 .5s1.5-.2 2-.5" /><path d="M19 6.3a9 9 0 0 1 1.8 3.9 2 2 0 0 1 0 3.6 9 9 0 0 1-17.6 0 2 2 0 0 1 0-3.6A9 9 0 0 1 12 3c2 0 3.5 1.1 3.5 2.5s-.9 2.5-2 2.5c-.8 0-1.5-.4-1.5-1" /></>,
-  mujer: <><circle cx="12" cy="9" r="5" /><path d="M12 14v8M9 19h6" /></>,
-  corazon: <path d="M19 14c1.5-1.5 3-3.2 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.8 0-3 .5-4.5 2-1.5-1.5-2.7-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4 3 5.5l7 7z" />,
-  hueso: <path d="M17 10c.7-.7 1.7 0 2.5 0a2.5 2.5 0 1 0 0-5 .5.5 0 0 1-.5-.5 2.5 2.5 0 1 0-5 0c0 .8.7 1.8 0 2.5l-7 7c-.7.7-1.7 0-2.5 0a2.5 2.5 0 0 0 0 5c.3 0 .5.2.5.5a2.5 2.5 0 1 0 5 0c0-.8-.7-1.8 0-2.5z" />,
-  piel: <path d="M18 11V6a2 2 0 0 0-4 0v5M14 10V4a2 2 0 0 0-4 0v6M10 10.5V6a2 2 0 0 0-4 0v8M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.9-6-2.3l-3.6-3.6a2 2 0 0 1 2.8-2.8L7 15" />,
-  ojo: <><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></>,
-  oido: <path d="M6 8.5a6.5 6.5 0 1 1 13 0c0 6-6 6-6 10a3.5 3.5 0 1 1-7 0M15 8.5a2.5 2.5 0 0 0-5 0v1a2 2 0 1 1 0 4" />,
-  mente: <><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5s1.3 2 3.5 2 3.5-2 3.5-2M9 9.5h.01M15 9.5h.01" /></>,
-  neuro: <path d="M13 2 4 14h8l-1 8 9-12h-8z" />,
-  digestivo: <path d="M4 3v6a2 2 0 0 0 2 2h3a2 2 0 0 0 2-2V3M7.5 3v18M20 15V3a5 5 0 0 0-4 5v5c0 1.1.9 2 2 2zm0 0v6" />,
-  rinon: <path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z" />,
-  alergia: <path d="M17.7 7.7A2.5 2.5 0 1 1 19.5 12H3M9.6 4.6A2 2 0 1 1 11 8H3M12.6 19.4A2 2 0 1 0 14 16H3" />,
-  cirugia: <><circle cx="6" cy="6" r="3" /><circle cx="6" cy="18" r="3" /><path d="M20 4 8.1 15.9M14.5 14.5 20 20M8.1 8.1 12 12" /></>,
-};
-function CategoryGlyph({ icon, size = 20 }: { icon: string; size?: number }) {
-  if (!GLYPHS[icon]) return <Icon name="steth" size={size} />;
-  return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">{GLYPHS[icon]}</svg>;
-}
 const CategoryList = ({ categories }: { categories: CategoryRef[] }) => <ul className="rq-cats">{categories.map(c => <li key={c.code}><CategoryGlyph icon={c.icon} size={16} />{c.name}</li>)}</ul>;
 
 /**

@@ -15,10 +15,11 @@ import { Segmented } from '../components/segmented';
 import { formatDuration, formatTime, plural } from '../lib/format';
 import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
 import './listas/lists.css';
+import { CategoryBadges, type CategoryRef } from '../components/category';
 
 type QueueAction = 'llamar' | 'atender' | 'completar' | 'no_se_presento';
 /** FILA-01/CITA-04: the server says which actions the reader may take now (`allowedActions`) and why the others are blocked. */
-type QueueTicket = BoardTicket & { fecha: string; patientId?: string | null; officeId?: string | null; officeCode?: string | null; version: number; consultationId?: string | null; consultationState?: string | null;
+type QueueTicket = BoardTicket & { fecha: string; categories?: CategoryRef[]; patientId?: string | null; officeId?: string | null; officeCode?: string | null; version: number; consultationId?: string | null; consultationState?: string | null;
   area?: string; priority?: Priority; appointmentAt?: string | null; walkIn?: boolean;
   /** R7 U1 (D-1, B-4): the appointment whose arrival issued this number, its doctor, and until when the issuer may void it. */
   appointmentId?: string | null; appointmentDoctorName?: string | null; arrivalFromAppointment?: boolean; voidableUntil?: string | null;
@@ -246,7 +247,7 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
         draggable={moves.length > 0 && !busy} aria-busy={pendingIds[ticket.id] ? true : undefined}
         onDragStart={event => { event.dataTransfer.setData(DRAG_TYPE, JSON.stringify({ id: ticket.id })); event.dataTransfer.effectAllowed = 'move'; }}>
       <div className="qb-ticket-head"><span className="qb-code"><AreaTag code={area} /><strong className="qb-number mono-data">{ticket.numero}</strong></span>{waitLevel(ticket, now) !== 'none' ? <span className={`qb-wait sla-${waitLevel(ticket, now)}`}>Espera {formatDuration(waitMinutes(ticket, now))}</span> : <span className="qb-wait sla-none" title="Hora de emisión">{formatTime(ticket.issuedAt)}</span>}</div>
-      <span>{ticket.patientName || 'Paciente no identificado'}</span>
+      <span>{ticket.patientName || 'Paciente no identificado'}<CategoryBadges categories={ticket.categories} /></span>
       {/* R4a: booked or walk-in is on every card, so the order of the column reads at a glance. */}
       <div className="qb-marks">
         {ticket.priority && ticket.priority !== 'rutina' && <PriorityBadge value={ticket.priority} />}
