@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { MoreLink } from '../../components/fold';
 import { BarChart, HBarList, type Tone } from '../../components/charts';
-import { roleNames, staffTypeNames, type AccessProfile, type Appointment, type AuditRow, type Shift } from '../../lib/api';
+import { can, roleNames, staffTypeNames, type AccessProfile, type Appointment, type AuditRow, type Shift } from '../../lib/api';
 import { formatDate, formatDateTime, formatDuration, formatPercent, formatRelative, formatTime, joinParts, minutesSince, plural } from '../../lib/format';
 import { StatusBadge } from '../../components/system';
 import type { Remote } from '../common';
@@ -87,10 +87,17 @@ const lowStock = (d: DashboardData): TrayGroupSpec => {
     items: perArticle(d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0 || soon.has(r.articulo_id)).map(r => ({ id: r.articulo_id, title: r.nombre, detail: [(r.bajo_minimo || r.disponible <= 0) && `Quedan ${plural(r.disponible, r.unidad, unitsOf(r.unidad))} · mínimo ${r.minimo}`, r.vencido > 0 && `${plural(r.vencido, r.unidad, unitsOf(r.unidad))} vencidos`, soon.has(r.articulo_id) && `${plural(soon.get(r.articulo_id) as number, r.unidad, unitsOf(r.unidad))} por vencer`].filter(Boolean).join(' · '), tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
   };
 };
-const pendingAmbulance = (d: DashboardData): TrayGroupSpec => ({
-  id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
-  items: (d.ambulance.data?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: `${r.address} · ${formatRelative(r.createdAt)}`, tone: 'urgent' as Tone, href: '#/ambulancia', action: 'Despachar', area: 'AMB' as const })),
-});
+/**
+ * «Despachar» only when this person may dispatch and the unit can leave now (the request's «Confirmar y despachar» is
+ * enabled); otherwise the row opens the request to read it.
+ */
+const pendingAmbulance = (d: DashboardData, profile: AccessProfile): TrayGroupSpec => {
+  const s = d.ambulance.data, canDispatch = can(profile, 'ambulancia.despachar') && s?.unit.state === 'disponible' && !s.dispatchBlock;
+  return {
+    id: 'ambulancia', title: 'Ambulancia por confirmar', href: '#/ambulancia', state: asRemote(d.ambulance),
+    items: (s?.pendingRequests ?? []).map(r => ({ id: `r-${r.id}`, title: r.reason, detail: `${r.address} · ${formatRelative(r.createdAt)}`, tone: 'urgent' as Tone, href: '#/ambulancia', action: canDispatch ? 'Despachar' : 'Ver solicitud', area: 'AMB' as const })),
+  };
+};
 /** A service still open 12 h after dispatch blocks every new dispatch; whoever may close it (Jefatura) sees it on Inicio. */
 export const unclosedAmbulance = (d: DashboardData): TrayGroupSpec => {
   const s = d.ambulance.data?.activeService;
@@ -163,9 +170,9 @@ const jop: RoleDashboard = {
     { id: 'aviso', label: 'Publicar aviso', hint: 'Comunicado para el personal o la pantalla pública', icon: 'megaphone', href: '#/avisos?accion=publicar', permission: 'avisos.publicar' },
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores con gráficos y exportación', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
-  tray: ({ d }) => [
+  tray: ({ d, profile }) => [
     coverageTodayGroup(d),
-    indicatedAdmissions(d), noBed(d), unclosedAmbulance(d), pendingAmbulance(d), lowStock(d),
+    indicatedAdmissions(d), noBed(d), unclosedAmbulance(d), pendingAmbulance(d, profile), lowStock(d),
   ],
   figures: ({ d }) => [
     fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined }),
@@ -229,7 +236,7 @@ const rec: RoleDashboard = {
     { id: 'llamar', label: 'Llamar siguiente', hint: 'Llama al próximo número en espera', icon: 'megaphone', href: '#/fila?accion=llamar', permission: 'fila.llamar' },
     { id: 'ambulancia', label: 'Solicitar ambulancia', hint: 'Registrar una solicitud de traslado', icon: 'ambulance', href: '#/ambulancia?accion=solicitud', permission: 'ambulancia.solicitar' },
   ],
-  tray: ({ d }) => [
+  tray: ({ d, profile }) => [
     // S8: asked appointments and requests by category both wait on Recepción: one group, one count (same as Citas).
     { id: 'solicitudes', title: 'Solicitudes de cita', href: '#/citas', state: requestsState(d),
       items: [
@@ -238,7 +245,7 @@ const rec: RoleDashboard = {
       ] },
     { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),
       items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name || l.account.email, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
-    indicatedAdmissions(d), noBed(d), pendingAmbulance(d),
+    indicatedAdmissions(d), noBed(d), pendingAmbulance(d, profile),
   ],
   figures: ({ d }) => [
     fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
@@ -357,7 +364,7 @@ const par: RoleDashboard = {
   title: 'Mi unidad',
   needs: ['ambulance', 'myShifts'],
   actions: [{ id: 'unidad', label: 'Abrir ambulancia', hint: 'Estado, servicio e hitos', icon: 'ambulance', href: '#/ambulancia', permission: 'ambulancia.ver_estado' }],
-  tray: ({ d }) => [pendingAmbulance(d)],
+  tray: ({ d, profile }) => [pendingAmbulance(d, profile)],
   figures: ({ d }) => [fig('unidad', 'Estado de la unidad', d.ambulance, a => unitStateNames[a.unit.state] ?? 'Otro estado', { href: '#/ambulancia' })],
   panels: ({ d }) => grid(<>
     <Panel title="Servicio en curso" icon="ambulance" action={{ label: 'Abrir ambulancia', href: '#/ambulancia' }}>

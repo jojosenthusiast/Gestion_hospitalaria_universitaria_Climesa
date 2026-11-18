@@ -217,7 +217,7 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
             } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
             // S1: an inactive patient is not chosen; the counter says why instead of letting the API refuse the number.
             val blocked = found?.let { sv.edu.catolica.climesa.domain.PatientGate.blockedReason(it, sv.edu.catolica.climesa.domain.PickPurpose.CARE) }
-            if (blocked != null) mutable.value = mutable.value.copy(issueSearch = mutable.value.issueSearch.copy(error = blocked))
+            if (blocked != null) mutable.value = mutable.value.copy(issueSearch = mutable.value.issueSearch.copy(blocked = blocked))
             else patients.pick(found ?: PickerPatient(id, record, name, null))
         }
     }
