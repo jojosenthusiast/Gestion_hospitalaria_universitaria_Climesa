@@ -43,7 +43,7 @@ export class AmbulanceController {
   location(@Req() r:ActorRequest,@Body() d:LocationDto,@Headers('idempotency-key') k?:string){return this.ambulance.location(r.actor,d,k);}
   @Get('bitacora') @RequirePermission('ambulancia.ver_bitacora') @ApiOperation({summary:'Bitácora filtrable (D-056); sin datos del paciente (solo el expediente enmascarado)'})
   @ApiQuery({name:'from',type:String,required:false,description:'Primer día local, yyyy-MM-dd'}) @ApiQuery({name:'to',type:String,required:false,description:'Último día local, yyyy-MM-dd'})
-  @ApiQuery({name:'type',type:String,required:false}) @ApiQuery({name:'finalState',type:String,required:false}) @ApiQuery({name:'priority',type:String,required:false})
+  @ApiQuery({name:'type',type:String,required:false}) @ApiQuery({name:'finalState',type:String,required:false,description:'Estado final del servicio, o en_curso para los que siguen sin cierre'}) @ApiQuery({name:'priority',type:String,required:false})
   @ApiQuery({name:'crewId',type:String,required:false}) @ApiQuery({name:'municipality',type:String,required:false}) @ApiQuery({name:'minResponseMinutes',type:Number,required:false}) @ApiQuery({name:'q',type:String,required:false,description:'Texto libre sin acentos: origen, destino, municipio o tripulación'}) @ApiOkResponse({ type: [ServiceLogEntryResponse] })
   log(@Req() r:ActorRequest,@Query() q:LogFilters){return this.ambulance.log(r.actor,q);}
 }
