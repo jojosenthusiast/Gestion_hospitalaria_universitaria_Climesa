@@ -92,7 +92,7 @@ export class PatientsService {
         UNION ALL SELECT 1 FROM ambulancia.servicio s JOIN ambulancia.tripulacion t ON t.servicio_id=s.id WHERE s.paciente_id=$1 AND t.persona_id=$2 AND (s.finalizado_en IS NULL OR s.finalizado_en>$3::timestamptz-interval '24 hours') LIMIT 1`,[id,actor.staffId,this.clock.now()])).rows;
       if(linked.length)return;
     }
-    throw new ForbiddenException('La ficha requiere una relación de atención o ser su titular.');
+    throw new ForbiddenException(contexts.includes('orden') && !contexts.includes('relacion') ? 'Laboratorio solo abre la ficha de pacientes con una orden pendiente o en proceso.' : 'La ficha requiere una relación de atención o ser su titular.');
   }
   /** Contexto `orden` (laboratorio): el paciente tiene una orden pendiente o en proceso. */
   private async hasOpenOrder(c:PoolClient,id:string) {

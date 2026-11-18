@@ -139,7 +139,7 @@ describe('Inicio · panel del día', () => {
     render(<Dashboard api={api} profile={perfil('LAB')} version={0} />);
     const inventario = await screen.findByRole('region', { name: 'Inventario bajo el mínimo' });
     expect(await within(inventario).findAllByText('Tubo de muestra tapón verde')).toHaveLength(1);
-    expect(within(inventario).getByText('2 de 4 kits')).toBeTruthy();
+    expect(within(inventario).getByText('Quedan 2 kits · mínimo 4')).toBeTruthy();
   });
 
   it('DPD: acciones con nombre legible, nunca el código del permiso', async () => {

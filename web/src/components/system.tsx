@@ -45,7 +45,9 @@ export function SectionState<T>({ state, children, rows = 4, compact = false, em
     // WEB-04: "no permission" and "load failed" are distinct; both can retry (access can be granted meanwhile).
     const denied = state.error.status === 403;
     const title = denied ? 'No tienes acceso a esta información' : 'No pudimos cargar esta información';
-    const message = denied ? 'Tu cuenta no tiene permiso para consultar esta sección.' : state.error.message;
+    // A 403 with its own reason (e.g. «needs a care relationship») says why; a bare «Forbidden» keeps the generic text.
+    const specific = denied && state.error.message && !/^(forbidden|prohibido|no autorizado)\.?$/i.test(state.error.message.trim());
+    const message = denied ? (specific ? state.error.message : 'Tu cuenta no tiene permiso para consultar esta sección.') : state.error.message;
     return <div className={`section-state-error${compact ? ' is-compact' : ''}`} role="alert">
       <Icon name="alert" size={compact ? 16 : 20} />
       <div><strong>{title}</strong><span>{message}</span>{denied && !compact && <span>Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</span>}</div>
