@@ -106,8 +106,8 @@ class ConsultationJourneyTest {
     }
 
     @Test fun signSaysWhatIsMissing() {
-        assertEquals("Completa el motivo y el plan para firmar.", ConsultationRecordRules.signBlocker("Tos", ""))
-        assertEquals("Completa el motivo y el plan para firmar.", ConsultationRecordRules.signBlocker("", "Reposo"))
+        assertEquals("Completa el plan para firmar.", ConsultationRecordRules.signBlocker("Tos", ""))
+        assertEquals("Completa el motivo para firmar.", ConsultationRecordRules.signBlocker("", "Reposo"))
         assertEquals("Completa el motivo y el plan para firmar.", ConsultationRecordRules.signBlocker("", ""))
         assertNull(ConsultationRecordRules.signBlocker("Tos", "Reposo"))
     }

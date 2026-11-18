@@ -168,8 +168,9 @@ class PreconditionsSweepTest {
     // S7 ---------------------------------------------------------------------------------------------------------------
 
     @Test fun s7SignIsBlockedUntilMotiveAndPlan() {
-        assertEquals("Completa el motivo y el plan para firmar.", ConsultationRecordRules.signBlocker("", "Reposo"))
-        assertEquals("Completa el motivo y el plan para firmar.", ConsultationRecordRules.signBlocker("Tos", ""))
+        assertEquals("Completa el motivo y el plan para firmar.", ConsultationRecordRules.signBlocker("", " "))
+        assertEquals("Completa el motivo para firmar.", ConsultationRecordRules.signBlocker("", "Reposo"))
+        assertEquals("Completa el plan para firmar.", ConsultationRecordRules.signBlocker("Tos", ""))
         assertNull(ConsultationRecordRules.signBlocker("Tos", "Reposo"))
     }
 
