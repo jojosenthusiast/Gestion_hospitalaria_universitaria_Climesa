@@ -17,7 +17,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -148,7 +147,7 @@ fun NoticesScreen(account: AuthenticatedAccount, modifier: Modifier = Modifier) 
                 filters = {
                     NoticeFilter.entries.forEach { f ->
                         val count = inbox?.let { NoticeInboxRules.count(it, f) }?.takeIf { it > 0 }
-                        FilterChip(state.filter == f, { model.setFilter(f) }, { Text(if (count != null) "${f.label} ($count)" else f.label) }, Modifier.heightIn(min = Spacing.touch))
+                        StatusFilterChip(state.filter == f, { model.setFilter(f) }, if (count != null) "${f.label} ($count)" else f.label, FilterTones.notice(f), Modifier.heightIn(min = Spacing.touch))
                     }
                 },
             )
@@ -174,6 +173,7 @@ private fun NoticeRow(notice: InboxNotice, onOpen: () -> Unit) {
     ClimesaClickableCard(onOpen) {
         Row(Modifier.fillMaxWidth().heightIn(min = Spacing.touch + Spacing.sm).padding(horizontal = Space4, vertical = Space3), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space3)) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space1 + 2.dp)) {
+                // Level and read state as their coloured, textured tags: the owner reads the inbox by these marks at a glance.
                 Row(horizontalArrangement = Arrangement.spacedBy(Space2), verticalAlignment = Alignment.CenterVertically) {
                     NoticeLevelBadge(notice.level)
                     FamilyBadge(stringResource(if (read) R.string.aviso_enterado else R.string.aviso_sin_leer), if (read) StatusFamily.LISTO else StatusFamily.ESPERA)
@@ -182,11 +182,14 @@ private fun NoticeRow(notice: InboxNotice, onOpen: () -> Unit) {
                     notice.title, style = MaterialTheme.typography.titleMedium, fontWeight = if (read) FontWeight.Normal else FontWeight.SemiBold,
                     color = if (read) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.onSurface, maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
-                val date = listOfNotNull(
-                    NoticeInboxRules.dateText(notice.publishedAt).takeIf { it.isNotBlank() },
-                    NoticeInboxRules.dateText(notice.until).takeIf { it.isNotBlank() }?.let { stringResource(R.string.aviso_hasta, it) },
+                // Dates said the way people say them ("Ayer 23:22", "Jueves 01:53"), never a full date with the year.
+                val now = java.time.Instant.now()
+                fun near(iso: String?) = iso?.let { runCatching { sv.edu.catolica.climesa.domain.MyShifts.relative(java.time.Instant.parse(it), now) }.getOrNull() }
+                val line = listOfNotNull(
+                    near(notice.publishedAt),
+                    near(notice.until)?.let { stringResource(R.string.aviso_hasta, it.replaceFirstChar { c -> c.lowercase() }) },
                 ).joinToString(" · ")
-                if (date.isNotBlank()) Text(date, style = MaterialTheme.typography.labelSmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)
         }

@@ -45,7 +45,9 @@ export function SectionState<T>({ state, children, rows = 4, compact = false, em
     // WEB-04: "no permission" and "load failed" are distinct; both can retry (access can be granted meanwhile).
     const denied = state.error.status === 403;
     const title = denied ? 'No tienes acceso a esta información' : 'No pudimos cargar esta información';
-    const message = denied ? 'Tu cuenta no tiene permiso para consultar esta sección.' : state.error.message;
+    // A 403 with its own reason (e.g. «needs a care relationship») says why; a bare «Forbidden» keeps the generic text.
+    const specific = denied && state.error.message && !/^(forbidden|prohibido|no autorizado|sin permiso)\.?$/i.test(state.error.message.trim());
+    const message = denied ? (specific ? state.error.message : 'Tu cuenta no tiene permiso para consultar esta sección.') : state.error.message;
     return <div className={`section-state-error${compact ? ' is-compact' : ''}`} role="alert">
       <Icon name="alert" size={compact ? 16 : 20} />
       <div><strong>{title}</strong><span>{message}</span>{denied && !compact && <span>Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</span>}</div>
@@ -157,6 +159,19 @@ export function StatusBadge({ value, label }: { value: string; label?: string })
   if (priority) return <span className={`status-badge status-tag status-${value} priority-${priority.id}`}><Icon name={priority.icon} size={14} /><span>{text}</span></span>;
   if (!family) return <span className={`status-badge status-tag status-${value} status-neutral`}><span className="status-dot" aria-hidden="true" /><span>{text}</span></span>;
   return <span className={`status-badge status-tag status-${value} fam-${family.id} pattern-${family.pattern}`}><Icon name={family.icon} size={14} /><span>{text}</span></span>;
+}
+
+/**
+ * R4a (owner): a filter that narrows by a status wears that status's look, so the button and the badge it filters
+ * read as the same thing. `status` is a status value (`pendiente`, `critico_alto`), a family id (`espera`) or a
+ * priority (`urgente`, `emergencia`). Unknown values and «Rutina» stay neutral (null). The label always stays.
+ */
+export function statusFilterLook(status: string | undefined): { className: string; icon: IconName } | null {
+  if (!status) return null;
+  const priority = PRIORITIES.find(p => p.id === status) ?? PRIORITIES.find(p => p.id === statusPriority(status));
+  if (priority) return priority.id === 'rutina' ? null : { className: `status-filter sf-prio-${priority.id}`, icon: priority.icon };
+  const family = STATUS_FAMILIES.find(f => f.id === status) ?? STATUS_FAMILIES.find(f => f.id === statusFamily(status));
+  return family ? { className: `status-filter sf-fam-${family.id} sf-pattern-${family.pattern}`, icon: family.icon } : null;
 }
 
 // ---------------------------------------------------------------- Prioridad (S7)

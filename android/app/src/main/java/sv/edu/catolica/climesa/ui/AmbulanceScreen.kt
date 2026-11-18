@@ -277,8 +277,8 @@ private fun ReasonDialog(title: String, busy: Boolean, error: String?, onClose: 
 }
 
 @Composable
-internal fun Choices(options: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
-    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { options.forEach { (value, label) -> FilterChip(selected = selected == value, onClick = { onSelect(value) }, label = { Text(label) }) } }
+internal fun Choices(options: List<Pair<String, String>>, selected: String, tone: (String) -> ChipTone? = { null }, onSelect: (String) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) { options.forEach { (value, label) -> StatusFilterChip(selected == value, { onSelect(value) }, label, tone(value)) } }
 }
 
 @Composable
@@ -339,7 +339,7 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
             Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.priorities, filters.priority) { model.setLogFilters(filters.copy(priority = it)) }
             Text(stringResource(R.string.amb_estado_final), style = MaterialTheme.typography.labelLarge)
-            Choices(listOf("" to stringResource(R.string.amb_todas), "completado" to StatusCatalog.label("completado")) + AmbulanceLabels.earlyFinalStates, filters.finalState) { model.setLogFilters(filters.copy(finalState = it)) }
+            Choices(listOf("" to stringResource(R.string.amb_todas), "completado" to StatusCatalog.label("completado")) + AmbulanceLabels.earlyFinalStates, filters.finalState, FilterTones::state) { model.setLogFilters(filters.copy(finalState = it)) }
             Text(stringResource(R.string.amb_tipo), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.types, filters.type) { model.setLogFilters(filters.copy(type = it)) }
         }

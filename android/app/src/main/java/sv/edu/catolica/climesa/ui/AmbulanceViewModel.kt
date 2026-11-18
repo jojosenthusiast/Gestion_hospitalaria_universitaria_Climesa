@@ -121,12 +121,12 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         loadJob = viewModelScope.launch {
             try {
                 when (current) {
-                    AmbulanceMode.STATUS -> mutable.value = mutable.value.copy(loading = false, status = AmbulanceParser.status(api.request("/ambulancia")))
-                    AmbulanceMode.LOG -> mutable.value = mutable.value.copy(loading = false, log = AmbulanceParser.log(api.request(AmbulanceRules.logPath(mutable.value.logFilters))))
+                    AmbulanceMode.STATUS -> api.request("/ambulancia").let { r -> mutable.value = mutable.value.copy(loading = false, status = AmbulanceParser.status(r)) }
+                    AmbulanceMode.LOG -> api.request(AmbulanceRules.logPath(mutable.value.logFilters)).let { r -> mutable.value = mutable.value.copy(loading = false, log = AmbulanceParser.log(r)) }
                     AmbulanceMode.ARRIVAL -> loadArrival()
                     AmbulanceMode.PARAMEDIC -> loadParamedic()
                     AmbulanceMode.REQUEST -> {
-                        mutable.value = mutable.value.copy(loading = false, ownRequests = AmbulanceParser.ownRequests(api.request("/ambulancia/solicitudes/mias")))
+                        api.request("/ambulancia/solicitudes/mias").let { r -> mutable.value = mutable.value.copy(loading = false, ownRequests = AmbulanceParser.ownRequests(r)) }
                         loadPrefill()
                     }
                 }
@@ -147,7 +147,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
 
     /** Pantalla "Servicio activo": estado de la unidad y, aparte, los últimos servicios; si la bitácora falla, el estado se muestra igual. */
     private suspend fun loadParamedic() {
-        mutable.value = mutable.value.copy(loading = false, status = AmbulanceParser.status(api.request("/ambulancia")))
+        api.request("/ambulancia").let { r -> mutable.value = mutable.value.copy(loading = false, status = AmbulanceParser.status(r)) }
         val recent = runCatching { AmbulanceParser.log(api.request(AmbulanceRules.logPath(LogFilters()))) }.getOrNull()
         if (recent != null) mutable.value = mutable.value.copy(log = recent)
     }
@@ -157,7 +157,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
      * another one), then the active one. The screen shows the chosen one (or an event's), else the first of the list.
      */
     private suspend fun loadArrival() {
-        if (readsStatus) mutable.value = mutable.value.copy(status = AmbulanceParser.status(api.request("/ambulancia")))
+        if (readsStatus) api.request("/ambulancia").let { r -> mutable.value = mutable.value.copy(status = AmbulanceParser.status(r)) }
         val arrivals = AmbulanceParser.arrivals(api.request("/ambulancia/llegada"))
         val chosen = mutable.value.arrivalServiceId
         // The chosen one while it is still listed; else the first; with nothing listed, the last one shown (its handover stays visible).

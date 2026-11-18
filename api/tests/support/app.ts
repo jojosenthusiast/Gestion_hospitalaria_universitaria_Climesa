@@ -108,8 +108,14 @@ export async function createTestApp(start: Date) {
   const consultation = async (patientId: string) => {
     // Each consultation uses its own past slot so the doctor's appointments never overlap.
     // Near local midnight a past slot falls on the previous business day (cita_fuera_de_dia), so use a later slot today.
+    // Specs also book their own appointments for the same doctor (a shift at now + 60 min, a request at + 3 h), so the
+    // slot is the first one still free in the database, never a fixed offset that can land on theirs
+    // (cita_medico_id_horario_excl).
     const n = ++slots, past = new Date(current.valueOf() - (60 + 20 * n) * 60_000);
-    const start = businessDate(past) === businessDate(current) ? past : new Date(current.valueOf() + 20 * n * 60_000);
+    let start = businessDate(past) === businessDate(current) ? past : new Date(current.valueOf() + 20 * n * 60_000);
+    const doctor = await staffOf('MED');
+    const taken = (at: Date) => one<{ busy: boolean }>(`SELECT EXISTS(SELECT 1 FROM atencion.cita WHERE medico_id=$1 AND horario && tstzrange($2::timestamptz,$2::timestamptz+interval '20 minutes','[)')) AS busy`, [doctor, at]);
+    while ((await taken(start)).busy) start = new Date(start.valueOf() + 20 * 60_000);
     const appointmentId = await appointment(patientId, start);
     const started = await call('MED', 'POST', '/consultas', { appointmentId });
     if (started.status !== 201) throw new Error(`consulta: ${started.status} ${JSON.stringify(started.body)}`);

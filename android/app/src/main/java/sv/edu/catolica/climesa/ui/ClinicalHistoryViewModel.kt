@@ -48,7 +48,7 @@ class ClinicalHistoryViewModel @Inject constructor(private val api: ApiGateway, 
         if (!silent) mutable.value = mutable.value.copy(patientId = patientId, loading = true, error = null, history = if (changed) null else mutable.value.history)
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            try { mutable.value = mutable.value.copy(loading = false, history = ClinicalHistoryParser.parse(api.request("/pacientes/$patientId/historial"))) }
+            try { api.request("/pacientes/$patientId/historial").let { r -> mutable.value = mutable.value.copy(loading = false, history = ClinicalHistoryParser.parse(r)) } }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent || mutable.value.history == null) mutable.value = mutable.value.copy(loading = false, error = userMessage(e, "No se pudo cargar el historial.")) }
         }

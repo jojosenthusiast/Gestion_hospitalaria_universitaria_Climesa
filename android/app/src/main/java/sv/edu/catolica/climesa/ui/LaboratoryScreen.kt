@@ -23,7 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.semantics.contentDescription
@@ -123,7 +122,8 @@ fun LaboratoryScreen(
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         // RN-25 / R3 A-29: critical values stay first in the inbox (with their critical pill); the portal keeps the one
         // persistent notice, so no second red banner here.
-        if (reviewer) item { FollowUpInbox(state.followUps, state.followUpBusy, state.busyIds, state.followUpsError, model) }
+        // The inbox card only shows when it has something: an empty "Al día" card above a result still "Por revisar" read as a contradiction.
+        if (reviewer && (state.followUps.isNotEmpty() || state.followUpsError != null)) item { FollowUpInbox(state.followUps, state.followUpBusy, state.busyIds, state.followUpsError, model) }
         when {
             state.loading && state.orders.isEmpty() -> item { LoadingState() }
             state.error != null && state.orders.isEmpty() -> item { ErrorState(state.error, retry) }
@@ -133,10 +133,10 @@ fun LaboratoryScreen(
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
                 if (!ownResults && !inboxOnly) {
                     item { LiveSearchField(query, { query = it }, stringResource(R.string.lab_buscar)) }
-                    item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter) { filterName = it.name } }
+                    item { ChipRow(LabFilter.entries.map { Triple(it, it.label, state.orders.count(it::matches)) }, filter, FilterTones::lab) { filterName = it.name } }
                     // R3 A-49: one toggle instead of a second row of priority chips.
                     item {
-                        FilterChip(urgentOnly, { urgentOnly = !urgentOnly }, { Text(stringResource(R.string.lab_solo_urgentes) + " (${state.orders.count(LabWorklist::isUrgent)})") }, Modifier.heightIn(min = Spacing.touch))
+                        StatusFilterChip(urgentOnly, { urgentOnly = !urgentOnly }, stringResource(R.string.lab_solo_urgentes) + " (${state.orders.count(LabWorklist::isUrgent)})", ChipTone.Level(Priority.URGENTE), Modifier.heightIn(min = Spacing.touch))
                     }
                 }
                 // The clock is read when the list is drawn: each realtime event redraws it, no timers.
@@ -145,7 +145,11 @@ fun LaboratoryScreen(
                 if (visible.isEmpty() && !inboxOnly) item { EmptyState(stringResource(R.string.lab_filtro_vacio), detail = stringResource(R.string.lab_filtro_vacio_detalle)) }
                 if (ownResults) items(visible, key = { it.id }) { order -> LaboratoryOrderCard(order, true, order.id in state.busyIds, model, now) }
                 // R3 A-9: "Resultados por revisar" is an inbox: only the orders this doctor can review, no queue filters.
-                else if (inboxOnly) items(state.orders.filter { it.allows(LabOrderAction.REVIEW) }, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now) }
+                else if (inboxOnly) {
+                    val toReview = state.orders.filter { it.allows(LabOrderAction.REVIEW) }
+                    if (toReview.isEmpty() && state.followUps.isEmpty()) item { EmptyState(stringResource(R.string.lab_pendientes_vacio), icon = Icons.Default.Check) }
+                    items(toReview, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now) }
+                }
                 else {
                     // S10: grouped by what comes next; closed groups start folded unless the person filters or searches.
                     val foldable = filter == LabFilter.ALL && query.isBlank()

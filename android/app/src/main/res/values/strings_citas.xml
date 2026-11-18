@@ -40,6 +40,8 @@
     <string name="clin_fila_otro_consultorio">Llamado desde otro consultorio</string>
     <string name="seg_titulo">Citas de seguimiento por confirmar</string>
     <string name="seg_detalle">Resultados de laboratorio que ya llegaron: agenda la cita con el médico que los pidió.</string>
+    <string name="citas_bandejas_al_dia">Al día: no hay solicitudes por asignar ni seguimientos por confirmar.</string>
+    <string name="citas_ver_dias_anteriores">Ver días anteriores (%1$d)</string>
     <string name="seg_vacio">Al día: no hay citas de seguimiento por confirmar.</string>
     <string name="seg_agendar">Agendar cita</string>
     <string name="seg_descartar">Descartar</string>

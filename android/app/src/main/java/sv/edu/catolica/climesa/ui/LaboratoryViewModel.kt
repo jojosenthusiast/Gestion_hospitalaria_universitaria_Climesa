@@ -169,7 +169,7 @@ class LaboratoryViewModel @Inject constructor(
     /** Loads the doctor's inbox; only called for readers with `laboratorio.revisar` (the API answers 403 otherwise). */
     fun loadFollowUps() {
         viewModelScope.launch {
-            try { mutable.value = mutable.value.copy(followUps = LabFollowUpRules.parse(api.request("/laboratorio/pendientes")), followUpsError = null) }
+            try { api.request("/laboratorio/pendientes").let { r -> mutable.value = mutable.value.copy(followUps = LabFollowUpRules.parse(r), followUpsError = null) } }
             catch (e: CancellationException) { throw e }
             // The list below still works and the inbox keeps what it showed, but the failure is said, never swallowed.
             catch (e: Exception) { mutable.value = mutable.value.copy(followUpsError = userMessage(e, "No se pudieron cargar los resultados por revisar.")) }
@@ -334,7 +334,9 @@ class LaboratoryViewModel @Inject constructor(
     private fun send(target: LabReviewTarget) {
         val s = mutable.value
         mutate(target.orderId, LabInbox.releasePath(target.orderId), LabInbox.releaseBody(target.version, s.reviewFollowUp, s.reviewNote), { answer -> LabInbox.releasedNotice(target.patientName, answer) }) {
-            it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != target.orderId }, followUps = it.followUps.filterNot { f -> f.orderId == target.orderId }, reviewFollowUp = true, reviewNote = "")
+            // The released order leaves "por revisar" at once; the reload that follows brings its new state.
+            it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != target.orderId }, followUps = it.followUps.filterNot { f -> f.orderId == target.orderId }, reviewFollowUp = true, reviewNote = "",
+                orders = it.orders.map { o -> if (o.id == target.orderId) o.copy(reviewed = true, allowedActions = o.allowedActions - LabOrderAction.REVIEW.wire) else o })
         }
     }
 

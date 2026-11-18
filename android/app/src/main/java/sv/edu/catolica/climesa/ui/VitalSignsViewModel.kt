@@ -78,11 +78,11 @@ class VitalSignsViewModel @Inject constructor(private val api: ApiGateway, realt
         this.permissions = permissions
         if ("admision.ver" in permissions) {
             mutable.value = mutable.value.copy(ward = begin(mutable.value.ward, silent))
-            viewModelScope.launch { mutable.value = mutable.value.copy(ward = fetch(mutable.value.ward, "/admisiones", VitalsParser::ward)) }
+            viewModelScope.launch { fetch(mutable.value.ward, "/admisiones", VitalsParser::ward).let { r -> mutable.value = mutable.value.copy(ward = r) } }
         }
         if ("fila.ver" in permissions) {
             mutable.value = mutable.value.copy(queue = begin(mutable.value.queue, silent))
-            viewModelScope.launch { mutable.value = mutable.value.copy(queue = fetch(mutable.value.queue, "/fila", VitalsParser::queue)) }
+            viewModelScope.launch { fetch(mutable.value.queue, "/fila", VitalsParser::queue).let { r -> mutable.value = mutable.value.copy(queue = r) } }
         }
     }
 

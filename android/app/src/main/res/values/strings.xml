@@ -231,7 +231,7 @@
     <string name="lab_grupo_mostrar">Mostrar %1$s</string>
     <string name="lab_grupo_ocultar">Ocultar %1$s</string>
     <string name="lab_pendientes_titulo">Resultados por revisar</string>
-    <string name="lab_pendientes_cuenta">%1$d pendiente(s)</string>
+    <string name="lab_pendientes_cuenta">Pendientes: %1$d</string>
     <string name="lab_pendientes_vacio">Al día: no tienes resultados por revisar.</string>
     <string name="lab_pendiente_observacion">Observación</string>
     <string name="lab_expediente">Exp. %1$s</string>

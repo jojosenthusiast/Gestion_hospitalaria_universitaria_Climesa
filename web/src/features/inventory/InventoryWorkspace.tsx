@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { ExportMenu } from '../../components/export-menu';
 import { Icon } from '../../components/ui';
+import { statusFilterLook } from '../../components/system';
 import type { AccessProfile, Api } from '../../lib/api';
 import { CompactHeader, Empty, RemoteState, useData } from '../common';
 import { ArticleDetailPane } from './ArticleDetailPane';
@@ -55,7 +56,7 @@ function Master({ rows, selected, setSelected, filters, setFilters, panel, setPa
           {suggestions.length > 0 && !selected && <p className="inv-muted" role="status">{shown.length} {shown.length === 1 ? 'resultado' : 'resultados'}: {suggestions.map(s => s.name).join(', ')}{shown.length > suggestions.length ? '…' : ''}</p>}
           {panel && <div className="inv-filter-panel" id="inv-filters">
             <fieldset><legend>Categoría</legend>{(Object.keys(categories) as ArticleType[]).map(t => <button key={t} type="button" className="inv-toggle" aria-pressed={filters.types.includes(t)} onClick={() => setFilters({ ...filters, types: toggle(filters.types, t) })}><Icon name={categories[t].icon} size={16} />{categories[t].plural}</button>)}</fieldset>
-            <fieldset><legend>Estado</legend>{statusOrder.map(s => <button key={s} type="button" className="inv-toggle" aria-pressed={filters.statuses.includes(s)} onClick={() => setFilters({ ...filters, statuses: toggle(filters.statuses, s) })}>{statusLabels[s]}</button>)}</fieldset>
+            <fieldset><legend>Estado</legend>{statusOrder.map(s => { const look = statusFilterLook(s); return <button key={s} type="button" className={look ? `inv-toggle ${look.className}` : 'inv-toggle'} aria-pressed={filters.statuses.includes(s)} onClick={() => setFilters({ ...filters, statuses: toggle(filters.statuses, s) })}>{look && <Icon name={look.icon} size={14} />}{statusLabels[s]}</button>; })}</fieldset>
             <div className="field"><label htmlFor="inv-sort">Ordenar por</label><select id="inv-sort" value={sort} onChange={e => setSort(e.target.value as SortKey)}>{(Object.keys(sortLabels) as SortKey[]).map(k => <option key={k} value={k}>{sortLabels[k]}</option>)}</select></div>
           </div>}
           {(chips.length > 0) && <div className="inv-chips" aria-label="Filtros activos">{chips.map(c => <span className="inv-chip" key={c.key}>{c.label}<button type="button" aria-label={`Quitar ${c.label}`} onClick={c.remove}>×</button></span>)}<button type="button" className="secondary-button" onClick={() => setFilters(emptyFilters)}>Quitar filtros</button></div>}

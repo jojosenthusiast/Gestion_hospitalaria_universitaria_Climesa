@@ -63,6 +63,14 @@
 .notice-detail-meta dd { margin: 0; font-size: 14px; font-variant-numeric: tabular-nums; }
 .notice-detail-done { margin: 0; display: flex; align-items: center; gap: var(--space-3); color: var(--muted); font-size: 14px; }
 .notice-history td.numeric { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* The title column keeps a readable width (words never break mid-word); long bodies clamp to three lines. */
+.notice-history td { overflow-wrap: break-word; }
+@media (min-width: 901px) { .notice-history td[data-label="Aviso"] { min-width: 15rem; } }
+.notice-history td[data-label="Aviso"] strong { display: block; }
+.notice-history td[data-label="Aviso"] small { display: -webkit-box; margin-top: var(--space-1); -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--muted); }
+/* Date-time inputs shrink with their column instead of spilling out of the form card. */
+.notice-fieldset .form-grid > * { min-width: 0; }
+.notice-fieldset input[type="datetime-local"] { width: 100%; min-width: 0; }
 .notice-history td[data-label="Nivel"] small { display: block; margin-top: var(--space-1); color: var(--muted); font-size: 12.5px; }
 
 @media (max-width: 900px) { .notice-inbox { grid-template-columns: 1fr; } .notice-detail { position: static; } }

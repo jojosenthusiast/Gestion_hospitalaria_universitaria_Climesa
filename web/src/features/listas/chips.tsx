@@ -1,14 +1,18 @@
 import type { ReactNode } from 'react';
+import { statusFilterLook } from '../../components/system';
 import { Icon } from '../../components/ui';
 
-export type ChipOption<T extends string> = { value: T; label: string; count?: number; tone?: string };
+/** `status`: the status this chip filters by; the chip then wears that status's colour, texture and icon. */
+export type ChipOption<T extends string> = { value: T; label: string; count?: number; tone?: string; status?: string };
 
 /** Fila de chips de filtro (una opción activa a la vez). Reemplaza combos cortos; cada chip dice cuántas filas deja. */
 export function ChipGroup<T extends string>({ label, value, options, onChange }: { label: string; value: T; options: ChipOption<T>[]; onChange: (value: T) => void }) {
-  return <div className="cl-chip-group" role="group" aria-label={label}>{options.map(option =>
-    <button type="button" key={option.value} className={`cl-chip${option.tone ? ` tone-${option.tone}` : ''}`} aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
-      <span>{option.label}</span>{option.count !== undefined && <small>{option.count}</small>}
-    </button>)}</div>;
+  return <div className="cl-chip-group" role="group" aria-label={label}>{options.map(option => {
+    const look = statusFilterLook(option.status);
+    return <button type="button" key={option.value} className={`cl-chip${option.tone ? ' tone-' + option.tone : ''} ${look?.className ?? ''}`.trim()} aria-pressed={value === option.value} onClick={() => onChange(option.value)}>
+      {look && <Icon name={look.icon} size={14} />}<span>{option.label}</span>{option.count !== undefined && <small>{option.count}</small>}
+    </button>;
+  })}</div>;
 }
 
 /** Filtros activos como chips quitables y «Quitar filtros»; no se muestra nada si no hay filtros. */

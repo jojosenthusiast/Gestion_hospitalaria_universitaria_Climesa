@@ -74,8 +74,14 @@ export function FillGapsDialog({ api, blocks: given, onClose, onPreview }: { api
     let alive = true;
     (async () => {
       const items: PreviewItem[] = [], uncovered: { block: GapBlock; reason: string }[] = [];
-      for (const block of blocks) {
-        const answer = await api.request<Candidates>(candidatesPath(block));
+      // The candidate reads are independent: fetch them six at a time (a week of holes took ~20 s one by one).
+      // Choosing people stays sequential below, so a person placed in one hole is not proposed for a nearby one.
+      const answers: Candidates[] = new Array(blocks.length);
+      let next = 0;
+      const worker = async () => { while (next < blocks.length) { const i = next++; answers[i] = await api.request<Candidates>(candidatesPath(blocks[i])); } };
+      await Promise.all(Array.from({ length: Math.min(6, blocks.length) }, worker));
+      for (const [index, block] of blocks.entries()) {
+        const answer = answers[index];
         const busy = (c: Candidate) => items.some(i => i.staffId === c.staffId && Date.parse(i.start) < Date.parse(block.end) + 8 * HOUR && Date.parse(i.end) + 8 * HOUR > Date.parse(block.start));
         const free = answer.candidatos.filter(c => !busy(c)).slice(0, block.missing);
         free.forEach(c => items.push(itemFor(block, c)));

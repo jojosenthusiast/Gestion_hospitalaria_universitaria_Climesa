@@ -2,6 +2,8 @@
 
 package sv.edu.catolica.climesa.ui.dashboard
 
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -188,15 +190,29 @@ private fun KpiTile(kpi: DashboardKpi, modifier: Modifier, onClick: () -> Unit) 
 /** Pending rows in one surface split by 1px lines (no card per item, no side stripe). The critical row gets the primary action. */
 @Composable
 private fun AttentionList(items: List<DashboardAttention>, onAction: (QuickActionRequest) -> Unit) {
+    // A heavy shift can pile up eight pending groups that only clear after real work: Inicio shows the two most urgent
+    // (critical first) and folds the rest behind one line, so the first glance is what to do now, not a wall of rows.
+    var expanded by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
+    val ranked = items.sortedBy { when (it.tone) { DashboardTone.DANGER -> 0; DashboardTone.WARNING -> 1; else -> 2 } }
+    val shown = if (expanded) ranked else ranked.take(ATTENTION_VISIBLE)
+    val hidden = ranked.size - shown.size
     Surface(color = MaterialTheme.colorScheme.surface, shape = MaterialTheme.shapes.medium, border = cardBorder()) {
         Column {
-            items.forEachIndexed { index, item ->
+            shown.forEachIndexed { index, item ->
                 if (index > 0) HorizontalDivider(color = MaterialTheme.climesa.line)
                 AttentionRow(item) { onAction(item.request) }
+            }
+            if (ranked.size > ATTENTION_VISIBLE) {
+                HorizontalDivider(color = MaterialTheme.climesa.line)
+                Box(Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.xs)) {
+                    RowAction(if (expanded) stringResource(R.string.dash_atencion_menos) else stringResource(R.string.dash_atencion_mas, hidden), { expanded = !expanded })
+                }
             }
         }
     }
 }
+
+private const val ATTENTION_VISIBLE = 2
 
 @Composable
 private fun AttentionRow(item: DashboardAttention, onClick: () -> Unit) {

@@ -187,15 +187,15 @@ private fun CompactRoleScaffold(
                         selected = selected == section,
                         onClick = { onSelected(section) },
                         icon = { SectionIcon(section, badges) },
-                        label = { Text(compactLabel(section), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                        label = { Text(compactLabel(section), style = NavLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         colors = barItemColors(),
                     )
                 }
                 NavigationBarItem(
                     selected = selected !in navigation.primary,
                     onClick = { moreOpen = true },
-                    icon = { BadgedIcon(Icons.Default.GridView, navigation.more.flatMap { it.sections }.sumOf { badges[it] ?: 0 }) },
-                    label = { Text(stringResource(R.string.ui_mas), maxLines = 1) },
+                    icon = { BadgedIcon(Icons.Default.GridView, navigation.more.flatMap { it.sections }.filter { it != AndroidSection.NOTICES }.sumOf { badges[it] ?: 0 }) },
+                    label = { Text(stringResource(R.string.ui_mas), style = NavLabel, maxLines = 1) },
                     colors = barItemColors(),
                 )
             }

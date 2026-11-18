@@ -1,3 +1,4 @@
+import { NoticesBell } from './avisos/NoticesBell';
 import { Component,lazy,Suspense,useEffect,useLayoutEffect,useRef,useState,type ComponentType,type ReactNode } from 'react';
 import { Brand,Icon,StatusView,type IconName } from '../components/ui';
 import { Skeleton } from '../components/system';
@@ -167,6 +168,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
     <button ref={toggleRef} className="nav-toggle" type="button" aria-label={navOpen?'Cerrar navegación':'Abrir navegación'} aria-expanded={navOpen} aria-controls="primary-navigation" onClick={()=>setNavOpen(open=>!open)}><Icon name={navOpen?'close':'menu'} size={22}/></button>
     <Brand light/>
     <div className="workspace-role"><span>{roleLabel}</span><span className="mono-label">HOSPITAL UNIVERSITARIO</span></div><HospitalDate />
+    <NoticesBell api={api} version={version} current={route==='avisos'}/>
     <details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><span className="account-menu-label">Mi cuenta</span><span aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details>
    </div>
   </header>

@@ -172,8 +172,8 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
         <div className="cl-toolbar ag-toolbar">
           <LiveSearch label="Buscar citas" placeholder="Paciente, médico o motivo" value={query} onChange={setQuery} />
           <Segmented label="Estado de la cita" value={state} onChange={setState}
-            options={VISIBLE_STATES.map(([value, label]) => ({ value, label, count: countOf(value) }))}
-            more={MORE_STATES.map(([value, label]) => ({ value, label, count: countOf(value) }))} />
+            options={VISIBLE_STATES.map(([value, label]) => ({ value, label, count: countOf(value), status: value }))}
+            more={MORE_STATES.map(([value, label]) => ({ value, label, count: countOf(value), status: value }))} />
           <label className="ag-range"><span className="sr-only">Fechas</span><select value={range} onChange={event => setRange(event.target.value as Range)}>{RANGES.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
           {(range === 'dia' || range === 'semana') && <span className="cl-day-nav"><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana anterior' : 'Día anterior'} onClick={() => setDay(addDays(day, range === 'semana' ? -7 : -1))}>‹</button><label><span className="sr-only">Fecha de referencia</span><input type="date" value={day} onChange={event => event.target.value && setDay(event.target.value)} /></label><button type="button" className="row-action" aria-label={range === 'semana' ? 'Semana siguiente' : 'Día siguiente'} onClick={() => setDay(addDays(day, range === 'semana' ? 7 : 1))}>›</button></span>}
           <div className="cl-doctor-filter"><SearchPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} minChars={0} placeholder="Todos los médicos" emptyText="Ningún médico con citas coincide." /></div>

@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -113,7 +114,18 @@ internal fun PortalScaffold(
                 title = title,
                 subtitle = subtitle,
                 navigationIcon = navigationIcon,
-                actions = { HospitalClock() },
+                // Notices sit one tap away on every screen (not buried in "Más"); the badge counts the unread ones.
+                actions = {
+                    if (AndroidSection.NOTICES in sections && selected != AndroidSection.NOTICES) {
+                        val unread = badges[AndroidSection.NOTICES] ?: 0
+                        androidx.compose.material3.IconButton(onClick = { onSelected(AndroidSection.NOTICES) }) {
+                            androidx.compose.material3.BadgedBox(badge = { if (unread > 0) androidx.compose.material3.Badge { Text(if (unread > 99) "99+" else unread.toString()) } }) {
+                                Icon(Icons.Default.Notifications, contentDescription = if (unread > 0) "Avisos, $unread sin leer" else "Avisos")
+                            }
+                        }
+                    }
+                    HospitalClock()
+                },
             )
         },
         content = content,
