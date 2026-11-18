@@ -18,6 +18,9 @@ enum class AppointmentAction(val wire: String, val label: String, val needsReaso
     START_CONSULTATION("iniciar_consulta", "Iniciar consulta", false),
     ;
 
+    /** Accepting or rejecting a patient's reschedule request (acts on the request, not on the appointment). */
+    val decidesReschedule get() = this == ACCEPT_RESCHEDULE || this == REJECT_RESCHEDULE
+
     companion object { fun of(wire: String?): AppointmentAction? = entries.firstOrNull { it.wire == wire } }
 }
 
@@ -86,7 +89,9 @@ object AppointmentActions {
         AppointmentAction.RESCHEDULE, AppointmentAction.CANCEL, AppointmentAction.NO_SHOW,
     )
 
-    fun available(a: ReceptionAppointment): List<AppointmentAction> = receptionOrder.filter { it in a.allowedActions }
+    /** Deciding a reschedule needs the request's own id (`/citas/reprogramaciones/{id}`): without one it is not offered. */
+    fun available(a: ReceptionAppointment): List<AppointmentAction> =
+        receptionOrder.filter { it in a.allowedActions && (!it.decidesReschedule || a.reschedule != null) }
     fun blocked(a: ReceptionAppointment): List<Pair<AppointmentAction, String>> =
         receptionOrder.filter { it !in a.allowedActions }.mapNotNull { action -> a.blockedActions[action]?.let { action to it } }
 
@@ -106,15 +111,18 @@ object AppointmentActions {
         }
     }
 
-    /** [rescheduleId] is required for the decision on a reschedule request. */
+    /**
+     * [rescheduleId] is required for the decision on a reschedule request: the appointment id there would be a 404, so
+     * [available] hides those actions when the row carries no request and the view model never sends them.
+     */
     fun path(action: AppointmentAction, id: String, rescheduleId: String? = null) = when (action) {
         AppointmentAction.CONFIRM -> "/citas/solicitudes/$id/confirmar"
         AppointmentAction.REJECT -> "/citas/solicitudes/$id/rechazar"
         AppointmentAction.CANCEL -> "/citas/$id/cancelar"
         AppointmentAction.RESCHEDULE -> "/citas/$id/reprogramar"
         AppointmentAction.NO_SHOW -> "/citas/$id/no-asistio"
-        AppointmentAction.ACCEPT_RESCHEDULE -> "/citas/reprogramaciones/${rescheduleId ?: id}/aceptar"
-        AppointmentAction.REJECT_RESCHEDULE -> "/citas/reprogramaciones/${rescheduleId ?: id}/rechazar"
+        AppointmentAction.ACCEPT_RESCHEDULE -> "/citas/reprogramaciones/${requireNotNull(rescheduleId) { "rescheduleId" }}/aceptar"
+        AppointmentAction.REJECT_RESCHEDULE -> "/citas/reprogramaciones/${requireNotNull(rescheduleId) { "rescheduleId" }}/rechazar"
         AppointmentAction.START_CONSULTATION -> "/consultas"
     }
 

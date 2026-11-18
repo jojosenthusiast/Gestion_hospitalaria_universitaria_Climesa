@@ -19,13 +19,16 @@ import kotlinx.coroutines.delay
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.data.ColdStart
 
-/** True once [active] has lasted [ColdStart.SLOW_HINT_MS] without finishing (MA-OPS-01). */
+/**
+ * True once [active] has lasted [ColdStart.SLOW_HINT_MS] without finishing while the server seems asleep (no answer yet,
+ * none for about 14 minutes, or the first attempt failed): a warm server that is merely slow shows no hint (MA-OPS-01).
+ */
 @Composable
 internal fun rememberSlowServer(active: Boolean): Boolean {
     var slow by remember { mutableStateOf(false) }
     LaunchedEffect(active) {
         slow = false
-        if (active) { delay(ColdStart.SLOW_HINT_MS); slow = true }
+        if (active) { delay(ColdStart.SLOW_HINT_MS); ColdStart.warmth.awaitLikelyCold(); slow = true }
     }
     return active && slow
 }

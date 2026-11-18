@@ -49,6 +49,15 @@ class AppointmentActionsTest {
         assertEquals(listOf(rows[0]), ReceptionScheduling.rescheduleDecisions(rows))
     }
 
+    @Test fun aRescheduleDecisionWithoutItsRequestIsNotOffered() {
+        val withRequest = row("confirmada", listOf("aceptar_reprogramacion", "rechazar_reprogramacion", "cancelar")).put("reschedule", JSONObject()
+            .put("id", "r1").put("start", "2026-11-15T15:00:00Z").put("end", "2026-11-15T15:20:00Z").put("state", "pendiente").put("version", 4))
+        val withoutRequest = row("confirmada", listOf("aceptar_reprogramacion", "rechazar_reprogramacion", "cancelar"))
+        val rows = parse(withRequest, withoutRequest)
+        assertEquals(listOf(AppointmentAction.ACCEPT_RESCHEDULE, AppointmentAction.REJECT_RESCHEDULE, AppointmentAction.CANCEL), AppointmentActions.available(rows[0]))
+        assertEquals(listOf(AppointmentAction.CANCEL), AppointmentActions.available(rows[1]))
+    }
+
     @Test fun commandPathsAndBodies() {
         assertEquals("/citas/a1/reprogramar", AppointmentActions.path(AppointmentAction.RESCHEDULE, "a1"))
         assertEquals("/citas/a1/no-asistio", AppointmentActions.path(AppointmentAction.NO_SHOW, "a1"))

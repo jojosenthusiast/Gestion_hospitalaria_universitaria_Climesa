@@ -1204,7 +1204,7 @@ struct ClinicalHistoryView: View {
                 LoadState(loader: loader, retry: load) { history in HistoryContent(history: history, viewerIsPatient: viewerIsPatient) }
             }
         }
-        .task(id: live.snapshot.version([.consultations, .laboratory, .admissions, .access, .patient])) { await load() }
+        .task(id: live.snapshot.version([.consultations, .laboratory, .admissions, .patient])) { await load() }
     }
 
     private func load() async {
@@ -1457,7 +1457,8 @@ struct MyAccessView: View {
                 }
             }
         }
-        .task(id: live.snapshot.version(.access)) { await load() }
+        // No event announces a new access: read on entering and again after a reconnection.
+        .task(id: live.snapshot.resyncVersion) { await load() }
     }
 
     @ViewBuilder private func accessDay(_ day: AccessLogRules.Day, now: Date) -> some View {

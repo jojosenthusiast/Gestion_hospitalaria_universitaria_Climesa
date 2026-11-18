@@ -89,10 +89,13 @@ object RealtimeProtocol {
         }
     }
 
+    /** `GET /eventos`: `tipo` and `entidad` (tiempo-real.md); the deprecated `type` / `entity` aliases are only a fallback. */
     fun parseCatchUp(json: JSONObject): CatchUp {
         val rows = json.optJSONArray("events")
         val events = (0 until (rows?.length() ?: 0)).mapNotNull { i ->
-            rows!!.optJSONObject(i)?.let { toEvent(it.optString("type"), it.optString("entity"), it.opt("id"), it.opt("version")) }
+            rows!!.optJSONObject(i)?.let {
+                toEvent(it.optString("tipo").ifBlank { it.optString("type") }, it.optString("entidad").ifBlank { it.optString("entity") }, it.opt("id"), it.opt("version"))
+            }
         }
         return CatchUp(json.opt("cursor")?.toString() ?: "0", events)
     }
@@ -154,7 +157,7 @@ object PortalEvents {
         path.startsWith("/pacientes") -> PatientEvents.matches(event)
         path.startsWith("/admisiones") -> LiveEntities.matches(event, "admision", "alta", "cama")
         // La ubicación en vivo llega cada pocos segundos y no cambia esta vista; la tripulación de turno sí (RN-30).
-        path.startsWith("/ambulancia") -> (LiveEntities.matches(event, "ambulancia") && event.type != "ambulancia.ubicacion") || LiveEntities.matches(event, "turno")
+        path.startsWith("/ambulancia") -> (LiveEntities.matches(event, "ambulancia", "unidad", "solicitud", "servicio") && event.type != "ambulancia.ubicacion") || LiveEntities.matches(event, "turno")
         else -> false
     }
 }
@@ -197,9 +200,9 @@ object DoctorDayEvents {
     fun matches(event: EventoDominio) = ConsultationEvents.matches(event) || QueueEvents.matches(event)
 }
 
-/** Hospitalization list: admissions publish `admision.*`. */
+/** Hospitalization list: admissions (including discharge) publish `admision.*` on entity `admision`. */
 object AdmissionEvents {
-    fun matches(event: EventoDominio) = LiveEntities.matches(event, "admision", "alta")
+    fun matches(event: EventoDominio) = LiveEntities.matches(event, "admision")
 }
 
 /** Inventory screen: stock movements publish `inventario.actualizado` on entity `articulo`. */
