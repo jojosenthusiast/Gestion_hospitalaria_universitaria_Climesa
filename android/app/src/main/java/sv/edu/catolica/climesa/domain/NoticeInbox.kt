@@ -17,6 +17,18 @@ enum class NoticeLevel(val wire: String, val label: String) {
     }
 }
 
+/**
+ * `estado` of an inbox notice: in force now, scheduled to start later, or expired in the last 30 days (history, like past
+ * appointment days). An answer without it only carried notices in force.
+ */
+enum class NoticeState(val wire: String) {
+    CURRENT("vigente"), SCHEDULED("programado"), EXPIRED("vencido");
+
+    companion object {
+        fun of(wire: String?) = entries.firstOrNull { it.wire == wire } ?: CURRENT
+    }
+}
+
 /** One notice of `GET /me/avisos/bandeja` (`MyInboxNoticeResponse`) with this account's acknowledgement. */
 data class InboxNotice(
     val id: String,
@@ -38,7 +50,18 @@ data class InboxNotice(
     val remindAt: String?,
     /** Decided by the API: critical, targeted, not acknowledged and not snoozed. The only thing "Inicio" shows. */
     val highlighted: Boolean,
+    /** Only [NoticeState.CURRENT] notices take "Enterado" and count as unread or critical. */
+    val state: NoticeState = NoticeState.CURRENT,
 )
+
+/** The inbox laid out like the appointments agenda: in force first, scheduled by start day, expired by end day (latest first). */
+data class NoticeTimeline(
+    val current: List<InboxNotice>,
+    val upcoming: List<Pair<String, List<InboxNotice>>>,
+    val past: List<Pair<String, List<InboxNotice>>>,
+) {
+    val pastCount get() = past.sumOf { it.second.size }
+}
 
 /** `MyInboxResponse`: the notices, the counts the API computes and the next instant the inbox changes by itself. */
 data class NoticeInbox(
@@ -68,7 +91,7 @@ object NoticeInboxParser {
         isPublic = r.optBoolean("publico", false), roles = strings(r.optJSONArray("roles")),
         level = NoticeLevel.of(text(r, "nivel")), areas = strings(r.optJSONArray("areas")), publishedAt = text(r, "publicadoEn"),
         targeted = r.optBoolean("dirigido", false), acknowledgedAt = text(r, "enteradoEn"), remindAt = text(r, "recordarEn"),
-        highlighted = r.optBoolean("destacado", false),
+        highlighted = r.optBoolean("destacado", false), state = NoticeState.of(text(r, "estado")),
     )
 
     private fun text(r: JSONObject, key: String) = if (r.isNull(key)) null else r.optString(key).takeIf { it.isNotBlank() }
@@ -92,10 +115,10 @@ object NoticeInboxRules {
     fun acknowledgePath(id: String) = "/me/avisos/$id/enterado"
     fun snoozePath(id: String) = "/me/avisos/$id/posponer"
 
-    /** The list with the chosen filter, in the server order (highlighted and critical first). "Sin leer": no "Enterado". */
+    /** The list with the chosen filter, in the server order (highlighted and critical first). "Sin leer": in force, no "Enterado". */
     fun filter(notices: List<InboxNotice>, filter: NoticeFilter) = when (filter) {
         NoticeFilter.ALL -> notices
-        NoticeFilter.UNREAD -> notices.filter { it.acknowledgedAt == null }
+        NoticeFilter.UNREAD -> notices.filter { it.state == NoticeState.CURRENT && it.acknowledgedAt == null }
         NoticeFilter.CRITICAL -> notices.filter { it.level == NoticeLevel.CRITICAL }
     }
 
@@ -124,13 +147,24 @@ object NoticeInboxRules {
     }
 
     /** Notices of "Inicio": only `destacado` (the API decides), minus the ones handled here and not yet re-read. */
-    fun banner(inbox: NoticeInbox?, hidden: Set<String> = emptySet()) = inbox?.notices.orEmpty().filter { it.highlighted && it.id !in hidden }
+    fun banner(inbox: NoticeInbox?, hidden: Set<String> = emptySet()) = inbox?.notices.orEmpty().filter { it.highlighted && it.state == NoticeState.CURRENT && it.id !in hidden }
 
-    /** "Enterado" is offered while the account has not given it; the API accepts it for every notice it receives. */
-    fun canAcknowledge(notice: InboxNotice) = notice.acknowledgedAt == null
+    /**
+     * Owner: "Avisos" reads like "Citas". Notices in force first, then scheduled ones grouped by the day they start (soonest
+     * first), then expired ones grouped by the day they ended (latest first), which the screen folds by default.
+     */
+    fun timeline(notices: List<InboxNotice>): NoticeTimeline = NoticeTimeline(
+        current = notices.filter { it.state == NoticeState.CURRENT },
+        upcoming = AppointmentAgenda.groupByDay(notices.filter { it.state == NoticeState.SCHEDULED && it.from != null }) { it.from!! },
+        past = AppointmentAgenda.groupByDay(notices.filter { it.state == NoticeState.EXPIRED && it.until != null }) { it.until!! }
+            .reversed().map { (day, rows) -> day to rows.reversed() },
+    )
+
+    /** "Enterado" is offered on a notice in force the account has not acknowledged; the API refuses it on the others. */
+    fun canAcknowledge(notice: InboxNotice) = notice.state == NoticeState.CURRENT && notice.acknowledgedAt == null
 
     /** "Recordarme en N h" only for a critical notice that targets the account and is not acknowledged (as the web). */
-    fun canSnooze(notice: InboxNotice) = notice.level == NoticeLevel.CRITICAL && notice.targeted && notice.acknowledgedAt == null
+    fun canSnooze(notice: InboxNotice) = notice.state == NoticeState.CURRENT && notice.level == NoticeLevel.CRITICAL && notice.targeted && notice.acknowledgedAt == null
 
     /**
      * Who a notice is for, in words ("Medicina, Enfermería + Área EMG"). An area-only notice may arrive with no public flag,
@@ -164,10 +198,11 @@ object NoticeInboxRules {
 
     /**
      * When reading again fails, what no longer holds is not left on screen: the notice that changed or was withdrawn ([event])
-     * and the ones already expired at [nowMs] are removed; counts are left as the API last sent them.
+     * and the ones in force or scheduled that already expired at [nowMs] are removed (expired history stays); counts are left
+     * as the API last sent them.
      */
     fun afterFailedRefetch(inbox: NoticeInbox, event: EventoDominio?, nowMs: Long): NoticeInbox = inbox.copy(notices = inbox.notices.filter { n ->
-        n.id != event?.id && n.until?.let { u -> runCatching { Instant.parse(u).toEpochMilli() > nowMs }.getOrDefault(true) } ?: true
+        n.id != event?.id && (n.state == NoticeState.EXPIRED || n.until?.let { u -> runCatching { Instant.parse(u).toEpochMilli() > nowMs }.getOrDefault(true) } ?: true)
     })
 
     private val dates = DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm", Locale("es", "SV")).withZone(ZoneId.of("America/El_Salvador"))

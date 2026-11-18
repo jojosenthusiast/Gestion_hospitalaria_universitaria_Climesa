@@ -3,7 +3,18 @@
     <!-- S11 · Avisos: su propia área (NoticesScreen) y aviso crítico persistente en el inicio (CriticalNoticeBanner) -->
     <string name="avisos_breadcrumb">CLIMESA / Comunicación</string>
     <string name="avisos_vacio">Estás al día</string>
-    <string name="avisos_vacio_detalle">No hay avisos vigentes para tu rol ni tu área.</string>
+    <string name="avisos_vacio_detalle">No hay avisos vigentes, programados ni vencidos en los últimos 30 días para tu rol ni tu área.</string>
+    <string name="avisos_vigentes">Vigentes · hoy</string>
+    <string name="avisos_programados_dia">%1$s · programados</string>
+    <string name="avisos_ver_vencidos">Ver avisos vencidos (%1$d)</string>
+    <string name="aviso_programado">Programado</string>
+    <string name="aviso_vencido">Vencido</string>
+    <string name="aviso_empieza">empieza %1$s</string>
+    <string name="aviso_vencio">venció %1$s</string>
+    <string name="aviso_empieza_label">Empieza</string>
+    <string name="aviso_vencio_label">Venció</string>
+    <string name="aviso_vencido_detalle">Este aviso ya venció.</string>
+    <string name="aviso_programado_detalle">Podrás dar «Enterado» cuando entre en vigencia.</string>
     <string name="avisos_sin_criticos">Sin avisos críticos</string>
     <string name="avisos_todo_leido">Todo leído</string>
     <string name="avisos_filtro_vacio_detalle">Cambia el filtro para ver los demás avisos.</string>
