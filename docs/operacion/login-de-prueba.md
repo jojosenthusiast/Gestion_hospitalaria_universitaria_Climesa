@@ -1,6 +1,14 @@
 # Login de prueba (temporal, solo desarrollo)
 
-Ayuda **temporal** para probar el sistema en desarrollo: en la pantalla de ingreso aparece el aviso "Modo de prueba: cuentas ficticias" y un selector **Cuenta de prueba** con los roles ADM, DPD, JOP, REC, AST, ENF, MED, LAB, PAR y PAC. Al elegir un rol se llenan el correo y la contraseña de su cuenta ficticia; la persona todavía pulsa "Iniciar sesión". Con la bandera apagada no se muestra nada y la aplicación no lleva ninguna credencial.
+Ayuda **temporal** para probar el sistema en desarrollo: en la pantalla de ingreso aparece el aviso "Modo de prueba: cuentas ficticias" y un selector **Cuenta de prueba** con los roles que usan esa plataforma. Al elegir un rol se llenan el correo y la contraseña de su cuenta ficticia; la persona todavía pulsa "Iniciar sesión". Con la bandera apagada no se muestra nada y la aplicación no lleva ninguna credencial.
+
+| Plataforma | Roles del selector | Dónde vive la regla |
+|---|---|---|
+| Web | ADM, DPD, JOP, REC, AST, ENF, MED, LAB, PAR y PAC (todos) | — |
+| Android | REC, AST, ENF, MED, PAR y PAC | `AndroidSections.roles` (`domain/AuthModels.kt`); JOP y LAB usan solo la web (D-090). |
+| iOS | MED y PAC | `AccessProfile.allowedIOSRoles` (`Core/Access.swift`), vía `DemoLogin.usesIOS`. |
+
+Las cuentas de otros roles ni siquiera llegan a la app: `android/app/build.gradle.kts` filtra `demo-credenciales.json` antes de escribir `BuildConfig.DEMO_CREDENTIALS`, e `ios/scripts/demo-login.sh` lo filtra antes de generar `ios/DemoLogin.xcconfig` (necesita `python3`, que viene con las herramientas de línea de comandos de Xcode). Las pruebas `DemoLoginTest` y `DemoLoginTests` comprueban que esas listas coincidan con la regla de cada app.
 
 Este archivo no contiene contraseñas ni correos reales, y nunca debe contenerlos.
 

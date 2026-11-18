@@ -19,7 +19,15 @@ val climesaWebUrl = providers.gradleProperty("CLIMESA_WEB_URL").getOrElse("https
 // for one with the flag on fails the build instead of shipping the accounts.
 val climesaDemoLogin = providers.gradleProperty("CLIMESA_DEMO_LOGIN").map { it.toBoolean() }.getOrElse(false)
 val climesaDemoCredentialsFile = rootProject.layout.projectDirectory.file("../demo-credenciales.json")
-val climesaDemoCredentials = if (climesaDemoLogin) providers.fileContents(climesaDemoCredentialsFile).asText.orNull.orEmpty() else ""
+// Only roles that use Android reach the APK: the same list as AndroidSections.roles (DemoLoginTest checks they match).
+val climesaDemoRoles = listOf("REC", "AST", "ENF", "MED", "PAR", "PAC")
+fun androidDemoCredentials(text: String): String {
+    if (text.isBlank()) return ""
+    val entries = runCatching { groovy.json.JsonSlurper().parseText(text) as? List<*> }.getOrNull() ?: return ""
+    val kept = entries.filter { (it as? Map<*, *>)?.get("rol") in climesaDemoRoles }
+    return if (kept.isEmpty()) "" else groovy.json.JsonOutput.toJson(kept)
+}
+val climesaDemoCredentials = if (climesaDemoLogin) androidDemoCredentials(providers.fileContents(climesaDemoCredentialsFile).asText.orNull.orEmpty()) else ""
 gradle.taskGraph.whenReady {
     if (climesaDemoLogin && allTasks.any { it.project == project && it.name.contains("Release") }) {
         throw GradleException("CLIMESA: CLIMESA_DEMO_LOGIN=true solo se permite en debug; un build release nunca incluye las cuentas de prueba.")
