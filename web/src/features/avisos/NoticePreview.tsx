@@ -1,6 +1,5 @@
 import { Icon, type IconName } from '../../components/ui';
-import { formatDateTime } from '../../lib/format';
-import { audienceText, levelLabel, priorityLabel, type Level, type NoticeAudience } from './rules';
+import { audienceText, levelLabel, priorityLabel, shortWhen, type Level, type NoticeAudience } from './rules';
 
 const levelIcon: Record<Level, IconName> = { critico: 'alert', importante: 'chevronsUp', informativo: 'info' };
 /** Clase de prioridad del sistema (02-sistema §3) para cada nivel: el rojo es solo de «Crítico». */
@@ -20,7 +19,7 @@ export function NoticeLevelBadge({ level }: { level: Level | undefined }) {
  * audiencia; quien lo recibe en «Para mí» lo tiene por su área (llega por /me/avisos sin códigos), como en iOS.
  */
 export function NoticeCard({ notice, compact = false, showAudience = true, emptyAudience = 'sin audiencia' }: { notice: Pick<NoticeAudience, 'titulo' | 'cuerpo' | 'prioridad' | 'publico' | 'roles' | 'nivel' | 'areas'> & { hasta?: string | null }; compact?: boolean; showAudience?: boolean; emptyAudience?: string }) {
-  const until = notice.hasta ? formatDateTime(notice.hasta) : null;
+  const until = notice.hasta ? shortWhen(notice.hasta) : null;
   const tone = notice.nivel ? cardTone[notice.nivel] : notice.prioridad;
   const label = notice.nivel ? levelLabel(notice.nivel) : priorityLabel(notice.prioridad);
   return <article className={`notice-card notice-${tone}${compact ? ' is-compact' : ''}`} aria-label={`Aviso ${label.toLowerCase()}: ${notice.titulo}`}>

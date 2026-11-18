@@ -3,10 +3,10 @@ import { AreaTag, statusFilterLook } from '../../components/system';
 import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
 import { useRefreshAt } from '../../lib/publico';
-import { Dialog, Empty, CompactHeader, RemoteState, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from '../common';
-import { formatDayHeading, formatNumber, plural } from '../../lib/format';
+import { Dialog, Empty, CompactHeader, RemoteState, Tag, WriteError, useAction, useData, type Remote } from '../common';
+import { formatDayHeading, formatNumber, joinParts, plural } from '../../lib/format';
 import { NoticeCard, NoticeLevelBadge } from './NoticePreview';
-import { audienceRoles, audienceText, durations, filterInbox, groupInbox, inboxFilters, inboxState, inboxStateTag, shortWhen, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
+import { audienceRoles, audienceText, durations, filterInbox, groupInbox, inboxFilters, inboxState, inboxStateTag, noticeWhen, shortWhen, isoToLocalInput, levels, localInput, localToIso, personalDataIn, priorityOfLevel, WITHDRAW_MIN, type Inbox, type InboxFilter, type InboxNotice, type Level, type NoticeListItem, type NoticeStats, type Priority } from './rules';
 import '../listas/lists.css';
 import './avisos.css';
 
@@ -46,7 +46,7 @@ export function NoticesPage({ api, profile, version }: { api: Api; profile: Acce
 function InboxRow({ notice: n, selected, onSelect }: { notice: InboxNotice; selected: boolean; onSelect: () => void }) {
   const state = inboxState(n);
   const when = state === 'programado' ? (n.desde ? `empieza ${shortWhen(n.desde)}` : '') : state === 'vencido' ? (n.hasta ? `venció ${shortWhen(n.hasta)}` : '')
-    : `${n.publicadoEn ? shortWhen(n.publicadoEn) : ''}${n.hasta ? ` · hasta ${shortWhen(n.hasta)}` : ''}`;
+    : joinParts(n.publicadoEn && noticeWhen(n.publicadoEn), n.hasta && `hasta ${shortWhen(n.hasta)}`);
   return <li><button type="button" className={`notice-row${n.enteradoEn || state !== 'vigente' ? ' is-read' : ''}`} aria-current={selected ? 'true' : undefined} onClick={onSelect}>
     <span className="notice-row-head"><NoticeLevelBadge level={n.nivel} /><span className="notice-row-tags">
       {state !== 'vigente' && <Tag value={inboxStateTag[state].value} label={inboxStateTag[state].label} />}
@@ -92,16 +92,16 @@ function NoticeDetail({ api, notice, hours, onDone }: { api: Api; notice: InboxN
   return <section className="notice-detail" aria-label="Detalle del aviso">
     <NoticeCard notice={notice} emptyAudience="Tu área" />
     <dl className="notice-detail-meta">
-      <div><dt>Publicado</dt><dd>{notice.publicadoEn ? formatDateTime(notice.publicadoEn) : '—'}</dd></div>
-      {inboxState(notice) === 'programado' && <div><dt>Empieza</dt><dd>{notice.desde ? formatDateTime(notice.desde) : '—'}</dd></div>}
-      <div><dt>{inboxState(notice) === 'vencido' ? 'Venció' : 'Vigente hasta'}</dt><dd>{notice.hasta ? formatDateTime(notice.hasta) : '—'}</dd></div>
-      {notice.recordarEn && !notice.enteradoEn && <div><dt>Te lo recordamos</dt><dd>{formatDateTime(notice.recordarEn)}</dd></div>}
+      <div><dt>Publicado</dt><dd>{notice.publicadoEn ? noticeWhen(notice.publicadoEn) : '—'}</dd></div>
+      {inboxState(notice) === 'programado' && <div><dt>Empieza</dt><dd>{notice.desde ? noticeWhen(notice.desde) : '—'}</dd></div>}
+      <div><dt>{inboxState(notice) === 'vencido' ? 'Venció' : 'Vigente hasta'}</dt><dd>{notice.hasta ? noticeWhen(notice.hasta) : '—'}</dd></div>
+      {notice.recordarEn && !notice.enteradoEn && <div><dt>Te lo recordamos</dt><dd>{noticeWhen(notice.recordarEn)}</dd></div>}
     </dl>
     <WriteError error={action.error} />
     {!current
-      ? <p className="notice-detail-done">{notice.enteradoEn && <><Tag value="completado" label="Enterado" /> {formatDateTime(notice.enteradoEn)} · </>}{inboxState(notice) === 'vencido' ? 'Este aviso ya venció.' : 'Podrás dar «Enterado» cuando entre en vigencia.'}</p>
+      ? <p className="notice-detail-done">{notice.enteradoEn && <><Tag value="completado" label="Enterado" /> {noticeWhen(notice.enteradoEn)} · </>}{inboxState(notice) === 'vencido' ? 'Este aviso ya venció.' : 'Podrás dar «Enterado» cuando entre en vigencia.'}</p>
       : notice.enteradoEn
-      ? <p className="notice-detail-done"><Tag value="completado" label="Enterado" /> {formatDateTime(notice.enteradoEn)}</p>
+      ? <p className="notice-detail-done"><Tag value="completado" label="Enterado" /> {noticeWhen(notice.enteradoEn)}</p>
       : <div className="dialog-actions">
         {snoozable && <button type="button" className="secondary-button" disabled={action.busy} onClick={() => void send('posponer')}>Recordarme en {hours} h</button>}
         <button type="button" className="primary-button" disabled={action.busy} onClick={() => void send('enterado')}><Icon name="check" size={18} />Enterado</button>
@@ -128,10 +128,10 @@ function PublishedNotices({ api, profile, version }: { api: Api; profile: Access
             <td data-label="Aviso"><strong>{a.titulo}</strong><small>{a.cuerpo}</small></td>
             <td data-label="Nivel"><NoticeLevelBadge level={a.nivel} /></td>
             <td data-label="Dónde se ve">{audienceText(a)}</td>
-            <td data-label="Vigencia">{a.desde ? formatDateTime(a.desde) : '—'}<small>hasta {a.hasta ? formatDateTime(a.hasta) : '—'}</small></td>
+            <td data-label="Vigencia">{a.desde ? noticeWhen(a.desde) : '—'}<small>hasta {a.hasta ? shortWhen(a.hasta) : '—'}</small></td>
             <td data-label="Enterado" className="numeric">{count ? (count.destinatarios ? `${count.enterados}/${count.destinatarios} enterados` : String(count.enterados)) : '—'}</td>
             <td data-label="Estado"><Tag value={stateTag[a.estado] ?? a.estado} label={stateLabel[a.estado] ?? a.estado} />
-              {a.estado === 'retirado' && <small>{a.retiradoEn ? `${formatDateTime(a.retiradoEn)} · ` : ''}Motivo: {a.motivoRetiro ?? 'sin motivo registrado'}</small>}</td>
+              {a.estado === 'retirado' && <small>{a.retiradoEn ? `${noticeWhen(a.retiradoEn)} · ` : ''}Motivo: {a.motivoRetiro ?? 'sin motivo registrado'}</small>}</td>
             <td data-label="Acciones">{(a.allowedActions ?? []).length
               ? <div className="row-actions">
                 {a.allowedActions.includes('editar') && <button type="button" className="row-action" onClick={() => edit(a)}>Editar</button>}
@@ -242,8 +242,8 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
       <fieldset className="notice-fieldset"><legend>Vigencia</legend>
         <div className="form-grid">
           {started
-            ? <p className="field-hint">Vigente desde {editing?.desde ? formatDateTime(editing.desde) : '—'}; el inicio no cambia.</p>
-            : <Field label="Desde (opcional)" type="datetime-local" value={from} onChange={setFrom} hint={scheduled && editing?.desde ? `Programado para ${formatDateTime(editing.desde)}. Si lo vacías, empieza al guardar.` : 'Sin fecha, empieza al publicarlo.'} />}
+            ? <p className="field-hint">Vigente desde {editing?.desde ? shortWhen(editing.desde) : '—'}; el inicio no cambia.</p>
+            : <Field label="Desde (opcional)" type="datetime-local" value={from} onChange={setFrom} hint={scheduled && editing?.desde ? `Programado para ${shortWhen(editing.desde)}. Si lo vacías, empieza al guardar.` : 'Sin fecha, empieza al publicarlo.'} />}
           <Field label="Hasta" type="datetime-local" value={until} onChange={setUntil} required hint={editing ? 'Adelántalo para que venza antes.' : undefined} />
         </div>
         <div className="segmented-control" role="group" aria-label="Duración rápida">{durations.map(d => <button key={d.hours} type="button" onClick={() => setUntil(localInput(d.hours))}>{d.label}</button>)}</div>
@@ -267,7 +267,7 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
           <div><dt>Nivel</dt><dd><NoticeLevelBadge level={level} /></dd></div>
           <div><dt>Dónde se ve</dt><dd>{audienceText({ publico: isPublic, roles, areas })}</dd></div>
           {reachText && <div><dt>Alcance</dt><dd>{reachText}</dd></div>}
-          <div><dt>Hasta</dt><dd>{until ? formatDateTime(localToIso(until)) : '—'}</dd></div>
+          <div><dt>Hasta</dt><dd>{until ? noticeWhen(localToIso(until)) : '—'}</dd></div>
         </dl>
         <div className="dialog-actions">
           <button type="button" className="secondary-button" onClick={() => setConfirming(false)}>Volver</button>

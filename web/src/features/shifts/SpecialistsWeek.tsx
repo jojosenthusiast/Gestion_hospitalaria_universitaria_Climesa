@@ -3,6 +3,7 @@ import { Icon } from '../../components/ui';
 import type { Api } from '../../lib/api';
 import { Empty, RemoteState, Tag, useData } from '../common';
 import { HOUR, localDay, localMs, localTime } from './rules';
+import { joinParts } from '../../lib/format';
 
 type SpecialistWeek = { from: string; to: string; items: { date: string; specialty: string; name: string; area: string; start: string; end: string; attendance: string | null }[] };
 
@@ -39,7 +40,7 @@ export function SpecialistsWeek({ api, version }: { api: Api; version: number })
         {[...specialties.entries()].sort((a, b) => a[0].localeCompare(b[0], 'es')).map(([specialty, doctors]) => <div key={specialty} className="specialists-group">
           <h4>{specialty}</h4>
           <ul>{doctors.map((d, i) => <li key={`${d.name}-${d.start}-${i}`}>
-            <span>{d.name} · {d.area} · {localTime(Date.parse(d.start))} a {localTime(Date.parse(d.end))}</span>
+            <span>{joinParts(d.name, d.area, `${localTime(Date.parse(d.start))} a ${localTime(Date.parse(d.end))}`)}</span>
             {d.attendance === 'ausente' && <Tag value="cancelado" label="Ausente" />}
           </li>)}</ul>
         </div>)}

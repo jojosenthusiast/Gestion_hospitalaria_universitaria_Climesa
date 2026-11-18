@@ -1,0 +1,9 @@
+/* RowMenu: the main action, then «Más acciones» that opens the rest in place, all in a narrow column. */
+.row-menu { display: grid; justify-items: start; gap: 2px; }
+.row-menu > .row-action { min-height: 36px; white-space: nowrap; }
+.row-menu-toggle { color: var(--muted); font-weight: 600; }
+.row-menu-toggle svg { transition: transform var(--motion-fast) var(--ease-out); }
+.row-menu-toggle[aria-expanded='true'] svg { transform: rotate(90deg); }
+.row-menu-list { display: grid; gap: 2px; margin: 0; padding: 4px 0 0 10px; border-left: 2px solid var(--line); list-style: none; }
+.row-menu-list .row-action { min-height: 36px; text-align: left; white-space: normal; }
+@media (pointer: coarse) { .row-menu > .row-action, .row-menu-list .row-action { min-height: 44px; } }

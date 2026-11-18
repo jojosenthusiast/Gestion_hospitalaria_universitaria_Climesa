@@ -9,6 +9,7 @@
 .cl-sort { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .cl-sort select { min-height: 44px; padding: 0 10px; border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; }
 .cl-filter-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; margin-bottom: 8px; }
+.cl-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; }
 .cl-filter-label { color: var(--muted); font-size: 12px; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
 /* Filtros con muchas opciones (área, médico, función, rol): selects en fila que bajan a una columna en el teléfono. */
 .cl-filter-selects { align-items: flex-end; }

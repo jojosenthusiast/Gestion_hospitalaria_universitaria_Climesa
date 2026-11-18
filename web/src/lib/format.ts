@@ -75,6 +75,12 @@ export function formatShortDateTime(value: string | Date, now: string | Date = n
   const near = day.split(' · ');
   return near.length === 2 ? `${near[0]} ${time}` : `${day}, ${time}`;
 }
+/**
+ * Joins the parts that have text with « · », so an empty or missing part never leaves an orphan separator at the start,
+ * the end or twice in the middle ("· nota", "nota ·", "a ·  · b").
+ */
+export const joinParts = (...parts: (string | number | null | undefined | false)[]) =>
+  parts.filter(part => part !== null && part !== undefined && part !== false && String(part).trim() !== '').map(String).join(' · ');
 /** `yyyy-MM-dd` of the instant in hospital time. */
 export const localDayKey = (value: string | Date) => { const l = local(value); return `${l.year}-${pad(l.month)}-${pad(l.day)}`; };
 

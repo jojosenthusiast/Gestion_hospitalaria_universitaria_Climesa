@@ -5,7 +5,7 @@ import { takePatientSearch } from './patient-handoff';
 import { RegisterExternalResultDialog } from './lab-external-record';
 import { ActiveFilters,ChipGroup } from './listas/chips';
 import { FilterPopover } from '../components/filter-popover';
-import { plural } from '../lib/format';
+import { joinParts,plural } from '../lib/format';
 import { ageFrom,profileGaps,validatePatientDraft } from './listas/patient-rules';
 import type { ClinicalHistory } from './clinical-history';
 import { dayKey,dayLabel,timeRange } from './listas/schedule';
@@ -17,6 +17,15 @@ import { useQuickAction } from './personal/accion';
 import { can,type AccessProfile,type Api,type ApiError,type Appointment,type Patient,type PatientInput,type SearchReceipt } from '../lib/api';
 import { Dialog,Empty,CompactHeader,RemoteState,SaveButton,Select,Tag,WriteError,formatDate,formatDateTime,isVersionConflict,useAction,useData } from './common';
 const sexNames:Record<string,string>={femenino:'Femenino',masculino:'Masculino',indeterminado:'Indeterminado',no_registrado:'No registrado'};
+/**
+ * The list's second line: birth date and age, or the age range, then the sex. An account that sees neither (JOP) gets
+ * only the sex: «Sin fecha» on every row read like missing data when it is privacy (privacidad.md).
+ */
+export function patientMeta(p:Pick<Patient,'birth'|'ageRange'|'sex'>){
+ const age=p.birth?ageFrom(p.birth):null;
+ const when=p.birth?joinParts(formatDate(p.birth,{withYear:true}),age!==null&&plural(age,'año','años')):p.ageRange?`${p.ageRange} años`:null;
+ return joinParts(when,sexNames[p.sex]??p.sex);
+}
 const fieldNames:Record<string,string>={nombres:'Nombres',primer_apellido:'Apellidos',segundo_apellido:'Segundo apellido',sexo:'Sexo',nacimiento:'Nacimiento',precision_nacimiento:'Precisión del nacimiento',telefono:'Teléfono',correo:'Correo',direccion:'Dirección',dui:'DUI',estado:'Estado'};
 const expiredText='La búsqueda venció; vuelve a buscar.';
 /** FR-102-02: el recibo de búsqueda dura 10 minutos; avisa cuando vence aunque la pantalla siga abierta. */
@@ -85,7 +94,6 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  const filterCount=[filters.estado!=='vigente',!!filters.situacion,!!filters.area,!!filters.medico].filter(Boolean).length;
  // R4a: the server sorts the list by name; the reason only shows when a search matched a document or a record.
  const reasonOf=(p:Patient)=>(typed||receipt)&&/documento|expediente/i.test(p.matchReason??'')?p.matchReason:null;
- const yearsText=(n:number)=>plural(n,'año','años');
  const empty=patientEmptyState(filters,{area:areaName,medico:doctorName});
  const exportTable=()=>({filename:'pacientes',title:'Pacientes',subtitle:`${rows.length} expedientes${active.length?` · ${active.map(f=>f.label).join(' · ')}`:''}`,columns:['Expediente','Paciente','Sexo','Nacimiento','Estado'],rows:rows.map(p=>[p.record,p.fullName,sexNames[p.sex]??p.sex,p.birth?formatDate(p.birth,{withYear:true}):p.ageRange?`${p.ageRange} años`:'',p.active?'Activo':'Inactivo'])});
  return <><CompactHeader breadcrumb="Pacientes / Registro compartido" title="Pacientes" actions={register?<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>:<span className="qb-readonly"><Icon name="eye" size={16}/>Solo lectura</span>}/>
@@ -99,7 +107,7 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  <ActiveFilters filters={active} onClear={()=>{clearQuery();setFilters({estado:'vigente',situacion:'',area:'',medico:''});}}/>
  <WriteError error={search.error}/><p className="table-caption">{receipt?`${plural(rows.length,'coincidencia','coincidencias')} · ${query}`:typed?`${plural(rows.length,'resultado','resultados')} mientras escribes · ${typed}`:filtered?`${plural(rows.length,'expediente','expedientes')} con estos filtros · por nombre`:'Pacientes por nombre (A–Z)'}{register&&receipt&&<span>{validReceipt?'Puedes registrar después de revisar las coincidencias.':expiredText}</span>}</p>
  {register&&validReceipt&&receipt.candidates.length>0&&<Notice kind="info">Posibles coincidencias: revisa cada ficha y su motivo antes de registrar a alguien nuevo.</Notice>}
- <RemoteState state={initial}>{()=>rows.length?<div className={`cl-master-detail${selected?'':' is-collapsed'}`}><ul className="cl-master" aria-label="Pacientes encontrados">{rows.map(p=><li key={p.id}><button type="button" className="pt-row" aria-current={p.id===selected} aria-label={viewFicha?`Abrir ficha de ${p.fullName}`:`Paciente ${p.fullName}`} disabled={!viewFicha} onClick={()=>setSelected(p.id)}><span className="pt-name"><strong>{p.fullName}</strong>{reasonOf(p)&&<small>{reasonOf(p)}</small>}</span><span className="mono-data">{p.record}</span><span className="pt-meta">{p.birth?`${formatDate(p.birth,{withYear:true})}${ageFrom(p.birth)!==null?` · ${yearsText(ageFrom(p.birth)!)}`:''}`:p.ageRange?`${p.ageRange} años`:'Sin fecha'} · {sexNames[p.sex]}</span>{p.state!=='activo'&&<Tag value={p.state}/>}</button></li>)}</ul>
+ <RemoteState state={initial}>{()=>rows.length?<div className={`cl-master-detail${selected?'':' is-collapsed'}`}><ul className="cl-master" aria-label="Pacientes encontrados">{rows.map(p=><li key={p.id}><button type="button" className="pt-row" aria-current={p.id===selected} aria-label={viewFicha?`Abrir ficha de ${p.fullName}`:`Paciente ${p.fullName}`} disabled={!viewFicha} onClick={()=>setSelected(p.id)}><span className="pt-name"><strong>{p.fullName}</strong>{reasonOf(p)&&<small>{reasonOf(p)}</small>}</span><span className="mono-data">{p.record}</span><span className="pt-meta">{patientMeta(p)}</span>{p.state!=='activo'&&<Tag value={p.state}/>}</button></li>)}</ul>
   {selected?<PatientPanel key={selected} api={api} id={selected} profile={profile} version={version} onClose={()=>setSelected(null)} onEdit={p=>setEditing(p)} onState={p=>setStatus(p)}/>:null}</div>:<Empty title={empty.title} description={empty.description}/>}</RemoteState>
  {rows.length>=50&&<p className="table-footnote">Se muestran los primeros 50. Afina la búsqueda o los filtros.</p>}</section>
  {registered&&<Notice kind="success">Paciente registrado{registered.record?` con expediente ${registered.record}`:''}. <a className="cl-link-button" href={`#/fila?accion=emitir&paciente=${registered.id}`}>Emitir número</a></Notice>}

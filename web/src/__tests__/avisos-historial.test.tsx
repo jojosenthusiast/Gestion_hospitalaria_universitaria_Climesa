@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
 import { NoticesPage } from '../features/notices';
 import { NoticesBell } from '../features/avisos/NoticesBell';
-import { filterInbox, groupInbox, shortWhen, type InboxNotice } from '../features/avisos/rules';
+import { filterInbox, groupInbox, noticeWhen, shortWhen, type InboxNotice } from '../features/avisos/rules';
 
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
 
@@ -43,9 +43,14 @@ describe('Avisos · historial como la agenda de citas', () => {
     expect(filterInbox(sample(), 'sin-leer').map(n => n.id)).toEqual(['v-1']);
   });
 
-  it('short dates leave out the year', () => {
-    expect(shortWhen('2026-11-16T15:33:00.000Z', new Date('2026-11-18T12:00:00.000Z'))).toBe('16 nov, 09:33');
-    expect(shortWhen('2026-11-18T15:33:00.000Z', new Date('2026-11-18T16:00:00.000Z'))).toBe('hoy, 09:33');
+  it('short dates leave out the year and say hoy / ayer / mañana like Android', () => {
+    const now = new Date('2026-11-18T16:00:00.000Z');
+    expect(shortWhen('2026-11-16T15:33:00.000Z', now)).toBe('lun 16 nov, 09:33');
+    expect(shortWhen('2026-11-18T15:33:00.000Z', now)).toBe('hoy 09:33');
+    // List, detail and «Enterado» read the same instant the same way: «Ayer 23:22 · hasta hoy 23:22».
+    expect(noticeWhen('2026-11-18T05:22:00.000Z', now)).toBe('Ayer 23:22');
+    expect(shortWhen('2026-11-19T05:22:00.000Z', now)).toBe('hoy 23:22');
+    expect(noticeWhen('2026-11-19T15:00:00.000Z', now)).toBe('Mañana 09:00');
   });
 
   it('shows in-force and scheduled notices, folds expired ones behind «Vencidos», with state tags', async () => {

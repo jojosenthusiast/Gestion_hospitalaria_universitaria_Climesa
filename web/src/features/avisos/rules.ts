@@ -1,5 +1,5 @@
 import { roleNames } from '../../lib/api';
-import { formatDate, formatTime, localDayKey } from '../../lib/format';
+import { formatShortDateTime, localDayKey } from '../../lib/format';
 
 export type Priority = 'atencion' | 'urgente' | 'critico';
 export const priorities: { id: Priority; label: string; hint: string }[] = [
@@ -71,8 +71,13 @@ export function groupInbox(items: InboxNotice[]) {
     past: byDay(items.filter(n => inboxState(n) === 'vencido'), n => n.hasta ?? '', -1),
   };
 }
-/** «hoy, 09:33» or «16 nov, 09:33»: short and without the year, like the agenda. */
-export const shortWhen = (iso: string, now = new Date()) => `${localDayKey(iso) === localDayKey(now) ? 'hoy' : formatDate(iso, { withYear: false })}, ${formatTime(iso)}`;
+/**
+ * One date style for every instant in Avisos (list, detail, «Enterado», publicados), the same as Android and the
+ * agenda: «Hoy 09:33», «Ayer 23:22», «Mañana 08:00», else «Lun 16 nov, 09:33»; never the year.
+ */
+export const noticeWhen = (iso: string, now = new Date()) => formatShortDateTime(iso, now);
+/** `noticeWhen` inside a sentence: «hasta hoy 23:22», «venció lun 16 nov, 09:33». */
+export const shortWhen = (iso: string, now = new Date()) => { const text = noticeWhen(iso, now); return text.charAt(0).toLowerCase() + text.slice(1); };
 
 /** Dónde se ve un aviso, en palabras: «Pantalla pública y apps sin sesión» o «Medicina y Enfermería». */
 export function audienceText(notice: Pick<NoticeAudience, 'publico' | 'roles' | 'areas'>) {

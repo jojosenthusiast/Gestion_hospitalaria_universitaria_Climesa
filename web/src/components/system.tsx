@@ -153,6 +153,9 @@ export const statusNames: Record<string, string> = { activo: 'Activo', inactivo:
  * neutro, con un punto y su texto.
  */
 export function StatusBadge({ value, label }: { value: string; label?: string }) {
+  // A priority passed as a status («urgente» on a lab order in Inicio) wears the priority badge, the same as the lab
+  // page and the «Urgentes» filter, never a neutral grey tag with a dot.
+  if (value === 'urgente' || value === 'emergencia') return <PriorityBadge value={value} label={label} />;
   const family = STATUS_FAMILIES.find(f => f.id === statusFamily(value));
   const text = label ?? statusNames[value] ?? value.replace(/_/g, ' ');
   const priority = PRIORITIES.find(p => p.id === statusPriority(value));

@@ -25,6 +25,11 @@
 /* Sin franja lateral: la etapa la dicen el ícono, el patrón y la etiqueta del estado. */
 .lab-row.lw-row { border-width: 1px; border-left-width: 1px; border-left-color: var(--line); transition: background-color var(--motion-instant, 100ms) ease-out; }
 .lab-row.lw-row[aria-current='true'] { border-color: var(--primary); }
+/* No priority column: routine has no tag and urgent sits next to the name, so the name and «Pidió» get the width. */
+.lab-row.lw-row { grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) auto; }
+.lab-row-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; }
+.lab-row-name strong { display: inline; }
+@media (max-width: 720px) { .lab-row.lw-row { grid-template-columns: 1fr auto; } }
 @media (hover: hover) { .lab-row.lw-row:hover { border-color: var(--primary); } }
 .lab-batch { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0 0 var(--space-3); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
 .lab-batch > span { margin-right: auto; color: var(--muted); font-size: var(--text-sm); }
