@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { AreaTag } from '../../components/system';
+import { AreaTag, statusFilterLook } from '../../components/system';
 import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
 import { useRefreshAt } from '../../lib/publico';
@@ -34,7 +34,7 @@ export function NoticesPage({ api, profile, version }: { api: Api; profile: Acce
     <button type="button" aria-pressed={!mine} onClick={() => setView('publicados')}>Publicados</button>
   </div>;
   const counts: Record<InboxFilter, number | null> = { todos: null, 'sin-leer': inbox.data?.noLeidos ?? null, criticos: inbox.data?.criticos ?? null };
-  const filters = mine && <div className="segmented-control" role="group" aria-label="Filtrar avisos">{inboxFilters.map(f => <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{f.label}{counts[f.id] ? <span className="notice-count">{counts[f.id]}</span> : null}</button>)}</div>;
+  const filters = mine && <div className="segmented-control" role="group" aria-label="Filtrar avisos">{inboxFilters.map(f => { const look = statusFilterLook(f.status); return <button key={f.id} type="button" className={look?.className} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>{look && <Icon name={look.icon} size={14} />}{f.label}{counts[f.id] ? <span className="notice-count">{counts[f.id]}</span> : null}</button>; })}</div>;
   return <>
     <CompactHeader breadcrumb="CLIMESA / Comunicación" title="Avisos" filters={filters || undefined} actions={views || undefined}/>
     {mine ? <NoticeInbox api={api} state={inbox} filter={filter} /> : <PublishedNotices api={api} profile={profile} version={version} />}
@@ -202,7 +202,7 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
       <div className="field"><label htmlFor="aviso-cuerpo">Texto del aviso</label><textarea id="aviso-cuerpo" value={body} onChange={e => setBody(e.target.value)} required minLength={3} maxLength={1000} rows={4} /><small className="field-hint">{body.length}/1000 caracteres</small></div>
       {found.length > 0 && <Notice kind="error">El texto parece contener {found.join(', ')}. Un aviso no debe llevar datos de pacientes ni de personal: quítalos o, si es intencional, confirma al publicar.</Notice>}
       <fieldset className="notice-fieldset"><legend>Nivel</legend>
-        <div className="segmented-control" role="group" aria-label="Nivel">{levels.map(l => <button key={l.id} type="button" aria-pressed={level === l.id} title={l.hint} onClick={() => setLevel(l.id)}>{l.label}</button>)}</div>
+        <div className="segmented-control" role="group" aria-label="Nivel">{levels.map(l => { const look = statusFilterLook(l.status); return <button key={l.id} type="button" className={look?.className} aria-pressed={level === l.id} title={l.hint} onClick={() => setLevel(l.id)}>{look && <Icon name={look.icon} size={14} />}{l.label}</button>; })}</div>
         <small className="field-hint">{levels.find(l => l.id === level)?.hint}</small>
       </fieldset>
       <fieldset className="notice-fieldset"><legend>¿Quién lo ve?</legend>

@@ -3,6 +3,7 @@ import { AreaChip, RoleChip, roleIdentity } from '../../components/identity';
 import { ExportMenu } from '../../components/export-menu';
 import { SearchPicker, type PickerItem } from '../../components/search-picker';
 import { Icon, Notice } from '../../components/ui';
+import { statusFilterLook } from '../../components/system';
 import { can, type AccessProfile, type Api, type Shift } from '../../lib/api';
 import { exportName, type ExportTable } from '../../lib/export';
 import { CompactHeader, Dialog, Empty, RemoteState, SaveButton, WriteError, formatDateTime, isVersionConflict, useAction, useData } from '../common';
@@ -234,7 +235,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
             {catalog.areas.map(a => <button key={a.id} type="button" className="shift-pill" aria-pressed={area === a.id} onClick={() => toggle(area, a.id, setArea)}><AreaChip name={a.name} type={a.type} /></button>)}
           </div></fieldset>
           <fieldset className="shift-filter-group"><legend>Estado del turno</legend><div className="shift-pills">
-            {STATES.map(([code, name]) => <button key={code} type="button" className="shift-pill" aria-pressed={state === code} onClick={() => toggle(state, code, setState)}>{name}</button>)}
+            {STATES.map(([code, name]) => { const look = statusFilterLook(code); return <button key={code} type="button" className={look ? `shift-pill ${look.className}` : 'shift-pill'} aria-pressed={state === code} onClick={() => toggle(state, code, setState)}>{look && <Icon name={look.icon} size={14} />}{name}</button>; })}
           </div></fieldset>
         </div>}
         {active.length > 0 && <div className="shift-active" aria-label="Filtros activos">

@@ -647,6 +647,34 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .priority-urgente { --prio: var(--priority-urgente); --prio-soft: var(--priority-urgente-soft); }
 .priority-emergencia { --prio: var(--critical); background: var(--critical); color: var(--on-status); }
 
+/* R4a (owner): a filter for a status wears the same colour, texture and icon as the badge it filters (segments,
+   chips, pills). Unselected: soft tint + the family texture; selected: the family fill, texture still visible.
+   The doubled class and [class] outrank each control's own neutral and hover rules. The label always stays. */
+.status-filter { --fam: var(--muted); --fam-soft: var(--bg); }
+.status-filter.sf-fam-espera { --fam: var(--status-espera); --fam-soft: var(--status-espera-soft); }
+.status-filter.sf-fam-llamado { --fam: var(--status-llamado); --fam-soft: var(--status-llamado-soft); }
+.status-filter.sf-fam-atencion { --fam: var(--status-atencion); --fam-soft: var(--status-atencion-soft); }
+.status-filter.sf-fam-listo { --fam: var(--status-listo); --fam-soft: var(--status-listo-soft); }
+.status-filter.sf-fam-cerrado { --fam: var(--status-cerrado); --fam-soft: var(--status-cerrado-soft); }
+.status-filter.sf-fam-critico, .status-filter.sf-prio-emergencia { --fam: var(--critical); --fam-soft: var(--critical-soft); }
+.status-filter.sf-prio-urgente { --fam: var(--priority-urgente); --fam-soft: var(--priority-urgente-soft); }
+.status-filter.status-filter[class] { gap: 6px; border-color: var(--fam); background: var(--fam-soft); color: var(--fam); box-shadow: none; }
+.status-filter.status-filter[class] > * { color: inherit; }
+/* A segment only draws its left divider; a status segment draws its whole edge so its texture border shows. */
+.segment.status-filter.status-filter[class] { border: 1px solid var(--fam); }
+.status-filter.status-filter[class].sf-pattern-rayado { background: repeating-linear-gradient(135deg, var(--fam-soft) 0 4px, color-mix(in srgb, var(--fam) 18%, var(--fam-soft)) 4px 7px); }
+.status-filter.status-filter[class].sf-pattern-punteado { border-style: dotted; background-color: var(--fam-soft); background-image: radial-gradient(color-mix(in srgb, var(--fam) 32%, transparent) 1px, transparent 1.4px); background-size: 5px 5px; }
+.status-filter.status-filter[class].sf-pattern-contorno { background: var(--surface); }
+.status-filter.status-filter[class].sf-pattern-discontinuo { border-style: dashed; background: var(--surface); }
+.status-filter.status-filter[class].sf-pattern-doble { border-style: double; border-width: 3px; }
+.status-filter.status-filter[class] :is(small, .notice-count) { background: var(--surface); color: var(--fam); }
+@media (hover: hover) and (pointer: fine) { .status-filter.status-filter[class]:not([aria-pressed='true'], .is-selected):hover { box-shadow: inset 0 0 0 1px var(--fam); } }
+.status-filter.status-filter[class]:is([aria-pressed='true'], .is-selected) { border-color: color-mix(in srgb, var(--fam) 55%, var(--ink)); background: var(--fam); color: var(--on-status); }
+.status-filter.status-filter[class].sf-pattern-rayado:is([aria-pressed='true'], .is-selected) { background: repeating-linear-gradient(135deg, var(--fam) 0 4px, color-mix(in srgb, var(--on-status) 14%, var(--fam)) 4px 7px); }
+.status-filter.status-filter[class].sf-pattern-punteado:is([aria-pressed='true'], .is-selected) { background-color: var(--fam); background-image: radial-gradient(color-mix(in srgb, var(--on-status) 30%, transparent) 1px, transparent 1.4px); }
+.status-filter.status-filter[class]:is([aria-pressed='true'], .is-selected) :is(small, .notice-count) { background: var(--on-status); color: var(--fam); }
+.shift-pill.status-filter { padding-inline: 12px; }
+
 /* Leyenda: las mismas piezas que las tarjetas y los filtros. */
 .status-legend { display: flex; flex-wrap: wrap; gap: var(--space-4) var(--space-8); }
 .status-legend > div { display: grid; gap: var(--space-2); }
