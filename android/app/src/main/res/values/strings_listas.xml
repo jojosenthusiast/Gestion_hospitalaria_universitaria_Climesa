@@ -22,6 +22,12 @@
     <string name="fila_paciente_pasa">Pasa al consultorio %1$s</string>
     <string name="fila_paciente_otros">Tus otros números de hoy</string>
     <string name="fila_espera_promedio">Espera promedio: %1$s · máxima %2$s</string>
+    <string name="fila_dock_atendiendo">En atención</string>
+    <string name="fila_dock_sigue">Sigue</string>
+    <string name="fila_dock_espera">Espera promedio</string>
+    <string name="fila_dock_espera_max">Máxima %1$s</string>
+    <string name="fila_dock_nadie">—</string>
+    <string name="fila_dock_en_espera">%1$d en espera</string>
     <string name="fila_espera">Espera %1$s</string>
     <!-- Citas -->
     <string name="rec_citas_buscar">Paciente o médico</string>

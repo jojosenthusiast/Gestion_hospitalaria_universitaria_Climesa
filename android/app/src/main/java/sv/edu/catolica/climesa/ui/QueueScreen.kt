@@ -1,5 +1,10 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.FlowRow
@@ -122,17 +127,10 @@ fun QueueScreen(
         LaunchedEffect(Unit) { model.followOwnTicket(); model.load(silent = true) }
         PatientTicketView(state, modifier, onRetry = { model.clearMessages(); model.load() }); return
     }
-    PageList(modifier) {
-        // R3 A-10/A-14: no second title; one primary action in the compact bar (issue a number, else call next).
-        if (canIssue || (canCall && service == null)) item {
-            CompactHeader("", actions = {
-                if (canCall && service == null) {
-                    if (canIssue) RowAction(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); callNextOpen = true }, enabled = !state.busy)
-                    else PrimaryButton(stringResource(R.string.fila_llamar_siguiente), { model.clearMessages(); callNextOpen = true }, icon = Icons.Default.Phone, enabled = !state.busy, fill = false)
-                }
-                if (canIssue) PrimaryButton(stringResource(R.string.rec7_emitir_numero), { model.clearMessages(); issueOpen = true }, icon = Icons.Default.Add, enabled = !state.busy, fill = false)
-            })
-        }
+    // The board scrolls; who is being seen, who is next, the wait and the two daily actions stay docked at the bottom,
+    // within thumb reach, like the reception counter of the web.
+    Column(modifier.fillMaxSize()) {
+    PageList(Modifier.weight(1f)) {
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (canCall) state.myPostError?.let { item { NoticeBanner(NoticeKind.WARNING, it) } }
         // Sweep: the call's undo lives only on its card ("Deshacer"), not again at the top.
@@ -163,8 +161,7 @@ fun QueueScreen(
                 if (state.loading) item { RefreshHint() }
                 item { LiveSearchField(query, { query = it }, stringResource(R.string.fila_buscar)) }
                 item { ChipRow(listOf(Triple<String?, String, Int?>(null, stringResource(R.string.fila_todos), state.tickets.size)) + QueueLabels.services.map { (value, label) -> Triple<String?, String, Int?>(value, label, state.tickets.count { it.service == value }) }, service) { service = it } }
-                // R3 A-27: the column headings carry the counts; no stat tiles repeating them.
-                item { Text(stringResource(R.string.fila_espera_promedio, elapsedText(summary.averageWait), elapsedText(summary.longestWait)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                // R3 A-27: the column headings carry the counts; the wait times live in the bottom dock.
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
                 QueueColumn.entries.forEach { column ->
                     val inColumn = QueueBoard.sorted(visible.filter { QueueBoard.column(it) == column })
@@ -175,6 +172,62 @@ fun QueueScreen(
                 }
             }
         }
+    }
+    if (state.tickets.isNotEmpty() || canIssue || canCall) QueueDock(
+        state, service, query,
+        onCallNext = if (canCall && service == null) ({ model.clearMessages(); callNextOpen = true }) else null,
+        onIssue = if (canIssue) ({ model.clearMessages(); issueOpen = true }) else null,
+    )
+    }
+}
+
+/**
+ * Bottom dock of the day's line: who is being seen, who goes next (with the area colour), the wait times in large
+ * numbers, and "Llamar siguiente" / "Emitir número" splitting the full width. It stays put while the board scrolls.
+ */
+@Composable
+private fun QueueDock(state: QueueState, service: String?, query: String, onCallNext: (() -> Unit)?, onIssue: (() -> Unit)?) {
+    val now = System.currentTimeMillis()
+    val visible = QueueBoard.visible(state.tickets, service, query)
+    val summary = QueueBoard.summary(visible, now)
+    val serving = visible.filter { it.state == "en_atencion" || it.state == "llamado" }.maxByOrNull { it.issuedAtMillis ?: 0L }
+    val waiting = QueueBoard.sorted(visible.filter { it.state == "en_espera" })
+    // The server rule picks who goes next; when it already answered for this area, show its pick, else the head of the line.
+    val proposal = state.next?.proposal?.takeIf { service != null }
+    val nextArea = proposal?.area ?: waiting.firstOrNull()?.area
+    val nextCode = (proposal?.number ?: waiting.firstOrNull()?.number)?.toString()
+    Column(
+        Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)
+            .drawBehind { drawLine(Color.Black.copy(alpha = 0.08f), Offset(0f, 0f), Offset(size.width, 0f), 1.dp.toPx()) }
+            .padding(horizontal = Spacing.page, vertical = Spacing.md),
+        verticalArrangement = Arrangement.spacedBy(Spacing.md),
+    ) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            DockStat(stringResource(R.string.fila_dock_atendiendo), serving?.number?.toString() ?: stringResource(R.string.fila_dock_nadie), serving?.area, Modifier.weight(1f))
+            DockStat(stringResource(R.string.fila_dock_sigue), nextCode ?: stringResource(R.string.fila_dock_nadie), nextArea, Modifier.weight(1f),
+                detail = if (waiting.isNotEmpty()) stringResource(R.string.fila_dock_en_espera, waiting.size) else null)
+            DockStat(stringResource(R.string.fila_dock_espera), elapsedText(summary.averageWait), null, Modifier.weight(1.2f), detail = stringResource(R.string.fila_dock_espera_max, elapsedText(summary.longestWait)))
+        }
+        if (onCallNext != null || onIssue != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            if (onCallNext != null) {
+                if (onIssue != null) SecondaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, Modifier.weight(1f), icon = Icons.Default.Phone, enabled = !state.busy && waiting.isNotEmpty())
+                else PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, Modifier.weight(1f), icon = Icons.Default.Phone, enabled = !state.busy && waiting.isNotEmpty())
+            }
+            if (onIssue != null) PrimaryButton(stringResource(R.string.rec7_emitir_numero), onIssue, Modifier.weight(1f), icon = Icons.Default.Add, enabled = !state.busy)
+        }
+    }
+}
+
+/** One dock figure: a small label over a large number; the area tag tints it softly so the colour guides, not shouts. */
+@Composable
+private fun DockStat(label: String, value: String, area: String?, modifier: Modifier = Modifier, detail: String? = null) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Text(label, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            if (area != null) AreaTag(area)
+            Text(value, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (detail != null) Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1)
     }
 }
 
