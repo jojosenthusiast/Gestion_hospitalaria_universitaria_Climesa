@@ -32,7 +32,7 @@
     <string name="signos_nota">Nota (opcional)</string>
     <string name="signos_nota_contador">%1$d de %2$d caracteres</string>
     <string name="signos_guardar">Guardar signos</string>
-    <string name="signos_solo_lectura">Tu rol consulta los signos vitales; las tomas las registra el personal de enfermería.</string>
+    <string name="signos_solo_lectura">Solo puedes consultar los signos vitales; registrar una toma necesita el permiso «Registrar signos vitales».</string>
     <string name="signos_tendencia">Tendencia</string>
     <string name="signos_tendencia_detalle">Últimas tomas de cada medida, de la más antigua a la más reciente. La franja verde es el rango normal.</string>
     <string name="signos_historial">Historial</string>

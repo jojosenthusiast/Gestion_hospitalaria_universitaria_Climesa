@@ -73,6 +73,13 @@ data class VitalsForm(
     fun with(measure: VitalMeasure, text: String): VitalsForm = copy(values = values + (measure to text))
 }
 
+/** D6 (AGENTS rule 8): taking vital signs depends on the permission `signos.registrar`, never on the role. */
+object VitalsAccess {
+    const val PERMISSION = "signos.registrar"
+
+    fun canRecord(permissions: Collection<String>) = PERMISSION in permissions
+}
+
 object VitalsRules {
     const val NOTE_MAX = 500
 
