@@ -73,6 +73,20 @@ describe('Personal · cobertura, publicación y horas semanales (HU-103)',()=>{
   ]);
  });
 
+ // Auditoría admin/ops: un borrador no cubre el hueco (falta publicarlo), pero la cobertura dice que ya está cubierto en borrador.
+ test('la cobertura cuenta aparte los borradores: el hueco sigue y trae actualConBorradores',async()=>{
+  const doctor=await person('medico'),d='2026-12-03';
+  const draft=(await shift(doctor.id,local(d,'08:00'),local(d,'16:00'))).body;
+  await fixture.pg.query("UPDATE personal.turno SET estado='borrador',publicado_por=NULL,publicado_en=NULL WHERE id=$1",[draft.id]);
+  const result=await coverage(d,d);
+  expect(result.status).toBe(200);
+  expect(result.body.gaps.filter((g:any)=>g.areaId===emergencyId&&g.role==='MED').map((g:any)=>[g.start,g.end,g.actual,g.actualConBorradores])).toEqual([
+   ['2026-12-03T06:00:00.000Z','2026-12-03T14:00:00.000Z',0,0],
+   ['2026-12-03T14:00:00.000Z','2026-12-03T22:00:00.000Z',0,1],
+   ['2026-12-03T22:00:00.000Z','2026-12-04T06:00:00.000Z',0,0],
+  ]);
+ });
+
  test('la cobertura valida el rango y exige el permiso de ver turnos',async()=>{
   expect((await coverage('2026-11-10','2026-11-09')).status).toBe(400);
   expect((await coverage('2026-02-30','2026-03-01')).status).toBe(400);
