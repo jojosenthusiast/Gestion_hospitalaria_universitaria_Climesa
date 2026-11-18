@@ -1,44 +1,36 @@
 import { Notice } from '../../components/ui';
-import { roleNames, type Api } from '../../lib/api';
+import type { Api } from '../../lib/api';
 import { useData } from '../common';
-import { HOUR, localDay, localTime } from './rules';
+import { draftCountLabel, gapCountLabel, pendingGapBlocks } from './GapCover';
+import { mondayOf, weekDays } from './week';
 
 /** Hueco de cobertura de `GET /turnos/cobertura`: un área con menos personal de un rol que el mínimo vigente (RN-15). */
-export type AreaGap = { areaId: string; area: string; role: string; start: string; end: string; required: number; actual: number };
+export type AreaGap = { areaId: string; area: string; role: string; start: string; end: string; required: number; actual: number; actualConBorradores?: number };
 export type CoverageWeek = { from: string; to: string; gaps: AreaGap[] };
-export const AREA_COVERAGE_DAYS = 7;
-const SHOWN = 6;
 
-const dayLabel = (ms: number) => new Intl.DateTimeFormat('es-SV', { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'America/El_Salvador' }).format(new Date(ms));
-const span = (g: AreaGap) => {
-  const from = Date.parse(g.start), to = Date.parse(g.end);
-  return localDay(from) === localDay(to - 1) ? `${dayLabel(from)} ${localTime(from)}–${localTime(to)}` : `${dayLabel(from)} ${localTime(from)} a ${dayLabel(to)} ${localTime(to)}`;
-};
-
-/** Huecos que todavía importan: los que terminan después de `now`, del más próximo al más lejano. */
-export const upcomingGaps = (gaps: AreaGap[], now: Date) => gaps.filter(g => Date.parse(g.end) > now.valueOf()).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.area.localeCompare(b.area, 'es'));
+/** This week (Monday to Sunday) of `now`: the window the alert names «esta semana». */
+export const thisWeek = (now: Date) => { const days = weekDays(mondayOf(now.valueOf())); return { from: days[0].date, to: days[6].date }; };
 
 /**
- * MA-REQ-02 (RN-15): huecos de cobertura por área y rol de los próximos 7 días, según la política `turnos.cobertura_minima`.
- * Es el cliente de `GET /turnos/cobertura`; se actualiza en vivo con los eventos de turnos y personal.
+ * MA-REQ-02 (RN-15): turnos por cubrir esta semana según la política `turnos.cobertura_minima`, con la regla única de
+ * huecos (`pendingGapBlocks`) y el filtro de área de la pantalla. Es el cliente de `GET /turnos/cobertura` (la misma
+ * dirección que la semana visible cuando es esta semana) y se actualiza en vivo con los eventos de turnos y personal.
+ * Solo un resumen: los huecos y «Cubrir hueco» están en la lista de la semana (`onShow` lleva a ella).
  */
-export function AreaCoverageAlert({ api, version, now, onPlan }: { api: Api; version: number; now: Date; onPlan?: () => void }) {
-  const from = localDay(now.valueOf()), to = localDay(now.valueOf() + (AREA_COVERAGE_DAYS - 1) * 24 * HOUR);
+export function AreaCoverageAlert({ api, version, now, areaId, onShow }: { api: Api; version: number; now: Date; areaId?: string; onShow?: () => void }) {
+  const { from, to } = thisWeek(now);
   const week = useData<CoverageWeek>(api, `/turnos/cobertura?from=${from}&to=${to}`, version);
   if (week.error?.status === 403) return null;
   const retry = <button type="button" className="secondary-button" onClick={week.refresh}>Volver a intentar</button>;
-  if (week.error) return <Notice kind="error">No pudimos revisar la cobertura mínima de los próximos {AREA_COVERAGE_DAYS} días: {week.error.message} {retry}</Notice>;
+  if (week.error) return <Notice kind="error">No pudimos revisar la cobertura mínima de esta semana: {week.error.message} {retry}</Notice>;
   if (week.data === undefined || week.data === null) return null;
   const list = week.data.gaps;
   // A 200 without the gap list is a broken answer, not "no gaps": say so instead of hiding the alert.
-  if (!Array.isArray(list)) return <Notice kind="error">No pudimos revisar la cobertura mínima de los próximos {AREA_COVERAGE_DAYS} días: la respuesta llegó incompleta. {retry}</Notice>;
-  const gaps = upcomingGaps(list, now);
-  if (!gaps.length) return null;
-  const shown = gaps.slice(0, SHOWN);
+  if (!Array.isArray(list)) return <Notice kind="error">No pudimos revisar la cobertura mínima de esta semana: la respuesta llegó incompleta. {retry}</Notice>;
+  const { open, inDraft } = pendingGapBlocks(list.filter(g => !areaId || g.areaId === areaId), now);
+  if (!open.length && !inDraft.length) return null;
   return <section className="crew-coverage" aria-label="Cobertura mínima por área">
-    <Notice kind="info"><strong>{gaps.length === 1 ? 'Un tramo seguido' : `${gaps.length} tramos seguidos`} de los próximos {AREA_COVERAGE_DAYS} días con menos personal que el mínimo.</strong> Cada área necesita el personal que fija la política de cobertura mínima (RN-15).</Notice>
-    <ul className="crew-coverage-list">{shown.map(g => <li key={`${g.areaId}-${g.role}-${g.start}`}><strong>{g.area} · {roleNames[g.role] ?? g.role}</strong> · {span(g)} · {g.actual} de {g.required}</li>)}</ul>
-    {gaps.length > shown.length && <p className="crew-coverage-more">y {gaps.length - shown.length} tramos más.</p>}
-    {onPlan ? <button type="button" className="secondary-button" onClick={onPlan}>Asignar un turno para cubrirlo</button> : <p className="crew-coverage-more">Avisa a la Jefatura de Operaciones para que asigne los turnos que faltan.</p>}
+    <Notice kind="info"><strong>{gapCountLabel(open.length, 'esta semana')}{inDraft.length ? ` · ${draftCountLabel(inDraft.length)}` : ''}.</strong> Cada área necesita el personal que fija la política de cobertura mínima (RN-15).{inDraft.length ? ' Los borradores cuentan al publicar la semana.' : ''}</Notice>
+    {onShow && <button type="button" className="secondary-button" onClick={onShow}>Ver los huecos de esta semana</button>}
   </section>;
 }

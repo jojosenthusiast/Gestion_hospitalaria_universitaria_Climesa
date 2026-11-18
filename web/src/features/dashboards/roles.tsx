@@ -11,6 +11,7 @@ import { shownState } from '../listas/schedule';
 import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source, StockRow } from './data';
 import { unitPlural } from '../inventory/model';
 import { auditActionLabel } from './labels';
+import { coverageTodayGroup } from './coverage-tray';
 import { AttentionList, Panel, PanelState, isToday, localDay, minutesBetween, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
 export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'AST' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
@@ -138,8 +139,7 @@ const jop: RoleDashboard = {
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores con gráficos y exportación', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
   tray: ({ d }) => [
-    { id: 'huecos', title: 'Huecos de cobertura', href: '#/turnos', masculine: true, state: asRemote(d.board),
-      items: (d.board.data?.cobertura.detalle ?? []).map((g, i) => ({ id: `gap-${i}`, title: `${g.area} · ${roleNames[g.rol] ?? g.rol}`, detail: `${timeLabel(g.inicio)}–${timeLabel(g.fin)} · ${g.actuales} de ${plural(g.requeridos, 'persona', 'personas')}`, tone: 'warn' as Tone, href: '#/turnos?accion=planificar', action: 'Planificar' })) },
+    coverageTodayGroup(d),
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d), lowStock(d),
   ],
   figures: ({ d }) => [

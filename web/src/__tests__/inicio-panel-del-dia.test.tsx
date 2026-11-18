@@ -111,7 +111,7 @@ describe('Inicio · panel del día', () => {
 
   it('JOP: sin la tercera rejilla de resumen y sin datos repetidos', async () => {
     const { container } = montar('JOP');
-    await screen.findByRole('region', { name: 'Huecos de cobertura' });
+    await screen.findByRole('region', { name: 'Turnos por cubrir hoy' });
     await within(await screen.findByRole('region', { name: 'Cifras del día' })).findByText('21');
     expect(container.querySelector('.board-grid')).toBeNull();
     expect(screen.queryByText('Números en fila')).toBeNull();
@@ -129,12 +129,12 @@ describe('Inicio · panel del día', () => {
     expect(new Set(valores).size).toBe(valores.length);
   });
 
-  it('JOP: sin existencias se lee «Agotado», y los huecos dicen «0 de 1 persona»', async () => {
+  it('JOP: sin existencias se lee «Agotado», y los huecos dicen cuántas personas faltan', async () => {
     montar('JOP');
     const inventario = await screen.findByRole('region', { name: 'Inventario bajo el mínimo' });
     const fila = within(inventario).getByText('Jeringa de 5 ml').closest('li')!;
     expect(within(fila).getByText('Agotado')).toBeTruthy();
-    expect(within(await screen.findByRole('region', { name: 'Huecos de cobertura' })).getByText(/0 de 1 persona$/)).toBeTruthy();
+    expect(within(await screen.findByRole('region', { name: 'Turnos por cubrir hoy' })).getByText(/falta 1 persona$/)).toBeTruthy();
   });
 
   it('LAB: un artículo con varios lotes aparece una sola vez, y «kit» se lee «kits»', async () => {

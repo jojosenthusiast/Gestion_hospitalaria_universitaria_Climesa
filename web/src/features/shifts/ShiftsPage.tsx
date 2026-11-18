@@ -14,7 +14,8 @@ import { Field } from '../../components/ui';
 import { ShiftForm, type ShiftDraft } from './ShiftForm';
 import { CrewCoverageAlert } from './CrewCoverageAlert';
 import { AreaCoverageAlert, type CoverageWeek } from './AreaCoverageAlert';
-import { FillGapsDialog, GapCoverDialog, blockLabel, gapBlocks, type GapBlock } from './GapCover';
+import { FillGapsDialog, GapCoverDialog, blockLabel, draftCountLabel, findGapBlock, gapCountLabel, parseGapParam, pendingGapBlocks, type GapBlock } from './GapCover';
+import { useFold } from '../../components/fold';
 import { AttendanceDialog } from './AttendanceDialog';
 import { SpecialistsWeek } from './SpecialistsWeek';
 import { DAY_VIEW_LANES, ShiftWeek, StateLegend, timeRange, type CalendarPlanning } from './ShiftWeek';
@@ -59,18 +60,23 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
 
   const [open, setOpen] = useState(false), [editing, setEditing] = useState<Shift | null>(null), [cancelling, setCancelling] = useState<Shift | null>(null);
   const [marking, setMarking] = useState<ShiftRow | null>(null), [detail, setDetail] = useState<ShiftRow | null>(null), [draft, setDraft] = useState<ShiftDraft | undefined>(undefined);
-  const [view, setView] = useState<View>(initialView);
+  const [view, setView] = useState<View>(() => parseGapParam(readHashParams().get('hueco')) ? 'semana' : initialView());
   const [person, setPerson] = useState<PickerItem | null>(null), [role, setRole] = useState('todos'), [area, setArea] = useState('todos'), [state, setState] = useState('todos');
-  // R7 F3: `#/turnos?persona=yo` («Ver mis turnos» from Inicio) shows only this account's shifts.
+  // R7 F3: `#/turnos?persona=yo` («Ver mis turnos» from Inicio) shows only this account's shifts. An account without a
+  // staff record has no shifts of its own: it says so instead of showing the whole hospital.
+  const [unlinked, setUnlinked] = useState(false);
+  // `#/turnos?hueco=<areaId>:<role>:<start>` (the Inicio tray): open «Cubrir hueco» on that hole of its week.
+  const [wantedGap, setWantedGap] = useState(() => parseGapParam(readHashParams().get('hueco')));
   useEffect(() => {
     const params = readHashParams();
+    if (params.get('hueco')) writeHashParams({ hueco: null });
     if (params.get('persona') !== 'yo') return;
     writeHashParams({ persona: null });
-    if (profile.staffId) setPerson({ id: profile.staffId, label: `${profile.name} (yo)` });
+    if (profile.staffId) setPerson({ id: profile.staffId, label: `${profile.name} (yo)` }); else setUnlinked(true);
   }, []);
   const [sort, setSort] = useState<Sort>('inicio'), [panel, setPanel] = useState(false), [focusDay, setFocusDay] = useState<string | null>(null);
   const [now, setNow] = useState(() => new Date());
-  const [monday, setMonday] = useState(() => mondayOf(Date.now()));
+  const [monday, setMonday] = useState(() => mondayOf(wantedGap?.at ?? Date.now()));
   const [quick, consumeQuick] = useQuickAction();
   // Planificación (S12): vista Día, turno recién creado resaltado, mover con motivo, deshacer y lotes como borrador.
   const [scale, setScale] = useState<Scale>('semana'), [dayDate, setDayDate] = useState<string | null>(null);
@@ -118,10 +124,19 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
   const drawn = inWeek.filter(matches);
   const rows = drawn.filter(t => Date.parse(t.start) >= weekStart).sort((a, b) => Date.parse(a.start) - Date.parse(b.start) || a.person.localeCompare(b.person, 'es'));
   const assigned = inWeek.filter(t => Date.parse(t.start) >= weekStart).length;
-  const gaps = (coverage.data?.gaps ?? []).filter(g => area === 'todos' || g.areaId === area);
-  // R7 F2: holes still ahead, joined into shift-sized blocks for «Cubrir hueco» and «Llenar todos los huecos».
-  const openBlocks = useMemo(() => gapBlocks((coverage.data?.gaps ?? []).filter(g => (area === 'todos' || g.areaId === area) && Date.parse(g.start) >= at)), [coverage.data, area, at]);
+  const gaps = useMemo(() => (coverage.data?.gaps ?? []).filter(g => area === 'todos' || g.areaId === area), [coverage.data, area]);
+  // R7 F2 + the one gap rule (`pendingGapBlocks`): holes that end after now, in the 12 h blocks «Cubrir hueco» and
+  // «Llenar los huecos» propose; the ones drafts already cover only wait for publishing.
+  const pending = useMemo(() => pendingGapBlocks(gaps, at), [gaps, at]);
+  const openBlocks = pending.open;
+  const gapFold = useFold(openBlocks, 12);
   const [covering, setCovering] = useState<GapBlock | null>(null), [filling, setFilling] = useState(false);
+  useEffect(() => {
+    if (!wantedGap || !plan || !coverage.data || coverage.data.from !== mondayOf(wantedGap.at)) return;
+    const block = findGapBlock(openBlocks, wantedGap);
+    setWantedGap(null);
+    if (block) setCovering(block); else setAnnounce('Ese hueco ya está cubierto o ya terminó.');
+  }, [wantedGap, plan, coverage.data, openBlocks]);
 
   const active: { key: string; label: string; clear: () => void }[] = [
     ...(person ? [{ key: 'persona', label: `Persona: ${person.label}`, clear: () => setPerson(null) }] : []),
@@ -146,6 +161,10 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
     onAttendance: t => setMarking(t),
   };
   const isThisWeek = monday === mondayOf(at);
+  const gapWindow = isThisWeek ? 'esta semana' : `la semana del ${weekLabel(monday)}`;
+  // Planner alerts are for whoever plans; «Mis turnos» (this person's own shifts) never shows them.
+  const plannerAlerts = plan && !(person && person.id === profile.staffId);
+  const showGaps = () => { setMonday(mondayOf(at)); setView('semana'); setScale('semana'); setTimeout(() => document.getElementById('huecos-por-cubrir')?.scrollIntoView?.({ block: 'start' }), 0); };
 
   const reload = () => { data.refresh(); if (!covered) weekData.refresh(); };
   const shownDay = days.find(d => d.date === dayDate) ?? days.find(d => d.date === today) ?? days[0];
@@ -212,9 +231,9 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
     </div>
     {view === 'especialistas' ? <SpecialistsWeek api={api} version={version} /> : <>
     <div className="planning-window"><strong>Jornada laboral abierta</strong><span>{jornada} · Cada turno pasa a en curso a su hora, con la entrada confirmada, y a completado al terminar. Jefatura solo marca ausencias.</span></div>
-    {data.data && remote.data && <CrewCoverageAlert shifts={all} typeOf={typeOf} now={now} onPlan={plan ? () => { setEditing(null); setOpen(true); } : undefined} />}
-    <AreaCoverageAlert api={api} version={version} now={now} onPlan={plan ? () => { setEditing(null); setDraft(undefined); setOpen(true); } : undefined} />
-    <section className="data-workbench">
+    {plannerAlerts && data.data && remote.data && <CrewCoverageAlert shifts={all} typeOf={typeOf} now={now} onPlan={() => { setEditing(null); setOpen(true); }} />}
+    {plannerAlerts && <AreaCoverageAlert api={api} version={version} now={now} areaId={areaId} onShow={showGaps} />}
+    {unlinked ? <Empty title="Tu cuenta no está vinculada a una ficha" description="Pide a Administración que vincule tu cuenta con tu ficha de personal para ver tus turnos aquí." /> : <section className="data-workbench">
       <div className="shift-toolbar">
         <div className="shift-weeknav" role="group" aria-label="Semana">
           <button type="button" className="secondary-button" aria-label="Semana anterior" onClick={() => setMonday(m => addWeeks(m, -1))}><Icon name="back" size={18} /></button>
@@ -245,7 +264,7 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         </div>}
         {plan && view === 'semana' && <div className="shift-plan-tools" role="group" aria-label="Planificar la semana">
           <button type="button" className="secondary-button" onClick={() => setTool('rotacion')}>Generar rotación</button>
-          {openBlocks.length > 0 && <button type="button" className="secondary-button" onClick={() => setFilling(true)} title="Turnos que faltan en la semana que estás viendo, desde ahora">Llenar los huecos de esta semana ({openBlocks.length} {openBlocks.length === 1 ? 'turno' : 'turnos'})</button>}
+          {openBlocks.length > 0 && <button type="button" className="secondary-button" onClick={() => setFilling(true)} title="Turnos que faltan en la semana que estás viendo, desde ahora">Llenar los huecos de {gapWindow} ({openBlocks.length} {openBlocks.length === 1 ? 'turno' : 'turnos'})</button>}
           <button type="button" className="secondary-button" onClick={() => void copyPrevious()}>Copiar semana anterior</button>
           <button type="button" className="secondary-button" onClick={() => setTool('masiva')}>Asignación masiva</button>
           <button type="button" className="secondary-button" onClick={() => setTool('plantillas')}>Plantillas</button>
@@ -275,13 +294,15 @@ export function ShiftsPage({ api, profile, version }: { api: Api; profile: Acces
         {coverage.error && coverage.error.status !== 403 && <Notice kind="error">No pudimos dibujar los huecos de cobertura de esta semana: {coverage.error.message} <button type="button" className="secondary-button" onClick={coverage.refresh}>Volver a intentar</button></Notice>}
         <ShiftWeek days={visibleDays} today={today} now={at} shifts={drawn} gaps={gaps} onOpen={setDetail} onShowDay={date => { setFocusDay(date); setView('lista'); }}
           planning={planning} highlight={highlight} maxLanes={scale === 'dia' ? DAY_VIEW_LANES : undefined} />
-        {plan && openBlocks.length > 0 && <section className="gap-list" aria-label="Huecos por cubrir"><h3>Huecos por cubrir ({openBlocks.length})</h3><ul>
-          {openBlocks.slice(0, 12).map(b => <li key={b.key}><span>{blockLabel(b)}{b.missing > 1 ? ` · faltan ${b.missing}` : ''}</span><button type="button" className="secondary-button" aria-label={`Cubrir hueco: ${blockLabel(b)}`} onClick={() => setCovering(b)}>Cubrir hueco</button></li>)}
-        </ul>{openBlocks.length > 12 && <p className="muted">Y {openBlocks.length - 12} más; «Llenar los huecos de esta semana» los incluye.</p>}</section>}
+        {plan && (openBlocks.length > 0 || pending.inDraft.length > 0) && <section id="huecos-por-cubrir" className="gap-list" aria-label="Huecos por cubrir"><h3>{gapCountLabel(openBlocks.length, gapWindow).replace(/^./, c => c.toUpperCase())}</h3>
+          {openBlocks.length > 0 && <ul>
+            {gapFold.shown.map(b => <li key={b.key}><span>{blockLabel(b)}{b.missing > 1 ? ` · faltan ${b.missing}` : ''}</span><button type="button" className="secondary-button" aria-label={`Cubrir hueco: ${blockLabel(b)}`} onClick={() => setCovering(b)}>Cubrir hueco</button></li>)}
+          </ul>}{gapFold.more}
+          {pending.inDraft.length > 0 && <p className="muted">{draftCountLabel(pending.inDraft.length).replace(/^./, c => c.toUpperCase())}: cuentan cuando publiques la semana.</p>}</section>}
         {!drawn.length && <Empty title="Sin turnos en esta semana" description={active.length ? 'Ajusta los filtros o la búsqueda para consultar otros horarios.' : plan ? 'Haz clic en una hora del calendario, usa el botón + de cada día, genera una rotación o copia la semana anterior.' : 'Cambia de semana.'} />}
       </section> : drawn.length ? <ShiftDayList days={days} today={today} now={at} rows={drawn} plan={plan} byPerson={sort === 'persona'} typeOf={typeOf} actions={actions} />
         : <Empty title="Sin turnos en esta vista" description="Ajusta los filtros, la búsqueda o la semana para consultar otros horarios." />}</RemoteState>
-    </section>
+    </section>}
     </>}
     {detail && <ShiftDetail shift={detail} now={at} plan={plan} typeOf={typeOf} actions={actions} onClose={() => setDetail(null)} />}
     {open && <ShiftForm api={api} shift={editing} draft={editing ? undefined : draft} catalog={catalog} shifts={covered ? all : [...all, ...shown.filter(t => !all.some(a => a.id === t.id))]} onClose={() => setOpen(false)} onSaved={id => { setOpen(false); if (id) { setHighlight(id); setAnnounce(editing ? 'Turno guardado; está resaltado en el calendario.' : 'Turno asignado; está resaltado en el calendario.'); } reload(); }} />}
