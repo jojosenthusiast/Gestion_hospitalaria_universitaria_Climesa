@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent, type FormEvent } from 'react';
+import { useEffect, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { ExportMenu } from '../components/export-menu';
 import { SearchPicker, type PickerItem } from '../components/search-picker';
 import { StatusBadge, ActionButton, AreaTag, PriorityBadge, type Priority } from '../components/system';
@@ -9,7 +9,7 @@ import { patientPicker } from './appointments';
 import { useQuickAction } from './personal/accion';
 import { FrontDeskDialog } from './front-desk';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
-import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, WriteError, formatDateTime, isVersionConflict, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, WriteError, formatDateTime, isVersionConflict, useAction, useData, type Remote } from './common';
 import { LiveSearch, matches } from './listas/chips';
 import { Segmented } from '../components/segmented';
 import { formatDuration, formatTime, plural } from '../lib/format';
@@ -61,7 +61,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   // Quick actions: `emitir` opens the front desk (with `paciente=<id>` from the patient record, already chosen);
   // `llamar` preselects the caller's service and consulting room from the shift in progress (B-5).
   const [quick, consumeQuick] = useQuickAction();
-  const [deskPatient, setDeskPatient] = useState<string | null>(null), [postOffice, setPostOffice] = useState('');
+  const [deskPatient, setDeskPatient] = useState<string | null>(null), [office, setOffice] = useState('');
   const post = useData<MyPost>(api, '/fila/mi-puesto', 0, call && quick === 'llamar');
   useEffect(() => {
     if (quick === 'emitir' && issue) { setDeskPatient(readHashParams().get('paciente')); writeHashParams({ paciente: null }); setIssueOpen(true); }
@@ -70,7 +70,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   useEffect(() => {
     if (quick !== 'llamar' || post.loading) return;
     if (post.data?.service) setService(post.data.service);
-    if (post.data?.officeId) setPostOffice(post.data.officeId);
+    if (post.data?.officeId) setOffice(post.data.officeId);
     consumeQuick();
   }, [quick, post.loading, post.data, consumeQuick]);
 
@@ -122,32 +122,36 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   }
   // El reloj se lee al pintar; cada evento en vivo vuelve a pintar el tablero (sin temporizadores).
   const now = Date.now();
+  const loaded = Array.isArray(data.data) ? data.data : [];
+  // R4a: «Llamar siguiente» is never hidden behind a filter. With «Todos» it works on the first service that has
+  // someone waiting (in the order of the service list), and the line says which service that is.
+  const nextService = service !== 'todos' ? service : services.find(([value]) => loaded.some(t => t.service === value && t.state === 'en_espera'))?.[0] ?? null;
+  const showNext = !!nextService && wholeQueue && !readOnly;
+  const loadedVisible = loaded.filter(t => (service === 'todos' || t.service === service) && matches(query, String(t.numero), t.patientName, serviceNames[t.service], ticketCode(t)));
+  const waitingNext = loaded.filter(t => t.service === nextService && t.state === 'en_espera').length;
+  // One request for «Quién sigue»: the panel and the bottom dock read the same server proposal.
+  const next = useData<NextProposal>(api, `/fila/siguiente?service=${nextService ?? ''}`, version + tick, showNext);
   return <>
     <CompactHeader breadcrumb="Atención / Flujo de llegada" title="Fila del día" actions={<>
       {readOnly && <span className="qb-readonly" title="Llamar y atender corresponde a Recepción, Asistencia y Medicina."><Icon name="eye" size={16} />Solo lectura</span>}
-      {issue && <button className="primary-button" onClick={() => setIssueOpen(true)}><Icon name="plus" size={18}/>Emitir número</button>}</>}/>
+      </>}/>
     <section className="data-workbench" aria-label="Tablero de la fila">
       <RemoteState state={data}>{all => {
-        const visible = all.filter(t => (service === 'todos' || t.service === service) && matches(query, String(t.numero), t.patientName, serviceNames[t.service], ticketCode(t)));
+        const visible = loadedVisible;
         const shown = visible.map(t => ({ ...t, column: (pending[t.id] ?? columnOf(t)) as Column }));
         const summary = boardSummary(visible, now);
-        // R4a: «Llamar siguiente» is never hidden behind a filter. With «Todos» it works on the first service that has
-        // someone waiting (in the order of the service list), and the line says which service that is.
-        const nextService = service !== 'todos' ? service : services.find(([value]) => all.some(t => t.service === value && t.state === 'en_espera'))?.[0] ?? null;
         const exportTable = () => ({ filename: 'fila-del-dia', title: 'Fila del día', subtitle: `${visible.length} números`, columns: ['Número', 'Servicio', 'Paciente', 'Prioridad', 'Cita', 'Estado', 'Llamados', 'Emitido', 'Espera'], rows: visible.map(t => [ticketCode(t), serviceNames[t.service] ?? t.service, t.patientName ?? 'Paciente no identificado', PRIORITY_LABEL[t.priority ?? 'rutina'], t.appointmentAt ? localTime(t.appointmentAt) : 'Sin cita', COLUMN_LABEL[columnOf(t)], t.llamados, formatDateTime(t.issuedAt, { withYear: true }), minutesText(waitMinutes(t, now))]) });
-        const waitingHere = all.filter(t => t.service === nextService && t.state === 'en_espera').length;
         return <>
           <div className="cl-toolbar qb-toolbar">
             <LiveSearch label="Buscar en la fila" placeholder="Número o paciente" value={query} onChange={setQuery} />
             <Segmented label="Servicio" value={service} onChange={setService} options={[{ value: 'todos', label: 'Todos', count: all.length }, ...services.map(([value, label]) => ({ value, label, count: all.filter(t => t.service === value).length }))]} />
             <span className="qb-toolbar-end">{query.trim() && <button type="button" className="cl-link-button" onClick={() => setQuery('')}>Quitar filtros</button>}<ExportMenu table={exportTable} disabled={!visible.length} /></span>
           </div>
-          {nextService && wholeQueue && !readOnly
-            && <NextPanel api={api} profile={profile} service={nextService} named={service === 'todos'} version={version + tick} busy={action.busy} canCall={call} waiting={waitingHere} initialOffice={postOffice} onCallNext={callNext} />}
+          {showNext && nextService
+            && <NextPanel api={api} profile={profile} service={nextService} named={service === 'todos'} next={next} canCall={call} waiting={waitingNext} office={office} onOffice={setOffice} />}
           {/* A failed card action shows on its card; the line here stays for version conflicts (reload) and the panel. */}
           {(!failedId || isVersionConflict(action.error)) && <WriteError error={action.error} onReload={refresh} reloadLabel="Recargar la fila" />}
           {moveError && !moveError.ticketId && <Notice kind="info">{moveError.text}</Notice>}
-          {undo && !action.error && <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoCall(undo)}><Icon name="retry" size={16} />Deshacer</button></div>}
           {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(shown.filter(t => t.column === column), column)} now={now} busy={action.busy} call={call} manage={manage} issue={issue}
               pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} current={id => all.find(t => t.id === id) ?? null} undos={undos}
               cardError={id => failedId === id && action.error && !isVersionConflict(action.error) ? action.error.message : moveError?.ticketId === id ? moveError.text : null}
@@ -156,6 +160,10 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
         </>;
       }}</RemoteState>
     </section>
+    {data.data && (loaded.length > 0 || call || issue || !!undo) && <QueueDock visible={loadedVisible} now={now} proposal={showNext && next.data && !Array.isArray(next.data) && next.data.service === nextService ? next.data.proposal : null}
+            undo={undo && !action.error ? <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoCall(undo)}><Icon name="retry" size={16} />Deshacer</button></div> : null}
+            onCallNext={call && showNext && nextService ? () => void callNext(nextService, office) : null} callDisabled={action.busy || waitingNext === 0}
+            onIssue={issue ? () => setIssueOpen(true) : null} />}
     {issueOpen && (profile.patientId && !manage
       ? <IssueDialog api={api} profile={profile} onClose={() => setIssueOpen(false)} onSaved={() => { setIssueOpen(false); refresh(); }} />
       : <FrontDeskDialog api={api} patientId={deskPatient} onClose={() => { setIssueOpen(false); setDeskPatient(null); }} onIssued={refresh} />)}
@@ -170,15 +178,12 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
 
 /**
  * R4a: one line on top of the board. «Quién sigue» names the number the server rule proposes (the rule itself is the
- * tooltip, not printed text), with the consulting room picker and «Llamar siguiente» inline next to it.
+ * tooltip, not printed text), with the consulting room for the call. «Llamar siguiente» lives in the bottom dock.
  */
-function NextPanel({ api, profile, service, named, version, busy, canCall, waiting, initialOffice = '', onCallNext }: { api: Api; profile: AccessProfile; service: string; named: boolean; version: number; busy: boolean; canCall: boolean; waiting: number; initialOffice?: string; onCallNext: (service: string, officeId: string) => Promise<void> }) {
-  const next = useData<NextProposal>(api, `/fila/siguiente?service=${service}`, version);
+function NextPanel({ api, profile, service, named, next, canCall, waiting, office, onOffice }: { api: Api; profile: AccessProfile; service: string; named: boolean; next: Remote<NextProposal>; canCall: boolean; waiting: number; office: string; onOffice: (office: string) => void }) {
   const rooms = useData<Space[]>(api, '/espacios', 0, canCall && can(profile, 'espacios.ver'));
-  const [office, setOffice] = useState(initialOffice);
-  useEffect(() => { if (initialOffice) setOffice(initialOffice); }, [initialOffice]);
   const offices = Array.isArray(rooms.data) ? rooms.data.filter(space => space.type === 'consultorio' && space.active) : [];
-  const result = next.data && !Array.isArray(next.data) ? next.data : null;
+  const result = next.data && !Array.isArray(next.data) && next.data.service === service ? next.data : null;
   const proposal = result?.proposal ?? null;
   return <section className="qb-next" aria-label="Quién sigue" title={result ? `Orden: ${result.rule}` : undefined}>
     <div className="qb-next-main">
@@ -191,9 +196,39 @@ function NextPanel({ api, profile, service, named, version, busy, canCall, waiti
                 // The server proposes only whom this account may call (a doctor sees their own patients): others may still wait.
         : <p className="muted">{next.loading || !result ? 'Calculando…' : waiting > 0 ? `Esperan ${waiting} ${waiting === 1 ? 'paciente' : 'pacientes'} de otros médicos.` : 'Nadie espera en este servicio.'}</p>}
     </div>
-    {canCall && <div className="qb-next-actions">
-      {offices.length > 0 && <label className="qb-office"><span className="sr-only">Consultorio</span><select aria-label="Consultorio" value={office} onChange={event => setOffice(event.target.value)}><option value="">Sin consultorio</option>{offices.map(room => <option key={room.id} value={room.id}>{room.code} · {room.name}</option>)}</select></label>}
-      <button className="primary-button" disabled={busy || waiting === 0} onClick={() => void onCallNext(service, office)}><Icon name="megaphone" size={18} />Llamar siguiente</button>
+    {canCall && offices.length > 0 && <div className="qb-next-actions">
+      <label className="qb-office"><span className="sr-only">Consultorio</span><select aria-label="Consultorio" value={office} onChange={event => onOffice(event.target.value)}><option value="">Sin consultorio</option>{offices.map(room => <option key={room.id} value={room.id}>{room.code} · {room.name}</option>)}</select></label>
+    </div>}
+  </section>;
+}
+
+type DockProposal = NonNullable<NextProposal['proposal']>;
+/**
+ * Android parity (QueueDock): a bottom dock that stays in view while the board scrolls. Who is being seen, who goes
+ * next (the server proposal when there is one, else the head of the line) with the area tag, the wait times in large
+ * type, and «Llamar siguiente» / «Emitir número» splitting the full width. Buttons the account cannot use are absent.
+ */
+export function QueueDock({ visible, now, proposal, undo, onCallNext, callDisabled, onIssue }: { visible: QueueTicket[]; now: number; proposal: DockProposal | null; undo?: ReactNode; onCallNext: (() => void) | null; callDisabled: boolean; onIssue: (() => void) | null }) {
+  const serving = visible.filter(t => t.state === 'en_atencion' || t.state === 'llamado').sort((a, b) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0] ?? null;
+  const waiting = sortColumn(visible.filter(t => t.state === 'en_espera'), 'espera');
+  const summary = boardSummary(visible, now);
+  const nextArea = proposal ? proposal.area || 'GEN' : waiting[0] ? areaOfTicket(waiting[0]) : null;
+  const nextNumber = proposal?.numero ?? waiting[0]?.numero ?? null;
+  return <section className="qb-dock" aria-label="Resumen de atención">
+    {undo}
+    <div className="qb-dock-stats">
+      <div className="qb-dock-stat"><span className="qb-dock-label">En atención</span>
+        <span className="qb-dock-value">{serving ? <><AreaTag code={areaOfTicket(serving)} /><strong className="mono-data">{serving.numero}</strong></> : <strong className="qb-dock-none">Nadie</strong>}</span></div>
+      <div className="qb-dock-stat"><span className="qb-dock-label">Sigue</span>
+        <span className="qb-dock-value">{nextNumber !== null && nextArea ? <><AreaTag code={nextArea} /><strong className="mono-data">{nextNumber}</strong></> : <strong className="qb-dock-none">Nadie</strong>}</span>
+        {waiting.length > 0 && <small>{waiting.length} en espera</small>}</div>
+      <div className="qb-dock-stat qb-dock-wait"><span className="qb-dock-label">Espera promedio</span>
+        <span className="qb-dock-value"><strong>{formatDuration(summary.averageWait)}</strong></span>
+        <small>Máxima {formatDuration(summary.longestWait)}</small></div>
+    </div>
+    {(onCallNext || onIssue) && <div className="qb-dock-actions">
+      {onCallNext && <button type="button" className={onIssue ? 'secondary-button' : 'primary-button'} disabled={callDisabled} onClick={onCallNext}><Icon name="megaphone" size={18} />Llamar siguiente</button>}
+      {onIssue && <button type="button" className="primary-button" onClick={onIssue}><Icon name="plus" size={18} />Emitir número</button>}
     </div>}
   </section>;
 }

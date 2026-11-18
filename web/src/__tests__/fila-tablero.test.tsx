@@ -94,7 +94,8 @@ describe('Fila del día · tablero (S9)', () => {
     expect(within(next).getByText('Urgente: pasa antes que las citas y la fila.')).toBeTruthy();
     expect(next.getAttribute('title')).toMatch(/Emergencias primero/);
     await userEvent.selectOptions(await within(next).findByRole('combobox', { name: 'Consultorio' }), 'c-1');
-    await userEvent.click(within(next).getByRole('button', { name: /Llamar siguiente/ }));
+    // Android parity: the call button lives in the bottom dock, with the room chosen in «Quién sigue».
+    await userEvent.click(within(screen.getByRole('region', { name: 'Resumen de atención' })).getByRole('button', { name: /Llamar siguiente/ }));
     expect(api.write).toHaveBeenCalledWith('/fila/llamar-siguiente', { service: 'consulta_general', officeId: 'c-1' }, 'POST');
   });
 
