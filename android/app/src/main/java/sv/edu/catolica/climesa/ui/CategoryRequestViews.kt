@@ -189,14 +189,24 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
 @Composable
 internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, onWithdraw: (CategoryRequest) -> Unit, error: String? = null) {
     var confirm by rememberSaveable { mutableStateOf<String?>(null) }
+    var resolvedOpen by rememberSaveable { mutableStateOf(false) }
+    // Pending requests stay in view; assigned, rejected or withdrawn ones fold under one line.
+    val (pending, resolved) = requests.partition { it.pending }
     SectionCard(stringResource(R.string.cat_mis_solicitudes)) {
-        requests.forEach { r ->
+        @Composable fun RequestRow(r: CategoryRequest) {
             Column {
                 DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
                 r.appointment?.let { Text(stringResource(R.string.cat_asignada_detalle, it.doctorName, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
-                r.rejectionReason?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                r.rejectionReason?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.pac_motivo_rechazo, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (r.allows(CategoryRequestRules.CANCEL)) TextButton(onClick = { confirm = r.id }, enabled = !busy) { Text(stringResource(R.string.cat_retirar)) }
             }
+        }
+        pending.forEach { RequestRow(it) }
+        if (resolved.isNotEmpty()) {
+            TextButton(onClick = { resolvedOpen = !resolvedOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+                Text(stringResource(if (resolvedOpen) R.string.pac_solicitudes_ocultar_resueltas else R.string.pac_solicitudes_ver_resueltas, resolved.size))
+            }
+            if (resolvedOpen) resolved.forEach { RequestRow(it) }
         }
     }
     requests.firstOrNull { it.id == confirm }?.let { r ->

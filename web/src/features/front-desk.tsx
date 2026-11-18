@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { handOffPatientSearch } from './patient-handoff';
 import { SearchPicker, type PickerItem, type PickerPage } from '../components/search-picker';
-import { AreaTag, PriorityBadge, type Priority } from '../components/system';
+import { AreaTag, PriorityBadge, StatusBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
 import { type Api } from '../lib/api';
 import { SERVICE_AREA, localTime } from '../lib/queue-moves';
@@ -101,7 +101,7 @@ export function FrontDeskDialog({ api, patientId, onClose, onIssued }: { api: Ap
           {!picked && <p className="form-hint">¿No aparece? <a className="cl-link-button" href="#/pacientes?accion=registrar" onClick={() => handOffPatientSearch(typed.current)}>Registrar paciente nuevo</a></p>}
           {voided && <Notice kind="success">Se anuló {deskCode(voided)}. Puedes emitir otro número.</Notice>}
           <WriteError error={action.error} />
-          {patient && holding && <Notice kind="info">{patient.fullName} ya tiene el número {deskCode(holding)} ({TICKET_STATE[holding.state] ?? holding.state}). No hace falta otro.</Notice>}
+          {patient && holding && <Notice kind="info">{patient.fullName} ya tiene el número {deskCode(holding)} <StatusBadge value={holding.state} />. No hace falta otro.</Notice>}
           {patient && !holding && appointment && <section className="fd-arrival" aria-label="Cita de hoy">
             <p><Icon name="clock" size={16} /> Cita hoy a las <strong>{localTime(appointment.start)}</strong> con {appointment.doctorName}</p>
             <button type="button" className="primary-button fd-primary" disabled={busy} onClick={() => void issue(true)}>{action.busy ? 'Registrando…' : 'Registrar llegada'}{action.busy ? <span className="spinner" /> : <Icon name="arrow" size={18} />}</button>

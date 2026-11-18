@@ -7,6 +7,8 @@ import { ActiveFilters } from '../listas/chips';
 import { AuditDrawer } from './AuditDrawer';
 import { AuditExport } from './AuditExport';
 import { ChainPanel } from './ChainPanel';
+import { useQuickAction } from '../personal/accion';
+import { readHashParams, writeHashParams } from '../../lib/hash-params';
 import {
   PAGE_SIZES, activeCount, chips, defaultSort, describeAction, emptyFilters, pageQuery, presetLabel, presets, removeChip, resultNames,
   type AuditFilters, type AuditOptions, type AuditPageData, type AuditSort, type SortKey,
@@ -27,7 +29,16 @@ const columns: { key: SortKey; label: string }[] = [
 
 /** W32 · Espacio del auditor (DPD): búsqueda, filtros con chips, vistas rápidas, tabla ordenable y paginada, detalle, cadena y exportación. */
 export function AuditPage({ api, version }: { api: Api; version: number }) {
-  const [filters, setFilters] = useState<AuditFilters>(emptyFilters);
+  // `#/auditoria?resultado=denegado,fallido` (Inicio, «Eventos denegados o fallidos») opens the list already filtered.
+  const [filters, setFilters] = useState<AuditFilters>(() => {
+    const results = (readHashParams().get('resultado') ?? '').split(',').filter(r => r in resultNames);
+    return results.length ? { ...emptyFilters, results } : emptyFilters;
+  });
+  useEffect(() => { if (readHashParams().get('resultado')) writeHashParams({ resultado: null }); }, []);
+  // `?accion=verificar` (Inicio, «Verificar la cadena») runs the chain check once.
+  const [quick, consumeQuick] = useQuickAction();
+  const [verifyNow, setVerifyNow] = useState(false);
+  useEffect(() => { if (!quick) return; if (quick === 'verificar') setVerifyNow(true); consumeQuick(); }, [quick, consumeQuick]);
   const [sort, setSort] = useState<AuditSort>(defaultSort);
   const [page, setPage] = useState(1), [size, setSize] = useState(PAGE_SIZES[0]);
   const [panel, setPanel] = useState(false), [detail, setDetail] = useState<string | null>(null);
@@ -55,7 +66,7 @@ export function AuditPage({ api, version }: { api: Api; version: number }) {
 
   return <>
     <CompactHeader breadcrumb="Protección de datos / Trazabilidad" title="Auditoría" actions={<AuditExport api={api} total={total} subtitle={subtitle} queryFor={(p, s) => pageQuery(applied, sort, p, s, { exportar: 'true' })}/>}/>
-    <ChainPanel api={api} onOpen={setDetail} />
+    <ChainPanel api={api} onOpen={setDetail} autoRun={verifyNow} />
     <section className="data-workbench">
       <div className="audit-presets segmented-control" role="group" aria-label="Vistas rápidas">
         {presets.map(p => <button key={p.id} type="button" title={p.hint} aria-pressed={activePreset === p.id} onClick={() => applyPreset(p.id)}>{p.label}</button>)}

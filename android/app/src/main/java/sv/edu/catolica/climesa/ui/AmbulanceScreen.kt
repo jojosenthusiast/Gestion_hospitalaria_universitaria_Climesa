@@ -73,7 +73,7 @@ val ambulanceSections = setOf(
  * reporte prehospital (A72) y el reporte en cola sobreviva al cambio de sección y al giro.
  */
 @Composable
-fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: String, modifier: Modifier = Modifier) {
+fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: String, modifier: Modifier = Modifier, quickAction: sv.edu.catolica.climesa.domain.QuickAction? = null, onQuickActionHandled: () -> Unit = {}) {
     if (ParamedicRules.handles(section, profile.permissions)) { ParamedicScreen(section, profile, accountId, modifier); return }
     val model: AmbulanceViewModel = viewModel(key = "ambulance-$accountId")
     val state by model.state.collectAsStateWithLifecycle()
@@ -88,6 +88,13 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         }, readsStatus)
     }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
+    // Inicio "Despachar": open the dispatch form of the oldest pending request (the one the unit serves next) once loaded.
+    var dispatchFor by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(quickAction, state.status) {
+        if (quickAction == null || state.loading) return@LaunchedEffect
+        if (quickAction == sv.edu.catolica.climesa.domain.QuickAction.DISPATCH && "ambulancia.despachar" in profile.permissions) dispatchFor = state.status?.pendingRequests?.firstOrNull()?.id
+        onQuickActionHandled()
+    }
     PageList(modifier) {
         // G4: the request form and the dispatch dialogs show their own error next to their button.
         if (section != AndroidSection.AMBULANCE_REQUEST && section != AndroidSection.DISPATCH) state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
@@ -96,7 +103,7 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         else if (state.error != null) item { ErrorState(state.error, onRetry = { model.open(modeOf(section), readsStatus) }) }
         else when (section) {
             AndroidSection.AMBULANCE_REQUEST -> requestContent(state, model)
-            AndroidSection.DISPATCH -> dispatchContent(state, model)
+            AndroidSection.DISPATCH -> dispatchContent(state, model, dispatchFor) { dispatchFor = null }
             AndroidSection.LOG -> logContent(state, model)
             else -> arrivalContent(state, model)
         }
@@ -204,7 +211,7 @@ private fun LazyListScope.unitHeader(state: AmbulanceUiState) {
 }
 
 /** A36: solicitudes por confirmar, confirmar y despachar o descartar. */
-private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
+private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: AmbulanceViewModel, openFor: String? = null, onOpened: () -> Unit = {}) {
     unitHeader(state)
     val status = state.status ?: return
     status.activeService?.let { service -> item { ServiceSummary(service) } }
@@ -214,12 +221,13 @@ private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: Ambula
     // One primary per screen: only the oldest request (the one the unit serves next) gets the filled "Despachar".
     val first = status.pendingRequests.firstOrNull()?.id
     state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
-    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew, primary = request.id == first, error = state.formError) }
+    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew, primary = request.id == first, error = state.formError, autoOpen = request.id == openFor, onAutoOpened = onOpened) }
 }
 
 @Composable
-private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, primary: Boolean, error: String?) {
+private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, primary: Boolean, error: String?, autoOpen: Boolean = false, onAutoOpened: () -> Unit = {}) {
     var dispatching by rememberSaveable(request.id) { mutableStateOf(false) }
+    LaunchedEffect(autoOpen) { if (autoOpen) { if (available && !busy) dispatching = true; onAutoOpened() } }
     var discarding by rememberSaveable(request.id) { mutableStateOf(false) }
     val sent = remember(request.id) { mutableStateOf(false) }
     // G4: a failed dispatch keeps the dialog open with the crew, type and destination chosen, and says why inside it.

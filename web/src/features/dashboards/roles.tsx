@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { MoreLink } from '../../components/fold';
 import { BarChart, HBarList, type Tone } from '../../components/charts';
 import { roleNames, staffTypeNames, type AccessProfile, type Appointment, type AuditRow, type Shift } from '../../lib/api';
-import { formatDate, formatDuration, formatPercent, formatRelative, formatTime, joinParts, minutesSince, plural } from '../../lib/format';
+import { formatDate, formatDateTime, formatDuration, formatPercent, formatRelative, formatTime, joinParts, minutesSince, plural } from '../../lib/format';
 import { StatusBadge } from '../../components/system';
 import type { Remote } from '../common';
 import { milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames } from '../ambulance/types';
@@ -11,6 +11,8 @@ import { shownState } from '../listas/schedule';
 import type { AdmissionRow, DashboardData, LabOrderRow, QueueTicket, Source, StockRow } from './data';
 import { unitPlural } from '../inventory/model';
 import { auditActionLabel } from './labels';
+import { coverageTodayGroup } from './coverage-tray';
+import { needsStaffLink } from '../personal/filters';
 import { AttentionList, Panel, PanelState, isToday, localDay, minutesBetween, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
 export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'AST' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
@@ -101,8 +103,8 @@ const adm: RoleDashboard = {
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores del hospital por día', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
   tray: ({ d }) => [{
-    id: 'cuentas', title: 'Cuentas sin personal vinculado', href: '#/personal?cuenta=con', state: asRemote(d.users),
-    items: (d.users.data ?? []).filter(u => u.state === 'activo' && !u.staffId && u.roles.some(r => ['REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'].includes(r))).map(u => ({ id: u.id, title: u.name || u.email, detail: u.roles.map(r => roleNames[r] ?? r).join(' · '), tone: 'warn' as Tone, href: '#/personal?cuenta=con', action: 'Vincular' })),
+    id: 'cuentas', title: 'Cuentas sin personal vinculado', href: '#/personal?cuenta=sin_ficha', state: asRemote(d.users),
+    items: (d.users.data ?? []).filter(u => needsStaffLink(u)).map(u => ({ id: u.id, title: u.name || u.email, detail: u.roles.map(r => roleNames[r] ?? r).join(' · '), tone: 'warn' as Tone, href: `#/personal?cuenta=sin_ficha&vincular=${u.id}`, action: 'Vincular' })),
   }],
   figures: ({ d }) => [
     fig('cuentas-activas', 'Cuentas activas', d.users, u => u.filter(x => x.state === 'activo').length, { href: '#/personal?cuenta=con' }),
@@ -138,8 +140,7 @@ const jop: RoleDashboard = {
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores con gráficos y exportación', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
   tray: ({ d }) => [
-    { id: 'huecos', title: 'Huecos de cobertura', href: '#/turnos', masculine: true, state: asRemote(d.board),
-      items: (d.board.data?.cobertura.detalle ?? []).map((g, i) => ({ id: `gap-${i}`, title: `${g.area} · ${roleNames[g.rol] ?? g.rol}`, detail: `${timeLabel(g.inicio)}–${timeLabel(g.fin)} · ${g.actuales} de ${plural(g.requeridos, 'persona', 'personas')}`, tone: 'warn' as Tone, href: '#/turnos?accion=planificar', action: 'Planificar' })) },
+    coverageTodayGroup(d),
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d), lowStock(d),
   ],
   figures: ({ d }) => [
@@ -156,6 +157,13 @@ const jop: RoleDashboard = {
 // ───────────────────────────── DPD · protección de datos
 const AUDIT_LIMIT = 200;
 const failedEvents = (rows: AuditRow[]) => rows.filter(r => r.result !== 'exito');
+const FAILED_HREF = '#/auditoria?resultado=denegado,fallido';
+/** W04 · DPD: «cadena de auditoría por verificar» while nobody ran `auditoria.verificar` today (read from the latest events). */
+const chainUnverified = (d: DashboardData): TrayGroupSpec => ({
+  id: 'cadena', title: 'Cadena sin verificar hoy', href: '#/auditoria?accion=verificar', state: asRemote(d.audit),
+  items: d.audit.data && !d.audit.data.some(r => r.action === 'auditoria.verificar' && isToday(r.at))
+    ? [{ id: 'cadena', title: 'Integridad de la bitácora', detail: 'Nadie la ha verificado hoy', tone: 'warn' as Tone, href: '#/auditoria?accion=verificar', action: 'Verificar' }] : [],
+});
 const dpd: RoleDashboard = {
   title: 'Protección de datos',
   needs: ['audit', 'users'],
@@ -164,9 +172,9 @@ const dpd: RoleDashboard = {
     { id: 'cadena', label: 'Verificar la cadena', hint: 'Comprueba que nadie alteró la bitácora', icon: 'shield', href: '#/auditoria?accion=verificar', permission: 'auditoria.ver' },
     { id: 'metricas', label: 'Ver métricas', hint: 'Indicadores agregados', icon: 'chart', href: '#/metricas', permission: 'metricas.ver' },
   ],
-  tray: ({ d }) => [{
-    id: 'denegados', title: 'Eventos denegados o fallidos', href: '#/auditoria', masculine: true, state: asRemote(d.audit),
-    items: failedEvents(d.audit.data ?? []).map(r => ({ id: r.seq, title: auditActionLabel(r.action), detail: `${roleNames[r.role] ?? r.role} · ${formatTime(r.at)}`, tone: 'urgent' as Tone, href: '#/auditoria', action: 'Revisar', tag: r.result === 'denegado' ? 'Denegado' : 'Fallido', status: r.result === 'denegado' ? 'denegado' : 'fallido' })),
+  tray: ({ d }) => [chainUnverified(d), {
+    id: 'denegados', title: 'Eventos denegados o fallidos', href: FAILED_HREF, masculine: true, state: asRemote(d.audit),
+    items: failedEvents(d.audit.data ?? []).map(r => ({ id: r.seq, title: auditActionLabel(r.action), detail: `${roleNames[r.role] ?? r.role} · ${formatDateTime(r.at, { short: true })}`, tone: 'urgent' as Tone, href: FAILED_HREF, action: 'Revisar', tag: r.result === 'denegado' ? 'Denegado' : 'Fallido', status: r.result === 'denegado' ? 'denegado' : 'fallido' })),
   }],
   figures: ({ d }) => [
     // The list holds the latest 200 events: at the cap the real total is larger, so it reads «200+» (W-DPD-1).
@@ -205,7 +213,7 @@ const rec: RoleDashboard = {
         ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `${formatDate(a.start, { withYear: false })}, ${timeLabel(a.start)} · ${a.doctorName}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Por confirmar', status: 'solicitada' })),
       ] },
     { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),
-      items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
+      items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name || l.account.email, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d),
   ],
   figures: ({ d }) => [

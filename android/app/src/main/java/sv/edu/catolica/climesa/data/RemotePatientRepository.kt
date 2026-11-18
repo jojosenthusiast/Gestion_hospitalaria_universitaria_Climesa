@@ -24,8 +24,8 @@ class RemotePatientRepository(private val api:ApiClient):PatientRepository {
         val p=api.request("/pacientes/$id") as JSONObject
         val person=patient(p)
         val history=p.optJSONArray("history")?:JSONArray()
-        val labels=mapOf("nombres" to "Nombres","primer_apellido" to "Apellidos","nacimiento" to "Nacimiento","telefono" to "Teléfono","sexo" to "Sexo","estado" to "Estado","dui" to "DUI")
-        val events=(0 until history.length()).map { i->val h=history.getJSONObject(i);val changes=h.optJSONObject("changes")?:JSONObject();AuditEvent(person.record,"Modificación",h.getString("reason"),h.getInt("version"),h.getString("at"),changes.keys().asSequence().associate { key->val item=changes.optJSONObject(key);(labels[key]?:key) to "${item?.stringOrNull("before")?:"Sin registrar"} → ${item?.stringOrNull("after")?:"Sin registrar"}" }) }
+        // Field names and values as the web shows them (PatientHistory), never the raw column or enum.
+        val events=(0 until history.length()).map { i->val h=history.getJSONObject(i);val changes=h.optJSONObject("changes")?:JSONObject();AuditEvent(person.record,"Modificación",h.getString("reason"),h.getInt("version"),h.getString("at"),changes.keys().asSequence().associate { key->val item=changes.optJSONObject(key);PatientHistory.change(key,item?.stringOrNull("before"),item?.stringOrNull("after")) }) }
         return PatientDetails(person,events.sortedBy{it.version})
     }
     private fun body(d:PatientDraft)=JSONObject().put("givenNames",d.givenNames.trim()).put("surnames",d.surnames.trim()).put("dui",d.dui).put("birth",d.birth).put("sex",when(d.sex){Sex.FEMALE->"femenino";Sex.MALE->"masculino";Sex.INDETERMINATE->"indeterminado";Sex.UNKNOWN->"no_registrado"}).put("phone",d.phone)

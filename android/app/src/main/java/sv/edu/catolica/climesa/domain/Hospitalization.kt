@@ -143,6 +143,17 @@ object AdmissionParser {
  * Client-side checks and request bodies for hospitalization. The API stays the guarantee (rule 5); these rules
  * only keep the user from sending clinical text nobody wrote.
  */
+/** «Mi habitación» of the patient (iOS `RoomRules`): the API only returns the patient's own admissions. */
+object MyRoomRules {
+    /** Current stay with an assigned bed. */
+    fun current(admissions: List<HospitalAdmission>, patientId: String? = null): HospitalAdmission? =
+        admissions.firstOrNull { it.state == "hospitalizado" && it.bed.isNotBlank() && (patientId == null || it.patientId == null || it.patientId == patientId) }
+
+    /** Requested stay still waiting for a bed. */
+    fun waiting(admissions: List<HospitalAdmission>, patientId: String? = null): HospitalAdmission? =
+        admissions.firstOrNull { it.state == "pendiente_cama" && (patientId == null || it.patientId == null || it.patientId == patientId) }
+}
+
 object HospitalizationRules {
     /** G5: a hospitalized patient (or waiting for a bed) can have signs taken straight from the ward card. */
     fun vitalsSubject(row: HospitalAdmission): QuickSubject? {

@@ -23,6 +23,18 @@ public enum ColdStartPolicy {
         return now.timeIntervalSince(lastSuccess) > idleUntilCold
     }
 
+    /// The server is plausibly asleep when nothing answered yet, nothing answered for `idleUntilCold`, or the last call
+    /// failed without an answer (network or 502-504) after the last answer.
+    public static func isLikelyCold(lastSuccess: Date?, failedSinceSuccess: Bool, now: Date) -> Bool {
+        failedSinceSuccess || isLikelyCold(lastSuccess: lastSuccess, now: now)
+    }
+
+    /// "El servidor se está activando" shows only when the server is plausibly asleep and one call (never an upload,
+    /// which is slow because of its size) has waited `slowNoticeAfter` without an answer.
+    public static func showsWakingNotice(lastSuccess: Date?, failedSinceSuccess: Bool, waited: TimeInterval, isUpload: Bool, now: Date) -> Bool {
+        !isUpload && waited >= slowNoticeAfter && isLikelyCold(lastSuccess: lastSuccess, failedSinceSuccess: failedSinceSuccess, now: now)
+    }
+
     public static func timeout(path: String, lastSuccess: Date?, now: Date) -> TimeInterval {
         path.hasPrefix("/auth/me") || isLikelyCold(lastSuccess: lastSuccess, now: now) ? coldTimeout : warmTimeout
     }

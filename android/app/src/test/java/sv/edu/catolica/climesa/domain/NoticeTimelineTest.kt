@@ -50,7 +50,7 @@ class NoticeTimelineTest {
         assertFalse(NoticeInboxRules.canSnooze(expired))
         assertTrue(NoticeInboxRules.canSnooze(current))
         assertEquals(listOf("v"), NoticeInboxRules.filter(listOf(expired, scheduled, current), NoticeFilter.UNREAD).map { it.id })
-        assertEquals(3, NoticeInboxRules.filter(listOf(expired, scheduled, current), NoticeFilter.CRITICAL).size)
+        assertEquals(listOf("v"), NoticeInboxRules.filter(listOf(expired, scheduled, current), NoticeFilter.CRITICAL).map { it.id })
     }
 
     @Test fun badgeKeepsTheServerUnreadCount() {

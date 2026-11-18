@@ -2,7 +2,10 @@ import Foundation
 
 /// Grupos de datos que una pantalla vuelve a pedir cuando llega un evento delgado (invalidar y volver a pedir).
 public enum LiveTopic: String, CaseIterable, Hashable, Sendable {
-    case shifts, queue, appointments, consultations, laboratory, admissions, ambulance, hospitalInfo, link, access, patient, profile
+    /// `notices`: the account's inbox (`/me/avisos/bandeja`), only `aviso.*`; a bed or a shift never reloads it.
+    /// There is no `access` topic: the API emits no event for the access log («Quién vio mi expediente»), which is read
+    /// on entering and again after a reconnection (`LiveSnapshot.resyncVersion`).
+    case shifts, queue, appointments, consultations, laboratory, admissions, ambulance, hospitalInfo, notices, link, patient, profile
 }
 
 /// Qué eventos obligan a volver a pedir cada grupo de datos (docs/arquitectura/tiempo-real.md, enum `TipoEvento`).
@@ -28,8 +31,8 @@ public enum InvalidationRule {
         if type.hasPrefix("admision.") || type.hasPrefix("cama.") { topics.insert(.admissions) }
         if type.hasPrefix("ambulancia.") { topics.insert(.ambulance) }
         if type.hasPrefix("aviso.") || type.hasPrefix("cama.") || type.hasPrefix("turno.") || type.hasPrefix("metricas.") { topics.insert(.hospitalInfo) }
+        if type.hasPrefix("aviso.") || event.entity == "aviso" { topics.insert(.notices) }
         if type.hasPrefix("vinculacion.") { topics.insert(.link) }
-        if type.hasPrefix("acceso.") { topics.insert(.access) }
         if type.hasPrefix("paciente.") { topics.insert(.patient) }
         // Signos vitales fuera de consulta: los ven el expediente, la consulta abierta y los hospitalizados.
         if type.hasPrefix("signos.") { topics.formUnion([.patient, .consultations, .admissions]) }
@@ -44,6 +47,8 @@ public struct LiveSnapshot: Equatable, Sendable {
     public var version: Int
     public var shiftsVersion: Int
     public var profileVersion: Int
+    /// Sube solo al reconectar (`.resync`): para lo que no tiene eventos propios y se recupera tras una caída.
+    public var resyncVersion: Int = 0
     public var versions: [LiveTopic: Int]
     /// Último evento recibido (por ejemplo, para avisar "te llamaron" en I05).
     public var lastEvent: DomainEvent?
@@ -71,6 +76,7 @@ public enum LiveReducer {
             next.droppedChannels = channels
         case .resync:
             next.version += 1
+            next.resyncVersion += 1
             next.shiftsVersion += 1
             // Tras reconectar no se sabe qué se perdió: se invalidan todas las vistas.
             for topic in LiveTopic.allCases { next.versions[topic, default: 0] += 1 }
