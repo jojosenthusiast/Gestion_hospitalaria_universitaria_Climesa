@@ -13,10 +13,11 @@ export const audienceRoles = ['ADM', 'JOP', 'REC', 'AST', 'ENF', 'MED', 'LAB', '
 
 /** Fase 2, S11: criticidad para el personal. Solo «Crítico» se destaca en el inicio de quien lo recibe. */
 export type Level = 'informativo' | 'importante' | 'critico';
-export const levels: { id: Level; label: string; hint: string }[] = [
+/** `status`: the same priority look as the level badge of a notice (`NoticeLevelBadge`). */
+export const levels: { id: Level; label: string; hint: string; status?: string }[] = [
   { id: 'informativo', label: 'Informativo', hint: 'Queda en Avisos; no interrumpe a nadie.' },
-  { id: 'importante', label: 'Importante', hint: 'Se marca en Avisos para leerlo hoy; no sale en el inicio.' },
-  { id: 'critico', label: 'Crítico', hint: 'Sale en el inicio de su rol o área hasta que cada persona da «Enterado».' },
+  { id: 'importante', label: 'Importante', hint: 'Se marca en Avisos para leerlo hoy; no sale en el inicio.', status: 'urgente' },
+  { id: 'critico', label: 'Crítico', hint: 'Sale en el inicio de su rol o área hasta que cada persona da «Enterado».', status: 'emergencia' },
 ];
 export const levelLabel = (level: string | undefined) => levels.find(l => l.id === level)?.label ?? 'Informativo';
 /** Prioridad visual (D-071) de la pantalla pública que corresponde a cada nivel; la API aplica la misma regla. */
@@ -39,7 +40,8 @@ export type NoticeAck = { avisoId: string; enteradoEn: string | null; recordarEn
 /** `GET /avisos/estadisticas` (S11): solo conteos, nunca nombres. */
 export type NoticeStats = { avisoId: string; enterados: number; destinatarios: number };
 export type InboxFilter = 'todos' | 'sin-leer' | 'criticos';
-export const inboxFilters: { id: InboxFilter; label: string }[] = [{ id: 'todos', label: 'Todos' }, { id: 'sin-leer', label: 'Sin leer' }, { id: 'criticos', label: 'Críticos' }];
+/** `status`: the look of what each filter keeps («Sin leer» badge, «Crítico» level badge), so the button matches it. */
+export const inboxFilters: { id: InboxFilter; label: string; status?: string }[] = [{ id: 'todos', label: 'Todos' }, { id: 'sin-leer', label: 'Sin leer', status: 'pendiente' }, { id: 'criticos', label: 'Críticos', status: 'emergencia' }];
 export const filterInbox = (items: InboxNotice[], filter: InboxFilter) =>
   filter === 'sin-leer' ? items.filter(n => !n.enteradoEn) : filter === 'criticos' ? items.filter(n => n.nivel === 'critico') : items;
 

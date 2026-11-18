@@ -161,6 +161,19 @@ export function StatusBadge({ value, label }: { value: string; label?: string })
   return <span className={`status-badge status-tag status-${value} fam-${family.id} pattern-${family.pattern}`}><Icon name={family.icon} size={14} /><span>{text}</span></span>;
 }
 
+/**
+ * R4a (owner): a filter that narrows by a status wears that status's look, so the button and the badge it filters
+ * read as the same thing. `status` is a status value (`pendiente`, `critico_alto`), a family id (`espera`) or a
+ * priority (`urgente`, `emergencia`). Unknown values and «Rutina» stay neutral (null). The label always stays.
+ */
+export function statusFilterLook(status: string | undefined): { className: string; icon: IconName } | null {
+  if (!status) return null;
+  const priority = PRIORITIES.find(p => p.id === status) ?? PRIORITIES.find(p => p.id === statusPriority(status));
+  if (priority) return priority.id === 'rutina' ? null : { className: `status-filter sf-prio-${priority.id}`, icon: priority.icon };
+  const family = STATUS_FAMILIES.find(f => f.id === status) ?? STATUS_FAMILIES.find(f => f.id === statusFamily(status));
+  return family ? { className: `status-filter sf-fam-${family.id} sf-pattern-${family.pattern}`, icon: family.icon } : null;
+}
+
 // ---------------------------------------------------------------- Prioridad (S7)
 
 export type Priority = 'emergencia' | 'urgente' | 'rutina';

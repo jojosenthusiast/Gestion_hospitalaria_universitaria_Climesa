@@ -142,10 +142,10 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
         <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} />
       </ListToolbar>
       <div className="cl-filter-row"><span className="cl-filter-label">Etapa</span>
-        <ChipGroup label="Etapa de la orden" value={stage} onChange={setStage} options={[{ value: 'todas', label: 'Todas', count: all.length }, ...STAGE_FILTERS.map(value => ({ value, label: STAGE_LABEL[value], count: stageCount(value) }))]} />
+        <ChipGroup label="Etapa de la orden" value={stage} onChange={setStage} options={[{ value: 'todas', label: 'Todas', count: all.length }, ...STAGE_FILTERS.map(value => ({ value, label: STAGE_LABEL[value], count: stageCount(value), status: STAGE_STATUS[value] }))]} />
         <span className="cl-filter-label">Prioridad</span>
-        <ChipGroup label="Prioridad" value={urgentOnly ? 'urgente' : 'todas'} onChange={value => setUrgentOnly(value === 'urgente')} options={[{ value: 'todas', label: 'Todas' }, { value: 'urgente', label: 'Urgentes', count: all.filter(o => o.priority === 'urgente').length }]} />
-        <ChipGroup label="Valores críticos" value={criticalOnly ? 'si' : 'no'} onChange={value => setCriticalOnly(value === 'si')} options={[{ value: 'no', label: 'Todos los valores' }, { value: 'si', label: 'Con valores críticos', count: all.filter(isCritical).length }]} />
+        <ChipGroup label="Prioridad" value={urgentOnly ? 'urgente' : 'todas'} onChange={value => setUrgentOnly(value === 'urgente')} options={[{ value: 'todas', label: 'Todas' }, { value: 'urgente', label: 'Urgentes', status: 'urgente', count: all.filter(o => o.priority === 'urgente').length }]} />
+        <ChipGroup label="Valores críticos" value={criticalOnly ? 'si' : 'no'} onChange={value => setCriticalOnly(value === 'si')} options={[{ value: 'no', label: 'Todos los valores' }, { value: 'si', label: 'Con valores críticos', status: 'critico_alto', count: all.filter(isCritical).length }]} />
       </div>
       <ActiveFilters filters={filters} onClear={clear} />
       {completable.length > 0 && <div className="lab-batch" role="group" aria-label="Completar por lote">
