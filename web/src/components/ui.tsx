@@ -1,9 +1,10 @@
 import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
 import type { DemoAccount } from '../lib/demoLogin';
 
-export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry' | 'download' | 'clock' | 'alert' | 'chart' | 'userPlus' | 'megaphone' | 'steth' | 'drop' | 'pulse' | 'chevronsUp' | 'minus' | 'filter' | 'clipboard';
+export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry' | 'download' | 'clock' | 'alert' | 'chart' | 'userPlus' | 'megaphone' | 'steth' | 'drop' | 'pulse' | 'chevronsUp' | 'minus' | 'filter' | 'clipboard' | 'bell';
 const paths: Record<IconName, ReactNode> = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
+  bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></>,
   back: <><path d="M19 12H5M11 6l-6 6 6 6" /></>,
   shield: <><path d="M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z" /><path d="m8 12 3 3 5-6" /></>,
   mail: <><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3 6 9 7 9-7" /></>,
