@@ -769,3 +769,9 @@ html.qb-has-dock { scroll-padding-bottom: calc(var(--qb-dock-h, 120px) + var(--s
 .slot strong, .qb-wait, .qb-avg, .ag-time, .lw-elapsed, .shift-block-time, .lab-slot, .figure-value { font-family: var(--font-figures); font-variant-numeric: tabular-nums; }
 /* R3: «Ver N más» under a folded list (components/fold.tsx). */
 .fold-more { display: inline-flex; margin-top: var(--space-2); }
+/* Laboratory detail: why a cancelled order stopped and the corrections of its results. */
+.lab-cancel-reason { margin: var(--space-2) 0 0; padding: 8px 12px; border-radius: var(--radius-control); background: var(--surface-muted, var(--soft)); }
+.lab-history { margin-top: var(--space-2); }
+.lab-history h4 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
+.lab-history ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
+.lab-history li small { display: block; }

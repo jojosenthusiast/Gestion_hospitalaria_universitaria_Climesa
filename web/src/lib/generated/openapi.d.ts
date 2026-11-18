@@ -5107,8 +5107,11 @@ export interface components {
         LabOrderResponse: {
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
-            consultationId: string;
+            /**
+             * Format: uuid
+             * @description Consulta de la que cuelga la orden; null en órdenes de una admisión
+             */
+            consultationId: string | null;
             /** Format: uuid */
             patientId: string;
             /** Format: uuid */
@@ -5185,8 +5188,11 @@ export interface components {
         LabOrderDetailResponse: {
             /** Format: uuid */
             id: string;
-            /** Format: uuid */
-            consultationId: string;
+            /**
+             * Format: uuid
+             * @description Consulta de la que cuelga la orden; null en órdenes de una admisión
+             */
+            consultationId: string | null;
             /** Format: uuid */
             patientId: string;
             /** Format: uuid */

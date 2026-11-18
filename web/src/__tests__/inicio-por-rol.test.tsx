@@ -99,7 +99,7 @@ describe('inicio por rol', () => {
     // R4a: pending samples and low stock are groups of the one pending tray.
     const atencion = await screen.findByRole('region', { name: 'Muestras por tomar' });
     expect(await within(atencion).findByText('Marta Ficticia')).toBeTruthy();
-    expect(within(atencion).getByRole('link', { name: /Tomar muestra/ }).getAttribute('href')).toBe('#/laboratorio?accion=muestra');
+    expect(within(atencion).getByRole('link', { name: /Tomar muestra/ }).getAttribute('href')).toBe('#/laboratorio?orden=o1&accion=muestra');
     expect(await screen.findByRole('region', { name: 'Inventario bajo el mínimo' })).toBeTruthy();
     expect(await screen.findByText('Reactivo ficticio')).toBeTruthy();
   });
