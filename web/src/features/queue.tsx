@@ -1,4 +1,4 @@
-import { useEffect, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { ExportMenu } from '../components/export-menu';
 import { SearchPicker, type PickerItem } from '../components/search-picker';
 import { StatusBadge, ActionButton, AreaTag, PriorityBadge, type Priority } from '../components/system';
@@ -131,6 +131,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const waitingNext = loaded.filter(t => t.service === nextService && t.state === 'en_espera').length;
   // One request for «Quién sigue»: the panel and the bottom dock read the same server proposal.
   const next = useData<NextProposal>(api, `/fila/siguiente?service=${nextService ?? ''}`, version + tick, showNext);
+  const dockShown = !!data.data && (loaded.length > 0 || call || issue || !!undo);
   return <>
     <CompactHeader breadcrumb="Atención / Flujo de llegada" title="Fila del día" actions={<>
       {readOnly && <span className="qb-readonly" title="Llamar y atender corresponde a Recepción, Asistencia y Medicina."><Icon name="eye" size={16} />Solo lectura</span>}
@@ -160,7 +161,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
         </>;
       }}</RemoteState>
     </section>
-    {data.data && (loaded.length > 0 || call || issue || !!undo) && <QueueDock visible={loadedVisible} now={now} proposal={showNext && next.data && !Array.isArray(next.data) && next.data.service === nextService ? next.data.proposal : null}
+    {dockShown && <QueueDock visible={loadedVisible} now={now} proposal={showNext && next.data && !Array.isArray(next.data) && next.data.service === nextService ? next.data.proposal : null}
             undo={undo && !action.error ? <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoCall(undo)}><Icon name="retry" size={16} />Deshacer</button></div> : null}
             onCallNext={call && showNext && nextService ? () => void callNext(nextService, office) : null} callDisabled={action.busy || waitingNext === 0}
             onIssue={issue ? () => setIssueOpen(true) : null} />}
@@ -214,7 +215,21 @@ export function QueueDock({ visible, now, proposal, undo, onCallNext, callDisabl
   const summary = boardSummary(visible, now);
   const nextArea = proposal ? proposal.area || 'GEN' : waiting[0] ? areaOfTicket(waiting[0]) : null;
   const nextNumber = proposal?.numero ?? waiting[0]?.numero ?? null;
-  return <section className="qb-dock" aria-label="Resumen de atención">
+  const ref = useRef<HTMLElement>(null);
+  // The board reserves the dock's height under its last card (and scroll-into-view stops above it), so nothing ends
+  // up hidden under the sticky dock. The height changes with the undo line and the window width, so it is measured.
+  useEffect(() => {
+    const dock = ref.current;
+    const root = document.documentElement;
+    if (!dock) return;
+    const measure = () => root.style.setProperty('--qb-dock-h', `${Math.ceil(dock.getBoundingClientRect().height)}px`);
+    measure();
+    root.classList.add('qb-has-dock');
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(dock);
+    return () => { observer?.disconnect(); root.classList.remove('qb-has-dock'); root.style.removeProperty('--qb-dock-h'); };
+  }, []);
+  return <section ref={ref} className="qb-dock" aria-label="Resumen de atención">
     {undo}
     <div className="qb-dock-stats">
       <div className="qb-dock-stat"><span className="qb-dock-label">En atención</span>
@@ -253,12 +268,15 @@ type LaneProps = { column: Column; tickets: (QueueTicket & { column: Column })[]
   onUndo: (item: Undo) => void; onVoid: (ticket: QueueTicket) => void };
 
 const LANE_FOLD = 4;
+const LANE_FOLD_WIDE = 6;
 function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, averageWait, current, undos, cardError, onTransition, onMove, onPriority, onUndo, onVoid }: LaneProps) {
   const [over, setOver] = useState(false);
-  // #15: on a phone a long lane shows its first cards; the rest open on «Ver N más» (the page was 6,800 px tall).
+  // #15: a long lane shows its first cards; the rest open on «Ver N más» (the page was 6,800 px tall on a phone, and
+  // on a desktop a 16-card lane ran 3,500 px under the sticky dock). A phone folds sooner than a desktop.
   const [phone] = useState(() => typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(max-width: 767px)').matches);
   const [unfolded, setUnfolded] = useState(false);
-  const shownTickets = phone && !unfolded && tickets.length > LANE_FOLD ? tickets.slice(0, LANE_FOLD) : tickets;
+  const fold = phone ? LANE_FOLD : LANE_FOLD_WIDE;
+  const shownTickets = !unfolded && tickets.length > fold ? tickets.slice(0, fold) : tickets;
   const dropped = (event: DragEvent) => {
     event.preventDefault(); setOver(false);
     const raw = event.dataTransfer.getData(DRAG_TYPE);

@@ -8,6 +8,7 @@ import { spanishProblem } from './problems';
 import { useQuickAction } from './personal/accion';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
 import './hospitalization/admission-actions.css';
+import { RowMenu } from '../components/row-menu';
 
 type Suggestion = { id: string; version: number; code: string; room: string; category: string; reason: string };
 /** Row actions the web offers, in display order; the first one present is the row's primary action. `firmar_alta` is MED-only in the apps (D-02). */
@@ -81,12 +82,12 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
       </li>)}</ul>
     </section>}
     <section className="data-workbench"><RemoteState state={data}>{rows => rows.length ? <table className="record-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}>
-      <td data-label="Paciente"><strong>{row.patientName}</strong><small>{[row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null, row.postSurgical ? 'Posquirúrgico' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</td>
+      <td data-label="Paciente" className="cell-person"><strong>{row.patientName}</strong><small>{[row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null, row.postSurgical ? 'Posquirúrgico' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</td>
       <td data-label="Origen">{originNames[row.origin] ?? row.origin}</td>
       <td data-label="Categoría">{categoryNames[row.requestedCategory] ?? row.requestedCategory}{row.authorized && <small>Excepción autorizada</small>}</td>
       <td data-label="Estado"><Tag value={row.state} /><DischargeWait row={row} /></td>
       <td data-label="Cama">{row.bed ? <span className="nowrap-code">{row.bed}</span> : 'Sin cama'}</td>
-      <td data-label="Acción"><div className="row-actions">{availableActions(row).map((a, index) => <button key={a.key} className="row-action" onClick={() => setDialog({ kind: a.key, admission: row })}>{a.label}{index === 0 && <> <Icon name="arrow" size={16} /></>}</button>)}</div></td>
+      <td data-label="Acción" className="cell-actions"><RowMenu label={row.patientName} actions={availableActions(row).map(a => ({ key: a.key, label: a.label, onClick: () => setDialog({ kind: a.key, admission: row }) }))} /></td>
     </tr>)}</tbody></table> : <Empty title="No hay admisiones activas" description="Las nuevas admisiones aparecerán aquí cuando Recepción o Jefatura las registren." />}</RemoteState></section>
     {creating && <AdmissionStepper api={api} profile={profile} patient={prefill} onClose={() => { setCreating(false); setPrefill(null); }} onSaved={() => { setCreating(false); setPrefill(null); setDone('Ingreso registrado; aparece en la lista.'); data.refresh(); }} />}
     {dialog?.kind === 'asignar_cama' && <BedSuggestionDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}

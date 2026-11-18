@@ -394,7 +394,9 @@ function RequestInbox({ api, version, requests, asked, busy, onDirect, onDialog,
     {shownAsked.map(a => <li key={a.id} className="rq-row">
       <div className="rq-main">
         <p className="rq-who"><strong>{a.patientName}</strong><small className="muted">{formatDate(a.start, { withYear: false })}, {timeOnly(a.start)}</small></p>
-        <p className="rq-meta">Con <strong>{a.doctorName}</strong>{a.reason && <> · {a.reason}</>}</p>
+        {a.doctorName && <p className="rq-meta">Con <strong>{a.doctorName}</strong></p>}
+        {/* The reason is its own line (like a request's note): inline after «· » it wrapped into a line that began with «·». */}
+        {a.reason?.trim() && <p className="rq-note">{a.reason}</p>}
       </div>
       <div className="row-actions">
         {(['confirmar', 'rechazar'] as const).map(name => <ActionButton key={name} action={name} allowed={a.allowedActions ?? []} blocked={a.blockedActions ?? []} disabled={busy} className={name === 'confirmar' ? 'row-action rq-primary' : 'row-action'} aria-label={`${ACTION_LABEL[name]} · ${a.patientName}`} onClick={() => name === 'confirmar' ? onDirect(a, name) : onDialog(a, name)}>{ACTION_LABEL[name]}</ActionButton>)}
@@ -479,7 +481,8 @@ function MyRequests({ api, requests, sent }: { api: Api; requests: Remote<Catego
     <RemoteState state={requests} skeletonRows={1}>{() => <ol className="rq-list">{rows.map(r => <li key={r.id} className="rq-row">
       <div className="rq-main">
         <CategoryList categories={r.categories} />
-        <p className="rq-meta"><Tag value={REQUEST_STATE[r.state].value} label={REQUEST_STATE[r.state].label} /> {FRANJA_LABEL[r.franja]}{r.note && <> · {r.note}</>}</p>
+        <p className="rq-meta"><Tag value={REQUEST_STATE[r.state].value} label={REQUEST_STATE[r.state].label} /> {FRANJA_LABEL[r.franja]}</p>
+        {r.note?.trim() && <p className="rq-note">{r.note}</p>}
         {r.appointment && <p className="rq-note">Cita con {r.appointment.doctorName}, {formatShortDateTime(r.appointment.start)}.</p>}
         {r.state === 'rechazada' && r.rejectionReason && <p className="rq-note">{r.rejectionReason}</p>}
       </div>

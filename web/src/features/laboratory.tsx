@@ -141,11 +141,14 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
       <ListToolbar trailing={<><label className="cl-sort">Ordenar<select value={sort} onChange={event => setSort(event.target.value as WorkSort)}>{(Object.keys(SORT_NAMES) as WorkSort[]).map(key => <option key={key} value={key}>{SORT_NAMES[key]}</option>)}</select></label><ExportMenu table={exportTable} disabled={!rows.length} /></>}>
         <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} />
       </ListToolbar>
-      <div className="cl-filter-row"><span className="cl-filter-label">Etapa</span>
-        <ChipGroup label="Etapa de la orden" value={stage} onChange={setStage} options={[{ value: 'todas', label: 'Todas', count: all.length }, ...STAGE_FILTERS.map(value => ({ value, label: STAGE_LABEL[value], count: stageCount(value), status: STAGE_STATUS[value] }))]} />
-        <span className="cl-filter-label">Prioridad</span>
-        <ChipGroup label="Prioridad" value={urgentOnly ? 'urgente' : 'todas'} onChange={value => setUrgentOnly(value === 'urgente')} options={[{ value: 'todas', label: 'Todas' }, { value: 'urgente', label: 'Urgentes', status: 'urgente', count: all.filter(o => o.priority === 'urgente').length }]} />
-        <ChipGroup label="Valores críticos" value={criticalOnly ? 'si' : 'no'} onChange={value => setCriticalOnly(value === 'si')} options={[{ value: 'no', label: 'Todos los valores' }, { value: 'si', label: 'Con valores críticos', status: 'critico_alto', count: all.filter(isCritical).length }]} />
+      <div className="cl-filter-row">
+        {/* Each group keeps its label with its chips: they wrap together, never a label at the end of a row. */}
+        <div className="cl-filter-group"><span className="cl-filter-label">Etapa</span>
+          <ChipGroup label="Etapa de la orden" value={stage} onChange={setStage} options={[{ value: 'todas', label: 'Todas', count: all.length }, ...STAGE_FILTERS.map(value => ({ value, label: STAGE_LABEL[value], count: stageCount(value), status: STAGE_STATUS[value] }))]} /></div>
+        <div className="cl-filter-group"><span className="cl-filter-label">Prioridad</span>
+          <ChipGroup label="Prioridad" value={urgentOnly ? 'urgente' : 'todas'} onChange={value => setUrgentOnly(value === 'urgente')} options={[{ value: 'todas', label: 'Todas' }, { value: 'urgente', label: 'Urgentes', status: 'urgente', count: all.filter(o => o.priority === 'urgente').length }]} /></div>
+        <div className="cl-filter-group"><span className="cl-filter-label">Valores</span>
+          <ChipGroup label="Valores críticos" value={criticalOnly ? 'si' : 'no'} onChange={value => setCriticalOnly(value === 'si')} options={[{ value: 'no', label: 'Todos los valores' }, { value: 'si', label: 'Con valores críticos', status: 'critico_alto', count: all.filter(isCritical).length }]} /></div>
       </div>
       <ActiveFilters filters={filters} onClear={clear} />
       {completable.length > 0 && <div className="lab-batch" role="group" aria-label="Completar por lote">
@@ -186,8 +189,8 @@ function LabWorkRow({ order, now, current, onSelect, batchable, inBatch, onBatch
   return <li className={`lab-row-item${batchable ? ' has-batch' : ''}`}>
     {batchable && <input type="checkbox" className="lab-batch-check" checked={inBatch} onChange={onBatch} aria-label={`Incluir la orden de ${order.patientName} en el lote para completar`} />}
     <button type="button" className="lw-row lab-row" aria-current={current} aria-label={`Orden de ${order.patientName}, ${urgent ? 'urgente' : 'rutina'}, ${externalPending ? 'externa' : STAGE_LABEL[stage]}`} onClick={onSelect}>
-      <PriorityBadge value={urgent ? 'urgente' : 'rutina'} />
-      <span className="lw-patient"><strong>{order.patientName}</strong><small>{patientLine(order) || 'Sin datos del expediente'}</small></span>
+      {/* Routine is the default and has no tag (as on Android); only urgent shows, inline, so the name keeps the width. */}
+      <span className="lw-patient"><span className="lab-row-name"><strong>{order.patientName}</strong>{urgent && <PriorityBadge value="urgente" />}</span><small>{patientLine(order) || 'Sin datos del expediente'}</small></span>
       <span className="lw-exams">{shown.map(item => <span className="lw-exam" key={item.id} title={item.name}>{item.code}</span>)}{more > 0 && <span className="lw-exam">+{more}</span>}<small>{order.doctorName ? `Pidió: ${order.doctorName}` : ''}</small></span>
       <span className="lw-end">
         {externalPending ? <span className="lab-external-chip"><Icon name="building" size={14} />Externa</span> : <StageBadge stage={stage} />}
@@ -216,7 +219,8 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: 
   const when = (value?: string | null) => value ? formatDateTime(value) : 'Pendiente';
   async function transition(path: string, body: unknown) { if (await action.run(path, body)) onChanged(); }
   return <aside className="cl-detail" aria-label={`Detalle de la orden de ${order.patientName}`}>
-    <header><StageBadge stage={stage} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p><Tag value={order.state} label={stageLabel(order, allows(order, 'revisar'))} />
+    {/* One stage badge: above the name, with the finer label when there is one («Pendiente de revisar»). */}
+    <header><StatusBadge value={STAGE_STATUS[stage]} label={stageLabel(order, allows(order, 'revisar')) ?? STAGE_LABEL[stage]} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p>
       {next && <small className="lab-next"><strong>Ahora: {next.who}</strong> {next.what}</small>}</header>
     {order.external && <ExternalNote order={order} />}
     {done && <Notice kind="success">{done}</Notice>}

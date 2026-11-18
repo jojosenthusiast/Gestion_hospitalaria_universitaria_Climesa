@@ -80,6 +80,10 @@
 .table-toolbar { padding: 22px 24px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 92%, var(--soft)); }
 .table-toolbar > .field { flex: 1 1 280px; max-width: 560px; }
 .table-toolbar > .select-field { flex: 0 1 230px; }
+/* A chip row right under the filter block (Personal · «Turno de hoy») keeps the block's inset, never flush at x=0. */
+.table-toolbar + .cl-filter-row { margin: 0; padding: 14px 24px; border-bottom: 1px solid var(--line); }
+@media (max-width: 767px) { .table-toolbar + .cl-filter-row { padding: 14px 18px; } }
+.record-table .cell-nowrap { white-space: nowrap; }
 .search-form { min-width: 0; display: flex; align-items: flex-end; gap: 12px; flex: 1 1 560px; }
 .search-form > .field { min-width: 180px; flex: 1; }
 .search-form > button { min-height: 52px; }
@@ -122,7 +126,13 @@
 /* Tablas adaptativas */
 .record-table { width: 100%; border-collapse: collapse; color: var(--ink); font-size: 14px; text-align: left; }
 .record-table th { position: sticky; top: 76px; z-index: 2; padding: 15px 20px; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; line-height: 1.4; text-transform: uppercase; font-variant-numeric: tabular-nums; }
-.record-table td { max-width: 340px; padding: 18px 20px; border-bottom: 1px solid var(--line); line-height: 1.55; overflow-wrap: anywhere; vertical-align: middle; }
+.record-table td { max-width: 340px; padding: 18px 20px; border-bottom: 1px solid var(--line); line-height: 1.55; overflow-wrap: break-word; word-break: normal; hyphens: manual; vertical-align: middle; }
+/* `break-word` (not `anywhere`) keeps whole words in the column's minimum width, so a narrow column never reads
+   «Semipriva da»; a person's name gets room for two words per line and the actions column stays compact. */
+@media (min-width: 768px) {
+  .record-table td.cell-person { min-width: 13rem; }
+  .record-table td.cell-actions.cell-actions { min-width: 0; width: 1%; white-space: nowrap; }
+}
 .record-table tbody tr { transition: background var(--motion-fast) ease; }
 .record-table tbody tr:hover { background: var(--soft); }
 .record-table tr:last-child td { border-bottom: 0; }
@@ -658,7 +668,7 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .status-filter.sf-fam-cerrado { --fam: var(--status-cerrado); --fam-soft: var(--status-cerrado-soft); }
 .status-filter.sf-fam-critico, .status-filter.sf-prio-emergencia { --fam: var(--critical); --fam-soft: var(--critical-soft); }
 .status-filter.sf-prio-urgente { --fam: var(--priority-urgente); --fam-soft: var(--priority-urgente-soft); }
-.status-filter.status-filter[class] { gap: 6px; border-color: var(--fam); background: var(--fam-soft); color: var(--fam); box-shadow: none; }
+.status-filter.status-filter[class] { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-color: var(--fam); background: var(--fam-soft); color: var(--fam); box-shadow: none; }
 .status-filter.status-filter[class] > * { color: inherit; }
 /* A segment only draws its left divider; a status segment draws its whole edge so its texture border shows. */
 .segment.status-filter.status-filter[class] { border: 1px solid var(--fam); }
@@ -717,6 +727,16 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .qb-dock-wait .qb-dock-value strong { color: var(--primary-text); }
 .qb-dock-actions { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: var(--space-3); }
 .qb-dock-actions > button { width: 100%; justify-content: center; }
+/* The sticky dock never hides the board: focus and scroll-into-view stop above it (`--qb-dock-h` is its measured
+   height, QueueDock), and on a wide screen it is one short row (stats left, actions right) so the lanes stay in view. */
+html.qb-has-dock { scroll-padding-bottom: calc(var(--qb-dock-h, 120px) + var(--space-3)); }
+@media (min-width: 900px) {
+  .qb-dock { grid-template-columns: minmax(0, 1fr) auto; align-items: center; padding-block: var(--space-2); }
+  .qb-dock > .qb-undo { grid-column: 1 / -1; }
+  .qb-dock-stat { gap: 0; }
+  .qb-dock-value strong { font-size: var(--text-xl); }
+  .qb-dock-actions { grid-auto-columns: max-content; }
+}
 /* Inside the dock the undo is a line of the dock, not a floating toast that would cover it. */
 .qb-dock .qb-undo { position: static; transform: none; width: auto; max-width: none; box-shadow: none; }
 @media (max-width: 767px) {

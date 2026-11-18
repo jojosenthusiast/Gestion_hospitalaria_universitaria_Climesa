@@ -2,7 +2,7 @@ import type { ReactNode } from 'react';
 import { MoreLink } from '../../components/fold';
 import { BarChart, HBarList, type Tone } from '../../components/charts';
 import { roleNames, staffTypeNames, type AccessProfile, type Appointment, type AuditRow, type Shift } from '../../lib/api';
-import { formatDate, formatDuration, formatPercent, formatRelative, formatTime, minutesSince, plural } from '../../lib/format';
+import { formatDate, formatDuration, formatPercent, formatRelative, formatTime, joinParts, minutesSince, plural } from '../../lib/format';
 import { StatusBadge } from '../../components/system';
 import type { Remote } from '../common';
 import { milestoneNames, priorityLevel, priorityNames, stateNames as unitStateNames } from '../ambulance/types';
@@ -201,7 +201,7 @@ const rec: RoleDashboard = {
     // S8: asked appointments and requests by category both wait on Recepción: one group, one count (same as Citas).
     { id: 'solicitudes', title: 'Solicitudes de cita', href: '#/citas', state: requestsState(d),
       items: [
-        ...(d.apptRequests.data ?? []).filter(isPendingCategoryRequest).map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: `${r.categories.map(c => c.name).join(', ')}${r.note ? ` · ${r.note}` : ''} · ${formatRelative(r.createdAt)}`, tone: 'warn' as Tone, href: `#/citas?asignar=${r.id}`, action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
+        ...(d.apptRequests.data ?? []).filter(isPendingCategoryRequest).map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: joinParts(r.categories.map(c => c.name).join(', '), r.note, formatRelative(r.createdAt)), tone: 'warn' as Tone, href: `#/citas?asignar=${r.id}`, action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
         ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `${formatDate(a.start, { withYear: false })}, ${timeLabel(a.start)} · ${a.doctorName}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Por confirmar', status: 'solicitada' })),
       ] },
     { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),
@@ -273,7 +273,7 @@ const med: RoleDashboard = {
   ],
   tray: ({ d }) => [{
     id: 'liberar', title: 'Resultados por liberar', href: '#/laboratorio', masculine: true, state: asRemote(d.lab),
-    items: pendingReview(d.lab.data ?? []).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: o.items.map(i => i.name).join(', '), tone: 'warn' as Tone, href: '#/laboratorio', action: 'Revisar', tag: o.priority === 'urgente' ? 'Urgente' : undefined, status: o.priority === 'urgente' ? 'urgente' : undefined })),
+    items: pendingReview(d.lab.data ?? []).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: o.items.map(i => i.name).join(', '), tone: 'warn' as Tone, href: '#/laboratorio', action: 'Revisar', status: o.priority === 'urgente' || o.priority === 'emergencia' ? o.priority : undefined })),
   }],
   figures: ({ d }) => [
     fig('citas-hoy', 'Citas de hoy', d.agenda, r => r.filter(a => isToday(a.start)).length, { href: '#/consultas' }),
@@ -299,7 +299,7 @@ const lab: RoleDashboard = {
   ],
   tray: ({ d }) => [{
     id: 'muestras', title: 'Muestras por tomar', href: '#/laboratorio', state: asRemote(d.lab),
-    items: (d.lab.data ?? []).filter(o => o.state === 'pendiente').sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2) || a.createdAt.localeCompare(b.createdAt)).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: `${o.items.map(i => i.name).join(', ')} · ${formatRelative(o.createdAt)}`, tone: 'warn' as Tone, href: '#/laboratorio?accion=muestra', action: 'Tomar muestra', tag: o.priority === 'urgente' ? 'Urgente' : undefined, status: o.priority === 'urgente' ? 'urgente' : undefined })),
+    items: (d.lab.data ?? []).filter(o => o.state === 'pendiente').sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 2) - (PRIORITY_ORDER[b.priority] ?? 2) || a.createdAt.localeCompare(b.createdAt)).map(o => ({ id: o.id, title: o.patientName ?? 'Paciente', detail: `${o.items.map(i => i.name).join(', ')} · ${formatRelative(o.createdAt)}`, tone: 'warn' as Tone, href: '#/laboratorio?accion=muestra', action: 'Tomar muestra', status: o.priority === 'urgente' || o.priority === 'emergencia' ? o.priority : undefined })),
   }, lowStock(d)],
   figures: ({ d }) => {
     const today = d.lab.data ? turnaround(d.lab.data).filter(t => t.day === localDay()).map(t => t.minutes) : [];
