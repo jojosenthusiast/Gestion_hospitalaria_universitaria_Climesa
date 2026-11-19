@@ -1,18 +1,15 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.foundation.layout.size
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bed
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -68,14 +65,14 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
         }
         if (problem != null && !state.loading) item { Text(problem, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
         item {
-            if (step == AdmissionIntake.LAST_STEP) PrimaryButton(stringResource(R.string.ing_confirmar), { model.confirm(canAssignBed) }, icon = Icons.Default.Check, enabled = problem == null, loading = state.busy)
+            if (step == AdmissionIntake.LAST_STEP) PrimaryButton(stringResource(R.string.ing_confirmar), { model.confirm(canAssignBed) }, icon = ClimesaIcons.Check, enabled = problem == null, loading = state.busy)
             else PrimaryButton(stringResource(R.string.ing_siguiente), { model.next(canAssignBed) }, enabled = problem == null && !state.loading)
         }
         item { if (step > 0) SecondaryButton(stringResource(R.string.ing_atras), { model.back(canAssignBed) }, enabled = !state.busy) }
         // Lote 2: leaving keeps the draft; the list then offers «Continuar ingreso de X» or «Empezar de nuevo».
         item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                SecondaryButton(stringResource(R.string.ing_cancelar), model::leave, icon = Icons.Default.Close, enabled = !state.busy)
+                SecondaryButton(stringResource(R.string.ing_cancelar), model::leave, icon = ClimesaIcons.Close, enabled = !state.busy)
                 if (draft.patient != null) BlockedReason(stringResource(R.string.ing_borrador_se_guarda))
             }
         }
@@ -93,20 +90,20 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
     if (chosen != null) {
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Column(Modifier.weight(1f)) { Text(chosen.name, style = MaterialTheme.typography.titleMedium); Text(chosen.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-            TextButton(onClick = { model.pickPatient(null) }) { Text(stringResource(R.string.ing_paciente_cambiar)) }
+            TextButton(shape = ButtonShape, onClick = { model.pickPatient(null) }) { Text(stringResource(R.string.ing_paciente_cambiar)) }
         }
     } else {
         FormField(stringResource(R.string.ing_paciente_buscar), state.query, model::query, hint = stringResource(R.string.ing_paciente_ayuda))
         if (state.searching && state.results.isEmpty()) LoadingState()
         state.results.forEach { p -> PatientResult(p) { model.pickPatient(p) } }
-        if (state.hasMore) TextButton(onClick = model::moreResults, enabled = !state.searching) { Text(stringResource(R.string.ing_paciente_mas)) }
+        if (state.hasMore) TextButton(shape = ButtonShape, onClick = model::moreResults, enabled = !state.searching) { Text(stringResource(R.string.ing_paciente_mas)) }
         if (!state.searching && state.results.isEmpty() && sv.edu.catolica.climesa.domain.ReceptionScheduling.canSearch(state.query)) Text(stringResource(R.string.ing_paciente_sin_resultados), style = MaterialTheme.typography.bodySmall)
     }
 }
 @Composable private fun PatientResult(p: PickerPatient, pick: () -> Unit) {
     // S1: an inactive patient or one already admitted is listed with the reason, not choosable.
     val blocked = sv.edu.catolica.climesa.domain.PatientGate.blockedReason(p, sv.edu.catolica.climesa.domain.PickPurpose.ADMISSION)
-    TextButton(onClick = pick, enabled = blocked == null, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) {
+    TextButton(shape = ButtonShape, onClick = pick, enabled = blocked == null, modifier = Modifier.fillMaxWidth()) { Column(Modifier.fillMaxWidth()) {
         Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         blocked?.let { BlockedReason(it) }
     } }
@@ -118,7 +115,7 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             OriginKind.entries.forEach { kind ->
                 val count = state.origins.count { it.origin == kind }
-                FilterChip(selected = draft.origin == kind, onClick = { model.pickOrigin(kind) }, enabled = count > 0, label = { Text("${kind.label} · ${if (count == 0) stringResource(R.string.ing_origen_sin_registros) else count}") })
+                ClimesaFilterChip(selected = draft.origin == kind, onClick = { model.pickOrigin(kind) }, enabled = count > 0, label = { Text("${kind.label} · ${if (count == 0) stringResource(R.string.ing_origen_sin_registros) else count}") })
             }
         }
         if (!state.loading && state.origins.isEmpty()) Text(stringResource(R.string.ing_origen_vacio), style = MaterialTheme.typography.bodySmall)
@@ -129,12 +126,12 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
     FormField(stringResource(R.string.ing_motivo), draft.motive, model::motive, hint = stringResource(R.string.ing_motivo_ayuda), singleLine = false)
 }
 @Composable private fun RecordRow(record: OriginRecord, selected: Boolean, pick: () -> Unit) =
-    DataRow(record.label, subtitle = record.detail, leadingIcon = if (selected) Icons.Default.Check else null, onClick = pick)
+    DataRow(record.label, subtitle = record.detail, leadingIcon = if (selected) ClimesaIcons.Check else null, onClick = pick)
 
 @Composable private fun DoctorStep(state: AdmissionIntakeState, model: AdmissionIntakeViewModel) = Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
     val draft = state.draft
     FormField(stringResource(R.string.ing_fecha), draft.at, model::at, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
-    TextButton(onClick = { model.at(AdmissionIntake.nowLocal()) }) { Text(stringResource(R.string.ing_fecha_ahora)) }
+    TextButton(shape = ButtonShape, onClick = { model.at(AdmissionIntake.nowLocal()) }) { Text(stringResource(R.string.ing_fecha_ahora)) }
     SectionCard(stringResource(R.string.ing_medico)) {
         Text(stringResource(R.string.ing_medico_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         var filter by rememberSaveable { mutableStateOf(DoctorShiftFilter.WITH_SHIFT) }
@@ -149,7 +146,7 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
 @Composable private fun CategoryStep(state: AdmissionIntakeState, model: AdmissionIntakeViewModel) = SectionCard(stringResource(R.string.ing_resumen_categoria)) {
     Text(stringResource(R.string.ing_categoria_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     state.bedMap?.categories?.forEach { item ->
-        FilterChip(
+        ClimesaFilterChip(
             selected = state.draft.category == item.category, onClick = { model.pickCategory(item.category) }, enabled = item.selectable, modifier = Modifier.fillMaxWidth(),
             label = { Text("${AdmissionIntake.CATEGORY_LABELS[item.category] ?: item.category} · " + if (item.selectable) stringResource(R.string.ing_categoria_conteo, item.free, item.compatible) else stringResource(R.string.ing_categoria_sin_camas)) },
         )
@@ -161,7 +158,7 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
     if (draft.isolation) {
         Text(stringResource(R.string.ing_aislamiento_tipo), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            IsolationType.entries.forEach { type -> FilterChip(selected = draft.isolationType == type, onClick = { model.isolationType(if (draft.isolationType == type) null else type) }, label = { Text(type.label) }) }
+            IsolationType.entries.forEach { type -> ClimesaFilterChip(selected = draft.isolationType == type, onClick = { model.isolationType(if (draft.isolationType == type) null else type) }, label = { Text(type.label) }) }
         }
     }
     CheckLine(stringResource(R.string.ing_inestable), draft.unstable, model::unstable)
@@ -192,7 +189,7 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
 }
 @Composable private fun BedChip(bed: IntakeBed, selected: Boolean, pick: () -> Unit) {
     val note = if (bed.compatible) (if (bed.suggested) stringResource(R.string.ing_cama_sugerida) else null) else bed.reason
-    FilterChip(selected = selected, onClick = pick, enabled = bed.compatible, label = { Text(bed.code + (note?.let { " · $it" } ?: "")) }, leadingIcon = { androidx.compose.material3.Icon(Icons.Default.Bed, null) })
+    ClimesaFilterChip(selected = selected, onClick = pick, enabled = bed.compatible, label = { Text(bed.code + (note?.let { " · $it" } ?: "")) }, leadingIcon = { androidx.compose.material3.Icon(ClimesaIcons.Bed, null, Modifier.size(18.dp)) })
 }
 
 @Composable private fun VisitorsStep(draft: AdmissionDraft, model: AdmissionIntakeViewModel) = SectionCard(stringResource(R.string.ing_resumen_visitas)) {

@@ -1,6 +1,10 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.SwapHoriz
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.foundation.layout.Arrangement
@@ -13,18 +17,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Notes
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Bed
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -417,16 +411,16 @@ fun HospitalizationScreen(
             val resume = intakeState.resumeName
             if (resume == null) CrudButton(CrudKind.Create, stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, enabled = !state.busy)
             else Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                PrimaryButton(stringResource(R.string.ing_continuar_de, resume), { model.clearMessages(); intake.open() }, icon = Icons.Default.PlayArrow, enabled = !state.busy)
-                SecondaryButton(stringResource(R.string.ing_empezar_de_nuevo), { model.clearMessages(); intake.restart() }, icon = Icons.Default.Refresh, enabled = !state.busy)
+                PrimaryButton(stringResource(R.string.ing_continuar_de, resume), { model.clearMessages(); intake.open() }, icon = Icons.Outlined.PlayArrow, enabled = !state.busy)
+                SecondaryButton(stringResource(R.string.ing_empezar_de_nuevo), { model.clearMessages(); intake.restart() }, icon = ClimesaIcons.Retry, enabled = !state.busy)
             }
         }
         when {
             state.loading && state.admissions.isEmpty() -> item { LoadingState() }
             state.error != null && state.admissions.isEmpty() -> item { ErrorState(state.error, retry) }
             state.admissions.isEmpty() && HospitalizationRules.wardFollowsShift(profile?.permissionContexts?.get("admision.ver").orEmpty()) ->
-                item { EmptyState(stringResource(R.string.clin_hosp_sin_turno), detail = stringResource(R.string.clin_hosp_sin_turno_detalle), icon = Icons.Default.Bed) }
-            state.admissions.isEmpty() -> item { EmptyState(stringResource(R.string.clin_hosp_sin_admisiones), detail = stringResource(R.string.clin_hosp_sin_admisiones_detalle), icon = Icons.Default.Bed) }
+                item { EmptyState(stringResource(R.string.clin_hosp_sin_turno), detail = stringResource(R.string.clin_hosp_sin_turno_detalle), icon = ClimesaIcons.Bed) }
+            state.admissions.isEmpty() -> item { EmptyState(stringResource(R.string.clin_hosp_sin_admisiones), detail = stringResource(R.string.clin_hosp_sin_admisiones_detalle), icon = ClimesaIcons.Bed) }
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
@@ -498,12 +492,12 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                 else -> Text(stringResource(R.string.med_alta_sin_pendientes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        act(AdmissionAction.ASSIGN_BED, stringResource(R.string.hosp_asignar_cama), { model.open(row) }, Icons.Default.Bed)
+        act(AdmissionAction.ASSIGN_BED, stringResource(R.string.hosp_asignar_cama), { model.open(row) }, ClimesaIcons.Bed)
         act(AdmissionAction.SIGN_DISCHARGE, stringResource(R.string.hosp_firmar_alta), { model.openDischarge(row) })
         act(AdmissionAction.REGISTER_EXIT, stringResource(R.string.hosp_registrar_salida), { model.openExit(row) })
         if (AdmissionAction.REQUEST_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_solicitar_alta), { model.openReason(row, AdmissionAction.REQUEST_DISCHARGE) }, enabled = !busy)
-        if (AdmissionAction.TRANSFER in actions) SecondaryButton(stringResource(R.string.hosp_trasladar), { model.openTransfer(row) }, icon = Icons.Default.SwapHoriz, enabled = !busy)
-        if (AdmissionAction.NURSING_NOTE in actions) SecondaryButton(stringResource(R.string.hosp_notas), { model.openNotes(row) }, icon = Icons.AutoMirrored.Filled.Notes, enabled = !busy)
+        if (AdmissionAction.TRANSFER in actions) SecondaryButton(stringResource(R.string.hosp_trasladar), { model.openTransfer(row) }, icon = Icons.Outlined.SwapHoriz, enabled = !busy)
+        if (AdmissionAction.NURSING_NOTE in actions) SecondaryButton(stringResource(R.string.hosp_notas), { model.openNotes(row) }, icon = ClimesaIcons.Clipboard, enabled = !busy)
         HospitalizationRules.vitalsSubject(row)?.let { subject -> onOpenVitals?.let { open -> RowAction(stringResource(R.string.rec7_hosp_signos), { open(subject) }) } }
         if (AdmissionAction.REVOKE_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_revocar_alta), { model.openReason(row, AdmissionAction.REVOKE_DISCHARGE) }, enabled = !busy)
         // S0: cancelling an admission is the shared red deactivate action.
@@ -532,7 +526,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                     DataRow(
                         title = row.code,
                         subtitle = listOf(AdmissionIntake.CATEGORY_LABELS[row.category] ?: row.category, row.reason).filter { it.isNotBlank() }.joinToString(" · "),
-                        leadingIcon = if (row.id == selected) Icons.Default.Check else Icons.Default.Bed,
+                        leadingIcon = if (row.id == selected) ClimesaIcons.Check else ClimesaIcons.Bed,
                         onClick = { selected = row.id },
                         divider = true,
                         container = false,
@@ -558,8 +552,8 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             admission.dischargeRequestedAt?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_alta_solicitada, localTime(it))) }
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             Text(stringResource(R.string.hosp_alta_tipo), style = MaterialTheme.typography.labelLarge)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.take(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.drop(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.take(2).forEach { type -> ClimesaFilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.drop(2).forEach { type -> ClimesaFilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
             FormField(stringResource(R.string.hosp_alta_resumen), form.summary, model::onSummary, hint = stringResource(R.string.hosp_alta_resumen_ayuda) + " " + HospitalizationRules.counter(form.summary, HospitalizationRules.SUMMARY_MAX), enabled = !state.busy, singleLine = false)
             if (form.type == DischargeType.VOLUNTARY) Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(form.voluntaryConsent, model::onVoluntaryConsent, enabled = !state.busy); Text(stringResource(R.string.hosp_alta_constancia), style = MaterialTheme.typography.bodySmall) }
             Text(stringResource(R.string.hosp_alta_pendientes), style = MaterialTheme.typography.labelLarge)
@@ -569,10 +563,10 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                         FormField(stringResource(R.string.hosp_alta_pendiente), item.description, { model.onPending(index, item.copy(description = it)) }, enabled = !state.busy)
                         FormField(stringResource(R.string.hosp_alta_responsable), item.responsible, { model.onPending(index, item.copy(responsible = it)) }, enabled = !state.busy)
                     }
-                    IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(Icons.Default.Close, stringResource(R.string.hosp_alta_quitar)) }
+                    IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(ClimesaIcons.Close, stringResource(R.string.hosp_alta_quitar)) }
                 }
             }
-            TextButton(onClick = model::addPending, enabled = !state.busy) { Text(stringResource(R.string.hosp_alta_agregar)) }
+            TextButton(shape = ButtonShape, onClick = model::addPending, enabled = !state.busy) { Text(stringResource(R.string.hosp_alta_agregar)) }
         }
     }
 }
@@ -655,7 +649,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                 form.loadError != null -> NoticeBanner(NoticeKind.ERROR, form.loadError)
                 form.beds.isEmpty() -> NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_traslado_sin_camas))
                 else -> form.beds.forEach { bed ->
-                    DataRow(title = "${bed.code} · ${bed.room}", leadingIcon = if (bed.id == form.bedId) Icons.Default.Check else Icons.Default.Bed, onClick = { model.pickTransferBed(bed.id) }, divider = true, container = false)
+                    DataRow(title = "${bed.code} · ${bed.room}", leadingIcon = if (bed.id == form.bedId) ClimesaIcons.Check else ClimesaIcons.Bed, onClick = { model.pickTransferBed(bed.id) }, divider = true, container = false)
                 }
             }
             FormField(stringResource(R.string.hosp_traslado_motivo), form.reason, model::onTransferReason, hint = stringResource(R.string.hosp_contador_motivo, HospitalizationRules.counter(form.reason, ChangeReason.MAX)), enabled = !state.busy, singleLine = false)
@@ -681,7 +675,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             FormField(stringResource(R.string.hosp_nota_nueva), panel.text, model::onNoteText, hint = HospitalizationRules.counter(panel.text, HospitalizationRules.NOTE_MAX), enabled = !state.busy, singleLine = false)
             when {
                 panel.loading && panel.notes.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Spinner(size = 20.dp, strokeWidth = 2.dp); Text(stringResource(R.string.ui_cargando_titulo), style = MaterialTheme.typography.bodySmall) }
-                panel.loadError != null -> { NoticeBanner(NoticeKind.ERROR, panel.loadError); TextButton(onClick = model::retryNotes) { Text(stringResource(R.string.ui_reintentar)) } }
+                panel.loadError != null -> { NoticeBanner(NoticeKind.ERROR, panel.loadError); TextButton(shape = ButtonShape, onClick = model::retryNotes) { Text(stringResource(R.string.ui_reintentar)) } }
                 panel.notes.isEmpty() -> Text(stringResource(R.string.hosp_notas_vacio), style = MaterialTheme.typography.bodySmall)
                 // ENF/AST audit #6: the note is body text, never cut to two lines.
                 else -> panel.notes.forEachIndexed { index, note ->

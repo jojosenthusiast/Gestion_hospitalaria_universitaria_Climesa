@@ -1,8 +1,7 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,7 +65,7 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
                 val olderCount = days.filter { it.older }.sumOf { it.entries.size }
                 for ((index, day) in days.withIndex()) {
                     if (day.older && days.getOrNull(index - 1)?.older != true) item(key = "anteriores") {
-                        TextButton(onClick = { olderOpen = !olderOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+                        TextButton(shape = ButtonShape, onClick = { olderOpen = !olderOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
                             Text(stringResource(if (olderOpen) R.string.pac_accesos_ocultar_anteriores else R.string.pac_accesos_ver_anteriores, olderCount))
                         }
                     }
@@ -76,7 +75,7 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
                 }
             }
         }
-        if (!state.loading) item { SecondaryButton(stringResource(R.string.mis_accesos_actualizar), { model.load() }, icon = Icons.Default.Refresh) }
+        if (!state.loading) item { SecondaryButton(stringResource(R.string.mis_accesos_actualizar), { model.load() }, icon = ClimesaIcons.Retry) }
     }
 }
 

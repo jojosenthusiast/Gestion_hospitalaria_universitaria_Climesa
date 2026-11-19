@@ -1,6 +1,9 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Send
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.foundation.layout.Arrangement
@@ -12,10 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -66,7 +65,7 @@ fun PatientAppointmentsScreen(
     // "Pedir cita" only for a linked account: unlinked, the API answers 403 "La cuenta no está vinculada".
     val canRequest = linked && "citas.solicitar" in permissions
     if (!linked) {
-        PageList(modifier) { item { EmptyState(stringResource(R.string.pac_citas_sin_vincular), detail = stringResource(R.string.pac_citas_sin_vincular_detalle), icon = Icons.Default.CalendarMonth) } }
+        PageList(modifier) { item { EmptyState(stringResource(R.string.pac_citas_sin_vincular), detail = stringResource(R.string.pac_citas_sin_vincular_detalle), icon = ClimesaIcons.Calendar) } }
         return
     }
     LaunchedEffect(Unit) { model.load(); model.startLive(channels); requests.load(withCategories = canRequest); requests.startLive(channels) }
@@ -93,11 +92,11 @@ fun PatientAppointmentsScreen(
         // state without it). A failed command (cancel, reschedule, doctor list) is a plain notice: reloading would not fix it.
         state.loadError?.let { error -> item { ErrorState(error, onRetry = { model.clearMessages(); model.load() }) } }
         state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-        state.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
+        state.notice?.let { notice -> item { InlineStatus(notice, Icons.Outlined.Send) } }
         requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-        requestState.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
+        requestState.notice?.let { notice -> item { InlineStatus(notice, Icons.Outlined.Send) } }
         if (canRequest) item {
-            CompactHeader("", actions = { PrimaryButton(stringResource(R.string.cat_pedir_cita), { model.clearMessages(); requests.openForm() }, icon = Icons.Default.CalendarMonth, fill = false) })
+            CompactHeader("", actions = { PrimaryButton(stringResource(R.string.cat_pedir_cita), { model.clearMessages(); requests.openForm() }, icon = ClimesaIcons.Calendar, fill = false) })
         }
         if (requestState.requests.isNotEmpty()) item { MyCategoryRequests(requestState.requests, requestState.saving, requests::withdraw, requestState.error) }
         // R3 A-23: the skeleton only stands in for an empty list; a reload keeps the appointments on screen.
@@ -121,7 +120,7 @@ fun PatientAppointmentsScreen(
                 }
             }
             if (split.past.isNotEmpty()) item(key = "pasadas") {
-                TextButton(onClick = { pastOpen = !pastOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+                TextButton(shape = ButtonShape, onClick = { pastOpen = !pastOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
                     Text(stringResource(if (pastOpen) R.string.cita_ocultar_anteriores else R.string.cita_ver_anteriores, split.past.size))
                 }
             }

@@ -1,13 +1,12 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyListScope
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Logout
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
@@ -62,7 +61,7 @@ internal fun LazyListScope.profileItems(
     item { AppearanceCard(dark, setDark) }
     item {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            SecondaryButton(stringResource(R.string.cerrar_sesion), onLogout, icon = Icons.Default.Logout)
+            SecondaryButton(stringResource(R.string.cerrar_sesion), onLogout, icon = ClimesaIcons.Logout)
             Text(stringResource(R.string.ui_cerrar_sesion_ayuda), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }

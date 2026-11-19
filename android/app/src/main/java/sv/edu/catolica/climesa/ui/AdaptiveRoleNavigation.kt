@@ -2,6 +2,23 @@
 
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ListAlt
+import androidx.compose.material.icons.outlined.AirportShuttle
+import androidx.compose.material.icons.outlined.CleaningServices
+import androidx.compose.material.icons.outlined.Emergency
+import androidx.compose.material.icons.outlined.EventAvailable
+import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.HourglassTop
+import androidx.compose.material.icons.outlined.KingBed
+import androidx.compose.material.icons.outlined.Today
+import androidx.compose.material.icons.outlined.DarkMode
+import androidx.compose.material.icons.outlined.FolderShared
+import androidx.compose.material.icons.outlined.Healing
+import androidx.compose.material.icons.outlined.HowToReg
+import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.MoveToInbox
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.heightIn
@@ -9,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import sv.edu.catolica.climesa.domain.MoreEntry
@@ -22,10 +38,6 @@ import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.FactCheck
-import androidx.compose.material.icons.automirrored.filled.ListAlt
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -91,44 +103,45 @@ private fun compactLabel(section: AndroidSection): String = when (section) {
 
 /** E-04/E-07: every section has its own icon, so the bar and the "Más" sheet never repeat one. */
 internal fun iconFor(section: AndroidSection): ImageVector = when (section) {
-    AndroidSection.HOME -> Icons.Default.Home
-    AndroidSection.NOTICES -> Icons.Default.Notifications
-    AndroidSection.PROFILE -> Icons.Default.AccountCircle
-    AndroidSection.SHIFTS -> Icons.Default.Schedule
-    AndroidSection.APPOINTMENTS -> Icons.Default.DateRange
-    AndroidSection.MY_APPOINTMENTS -> Icons.Default.EventAvailable
-    AndroidSection.PATIENTS -> Icons.Default.Groups
-    AndroidSection.UNIDENTIFIED_PATIENT -> Icons.Default.PersonSearch
-    AndroidSection.BEDS -> Icons.Default.Bed
-    AndroidSection.ADMISSION -> Icons.Default.AssignmentInd
-    AndroidSection.WARD -> Icons.Default.Apartment
-    AndroidSection.UNIT -> Icons.Default.LocalShipping
-    AndroidSection.SERVICE -> Icons.Default.Emergency
-    AndroidSection.DISPATCH -> Icons.Default.SupportAgent
-    AndroidSection.AMBULANCE_REQUEST -> Icons.Default.Sos
-    AndroidSection.AMBULANCE_ARRIVAL -> Icons.Default.AirportShuttle
-    AndroidSection.AMBULANCE_RECEPTION -> Icons.Default.MoveToInbox
-    AndroidSection.RESULTS -> Icons.Default.Science
-    AndroidSection.RESULT_REVIEW -> Icons.AutoMirrored.Filled.FactCheck
-    AndroidSection.PATIENT_QUEUE -> Icons.Default.HourglassTop
-    AndroidSection.QUEUE -> Icons.Default.ConfirmationNumber
-    AndroidSection.HISTORY -> Icons.Default.History
-    AndroidSection.MY_ROOM -> Icons.Default.KingBed
-    AndroidSection.RECORD -> Icons.Default.FolderShared
-    AndroidSection.LOG -> Icons.AutoMirrored.Filled.ListAlt
-    AndroidSection.MY_ACCESS -> Icons.Default.Shield
-    AndroidSection.LINK_RECORD -> Icons.Default.Link
-    AndroidSection.LINKING -> Icons.Default.HowToReg
-    AndroidSection.SUPPLIES -> Icons.Default.Inventory
-    AndroidSection.MEDICAL_DAY -> Icons.Default.Today
-    AndroidSection.CONSULTATIONS -> Icons.Default.MedicalServices
-    AndroidSection.HOSPITALIZED -> Icons.Default.Hotel
-    AndroidSection.INPATIENT_CARE -> Icons.Default.Healing
-    AndroidSection.VITAL_SIGNS -> Icons.Default.MonitorHeart
-    AndroidSection.HOSPITAL_INFO -> Icons.Default.Info
-    AndroidSection.ASSISTANT_STATION -> Icons.Default.MeetingRoom
-    AndroidSection.CLEANING -> Icons.Default.CleaningServices
-    AndroidSection.PREHOSPITAL_REPORT -> Icons.Default.NoteAlt
+    // Web icon where the web has the concept (shell `moduleIcons`), Material Outlined where it has none or would repeat one.
+    AndroidSection.HOME -> ClimesaIcons.Home
+    AndroidSection.NOTICES -> ClimesaIcons.Bell
+    AndroidSection.PROFILE -> ClimesaIcons.User
+    AndroidSection.SHIFTS -> ClimesaIcons.Clock
+    AndroidSection.APPOINTMENTS -> ClimesaIcons.Calendar
+    AndroidSection.MY_APPOINTMENTS -> Icons.Outlined.EventAvailable
+    AndroidSection.PATIENTS -> ClimesaIcons.Users
+    AndroidSection.UNIDENTIFIED_PATIENT -> ClimesaIcons.Search
+    AndroidSection.BEDS -> ClimesaIcons.Grid
+    AndroidSection.ADMISSION -> ClimesaIcons.UserPlus
+    AndroidSection.WARD -> ClimesaIcons.Building
+    AndroidSection.UNIT -> ClimesaIcons.Ambulance
+    AndroidSection.SERVICE -> Icons.Outlined.Emergency
+    AndroidSection.DISPATCH -> ClimesaIcons.Desk
+    AndroidSection.AMBULANCE_REQUEST -> ClimesaIcons.Phone
+    AndroidSection.AMBULANCE_ARRIVAL -> Icons.Outlined.AirportShuttle
+    AndroidSection.AMBULANCE_RECEPTION -> Icons.Outlined.MoveToInbox
+    AndroidSection.RESULTS -> ClimesaIcons.Lab
+    AndroidSection.RESULT_REVIEW -> ClimesaIcons.Audit
+    AndroidSection.PATIENT_QUEUE -> Icons.Outlined.HourglassTop
+    AndroidSection.QUEUE -> ClimesaIcons.Queue
+    AndroidSection.HISTORY -> Icons.Outlined.History
+    AndroidSection.MY_ROOM -> Icons.Outlined.KingBed
+    AndroidSection.RECORD -> Icons.Outlined.FolderShared
+    AndroidSection.LOG -> Icons.AutoMirrored.Outlined.ListAlt
+    AndroidSection.MY_ACCESS -> ClimesaIcons.Privacy
+    AndroidSection.LINK_RECORD -> Icons.Outlined.Link
+    AndroidSection.LINKING -> Icons.Outlined.HowToReg
+    AndroidSection.SUPPLIES -> ClimesaIcons.Inventory
+    AndroidSection.MEDICAL_DAY -> Icons.Outlined.Today
+    AndroidSection.CONSULTATIONS -> ClimesaIcons.Steth
+    AndroidSection.HOSPITALIZED -> ClimesaIcons.Bed
+    AndroidSection.INPATIENT_CARE -> Icons.Outlined.Healing
+    AndroidSection.VITAL_SIGNS -> ClimesaIcons.Pulse
+    AndroidSection.HOSPITAL_INFO -> ClimesaIcons.Info
+    AndroidSection.ASSISTANT_STATION -> ClimesaIcons.Door
+    AndroidSection.CLEANING -> Icons.Outlined.CleaningServices
+    AndroidSection.PREHOSPITAL_REPORT -> ClimesaIcons.Clipboard
 }
 
 @Composable
@@ -195,7 +208,7 @@ private fun CompactRoleScaffold(
                 NavigationBarItem(
                     selected = selected !in navigation.primary,
                     onClick = { moreOpen = true },
-                    icon = { BadgedIcon(Icons.Default.GridView, navigation.more.flatMap { it.sections }.filter { it != AndroidSection.NOTICES }.sumOf { badges[it] ?: 0 }) },
+                    icon = { BadgedIcon(ClimesaIcons.Grid, navigation.more.flatMap { it.sections }.filter { it != AndroidSection.NOTICES }.sumOf { badges[it] ?: 0 }) },
                     label = { Text(stringResource(R.string.ui_mas), style = NavLabel, maxLines = 1) },
                     colors = barItemColors(),
                 )
@@ -233,7 +246,7 @@ private fun RailRoleScaffold(
                 NavigationRailItem(
                     selected = false,
                     onClick = onLogout,
-                    icon = { Icon(Icons.Default.Logout, contentDescription = null) },
+                    icon = { Icon(ClimesaIcons.Logout, contentDescription = null) },
                     label = { Text(stringResource(R.string.cerrar_sesion), maxLines = 2) },
                 )
             }
@@ -288,7 +301,7 @@ private fun DrawerRoleScaffold(
                         )
                     }
                     HorizontalDivider(modifier = Modifier.padding(vertical = 12.dp))
-                    NavigationDrawerItem(label = { Text(stringResource(R.string.cerrar_sesion)) }, selected = false, onClick = onLogout, icon = { Icon(Icons.Default.Logout, contentDescription = null) })
+                    NavigationDrawerItem(label = { Text(stringResource(R.string.cerrar_sesion)) }, selected = false, onClick = onLogout, icon = { Icon(ClimesaIcons.Logout, contentDescription = null) })
                 }
             }
         },
@@ -316,11 +329,11 @@ private fun MoreSheet(
             }
             MoreHeading(stringResource(R.string.ui_ajustes))
             Row(Modifier.fillMaxWidth().heightIn(min = 56.dp).padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                Icon(Icons.Default.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                Icon(Icons.Outlined.DarkMode, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
                 Text(stringResource(R.string.ui_modo_oscuro), style = MaterialTheme.typography.bodyLarge, modifier = Modifier.weight(1f))
                 Switch(dark, setDark)
             }
-            MoreRow(Icons.Default.Logout, stringResource(R.string.cerrar_sesion), false, chevron = false, onClick = onLogout)
+            MoreRow(ClimesaIcons.Logout, stringResource(R.string.cerrar_sesion), false, chevron = false, onClick = onLogout)
         }
     }
 }
@@ -341,7 +354,7 @@ private fun MoreRow(icon: ImageVector, label: String, selected: Boolean, chevron
             Icon(icon, contentDescription = null, tint = if (selected) MaterialTheme.climesa.primaryText else MaterialTheme.colorScheme.onSurfaceVariant)
             Text(label, style = MaterialTheme.typography.bodyLarge, color = if (selected) MaterialTheme.climesa.primaryText else MaterialTheme.colorScheme.onSurface, modifier = Modifier.weight(1f), maxLines = 2)
             NoticeInboxRules.badgeText(badge)?.let { CountBadge(it, badge) }
-            if (chevron) Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (chevron) Icon(ClimesaIcons.Chevron, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

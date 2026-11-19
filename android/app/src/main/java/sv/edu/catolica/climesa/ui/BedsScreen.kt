@@ -1,10 +1,10 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreVert
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bed
-import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -47,7 +47,7 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
             state.loading && state.beds.isEmpty() -> item { LoadingState() }
             // ENF/AST audit #3: a failed reload keeps the board on screen; the full error only when there is nothing to show.
             state.error != null && state.beds.isEmpty() -> item { ErrorState(state.error, onRetry = model::reload) }
-            state.beds.isEmpty() -> item { EmptyState(stringResource(R.string.camas_vacio), icon = Icons.Default.Bed) }
+            state.beds.isEmpty() -> item { EmptyState(stringResource(R.string.camas_vacio), icon = ClimesaIcons.Bed) }
             else -> {
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.WARNING, error) } }
                 // ENF/AST audit #4: beds to verify, then to finish cleaning, stay on top as cards with their action.
@@ -119,9 +119,9 @@ private fun BedTile(bed: Bed, actions: List<BedAction>, onAction: (BedAction) ->
             verticalArrangement = Arrangement.spacedBy(Spacing.xs),
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Icon(Icons.Default.Bed, null, Modifier.size(18.dp), tint = strong)
+                Icon(ClimesaIcons.Bed, null, Modifier.size(18.dp), tint = strong)
                 Text(bed.code, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                if (actions.isNotEmpty()) Icon(Icons.Default.MoreVert, stringResource(R.string.camas_acciones_de, bed.code), Modifier.size(18.dp))
+                if (actions.isNotEmpty()) Icon(Icons.Outlined.MoreVert, stringResource(R.string.camas_acciones_de, bed.code), Modifier.size(18.dp))
             }
             OperacionStatusTag(bed.state, label = BedRules.stateLabel(bed.state))
             bed.occupant?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }

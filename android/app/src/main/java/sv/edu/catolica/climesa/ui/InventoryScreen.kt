@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -18,13 +19,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Inventory2
-import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Science
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -52,9 +46,9 @@ import sv.edu.catolica.climesa.domain.gaugeFraction
 import sv.edu.catolica.climesa.domain.trimNumber
 
 private fun categoryIcon(category: ArticleCategory): ImageVector = when (category) {
-    ArticleCategory.SUPPLY -> Icons.Default.Inventory2
-    ArticleCategory.REAGENT -> Icons.Default.Science
-    ArticleCategory.MINOR_EQUIPMENT -> Icons.Default.MedicalServices
+    ArticleCategory.SUPPLY -> ClimesaIcons.Box
+    ArticleCategory.REAGENT -> ClimesaIcons.Lab
+    ArticleCategory.MINOR_EQUIPMENT -> ClimesaIcons.Steth
 }
 /** Stock state on the shared family table (`agotado` closed, `bajo_minimo` called, `por_vencer` waiting); `ok` is done. Never red. */
 /** Family of a stock state; null for `agotado`, which is drawn as the urgent priority ([StatusFamily.urgent]). */
@@ -103,8 +97,8 @@ private fun androidx.compose.foundation.lazy.LazyListScope.listItems(state: Inve
             }
             FormField(stringResource(R.string.inv_buscar), state.filter.query, model::setQuery, hint = stringResource(R.string.inv_buscar_hint))
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                ArticleCategory.entries.forEach { c -> FilterChip(c in state.filter.categories, { model.toggleCategory(c) }, { Text(c.label) }, leadingIcon = { Icon(categoryIcon(c), null, Modifier.size(18.dp)) }) }
-                if (state.filter.active) FilterChip(false, { model.clearFilters() }, { Text(stringResource(R.string.inv_quitar_filtros)) })
+                ArticleCategory.entries.forEach { c -> ClimesaFilterChip(c in state.filter.categories, { model.toggleCategory(c) }, { Text(c.label) }, leadingIcon = { Icon(categoryIcon(c), null, Modifier.size(18.dp)) }) }
+                if (state.filter.active) ClimesaFilterChip(false, { model.clearFilters() }, { Text(stringResource(R.string.inv_quitar_filtros)) })
             }
             if (configure) CrudButton(CrudKind.Create, stringResource(R.string.inv_nuevo_articulo), { model.openArticle(null) })
         }
@@ -139,7 +133,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.listItems(state: Inve
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: InventoryState, detail: ArticleDetail?, kinds: List<MovementKind>, configure: Boolean, model: InventoryViewModel) {
-    item { SecondaryButton(stringResource(R.string.inv_volver), { model.back() }, icon = Icons.AutoMirrored.Filled.ArrowBack) }
+    item { SecondaryButton(stringResource(R.string.inv_volver), { model.back() }, icon = ClimesaIcons.Back) }
     if (detail == null) { item { if (state.detailLoading) LoadingState() else ErrorState(state.error, onRetry = { model.clearMessages(); state.selectedId?.let(model::select) }) }; return }
     val article = detail.summary
     item {
@@ -153,7 +147,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
                 StatTile(trimNumber(article.expiringSoon), stringResource(R.string.inv_por_vencer_30), Modifier.weight(1f))
                 StatTile(trimNumber(article.expired), stringResource(R.string.inv_vencida), Modifier.weight(1f))
             }
-            if (kinds.isNotEmpty() && article.active) PrimaryButton(stringResource(R.string.inv_registrar_movimiento), { model.openMovement(kinds.first()) }, icon = Icons.Default.Add, enabled = !state.busy)
+            if (kinds.isNotEmpty() && article.active) PrimaryButton(stringResource(R.string.inv_registrar_movimiento), { model.openMovement(kinds.first()) }, icon = ClimesaIcons.Plus, enabled = !state.busy)
             if (configure) {
                 CrudButton(CrudKind.Edit, stringResource(R.string.inv_editar_articulo), { model.openArticle(article) })
                 CrudButton(CrudKind.Create, stringResource(R.string.inv_nuevo_lote), { model.openLot(null) })
@@ -195,13 +189,13 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
 }
 
 @Composable private fun KindChips(current: MovementKind, kinds: List<MovementKind>, onPick: (MovementKind) -> Unit) {
-    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { kinds.forEach { FilterChip(it == current, { onPick(it) }, { Text(it.label) }) } }
+    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { kinds.forEach { ClimesaFilterChip(it == current, { onPick(it) }, { Text(it.label) }) } }
 }
 @Composable private fun <T> ChoiceChips(label: String, items: List<T>, selectedId: String, id: (T) -> String, text: (T) -> String, error: String?, onPick: (String) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Text(label, style = MaterialTheme.typography.labelLarge)
         if (items.isEmpty()) Text(stringResource(R.string.inv_sin_opciones), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { items.forEach { FilterChip(id(it) == selectedId, { onPick(id(it)) }, { Text(text(it)) }) } }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { items.forEach { ClimesaFilterChip(id(it) == selectedId, { onPick(id(it)) }, { Text(text(it)) }) } }
         error?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
     }
 }
@@ -239,11 +233,11 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             FormField(stringResource(R.string.inv_codigo), draft.code, { v -> model.editArticle { it.copy(code = v) } }, enabled = !busy)
             FormField(stringResource(R.string.inv_nombre), draft.name, { v -> model.editArticle { it.copy(name = v) } }, enabled = !busy)
-            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { ArticleCategory.entries.forEach { c -> FilterChip(c == draft.category, { model.editArticle { it.copy(category = c) } }, { Text(c.label) }) } }
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { ArticleCategory.entries.forEach { c -> ClimesaFilterChip(c == draft.category, { model.editArticle { it.copy(category = c) } }, { Text(c.label) }) } }
             FormField(stringResource(R.string.inv_unidad), draft.unit, { v -> model.editArticle { it.copy(unit = v) } }, enabled = !busy)
             FormField(stringResource(R.string.inv_existencia_minima), draft.minimum, { v -> model.editArticle { it.copy(minimum = v) } }, enabled = !busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
             if (draft.id != null) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { FilterChip(draft.active, { model.editArticle { it.copy(active = true) } }, { Text(stringResource(R.string.inv_activo)) }); FilterChip(!draft.active, { model.editArticle { it.copy(active = false) } }, { Text(stringResource(R.string.inv_inactivo)) }) }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { ClimesaFilterChip(draft.active, { model.editArticle { it.copy(active = true) } }, { Text(stringResource(R.string.inv_activo)) }); ClimesaFilterChip(!draft.active, { model.editArticle { it.copy(active = false) } }, { Text(stringResource(R.string.inv_inactivo)) }) }
                 FormField(stringResource(R.string.inv_motivo_cambio), draft.reason, { v -> model.editArticle { it.copy(reason = v) } }, enabled = !busy, hint = stringResource(R.string.inv_motivo_hint_auditoria), singleLine = false)
             }
             error?.let { NoticeBanner(NoticeKind.ERROR, it) }
@@ -257,7 +251,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
             FormField(stringResource(R.string.inv_numero_lote), draft.number, { v -> model.editLot { it.copy(number = v) } }, enabled = !busy)
             FormField(stringResource(R.string.inv_vencimiento), draft.expiresAt, { v -> model.editLot { it.copy(expiresAt = v) } }, enabled = !busy, hint = stringResource(R.string.inv_vacio_no_vence))
             if (draft.id != null) {
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { FilterChip(draft.active, { model.editLot { it.copy(active = true) } }, { Text(stringResource(R.string.inv_activo)) }); FilterChip(!draft.active, { model.editLot { it.copy(active = false) } }, { Text(stringResource(R.string.inv_dado_de_baja)) }) }
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) { ClimesaFilterChip(draft.active, { model.editLot { it.copy(active = true) } }, { Text(stringResource(R.string.inv_activo)) }); ClimesaFilterChip(!draft.active, { model.editLot { it.copy(active = false) } }, { Text(stringResource(R.string.inv_dado_de_baja)) }) }
                 FormField(stringResource(R.string.inv_motivo_cambio), draft.reason, { v -> model.editLot { it.copy(reason = v) } }, enabled = !busy, hint = stringResource(R.string.inv_motivo_hint), singleLine = false)
             }
             error?.let { NoticeBanner(NoticeKind.ERROR, it) }

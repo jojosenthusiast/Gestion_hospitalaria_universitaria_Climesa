@@ -1,5 +1,8 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MoreVert
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.background
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
@@ -31,10 +34,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
@@ -235,10 +234,10 @@ private fun QueueDock(state: QueueState, service: String?, query: String, onCall
         }
         if (onCallNext != null || onIssue != null) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             if (onCallNext != null) {
-                if (onIssue != null) SecondaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, Modifier.weight(1f), icon = Icons.Default.Phone, enabled = !state.busy && waiting.isNotEmpty())
-                else PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, Modifier.weight(1f), icon = Icons.Default.Phone, enabled = !state.busy && waiting.isNotEmpty())
+                if (onIssue != null) SecondaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, Modifier.weight(1f), icon = ClimesaIcons.Phone, enabled = !state.busy && waiting.isNotEmpty())
+                else PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, Modifier.weight(1f), icon = ClimesaIcons.Phone, enabled = !state.busy && waiting.isNotEmpty())
             }
-            if (onIssue != null) PrimaryButton(stringResource(R.string.rec7_emitir_numero), onIssue, Modifier.weight(1f), icon = Icons.Default.Add, enabled = !state.busy)
+            if (onIssue != null) PrimaryButton(stringResource(R.string.rec7_emitir_numero), onIssue, Modifier.weight(1f), icon = ClimesaIcons.Plus, enabled = !state.busy)
         }
     }
 }
@@ -279,8 +278,8 @@ private fun NextCard(state: QueueState, service: String, canCall: Boolean, prima
         if (canCall) {
             OfficePicker(state.offices, office, busy, onOffice)
             val calling = state.busyKey == QueueViewModel.NEXT
-            if (primary) PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = Icons.Default.Phone, enabled = !busy && waiting, loading = calling)
-            else SecondaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = Icons.Default.Phone, enabled = !busy && waiting, loading = calling)
+            if (primary) PrimaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = ClimesaIcons.Phone, enabled = !busy && waiting, loading = calling)
+            else SecondaryButton(stringResource(R.string.fila_llamar_siguiente), onCallNext, icon = ClimesaIcons.Phone, enabled = !busy && waiting, loading = calling)
         }
     }
 }
@@ -292,7 +291,7 @@ private fun OfficePicker(offices: List<QueueOffice>, selected: String, busy: Boo
     var open by remember { mutableStateOf(false) }
     val label = offices.firstOrNull { it.id == selected }?.label ?: stringResource(R.string.fila_consultorio_sin_asignar)
     Box {
-        TextButton(onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_consultorio, label)) }
+        TextButton(shape = ButtonShape, onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_consultorio, label)) }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             DropdownMenuItem(text = { Text(stringResource(R.string.fila_consultorio_sin_asignar)) }, onClick = { open = false; onSelect("") })
             offices.forEach { room -> DropdownMenuItem(text = { Text(room.label) }, onClick = { open = false; onSelect(room.id) }) }
@@ -305,7 +304,7 @@ private fun OfficePicker(offices: List<QueueOffice>, selected: String, busy: Boo
 private fun UndoRow(label: String, busy: Boolean, onUndo: () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         Text(label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
-        TextButton(onClick = onUndo, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_deshacer)) }
+        TextButton(shape = ButtonShape, onClick = onUndo, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_deshacer)) }
     }
 }
 
@@ -366,8 +365,8 @@ private fun CardMenu(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, 
     if (moves.isEmpty() && priorities.isEmpty()) return
     var open by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch).semantics { contentDescription = "Más acciones de ${QueueLabels.code(ticket)}" }) {
-            Icon(Icons.Default.MoreVert, null, Modifier.size(20.dp)); Spacer(Modifier.width(Spacing.xs)); Text(stringResource(R.string.fila_mas))
+        TextButton(shape = ButtonShape, onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch).semantics { contentDescription = "Más acciones de ${QueueLabels.code(ticket)}" }) {
+            Icon(Icons.Outlined.MoreVert, null, Modifier.size(20.dp)); Spacer(Modifier.width(Spacing.xs)); Text(stringResource(R.string.fila_mas))
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             moves.forEach { move ->
@@ -501,11 +500,11 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
             // "Emitir sin la cita" falls back to the walk-in chips.
             if (arrival) {
                 NoticeBanner(NoticeKind.INFO, stringResource(R.string.u5_llegada_explica))
-                TextButton(onClick = { withoutAppointment = true }, enabled = !sending, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.u5_emitir_sin_cita)) }
+                TextButton(shape = ButtonShape, onClick = { withoutAppointment = true }, enabled = !sending, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.u5_emitir_sin_cita)) }
             } else {
                 Text(stringResource(R.string.rec7_servicio), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    QueueLabels.services.forEach { (value, label) -> androidx.compose.material3.FilterChip(selected = service == value, onClick = { service = value }, enabled = !sending, label = { Text(label) }) }
+                    QueueLabels.services.forEach { (value, label) -> ClimesaFilterChip(selected = service == value, onClick = { service = value }, enabled = !sending, label = { Text(label) }) }
                 }
             }
             Text(stringResource(R.string.fila_prioridad), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))

@@ -95,7 +95,7 @@ internal fun PatientSearchPicker(
                 chosen.appointmentToday?.let { Text(it.chip, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary) }
                 chosen.ticketToday?.let { Text(stringResource(R.string.u5_ya_tiene_numero, it.code), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant) }
             }
-            TextButton(onClick = { onPick(null) }, enabled = enabled) { Text(stringResource(R.string.rec_agendar_cambiar)) }
+            TextButton(shape = ButtonShape, onClick = { onPick(null) }, enabled = enabled) { Text(stringResource(R.string.rec_agendar_cambiar)) }
         }
         return
     }
@@ -103,7 +103,7 @@ internal fun PatientSearchPicker(
     if (searching && results.isEmpty()) LoadingState()
     results.forEach { p ->
         val blocked = PatientGate.blockedReason(p, purpose)
-        TextButton(onClick = { onPick(p) }, enabled = enabled && blocked == null, modifier = Modifier.fillMaxWidth()) {
+        TextButton(shape = ButtonShape, onClick = { onPick(p) }, enabled = enabled && blocked == null, modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.fillMaxWidth()) {
                 Text(p.name, style = MaterialTheme.typography.titleSmall); Text(p.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 // S1: shown but not choosable, with why and what to do, before the tap.
@@ -114,6 +114,6 @@ internal fun PatientSearchPicker(
             }
         }
     }
-    if (hasMore) TextButton(onClick = onMore, enabled = !searching) { Text(stringResource(R.string.rec_agendar_mas)) }
+    if (hasMore) TextButton(shape = ButtonShape, onClick = onMore, enabled = !searching) { Text(stringResource(R.string.rec_agendar_mas)) }
     if (!searching && results.isEmpty() && ReceptionScheduling.canSearch(query)) Text(stringResource(R.string.rec_agendar_sin_resultados), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }

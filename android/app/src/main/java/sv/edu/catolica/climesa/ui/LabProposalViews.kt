@@ -1,12 +1,9 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.MaterialTheme
@@ -57,8 +54,8 @@ private fun ProposalRow(p: LabProposal, state: LabProposalsState, model: LabProp
             active && state.mode == ProposalMode.DISCARD -> DiscardForm(p, state, model)
             else -> ClimesaActionGroup {
                 // One primary per row group: schedule; discarding is the secondary way out.
-                PrimaryButton(stringResource(R.string.seg_agendar), { model.openSchedule(p) }, icon = Icons.Default.CalendarMonth, enabled = !state.busy)
-                SecondaryButton(stringResource(R.string.seg_descartar), { model.openDiscard(p) }, icon = Icons.Default.Close, enabled = !state.busy)
+                PrimaryButton(stringResource(R.string.seg_agendar), { model.openSchedule(p) }, icon = ClimesaIcons.Calendar, enabled = !state.busy)
+                SecondaryButton(stringResource(R.string.seg_descartar), { model.openDiscard(p) }, icon = ClimesaIcons.Close, enabled = !state.busy)
             }
         }
     }
@@ -73,7 +70,7 @@ private fun ScheduleForm(p: LabProposal, state: LabProposalsState, model: LabPro
     state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
     if (linkPending) NoticeBanner(NoticeKind.INFO, stringResource(R.string.seg_enlace_pendiente))
     else {
-        TextButton(onClick = { picker = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.seg_dia, sv.edu.catolica.climesa.domain.ShortDay.of(state.date, sv.edu.catolica.climesa.domain.ReceptionScheduling.today()))) }
+        TextButton(shape = ButtonShape, onClick = { picker = true }, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text(stringResource(R.string.seg_dia, sv.edu.catolica.climesa.domain.ShortDay.of(state.date, sv.edu.catolica.climesa.domain.ReceptionScheduling.today()))) }
         when {
             state.loadingSlots -> LoadingState()
             state.slots.none { it.selectable } -> Text(stringResource(R.string.seg_sin_horas), style = MaterialTheme.typography.bodySmall)
@@ -81,15 +78,15 @@ private fun ScheduleForm(p: LabProposal, state: LabProposalsState, model: LabPro
         }
     }
     ClimesaActionGroup {
-        PrimaryButton(stringResource(if (linkPending) R.string.seg_enlazar else R.string.seg_confirmar), { model.confirm(p, chosen) }, icon = Icons.Default.Check,
+        PrimaryButton(stringResource(if (linkPending) R.string.seg_enlazar else R.string.seg_confirmar), { model.confirm(p, chosen) }, icon = ClimesaIcons.Check,
             enabled = !state.busy && (linkPending || chosen != null), loading = state.busy)
         SecondaryButton(stringResource(R.string.seg_volver), { model.close() }, enabled = !state.busy)
     }
     if (picker) {
         val pickerState = rememberDatePickerState(initialSelectedDateMillis = state.date.atStartOfDay(ZoneId.of("UTC")).toInstant().toEpochMilli())
         DatePickerDialog(onDismissRequest = { picker = false },
-            confirmButton = { TextButton(onClick = { pickerState.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(ZoneId.of("UTC")).toLocalDate()) }; slot = null; picker = false }) { Text("Aceptar") } },
-            dismissButton = { TextButton(onClick = { picker = false }) { Text(stringResource(R.string.ui_cancelar)) } }) { DatePicker(state = pickerState) }
+            confirmButton = { TextButton(shape = ButtonShape, onClick = { pickerState.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(ZoneId.of("UTC")).toLocalDate()) }; slot = null; picker = false }) { Text("Aceptar") } },
+            dismissButton = { TextButton(shape = ButtonShape, onClick = { picker = false }) { Text(stringResource(R.string.ui_cancelar)) } }) { DatePicker(state = pickerState) }
     }
 }
 

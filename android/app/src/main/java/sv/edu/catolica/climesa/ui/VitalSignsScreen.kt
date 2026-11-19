@@ -1,5 +1,9 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Save
+import androidx.compose.material.icons.outlined.SwapHoriz
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.Canvas
@@ -11,21 +15,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Bed
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ConfirmationNumber
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.MonitorHeart
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.SwapHoriz
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -88,9 +80,9 @@ private fun levelColor(level: VitalLevel?): Color = when (level) {
 }
 
 private fun levelIcon(level: VitalLevel?): ImageVector = when (level) {
-    VitalLevel.CRITICAL -> Icons.Default.ErrorOutline
-    VitalLevel.ABNORMAL -> Icons.Default.Warning
-    else -> Icons.Default.CheckCircle
+    VitalLevel.CRITICAL -> ClimesaIcons.Alert
+    VitalLevel.ABNORMAL -> ClimesaIcons.Alert
+    else -> ClimesaIcons.Check
 }
 
 @Composable
@@ -141,20 +133,20 @@ private fun androidx.compose.foundation.lazy.LazyListScope.pickerItems(state: Vi
     }
     if (state.query.trim().length >= 2) {
         item { Text(stringResource(R.string.signos_resultados), style = MaterialTheme.typography.titleLarge) }
-        candidateSection(state.search, model, R.string.signos_buscar_vacio, R.string.signos_buscar_vacio_detalle, Icons.Default.Search, Icons.Default.Person) { model.onQuery(state.query) }
+        candidateSection(state.search, model, R.string.signos_buscar_vacio, R.string.signos_buscar_vacio_detalle, ClimesaIcons.Search, ClimesaIcons.User) { model.onQuery(state.query) }
         return
     }
     val hasWard = "admision.ver" in profile.permissions
     val hasQueue = "fila.ver" in profile.permissions
     if (hasWard) {
         item { Text(stringResource(R.string.signos_mi_planta), style = MaterialTheme.typography.titleLarge) }
-        candidateSection(state.ward, model, R.string.signos_mi_planta_vacio, R.string.signos_mi_planta_vacio_detalle, Icons.Default.Bed, Icons.Default.Bed) { model.loadSources(profile.permissions) }
+        candidateSection(state.ward, model, R.string.signos_mi_planta_vacio, R.string.signos_mi_planta_vacio_detalle, ClimesaIcons.Bed, ClimesaIcons.Bed) { model.loadSources(profile.permissions) }
     }
     if (hasQueue) {
         item { Text(stringResource(R.string.signos_fila), style = MaterialTheme.typography.titleLarge) }
-        candidateSection(state.queue, model, R.string.signos_fila_vacio, R.string.signos_fila_vacio_detalle, Icons.Default.ConfirmationNumber, Icons.Default.ConfirmationNumber) { model.loadSources(profile.permissions) }
+        candidateSection(state.queue, model, R.string.signos_fila_vacio, R.string.signos_fila_vacio_detalle, ClimesaIcons.Queue, ClimesaIcons.Queue) { model.loadSources(profile.permissions) }
     }
-    if (!hasWard && !hasQueue) item { EmptyState(stringResource(R.string.signos_sin_fuentes), icon = Icons.Default.Search) }
+    if (!hasWard && !hasQueue) item { EmptyState(stringResource(R.string.signos_sin_fuentes), icon = ClimesaIcons.Search) }
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.candidateSection(
@@ -178,7 +170,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.candidateSection(
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.patientItems(state: VitalSignsState, readOnly: Boolean, model: VitalSignsViewModel) {
-    item { SecondaryButton(stringResource(R.string.signos_cambiar_paciente), model::close, icon = Icons.Default.SwapHoriz) }
+    item { SecondaryButton(stringResource(R.string.signos_cambiar_paciente), model::close, icon = Icons.Outlined.SwapHoriz) }
     val history = state.history
     if (history == null) {
         val hint = state.patientHint
@@ -229,7 +221,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.patientItems(state: V
         }
     }
     item { Text(stringResource(R.string.signos_historial), style = MaterialTheme.typography.titleLarge) }
-    if (history.readings.isEmpty()) item { EmptyState(stringResource(R.string.signos_historial_vacio), detail = stringResource(R.string.signos_historial_vacio_detalle), icon = Icons.Default.MonitorHeart) }
+    if (history.readings.isEmpty()) item { EmptyState(stringResource(R.string.signos_historial_vacio), detail = stringResource(R.string.signos_historial_vacio_detalle), icon = ClimesaIcons.Pulse) }
     else {
         // ENF/AST audit #13: grouped by day; the newest day stays open and earlier days fold under "Ver N más".
         val days = history.days()
@@ -276,7 +268,7 @@ private fun CaptureForm(state: VitalSignsState, model: VitalSignsViewModel) {
             hint = stringResource(R.string.signos_nota_contador, state.form.note.length, VitalsRules.NOTE_MAX))
         state.formError?.let { if (state.conflict) ConflictBanner(model::reload, message = it) else NoticeBanner(NoticeKind.ERROR, it) }
         state.notice?.let { NoticeBanner(NoticeKind.SUCCESS, it) }
-        PrimaryButton(stringResource(R.string.signos_guardar), model::save, icon = Icons.Default.Save, loading = state.saving)
+        PrimaryButton(stringResource(R.string.signos_guardar), model::save, icon = Icons.Outlined.Save, loading = state.saving)
     }
 }
 
@@ -286,10 +278,10 @@ private fun VitalField(measure: VitalMeasure, text: String, onChange: (String) -
     val error = VitalsRules.fieldError(measure, text)
     val level = if (error == null && text.isNotBlank()) VitalsRules.level(measure, text) else null
     val tone = if (level == VitalLevel.ABNORMAL || level == VitalLevel.CRITICAL) levelColor(level) else null
-    val colors = if (tone == null) OutlinedTextFieldDefaults.colors()
+    val colors = if (tone == null) climesaFieldColors()
     else OutlinedTextFieldDefaults.colors(focusedBorderColor = tone, unfocusedBorderColor = tone, focusedLabelColor = tone, unfocusedLabelColor = tone, cursorColor = tone)
     val reference = measure.referenceText()
-    OutlinedTextField(
+    ClimesaTextField(
         value = text,
         onValueChange = onChange,
         modifier = modifier,
@@ -376,7 +368,7 @@ private fun ReadingCard(reading: VitalReading) {
         VitalsFormat.hour(reading.takenAt),
         subtitle = reading.summary(),
         meta = meta,
-        leadingIcon = Icons.Default.MonitorHeart,
+        leadingIcon = ClimesaIcons.Pulse,
         status = { if (level == VitalLevel.CRITICAL) CriticalPill(levelWord(level)) else FamilyBadge(levelWord(level), vitalLevelFamily(level)) },
     )
 }

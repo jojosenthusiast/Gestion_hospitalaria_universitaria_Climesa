@@ -1,12 +1,14 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Image
+import androidx.compose.material.icons.outlined.PictureAsPdf
+import androidx.compose.material.icons.outlined.UploadFile
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import android.content.Intent
 import android.net.Uri
-import androidx.compose.material.icons.automirrored.filled.OpenInNew
-import androidx.compose.material.icons.filled.Image
-import androidx.compose.material.icons.filled.PictureAsPdf
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.text.style.TextOverflow
@@ -35,13 +37,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -154,7 +152,7 @@ fun LaboratoryScreen(
                     val toReview = LabWorklist.sorted(state.orders.filter { it.allows(LabOrderAction.REVIEW) && it.id !in inInbox }).sortedByDescending(LabWorklist::isCritical)
                     // As on iOS: the doctor's own open orders that the API lets cancel or send/load as external.
                     val inProgress = LabWorklist.sorted(state.orders.filter { !it.allows(LabOrderAction.REVIEW) && (it.allows(LabOrderAction.CANCEL) || it.externalActions.isNotEmpty()) })
-                    if (toReview.isEmpty() && state.followUps.isEmpty() && inProgress.isEmpty()) item { EmptyState(stringResource(R.string.lab_pendientes_vacio), icon = Icons.Default.Check) }
+                    if (toReview.isEmpty() && state.followUps.isEmpty() && inProgress.isEmpty()) item { EmptyState(stringResource(R.string.lab_pendientes_vacio), icon = ClimesaIcons.Check) }
                     // One primary per screen: the inbox keeps it when it has a release; otherwise the first card here.
                     val inboxHasPrimary = LabInbox.rows(state.followUps).any { it.canRelease }
                     items(toReview, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now, primary = !inboxHasPrimary && order.id == toReview.first().id) }
@@ -196,7 +194,7 @@ private fun UploadFailureDialog(message: String, onClose: () -> Unit) {
         onDismissRequest = onClose,
         title = { Text(stringResource(R.string.lab_cargar_externo)) },
         text = { Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) { NoticeBanner(NoticeKind.ERROR, message); Text(stringResource(R.string.lab_subida_fallida_ayuda)) } },
-        confirmButton = { TextButton(onClick = onClose) { Text(stringResource(R.string.lab_entendido)) } },
+        confirmButton = { TextButton(shape = ButtonShape, onClick = onClose) { Text(stringResource(R.string.lab_entendido)) } },
     )
 }
 
@@ -219,7 +217,7 @@ private fun LabGroupHeader(label: String, count: Int, open: Boolean?, onToggle: 
         Text("$count", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (open != null) {
             Box(Modifier.weight(1f))
-            TextButton(onClick = onToggle) { Text(stringResource(if (open) R.string.lab_grupo_ocultar else R.string.lab_grupo_mostrar, label.lowercase())) }
+            TextButton(shape = ButtonShape, onClick = onToggle) { Text(stringResource(if (open) R.string.lab_grupo_ocultar else R.string.lab_grupo_mostrar, label.lowercase())) }
         }
     }
 }
@@ -232,7 +230,7 @@ private fun LabGroupHeader(label: String, count: Int, open: Boolean?, onToggle: 
 private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, busyOrders: Set<String>, error: String?, model: LaboratoryViewModel) {
     val rows = LabInbox.rows(items)
     SectionCard(title = stringResource(R.string.lab_pendientes_titulo), eyebrow = stringResource(R.string.lab_pendientes_cuenta, rows.size)) {
-        error?.let { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, it); SecondaryButton(stringResource(R.string.ui_reintentar), model::loadFollowUps, icon = Icons.Default.Refresh) } }
+        error?.let { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, it); SecondaryButton(stringResource(R.string.ui_reintentar), model::loadFollowUps, icon = ClimesaIcons.Retry) } }
         if (rows.isEmpty() && error == null) Text(stringResource(R.string.lab_pendientes_vacio), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         // One primary per screen: only the first row that can be released gets the filled button.
         val first = rows.firstOrNull { it.canRelease }?.orderId
@@ -247,8 +245,8 @@ private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, busyOrders: S
                 if (row.keyValues.isEmpty()) row.details.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 val rowBusy = row.orderId in busyOrders
                 when {
-                    row.canRelease && row.orderId == first -> PrimaryButton(stringResource(R.string.u5_lab_revisar_liberar), { model.openReview(row.orderId) }, icon = Icons.Default.Check, enabled = !rowBusy, loading = rowBusy)
-                    row.canRelease -> SecondaryButton(stringResource(R.string.u5_lab_revisar_liberar), { model.openReview(row.orderId) }, icon = Icons.Default.Check, enabled = !rowBusy)
+                    row.canRelease && row.orderId == first -> PrimaryButton(stringResource(R.string.u5_lab_revisar_liberar), { model.openReview(row.orderId) }, icon = ClimesaIcons.Check, enabled = !rowBusy, loading = rowBusy)
+                    row.canRelease -> SecondaryButton(stringResource(R.string.u5_lab_revisar_liberar), { model.openReview(row.orderId) }, icon = ClimesaIcons.Check, enabled = !rowBusy)
                     else -> items.filter { it.orderId == row.orderId }.forEach { item -> RowAction(stringResource(R.string.lab_pendiente_revisado), { model.reviewFollowUp(item) }, enabled = busy == null, loading = busy == item.id) }
                 }
             }
@@ -406,7 +404,7 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
         if (order.external) ExternalNote(order)
         if (!expanded) {
             Text(LabFlow.nextStep(order, ownView), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            TextButton(onClick = { expanded = true }) { Text(stringResource(R.string.lab_ver_detalle, order.items.size)) }
+            TextButton(shape = ButtonShape, onClick = { expanded = true }) { Text(stringResource(R.string.lab_ver_detalle, order.items.size)) }
             return@SectionCard
         }
         LabStepper(order, ownView)
@@ -438,7 +436,7 @@ private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: 
         else if (canReview) SecondaryButton(stringResource(R.string.lab_revisar), { model.openReview(order.id) }, enabled = !busy)
         if (canSendExternal) SecondaryButton(stringResource(R.string.lab_externo_titulo), { model.openExternal(order.id) }, enabled = !busy)
         if (canCancel) SecondaryButton(stringResource(R.string.lab_cancelar_orden), { model.openCancel(order.id) }, enabled = !busy)
-        if (!ownView && !(canReview || canLoadExternal || canSendExternal)) TextButton(onClick = { expanded = false }) { Text(stringResource(R.string.lab_ocultar_detalle)) }
+        if (!ownView && !(canReview || canLoadExternal || canSendExternal)) TextButton(shape = ButtonShape, onClick = { expanded = false }) { Text(stringResource(R.string.lab_ocultar_detalle)) }
     }
 }
 
@@ -470,7 +468,7 @@ private fun ExternalReport(order: LaboratoryOrder, model: LaboratoryViewModel) {
             val busy = state.attachmentBusy == file.id
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Icon(if (file.mimeType == "application/pdf") Icons.Default.PictureAsPdf else Icons.Default.Image, null, Modifier.size(20.dp), tint = MaterialTheme.climesa.primaryText)
+                    Icon(if (file.mimeType == "application/pdf") Icons.Outlined.PictureAsPdf else Icons.Outlined.Image, null, Modifier.size(20.dp), tint = MaterialTheme.climesa.primaryText)
                     Text(file.fileName, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Text(
@@ -480,16 +478,16 @@ private fun ExternalReport(order: LaboratoryOrder, model: LaboratoryViewModel) {
                 file.note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 if (file.stored) {
                     val description = stringResource(R.string.lab_adjunto_abrir_desc, file.fileName)
-                    SecondaryButton(stringResource(R.string.lab_adjunto_abrir), { model.openAttachment(order.id, file.id) }, Modifier.semantics { contentDescription = description }, icon = Icons.AutoMirrored.Filled.OpenInNew, enabled = state.attachmentBusy == null, loading = busy)
+                    SecondaryButton(stringResource(R.string.lab_adjunto_abrir), { model.openAttachment(order.id, file.id) }, Modifier.semantics { contentDescription = description }, icon = Icons.AutoMirrored.Outlined.OpenInNew, enabled = state.attachmentBusy == null, loading = busy)
                 } else {
                     Text(stringResource(R.string.lab_adjunto_solo_referencia), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (canAttach) SecondaryButton(stringResource(R.string.lab_adjunto_subir), { target = file.id; picker.launch(LabExternalRules.ATTACHMENT_TYPES.toTypedArray()) }, icon = Icons.Default.UploadFile, enabled = state.attachmentBusy == null, loading = busy)
+                    if (canAttach) SecondaryButton(stringResource(R.string.lab_adjunto_subir), { target = file.id; picker.launch(LabExternalRules.ATTACHMENT_TYPES.toTypedArray()) }, icon = Icons.Outlined.UploadFile, enabled = state.attachmentBusy == null, loading = busy)
                 }
             }
         }
         report?.error?.let { error ->
             NoticeBanner(NoticeKind.ERROR, error)
-            if (report.files.isEmpty()) TextButton(onClick = { model.loadAttachments(order.id, order.version, force = true) }) { Text(stringResource(R.string.lab_adjunto_reintentar)) }
+            if (report.files.isEmpty()) TextButton(shape = ButtonShape, onClick = { model.loadAttachments(order.id, order.version, force = true) }) { Text(stringResource(R.string.lab_adjunto_reintentar)) }
         }
     }
 }
@@ -534,7 +532,7 @@ private fun LabStepper(order: LaboratoryOrder, ownView: Boolean) {
                 val fill = when (step.status) { LabStepStatus.DONE -> colors.success; LabStepStatus.CURRENT -> colors.processSoft; LabStepStatus.PENDING -> MaterialTheme.colorScheme.surface }
                 val ring = when (step.status) { LabStepStatus.DONE -> colors.success; LabStepStatus.CURRENT -> colors.process; LabStepStatus.PENDING -> colors.line }
                 Box(Modifier.size(22.dp).background(fill, CircleShape).border(2.dp, ring, CircleShape), contentAlignment = Alignment.Center) {
-                    if (step.status == LabStepStatus.DONE) Icon(Icons.Default.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.surface)
+                    if (step.status == LabStepStatus.DONE) Icon(ClimesaIcons.Check, null, Modifier.size(14.dp), tint = MaterialTheme.colorScheme.surface)
                     if (step.status == LabStepStatus.CURRENT) Box(Modifier.size(8.dp).background(colors.process, CircleShape))
                 }
             }

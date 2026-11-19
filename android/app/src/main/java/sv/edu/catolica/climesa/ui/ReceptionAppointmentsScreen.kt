@@ -1,6 +1,7 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 
 import androidx.compose.foundation.layout.Arrangement
@@ -11,12 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.HorizontalDivider
@@ -92,7 +87,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     BackHandler(enabled = state.scheduling) { model.leaveScheduling() }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
     PageList(modifier) {
-        state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
+        state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = ClimesaIcons.Retry) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         actionState.error?.takeIf { actionState.target == null }?.let { error -> item {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
@@ -103,7 +98,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 }
             }
         } }
-        if (canSchedule) item { CompactHeader("", actions = { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = Icons.Default.Add, fill = false) }) }
+        if (canSchedule) item { CompactHeader("", actions = { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = ClimesaIcons.Plus, fill = false) }) }
         if (canSchedule) {
             requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
             requestState.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
@@ -116,7 +111,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
         }
         when {
             state.loading && state.appointments.isEmpty() -> item { LoadingState() }
-            state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.rec_citas_vacio), detail = stringResource(R.string.rec_citas_vacio_detalle), icon = Icons.Default.CalendarMonth) }
+            state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.rec_citas_vacio), detail = stringResource(R.string.rec_citas_vacio_detalle), icon = ClimesaIcons.Calendar) }
             else -> {
                 val chosen = if (state.requestsOnly) "solicitada" else stateFilter
                 val visible = state.appointments.filter { (chosen == null || it.state == chosen) && sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
@@ -256,19 +251,19 @@ private fun SchedulingForm(state: ReceptionAppointmentsState, model: ReceptionAp
         item { SectionIntro(stringResource(R.string.rec_citas_eyebrow), stringResource(R.string.rec_citas_agendar), stringResource(R.string.rec_citas_detalle)) }
         state.error?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
         item { PatientPicker(state, model) }
-        item { OutlinedButton(onClick = { datePicker = true }, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(Icons.Default.CalendarMonth, null); Spacer(Modifier.padding(4.dp)); Text(stringResource(R.string.rec_agendar_fecha, sv.edu.catolica.climesa.domain.ShortDay.of(state.date, sv.edu.catolica.climesa.domain.ReceptionScheduling.today()))) } }
+        item { OutlinedButton(shape = ButtonShape, onClick = { datePicker = true }, modifier = Modifier.fillMaxWidth()) { androidx.compose.material3.Icon(ClimesaIcons.Calendar, null); Spacer(Modifier.padding(4.dp)); Text(stringResource(R.string.rec_agendar_fecha, sv.edu.catolica.climesa.domain.ShortDay.of(state.date, sv.edu.catolica.climesa.domain.ReceptionScheduling.today()))) } }
         item { DoctorPicker(state, model) }
         item { SlotSection(state, model) }
         item { FormField(stringResource(R.string.rec_agendar_motivo), state.reason, model::reason, singleLine = false) }
-        item { PrimaryButton(stringResource(R.string.rec_agendar_confirmar), model::confirm, icon = Icons.Default.Check, enabled = state.canConfirm, loading = state.saving) }
-        item { SecondaryButton(stringResource(R.string.ui_cancelar), model::closeScheduling, icon = Icons.Default.Close, enabled = !state.saving) }
+        item { PrimaryButton(stringResource(R.string.rec_agendar_confirmar), model::confirm, icon = ClimesaIcons.Check, enabled = state.canConfirm, loading = state.saving) }
+        item { SecondaryButton(stringResource(R.string.ui_cancelar), model::closeScheduling, icon = ClimesaIcons.Close, enabled = !state.saving) }
     }
     if (datePicker) {
         // Material 3 date pickers speak UTC midnight; reading them in El Salvador time picked the day before.
         val picker = rememberDatePickerState(initialSelectedDateMillis = state.date.atStartOfDay(java.time.ZoneOffset.UTC).toInstant().toEpochMilli())
         DatePickerDialog(onDismissRequest = { datePicker = false },
-            confirmButton = { TextButton(onClick = { picker.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()) }; datePicker = false }) { Text("Aceptar") } },
-            dismissButton = { TextButton(onClick = { datePicker = false }) { Text(stringResource(R.string.ui_cancelar)) } }) { DatePicker(state = picker) }
+            confirmButton = { TextButton(shape = ButtonShape, onClick = { picker.selectedDateMillis?.let { model.selectDate(Instant.ofEpochMilli(it).atZone(java.time.ZoneOffset.UTC).toLocalDate()) }; datePicker = false }) { Text("Aceptar") } },
+            dismissButton = { TextButton(shape = ButtonShape, onClick = { datePicker = false }) { Text(stringResource(R.string.ui_cancelar)) } }) { DatePicker(state = picker) }
     }
 }
 
