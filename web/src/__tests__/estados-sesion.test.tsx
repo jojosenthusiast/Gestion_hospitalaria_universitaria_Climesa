@@ -60,8 +60,10 @@ describe('en vivo, conflicto y carga', () => {
     render(<HospitalShell api={api} profile={perfil} connection="live" onLogout={() => undefined} />);
     expect(screen.queryByText(/En vivo/)).toBeNull();
     expect(screen.queryByLabelText(/Hora actual/)).toBeNull();
-    expect(document.querySelector('.hospital-clock')).toBeNull();
-    expect(document.querySelector('time.topbar-date')?.textContent).toMatch(/de/);
+    // Owner batch 1 (S2): the live clock is back: time with seconds plus weekday, day and month.
+    const clock = document.querySelector('time.topbar-clock');
+    expect(clock?.querySelector('strong')?.textContent).toMatch(/^\d{2}:\d{2}:\d{2}$/);
+    expect(clock?.textContent).toMatch(/de/);
   });
 
   it('sin conexión no dice "En vivo"', () => {

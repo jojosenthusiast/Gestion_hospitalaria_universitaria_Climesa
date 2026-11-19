@@ -18,6 +18,10 @@
 .workspace-role option { background: var(--navy); }
 /* R1: the day as plain small text in the topbar (it sits on the navy bar, so it uses the bar's light muted ink). */
 .topbar-date { min-width: 0; margin-left: auto; color: #d3dbe6; font-size: var(--text-sm); line-height: 1.3; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.topbar-clock { display: grid; justify-items: end; gap: 1px; }
+.topbar-clock strong { color: #fff; font-size: 18px; font-weight: 800; letter-spacing: 0.02em; }
+.topbar-clock span { display: block; }
+.topbar-clock span::first-letter { text-transform: uppercase; }
 /* R4a: «lunes, 16 de noviembre», never «Lunes, 16 De Noviembre»: only the first letter goes up. */
 .topbar-date::first-letter { text-transform: uppercase; }
 .nav-toggle { width: 46px; height: 46px; display: none; place-items: center; flex-shrink: 0; border: 1px solid rgb(255 255 255 / 0.3); border-radius: var(--radius-card); background: transparent; color: #ffffff; transition: background var(--motion-fast) ease, transform var(--motion-instant) ease; }
@@ -784,3 +788,16 @@ html.qb-has-dock { scroll-padding-bottom: calc(var(--qb-dock-h, 120px) + var(--s
 .lab-history h4 { margin: 0 0 var(--space-2); font-size: var(--text-sm); }
 .lab-history ul { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--space-2); }
 .lab-history li small { display: block; }
+
+/* Owner batch 1 (S13): the current password on its own row; new and confirm side by side, aligned; the rule under both. */
+.password-grid { align-items: start; }
+.password-grid > .field:first-child { grid-column: 1 / -1; max-width: calc(50% - 10px); }
+.password-grid .password-rule { grid-column: 1 / -1; margin: -4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+@media (max-width: 720px) { .password-grid > .field:first-child { max-width: none; } }
+
+/* Owner batch 1 (S12): two ways to choose a range, labelled, and one line that says which one is applied. */
+.metric-range { min-width: 0; margin: 0; padding: 0; border: 0; display: grid; gap: 8px; }
+.metric-range legend { padding: 0; margin-bottom: 8px; color: var(--muted); font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.04em; }
+.metric-or { align-self: center; color: var(--muted); font-weight: 800; }
+.metric-applied { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; color: var(--ink); font-size: 14px; }
+.metric-applied svg { color: var(--primary-text); }

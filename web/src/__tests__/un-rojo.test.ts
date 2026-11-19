@@ -17,8 +17,11 @@ const cssFiles = (dir: string, out: string[] = []): string[] => {
   return out;
 };
 
-/** A rule may use `--danger` only when its selector names an error (form, load, write or integrity failure). */
-const ERROR_SELECTOR = /error|invalid|is-broken|has-conflict/i;
+/**
+ * A rule may use `--danger` only when its selector names an error (form, load, write or integrity failure), or the one
+ * destructive verb: the owner asked for a fixed color per CRUD action, and «desactivar» is red (owner batch 1, S0).
+ */
+const ERROR_SELECTOR = /error|invalid|is-broken|has-conflict|crud-deactivate/i;
 
 describe('un solo rojo (R1, WC-33 a WC-37)', () => {
   it('los tonos de gráficos y cifras no tienen un rojo genérico; pasar un umbral es urgente', () => {

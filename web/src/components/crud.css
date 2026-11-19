@@ -1,0 +1,36 @@
+/* Owner batch 1 (S0): one color and one symbol per CRUD verb, the same in every module. */
+.crud-button {
+  min-height: 44px; padding: 8px 16px; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  border: 1px solid; border-radius: var(--radius-control); font: inherit; font-size: 15px; font-weight: 800; line-height: 1.2;
+  cursor: pointer; white-space: nowrap; text-decoration: none;
+  transition-property: scale, background-color, border-color, color; transition-duration: 150ms; transition-timing-function: ease-out;
+}
+.crud-button svg { flex: 0 0 auto; }
+.crud-create { border-color: var(--primary); background: var(--primary); color: var(--on-primary); }
+.crud-create:hover:not(:disabled) { border-color: var(--primary-strong); background: var(--primary-strong); }
+.crud-edit { border-color: var(--primary-text); background: var(--surface); color: var(--primary-text); }
+.crud-edit:hover:not(:disabled) { background: var(--soft); }
+.crud-deactivate { border-color: var(--danger); background: var(--surface); color: var(--danger); }
+.crud-deactivate:hover:not(:disabled) { background: var(--danger-soft); }
+.crud-view { border-color: var(--control-line); background: var(--surface); color: var(--ink); }
+.crud-view:hover:not(:disabled) { border-color: var(--primary-text); color: var(--primary-text); background: var(--soft); }
+.crud-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.crud-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--primary-text) 40%, transparent); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) { .crud-button:active:not(:disabled) { scale: 0.96; } }
+.crud-icon { width: 36px; min-height: 36px; height: 36px; padding: 0; }
+.crud-actions { display: inline-flex; flex-wrap: nowrap; align-items: center; justify-content: flex-end; gap: 6px; }
+
+/* Read-only: a visible lock pill; its tooltip says who can change the data. */
+.readonly-badge {
+  position: relative; display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--warning, #8a5a00) 55%, transparent); border-radius: 999px;
+  background: color-mix(in srgb, var(--warning, #8a5a00) 12%, var(--surface)); color: var(--ink);
+  font-size: 14px; font-weight: 800; white-space: nowrap; cursor: help;
+}
+.readonly-badge svg { color: var(--warning, #8a5a00); }
+.readonly-tip {
+  position: absolute; z-index: 30; top: calc(100% + 8px); right: 0; width: max-content; max-width: 280px; padding: 8px 12px;
+  border-radius: var(--radius-control); background: var(--ink); color: var(--surface); font-size: 13px; font-weight: 600; line-height: 1.45;
+  white-space: normal; opacity: 0; visibility: hidden; pointer-events: none; transition: opacity 120ms ease-out;
+}
+.readonly-badge:hover .readonly-tip, .readonly-badge:focus .readonly-tip, .readonly-badge:focus-visible .readonly-tip { opacity: 1; visibility: visible; }

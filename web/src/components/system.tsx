@@ -1,5 +1,6 @@
 import { useId, type ButtonHTMLAttributes, type CSSProperties, type ReactNode } from 'react';
 import { Icon, type IconName } from './ui';
+import './crud.css';
 
 /**
  * Fase 2 (docs/diseno/fase2/02-sistema.md): piezas comunes del sistema de diseño.
@@ -81,6 +82,39 @@ export function ActionButton({ action, allowed, blocked = [], showBlocked = fals
   return <span className="action-blocked">
     <button type="button" className={className} aria-disabled="true" aria-describedby={tipId} {...button} onClick={event => event.preventDefault()}>{children}</button>
     <span id={tipId} role="tooltip" className="action-tooltip">{reason}</span>
+  </span>;
+}
+
+// ---------------------------------------------------------------- CRUD and read-only (owner batch 1, S0)
+
+export type CrudKind = 'create' | 'edit' | 'deactivate' | 'view';
+const CRUD_ICON: Record<CrudKind, IconName> = { create: 'plus', edit: 'pencil', deactivate: 'trash', view: 'eye' };
+/**
+ * One look per CRUD verb, everywhere: create is solid blue with a plus, edit is a blue outline with a pencil,
+ * deactivate is a red outline with a trash can, view is a neutral outline with an eye. `iconOnly` is the compact
+ * form for table rows: a 36 px square whose label is the tooltip and the accessible name.
+ */
+export function CrudButton({ kind, label, iconOnly = false, className = '', ...button }: { kind: CrudKind; label: string; iconOnly?: boolean } & Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'>) {
+  const classes = `crud-button crud-${kind}${iconOnly ? ' crud-icon' : ''}${className ? ` ${className}` : ''}`;
+  return <button type="button" className={classes} aria-label={iconOnly ? label : undefined} title={iconOnly ? label : undefined} {...button}>
+    <Icon name={CRUD_ICON[kind]} size={18} />{!iconOnly && <span>{label}</span>}
+  </button>;
+}
+/** A row's CRUD actions side by side, aligned to the end of the cell. */
+export function CrudActions({ children }: { children: ReactNode }) {
+  return <div className="crud-actions">{children}</div>;
+}
+
+/**
+ * The module is read-only for this account: a visible lock pill. Hover, focus or tap says who can change it, so the
+ * user knows where to go instead of finding out after a refused action.
+ */
+export function ReadOnlyBadge({ who, what = 'esta información' }: { who: string; what?: string }) {
+  const tipId = useId();
+  const text = `Puedes consultar ${what}. Para hacer cambios, contacta a ${who}.`;
+  return <span className="readonly-badge" tabIndex={0} aria-describedby={tipId}>
+    <Icon name="lock" size={16} /><span>Solo lectura</span>
+    <span id={tipId} role="tooltip" className="readonly-tip">{text}</span>
   </span>;
 }
 

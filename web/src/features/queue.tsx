@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
 import { ExportMenu } from '../components/export-menu';
 import { SearchPicker, type PickerItem } from '../components/search-picker';
-import { StatusBadge, ActionButton, AreaTag, PriorityBadge, type Priority } from '../components/system';
+import { StatusBadge, ActionButton, AreaTag, PriorityBadge, ReadOnlyBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api, type Space } from '../lib/api';
 import { MOVE_LABEL, MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
@@ -150,7 +150,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const dockShown = !!data.data && (loaded.length > 0 || call || issue || !!undo);
   return <>
     <CompactHeader breadcrumb="Atención / Flujo de llegada" title="Fila del día" actions={<>
-      {readOnly && <span className="qb-readonly" title="Llamar y atender corresponde a Recepción, Asistencia y Medicina."><Icon name="eye" size={16} />Solo lectura</span>}
+      {readOnly && <ReadOnlyBadge who="Recepción, Asistencia o Medicina" what="la fila del día" />}
       </>}/>
     <section className="data-workbench" aria-label="Tablero de la fila">
       <RemoteState state={data}>{all => {
