@@ -782,8 +782,13 @@ private struct CategoryRequestSheet: View {
                 LoadState(loader: categories, retry: loadCategories) { list in
                     let visible = CategoryRequestRules.filter(list, query: query, picked: picked)
                     if visible.isEmpty { EmptyStateView(title: L.text("appointments.category.none")) }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
-                        ForEach(visible) { category in categoryButton(category) }
+                    // Lote 5 S16: grouped by body area (Cuerpo, Interno y digestivo, Mente y emociones, Sentidos, General).
+                    ForEach(CategoryGroups.sections(visible)) { section in
+                        Text(verbatim: section.group.title).font(Typo.label).foregroundStyle(Theme.muted).padding(.top, Spacing.s)
+                            .accessibilityAddTraits(.isHeader)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
+                            ForEach(section.categories) { category in categoryButton(category) }
+                        }
                     }
                 }
                 }
@@ -960,6 +965,8 @@ struct LabOrderRow: View {
     let critical: Bool
     /// The patient's own list does not repeat their name on every row.
     var showPatient = true
+    /// Lote 5 S13: «2 fuera de rango · 1 crítico» for the doctor's list; nil hides it.
+    var summary: String? = nil
     /// A row inside a `ListCard`, not a card of its own (I-9).
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
@@ -973,8 +980,11 @@ struct LabOrderRow: View {
                 if order.priority == .urgente { PriorityBadge(order.priority.rawValue) }
                 if critical { PatientTag("critico_alto", label: L.text("results.critical")) }
             }
-            .padding(.bottom, Spacing.s)
+            if let summary {
+                Text(verbatim: summary).font(Typo.small).foregroundStyle(critical ? Theme.danger : Theme.warning)
+            }
         }
+        .padding(.bottom, Spacing.s)
         .contentShape(Rectangle())
     }
 }
@@ -1008,6 +1018,10 @@ struct LabOrderDetail: View {
             // R7 C1: the doctor's note for the patient arrives only with the released results.
             if !staffView, showValues, let note = order.patientNote, !note.isEmpty { PatientNotice(text: String(format: L.text("exams.doctorNote"), note)) }
             ForEach(order.items) { item in
+                if staffView && showValues {
+                    // Lote 5 S13: each component with its value, unit, range and a coloured flag, so the review is not monotonous.
+                    StaffLabResultCard(item: item)
+                } else {
                 SectionCard(title: staffView ? "\(item.name) (\(item.code))" : item.name) {
                     if showValues {
                         HStack {
@@ -1032,8 +1046,53 @@ struct LabOrderDetail: View {
                         }
                     }
                 }
+                }
             }
         }
+    }
+}
+
+/// Lote 5 S13 · one result component for the doctor: name and code, the value large with its unit, the reference range
+/// and the flag (En rango, Alto, Bajo, Crítico) on its colour; a critical value gets a red edge on the whole card.
+struct StaffLabResultCard: View {
+    let item: LabOrderItem
+
+    var body: some View {
+        let flag = LabResultView.flag(item)
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+                Text(verbatim: item.name).font(Typo.subheading).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: item.code).font(Typo.caption).foregroundStyle(Theme.muted)
+                Spacer(minLength: Spacing.s)
+                LabFlagBadge(flag: flag)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
+                Text(verbatim: LabResultCopy.value(item)).font(Typo.heading).foregroundStyle(flag.critical ? Theme.danger : Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if item.result?.value != nil, let unit = item.unit, !unit.isEmpty { Text(verbatim: unit).font(Typo.label).foregroundStyle(Theme.muted) }
+            }
+            if let range = PatientLabRules.rangeText(item.referenceRange) {
+                Text(verbatim: String(format: L.text("results.range"), range)).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            if let observation = LabFollowUpRules.labNote(item.result, staffView: true) {
+                Text(verbatim: String(format: L.text(item.result?.relevant == true ? "exams.observation.relevant" : "exams.observation"), observation))
+                    .font(Typo.small).foregroundStyle(item.result?.relevant == true ? Theme.ink : Theme.muted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(flag.critical ? Theme.dangerSoft : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(flag.critical ? Theme.danger : (flag.outOfRange ? Theme.warning : Theme.line), lineWidth: flag.outOfRange ? 2 : 1))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The value shown for a result: the number without its unit, the written result, or «Pendiente».
+enum LabResultCopy {
+    static func value(_ item: LabOrderItem) -> String {
+        guard let result = item.result else { return LabFlag.pending.label }
+        if result.value != nil { return PatientLabRules.valueText(result, unit: nil) }
+        return result.text ?? "—"
     }
 }
 
@@ -1214,24 +1273,31 @@ private struct HistoryContent: View {
                                 meta: consultation.diagnoses.isEmpty ? nil : consultation.diagnoses.map { "\($0.code) \($0.description)" }.joined(separator: " · ")) {
                             PatientTag(consultation.state.rawValue, label: consultation.state.label)
                         }
+                        // Lote 5 S16: the row says when the consultation left a prescription, opened in its detail.
+                        if !consultation.prescriptions.isEmpty {
+                            Label { Text(verbatim: HistoryCopy.prescriptionLine(consultation.prescriptions.reduce(0) { $0 + $1.items.count })) } icon: { ClimesaIcon(.clipboard, size: 14) }
+                                .font(Typo.small).foregroundStyle(Theme.primaryText)
+                        }
                     }
                 }.buttonStyle(.plain)
             }
             SectionTitle("history.laboratory")
             if history.laboratory.isEmpty { EmptyStateView(title: L.text("history.none")) }
-            ForEach(history.laboratory) { order in
-                SectionCard {
-                    ListRow(title: ClimesaDates.display(order.createdAt, .date)) { PatientTag(order.state.rawValue, label: order.state.label) }
-                    ForEach(order.items) { item in
-                        HStack {
-                            Text(verbatim: item.name).font(Typo.small).foregroundStyle(Theme.ink)
-                            Spacer()
-                            if let result = item.result {
-                                Text(verbatim: PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark), unit: item.unit)).font(Typo.mono).foregroundStyle(Theme.ink)
-                                if let mark = result.mark { PatientTag(mark.rawValue, label: mark.label) }
+            // Lote 5 S15: one row per order (exams, date, how many fell out of range); its detail says why it was ordered.
+            ForEach(ClinicalRecordLab.rows(history)) { row in
+                if let order = history.laboratory.first(where: { $0.id == row.orderId }) {
+                    NavigationLink {
+                        ScreenFrame(title: "history.lab.detail") { RecordLabDetail(order: order, history: history, viewerIsPatient: viewerIsPatient) }
+                    } label: {
+                        SectionCard {
+                            ListRow(title: row.exams, subtitle: ClinicalRecordLab.summary(row), meta: ClimesaDates.display(row.orderedAt, .date)) {
+                                HStack(spacing: Spacing.s) {
+                                    PatientTag(order.state.rawValue, label: order.state.label)
+                                    ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                }
                             }
                         }
-                    }
+                    }.buttonStyle(.plain)
                 }
             }
             if !viewerIsPatient && !history.admissions.isEmpty {
@@ -1244,6 +1310,48 @@ private struct HistoryContent: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// Copy of the record list that depends on a count.
+enum HistoryCopy {
+    static func prescriptionLine(_ medicines: Int) -> String {
+        medicines == 1 ? "Con receta · 1 medicamento" : "Con receta · \(medicines) medicamentos"
+    }
+}
+
+/// Lote 5 S15 · one order of the record: «Por qué se pidió» (consultation, doctor, reason, diagnoses), then its results.
+private struct RecordLabDetail: View {
+    let order: LabOrder
+    let history: ClinicalHistory
+    var viewerIsPatient = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionCard(title: L.text("history.lab.why")) {
+                if let origin = LabOriginRules.of(history, consultationId: order.consultationId) {
+                    ListRow(title: String(format: L.text("history.lab.origin"), ClimesaDates.display(origin.date, .date)),
+                            subtitle: origin.doctor ?? L.text("history.doctor.unknown"))
+                    if let reason = origin.reason {
+                        Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(origin.diagnoses, id: \.self) { diagnosis in
+                        Text(verbatim: diagnosis).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Text("history.lab.noOrigin").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            SectionCard {
+                ListRow(title: L.text("history.lab.ordered"), meta: ClimesaDates.display(order.createdAt, .date)) {
+                    PatientTag(order.state.rawValue, label: order.state.label)
+                }
+                if let summary = LabResultView.summary(order.items) {
+                    Text(verbatim: summary).font(Typo.label).foregroundStyle(Theme.warning)
+                }
+            }
+            LabOrderDetail(order: order, showValues: true, staffView: !viewerIsPatient)
         }
     }
 }

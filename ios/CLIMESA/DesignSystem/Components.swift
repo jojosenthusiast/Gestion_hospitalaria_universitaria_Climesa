@@ -1202,3 +1202,25 @@ struct SavedFeedback: View {
         .accessibilityElement(children: .combine)
     }
 }
+
+/// Lote 5 S2: a card's actions on one line when they fit, stacked when they do not (large text, narrow screen). The
+/// line sits inside the card, under its content, so it is clear which card the buttons belong to.
+struct ActionRow<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.s) { content() }
+            VStack(alignment: .leading, spacing: Spacing.s) { content() }
+        }
+    }
+}
+
+/// Lote 5 S13: the flag next to a result: «En rango», «Alto», «Bajo», «Crítico alto»… on its result colour.
+struct LabFlagBadge: View {
+    let flag: LabFlag
+
+    var body: some View {
+        StatusBadge(flag.statusValue, label: flag.label)
+    }
+}

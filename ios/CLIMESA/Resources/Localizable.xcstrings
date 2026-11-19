@@ -3923,7 +3923,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Consultas sin firmar"
+            "value": "Pendientes de firmar"
           }
         }
       }
@@ -6245,6 +6245,138 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lo habitual es firmarla antes de iniciar otra. Puedes reanudarla ahora o iniciar esta consulta de todos modos."
+          }
+        }
+      }
+    },
+    "day.section.now": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora"
+          }
+        }
+      }
+    },
+    "day.section.upcoming": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Próximas"
+          }
+        }
+      }
+    },
+    "day.section.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atendidas hoy"
+          }
+        }
+      }
+    },
+    "day.record.view": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver expediente"
+          }
+        }
+      }
+    },
+    "day.history.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historial de días anteriores"
+          }
+        }
+      }
+    },
+    "history.lab.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Examen de laboratorio"
+          }
+        }
+      }
+    },
+    "history.lab.why": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por qué se pidió"
+          }
+        }
+      }
+    },
+    "history.lab.origin": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulta del %@"
+          }
+        }
+      }
+    },
+    "history.lab.noOrigin": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta orden no viene de una consulta (por ejemplo, de una hospitalización)."
+          }
+        }
+      }
+    },
+    "history.lab.ordered": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedido"
+          }
+        }
+      }
+    },
+    "results.orderedAt": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedido el %@"
+          }
+        }
+      }
+    },
+    "profile.accesos.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quién abrió tu expediente y cuándo"
           }
         }
       }

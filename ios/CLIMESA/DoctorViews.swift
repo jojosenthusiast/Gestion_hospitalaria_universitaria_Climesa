@@ -5,6 +5,8 @@ import SwiftUI
 /// Cada parte se pide por separado: la que falla muestra su error con «Reintentar» (CH-02), nunca un cero falso.
 struct DoctorDay: Sendable {
     var agenda: Part<[AgendaEntry]>?
+    /// Lote 5 S11: earlier days of the agenda, newest first, for «Historial de días anteriores».
+    var pastDays: [AgendaDay] = []
     var tickets: Part<[QueueTicket]>?
     /// S9: who goes next in consulta general by the server rule (`GET /fila/siguiente`). B3: a failed read shows its
     /// error in place; `.loaded(nil)` is a doctor who only sees their own queue (403).
@@ -41,6 +43,8 @@ struct DoctorDayView: View {
     /// Owner rule: pending lists show their two most urgent rows; the rest fold behind «Ver N pendientes más».
     @State private var unsignedOpen = false
     @State private var reschedulesOpen = false
+    /// Lote 5 S11: «Mostrar N más de hoy» opens the rest of today's upcoming appointments.
+    @State private var upcomingOpen = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
@@ -53,10 +57,15 @@ struct DoctorDayView: View {
                 }
                 // I-11: no tile grid repeating what each section already says.
                 partErrors(day)
+                // Lote 5 S11: Ahora, the queue, Próximas, Pendientes de firmar and Atendidas hoy, then the earlier days.
+                let today = day.agenda?.value.map { DoctorDaySections.split($0, now: Date()) }
+                if let today, !today.now.isEmpty { agendaBlock(L.text("day.section.now"), today.now) }
+                if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
+                if let today { upcomingSection(today.upcoming, nothingToday: today.now.isEmpty && today.done.isEmpty) }
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
                 if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
-                if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
-                if let agenda = day.agenda?.value { agendaSection(agenda) }
+                if let today, !today.done.isEmpty { agendaBlock(L.text("day.section.done"), today.done) }
+                historyEntry(day.pastDays)
                 moreSection(day)
             }
         }
@@ -72,15 +81,19 @@ struct DoctorDayView: View {
         // The oldest open consultation is the most urgent to sign.
         let ranked = open.sorted { (ClimesaDates.parse($0.startedAt) ?? .distantPast) < (ClimesaDates.parse($1.startedAt) ?? .distantPast) }
         ListCard(title: L.text("day.unsigned"), items: AttentionFold.shown(ranked, expanded: unsignedOpen)) { item in
-            NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: {
-                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.short(item.startedAt)) {
-                    HStack(spacing: Spacing.s) {
-                        Text("day.unsigned.resume").font(Typo.label).foregroundStyle(Theme.primaryText)
-                        ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.short(item.startedAt))
+                // Lote 5 S2: resume is an edit of the open consultation; the record is a neutral view.
+                ActionRow {
+                    NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: { CardActionLabel(title: L.text("day.unsigned.resume"), icon: .pencil) }
+                        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.edit)))
+                    if account.can("expediente.ver") {
+                        NavigationLink { PatientRecordScreen(patientId: item.patientId) } label: { CardActionLabel(title: L.text("day.record.view"), icon: .clipboard) }
+                            .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.neutral)))
                     }
                 }
-                .contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }
+            .padding(.bottom, Spacing.s)
         }
         AttentionFoldToggle(count: ranked.count, expanded: $unsignedOpen)
     }
@@ -96,10 +109,11 @@ struct DoctorDayView: View {
                         meta: item.reschedule.map { "→ \(ClimesaDates.short($0.start))" })
                 // S13: a list of decisions has no primary of its own; "Llamar siguiente" / "Atender" is the day's primary.
                 // I-15: the spinner shows only on the row being decided.
-                HStack(spacing: Spacing.m) {
-                    ClimesaButton(title: L.text("day.reschedules.accept"), kind: .secondary, loading: deciding.busyId != nil && deciding.busyId == item.reschedule?.id) { Task { await accept(item) } }
+                // Lote 5 S2: accept is the main step of the request, reject is danger.
+                ActionRow {
+                    CardActionButton(title: L.text("day.reschedules.accept"), role: .primary, icon: .check, loading: deciding.busyId != nil && deciding.busyId == item.reschedule?.id) { Task { await accept(item) } }
                         .disabled(deciding.busy)
-                    ClimesaButton(title: L.text("day.reschedules.reject"), kind: .secondary) { rejecting = item }
+                    CardActionButton(title: L.text("day.reschedules.reject"), role: .danger, icon: .close) { rejecting = item }
                         .disabled(deciding.busy)
                 }
             }
@@ -144,7 +158,7 @@ struct DoctorDayView: View {
                 nextCard(proposal)
             }
             if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
-                ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busy) { Task { await callNext() } }
+                CardActionButton(title: L.text("day.queue.callNext"), role: primary == .callNext ? .primary : .edit, icon: .megaphone, loading: calling.busy) { Task { await callNext() } }
             }
             WriteNotice(submission: calling, reload: load)
             absenceNotices
@@ -181,10 +195,15 @@ struct DoctorDayView: View {
                 Spacer()
                 MedicoTag(ticket.state.rawValue, label: ticket.state.label)
             }
-            Text(verbatim: ticket.patientName ?? ticket.service.label).font(Typo.body).foregroundStyle(Theme.ink)
+            Text(verbatim: ticket.patientName ?? ticket.service.label).font(Typo.subheading).foregroundStyle(Theme.ink)
+            // Lote 5 S11: what the doctor needs before calling them in: age and sex, service and origin, the wait.
+            if let who = QueueRowContext.demographics(age: ticket.patientAge, sex: ticket.patientSex) {
+                Text(verbatim: who).font(Typo.small).foregroundStyle(Theme.ink)
+            }
+            Text(verbatim: QueueRowContext.line(ticket)).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Spacing.s) {
                 if QueueBoardRules.priority(ticket) != "rutina" { PriorityBadge(ticket.priority) }
-                Text(verbatim: QueueBoardRules.arrival(ticket)).font(Typo.small).foregroundStyle(ticket.appointmentAt == nil ? Theme.muted : Theme.ink)
+                if let wait = QueueRowContext.wait(ticket, now: Date()) { Text(verbatim: wait).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             if absences.isPending(ticket.id) {
                 // D-3: nothing reached the server yet; «Deshacer» cancels it with no API call.
@@ -209,23 +228,30 @@ struct DoctorDayView: View {
     @ViewBuilder private func rowActions(_ ticket: QueueTicket, row: Submission, primary: DoctorDayAction?) -> some View {
         let allowed = ticket.allowedActions ?? []
         let undoable = account.can("fila.llamar") && DoctorDayActionRules.canUndo(ticket, calledHere: calledHere)
-        if allowed.contains(.llamar) || allowed.contains(.noSePresento) || undoable {
-            HStack(spacing: Spacing.m) {
-                if undoable { ClimesaButton(title: L.text("queue.undo"), kind: .secondary, loading: row.busy && row.busyId == "undo-\(ticket.id)") { Task { await undoCall(ticket) } }.disabled(row.busy) }
-                if allowed.contains(.llamar) { ClimesaButton(title: L.text("day.queue.callAgain"), kind: .secondary, loading: row.busy && row.busyId == ticket.id) { Task { await call(ticket) } }.disabled(row.busy) }
-                if allowed.contains(.noSePresento) { ClimesaButton(title: QueueAction.noSePresento.label, kind: .secondary) { Task { await absent(ticket) } }.disabled(row.busy) }
-            }
-        }
-        cardMenu(ticket, row: row, undoable: undoable)
+        // Lote 5 S2: attend is the main step, call again and undo are edits, «No se presentó» is danger, the record is neutral.
         if DoctorDayActionRules.calledElsewhere(ticket) {
             // Another clinician called this number: it is theirs to attend (web `calledElsewhere`).
             Text("day.queue.calledElsewhere").font(Typo.small).foregroundStyle(Theme.muted)
         } else if account.can("consulta.iniciar") {
             // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
-            NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
-                .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
-                .disabled(row.busy)
+            NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: {
+                CardActionLabel(title: L.text(ticket.consultationId == nil ? "day.attend" : "day.resume"), icon: .steth)
+            }
+            .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(primary == .attend(ticket.id) ? CardActionRole.primary : CardActionRole.edit)))
+            .disabled(row.busy)
         }
+        if allowed.contains(.llamar) || allowed.contains(.noSePresento) || undoable || (account.can("expediente.ver") && ticket.patientId != nil) {
+            ActionRow {
+                if undoable { CardActionButton(title: L.text("queue.undo"), role: .edit, loading: row.busy && row.busyId == "undo-\(ticket.id)") { Task { await undoCall(ticket) } }.disabled(row.busy) }
+                if allowed.contains(.llamar) { CardActionButton(title: L.text("day.queue.callAgain"), role: .edit, icon: .megaphone, loading: row.busy && row.busyId == ticket.id) { Task { await call(ticket) } }.disabled(row.busy) }
+                if let patientId = ticket.patientId, account.can("expediente.ver") {
+                    NavigationLink { PatientRecordScreen(patientId: patientId) } label: { CardActionLabel(title: L.text("day.record.view"), icon: .clipboard) }
+                        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.neutral)))
+                }
+                if allowed.contains(.noSePresento) { CardActionButton(title: QueueAction.noSePresento.label, role: .danger) { Task { await absent(ticket) } }.disabled(row.busy) }
+            }
+        }
+        cardMenu(ticket, row: row, undoable: undoable)
     }
 
     @ViewBuilder private func nextCard(_ next: QueueNextProposal) -> some View {
@@ -275,37 +301,90 @@ struct DoctorDayView: View {
         }
     }
 
-    @ViewBuilder private func agendaSection(_ agenda: [AgendaEntry]) -> some View {
-        if agenda.isEmpty {
+    /// Lote 5 S11 · «Próximas»: the first three of today, then «Mostrar N más de hoy». An empty day says so in one line.
+    @ViewBuilder private func upcomingSection(_ upcoming: [AgendaEntry], nothingToday: Bool) -> some View {
+        if upcoming.isEmpty {
             // I-37: one line inside the section, not a large empty block.
-            SectionCard(title: L.text("day.agenda")) { EmptyNote("day.agenda.none") }
+            if nothingToday { SectionCard(title: L.text("day.section.upcoming")) { EmptyNote("day.agenda.none") } }
         } else {
-            ListCard(title: L.text("day.agenda"), items: agenda) { entry in
-                VStack(alignment: .leading, spacing: Spacing.s) {
-                    ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
-                        if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
-                        else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
-                    }
-                    CategoryMarks(categories: entry.categories)
-                    // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`). I-12: a blocked
-                    // start is hidden; its server reason is not body text.
-                    let canOpen = entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada)))
-                    if canOpen || account.can("expediente.ver") {
-                        HStack(spacing: Spacing.m) {
-                            if canOpen {
-                                NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text(LocalizedStringKey(Self.consultationLinkKey(entry))) }
-                                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
-                            }
-                            if account.can("expediente.ver") {
-                                NavigationLink {
-                                    PatientRecordScreen(patientId: entry.patientId)
-                                } label: { CrudLabel(kind: .view, label: L.text("day.record")) }
-                                    .buttonStyle(ClimesaButtonStyle(kind: .view))
-                            }
+            let shown = upcomingOpen ? upcoming : Array(upcoming.prefix(DoctorDaySections.upcomingVisible))
+            SectionCard(title: L.text("day.section.upcoming")) {
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 { Divider().overlay(Theme.line) }
+                    agendaRow(entry)
+                }
+                if let label = DoctorDaySections.moreTodayLabel(upcoming.count, expanded: upcomingOpen) {
+                    Button { upcomingOpen.toggle() } label: {
+                        HStack(spacing: Spacing.space1) {
+                            Text(verbatim: label).font(Typo.label)
+                            Image(systemName: upcomingOpen ? "chevron.up" : "chevron.down").font(Typo.small).accessibilityHidden(true)
                         }
-                        .padding(.bottom, Spacing.s)
+                        .foregroundStyle(Theme.primaryText).frame(minHeight: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    /// «Ahora» and «Atendidas hoy»: today's appointments of that section, one row each with its actions.
+    @ViewBuilder private func agendaBlock(_ title: String, _ entries: [AgendaEntry]) -> some View {
+        SectionCard(title: title) {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 { Divider().overlay(Theme.line) }
+                agendaRow(entry)
+            }
+        }
+    }
+
+    /// One appointment: time, patient, reason and categories, its state, then its actions on one line (Lote 5 S2).
+    @ViewBuilder private func agendaRow(_ entry: AgendaEntry) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
+                if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
+                else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
+            }
+            CategoryMarks(categories: entry.categories)
+            // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`). I-12: a blocked
+            // start is hidden; its server reason is not body text.
+            let canOpen = entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada)))
+            if canOpen || account.can("expediente.ver") {
+                ActionRow {
+                    if canOpen {
+                        NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: {
+                            CardActionLabel(title: L.text(Self.consultationLinkKey(entry)), icon: entry.consultationState == .firmada ? .eye : .steth)
+                        }
+                        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(Self.consultationRole(entry))))
+                    }
+                    if account.can("expediente.ver") {
+                        NavigationLink { PatientRecordScreen(patientId: entry.patientId) } label: { CardActionLabel(title: L.text("day.record.view"), icon: .clipboard) }
+                            .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.neutral)))
                     }
                 }
+                .padding(.bottom, Spacing.s)
+            }
+        }
+    }
+
+    /// Start or resume is the main step; viewing a signed consultation is neutral.
+    static func consultationRole(_ entry: AgendaEntry) -> CardActionRole {
+        entry.consultationState == .firmada ? .neutral : .primary
+    }
+
+    /// Lote 5 S11 · «Historial de días anteriores»: one dated entry to the agenda's earlier days, instead of «Ver más».
+    @ViewBuilder private func historyEntry(_ past: [AgendaDay]) -> some View {
+        if let detail = DoctorDaySections.historyDetail(past), AppSection.visible(for: "MED", profile: profile).contains(.agenda) {
+            SectionCard {
+                NavigationLink { PatientSectionView(section: .agenda, profile: profile) } label: {
+                    HStack(spacing: Spacing.m) {
+                        ClimesaIcon(.calendar, size: 22).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+                        ListRow(title: L.text("day.history.title"), subtitle: detail) {
+                            ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -358,10 +437,12 @@ struct DoctorDayView: View {
             var day = DoctorDay()
             let today = ClimesaDates.localDay(Date())
             if profile.hasPermission("consulta.iniciar") {
+                var all: [AgendaEntry] = []
                 day.agenda = try await Part<[AgendaEntry]>.load {
-                    let entries = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
-                    return entries.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
+                    all = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
+                    return all.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
                 }
+                day.pastDays = AgendaRules.past(all, now: Date())
             }
             if profile.hasPermission("consulta.iniciar") {
                 day.unsigned = try await Part<[UnsignedConsultation]>.load { try await api.get("/consultas/sin-firmar", as: [UnsignedConsultation].self) }
@@ -636,7 +717,8 @@ struct ResultsReviewView: View {
             else if !pending.isEmpty {
                 ListCard(items: pending) { order in
                     NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
-                        LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order))
+                        LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order),
+                                    summary: LabResultView.summary(order.items))
                     }.buttonStyle(.plain)
                 }
             }
@@ -737,6 +819,8 @@ private struct ReviewDetailView: View {
     @State private var confirmingRelease = false
     /// Set once the API accepted the release: the result stays on this screen instead of closing it in silence.
     @State private var released: String?
+    /// Lote 5 S13: the consultation that ordered these exams, read from the patient's record (best effort).
+    @State private var origin: LabOrigin?
 
     init(order: LabOrder, reload: @escaping () async -> Void) {
         _order = State(initialValue: order)
@@ -751,6 +835,20 @@ private struct ReviewDetailView: View {
                 Text("results.amended").font(Typo.label).foregroundStyle(Theme.warning)
             }
             if let refreshError { PartError(message: refreshError, retry: refreshOrder) }
+            // Lote 5 S13: how many fell out of range, and the consultation and date that ordered them, before the values.
+            if let summary = LabResultView.summary(order.items) {
+                Label { Text(verbatim: summary) } icon: { ClimesaIcon(.alert, size: 16) }
+                    .font(Typo.label).foregroundStyle(ReviewRules.isCritical(order) ? Theme.danger : Theme.warning)
+            }
+            if let origin {
+                SectionCard(title: L.text("history.lab.why")) {
+                    ListRow(title: String(format: L.text("history.lab.origin"), ClimesaDates.display(origin.date, .date)), subtitle: origin.doctor)
+                    if let reason = origin.reason { Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true) }
+                    ForEach(origin.diagnoses, id: \.self) { Text(verbatim: $0).font(Typo.small).foregroundStyle(Theme.muted) }
+                }
+            } else {
+                Text(verbatim: String(format: L.text("results.orderedAt"), ClimesaDates.display(order.createdAt, .date))).font(Typo.small).foregroundStyle(Theme.muted)
+            }
             LabOrderDetail(order: order, showValues: true, staffView: true)
             // T07c: the external report's photo or PDF, opened through a 5-minute signed link (same rule as the web).
             if order.external && order.state == .completado { LabAttachmentsSection(order: order) }
@@ -797,6 +895,15 @@ private struct ReviewDetailView: View {
         }
         // A live lab event (another device, the lab) brings the current version of this order.
         .task(id: live.snapshot.version(.laboratory)) { await refreshOrder() }
+        .task(id: order.id) { await loadOrigin() }
+    }
+
+    /// Reads the record only to name the consultation that ordered the exams; a failure just leaves the date.
+    private func loadOrigin() async {
+        guard let consultationId = order.consultationId, account.can("expediente.ver") else { return }
+        if let history = try? await account.client().get("/pacientes/\(order.patientId)/historial", as: ClinicalHistory.self) {
+            origin = LabOriginRules.of(history, consultationId: consultationId)
+        }
     }
 
     /// The list behind and this order, after a write from this screen.
