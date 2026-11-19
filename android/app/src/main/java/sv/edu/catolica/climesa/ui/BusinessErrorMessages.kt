@@ -7,7 +7,17 @@ import sv.edu.catolica.climesa.domain.BusinessErrors
 
 /** Spanish message of a failed write: the mapped business code first, then the API helper message (MOV-03), then [fallback]. */
 internal fun businessMessage(error: Throwable, fallback: String): String =
-    ((error as? AuthRequestException)?.code?.let(BusinessErrors::message) ?: error.message)?.let { forbiddenText(error, it) } ?: fallback
+    ((error as? AuthRequestException)?.let(::ownMessage) ?: (error as? AuthRequestException)?.code?.let(BusinessErrors::message) ?: error.message)?.let { forbiddenText(error, it) } ?: fallback
+
+/** Lote 5 S6: codes whose API text is the one to show (it names the day or the specialty); [NO_STAFF_TEXT] when it is not readable. */
+private fun ownMessage(error: AuthRequestException): String? = when (error.code) {
+    NO_STAFF -> error.message?.takeIf { ApiProblems.readable(it) && !technical.containsMatchIn(it) } ?: NO_STAFF_TEXT
+    else -> null
+}
+
+/** 409 of assigning or scheduling when no doctor who can attend that reason has a published shift (Lote 5 S6). */
+internal const val NO_STAFF = "sin_personal_disponible"
+internal const val NO_STAFF_TEXT = "No hay médicos con turno que puedan atender este motivo en los próximos días. Rechaza la solicitud indicando ese motivo."
 
 /** S8: the server text a screen shows for a 403 is remembered as a refusal, so its error state offers no «Reintentar». */
 internal fun forbiddenText(error: Throwable, text: String): String {

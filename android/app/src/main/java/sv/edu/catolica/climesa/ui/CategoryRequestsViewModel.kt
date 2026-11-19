@@ -53,6 +53,10 @@ data class CategoryRequestsState(
     /** The patient left "Pedir cita" with the back gesture; reopening resumes this draft. */
     val draftKept: Boolean = false,
     val notice: String? = null,
+    /** Lote 5 S6: requests no doctor with a published shift can attend (`staffAvailable: false`); "Asignar" is not offered. */
+    val noStaff: Set<String> = emptySet(),
+    /** Lote 5 S6: the request whose assign or reject failed, so [error] is shown on its own card. */
+    val errorRequestId: String? = null,
 ) {
     val visibleCategories get() = CategoryRequestRules.filter(categories, query, picked)
     val canSend get() = !saving && CategoryRequestRules.canSend(picked, note)
@@ -83,8 +87,9 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
             mutable.update { it.copy(loading = true) }
             try {
                 val categories = if (withCategories || mutable.value.categories.isNotEmpty()) CategoryRequestRules.categories(api.request(CategoryRequestRules.CATEGORIES_PATH)) else emptyList()
-                val requests = CategoryRequestRules.requests(api.request(CategoryRequestRules.PATH))
-                mutable.update { s -> s.copy(loading = false, categories = categories.ifEmpty { s.categories }, requests = requests,
+                val raw = api.request(CategoryRequestRules.PATH)
+                val requests = CategoryRequestRules.requests(raw)
+                mutable.update { s -> s.copy(loading = false, categories = categories.ifEmpty { s.categories }, requests = requests, noStaff = noStaffIds(raw),
                     assigning = s.assigning?.let { a -> requests.firstOrNull { it.id == a.id && it.pending } }) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 mutable.update { it.copy(loading = false, error = message(e)) }
@@ -101,7 +106,7 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
         }
     }
 
-    fun clearMessages() { mutable.update { it.copy(error = null, notice = null) } }
+    fun clearMessages() { mutable.update { it.copy(error = null, notice = null, errorRequestId = null) } }
 
     // --- Patient ---
 
@@ -138,7 +143,7 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
 
     fun withdraw(request: CategoryRequest) {
         if (!request.allows(CategoryRequestRules.CANCEL)) return
-        resolve(CategoryRequestRules.cancelPath(request), CategoryRequestRules.cancelBody(request), "Solicitud retirada.")
+        resolve(CategoryRequestRules.cancelPath(request), CategoryRequestRules.cancelBody(request), "Solicitud retirada.", request.id)
     }
 
     // --- Reception ---
@@ -187,19 +192,19 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
         val doctor = s.doctor ?: return
         val slot = s.slot ?: return
         if (!s.canAssign) return
-        resolve(CategoryRequestRules.assignPath(request), CategoryRequestRules.assignBody(request, doctor.id, slot), "Cita asignada a ${request.patientName}.")
+        resolve(CategoryRequestRules.assignPath(request), CategoryRequestRules.assignBody(request, doctor.id, slot), "Cita asignada a ${request.patientName}.", request.id)
     }
 
     fun reject(request: CategoryRequest, reason: String) {
         if (!request.allows(CategoryRequestRules.REJECT)) return
         CategoryRequestRules.rejectError(reason)?.let { error -> mutable.update { it.copy(error = error) }; return }
         resolveIntent.reset()
-        resolve(CategoryRequestRules.rejectPath(request), CategoryRequestRules.rejectBody(request, reason), "Solicitud rechazada.")
+        resolve(CategoryRequestRules.rejectPath(request), CategoryRequestRules.rejectBody(request, reason), "Solicitud rechazada.", request.id)
     }
 
-    private fun resolve(path: String, body: JSONObject, done: String) {
+    private fun resolve(path: String, body: JSONObject, done: String, requestId: String) {
         if (mutable.value.saving) return
-        mutable.update { it.copy(saving = true, error = null, notice = null) }
+        mutable.update { it.copy(saving = true, error = null, notice = null, errorRequestId = null) }
         viewModelScope.launch {
             try {
                 resolveIntent.send { api.request(path, "POST", body) }
@@ -207,8 +212,10 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
                 mutable.update { it.copy(saving = false, assigning = null, slots = emptyList(), slot = null, notice = done) }
                 load()
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
-                mutable.update { it.copy(saving = false, error = message(e)) }
-                if (mutable.value.assigning != null) loadSlots(keepSlot = false)
+                mutable.update { it.copy(saving = false, error = message(e), errorRequestId = requestId) }
+                // S6: without staff the request cannot be assigned at all: close the panel and re-read it (the API may have rejected it).
+                if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.code == NO_STAFF) { mutable.update { it.copy(assigning = null, slots = emptyList(), slot = null) }; load() }
+                else if (mutable.value.assigning != null) loadSlots(keepSlot = false)
             }
         }
     }
@@ -264,6 +271,11 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
     }
 
     private fun message(error: Exception) = businessMessage(error, "No se pudo completar la operación.")
+
+    /** Ids of the rows the API marks `staffAvailable: false` (older APIs without the field mark none). */
+    private fun noStaffIds(raw: Any): Set<String> = (raw as? org.json.JSONArray)?.let { rows ->
+        (0 until rows.length()).mapNotNull { i -> rows.optJSONObject(i)?.takeIf { it.has("staffAvailable") && !it.isNull("staffAvailable") && !it.optBoolean("staffAvailable", true) }?.optString("id") }.toSet()
+    }.orEmpty()
 
     private companion object { const val SEARCH_DAYS = 7 }
 
