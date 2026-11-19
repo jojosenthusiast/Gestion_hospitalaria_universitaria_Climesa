@@ -31,7 +31,6 @@ const respuestas: Record<string, unknown> = {
   '/citas': [cita('s1', 'solicitada'), cita('s2', 'solicitada'), ...Array.from({ length: 9 }, (_, i) => cita(`c${i}`, 'confirmada'))],
   // S8: a request by category, without doctor, is also a «Solicitud de cita».
   '/citas/solicitudes-categoria': [{ id: 'q1', patientName: 'Paciente Por Motivo', categories: [{ code: 'piel', name: 'Piel' }], franja: 'tarde', note: null, state: 'pendiente', createdAt: hoy }],
-  '/cuentas/vinculaciones': Array.from({ length: 5 }, (_, i) => ({ id: `v${i}`, createdAt: hoy, version: 1, account: { email: `v${i}@example.test`, name: i === 0 ? nombreLargo : `Cuenta ${i}` }, declared: { dui: '', birth: '' }, candidate: null, candidates: 0 })),
   '/admisiones': [{ id: 'a1', patientName: 'Paciente Sin Cama', state: 'pendiente_cama', requestedCategory: 'general', isolation: false, bed: '' }],
   '/ambulancia': { unit: { id: 'u', plate: 'P-1', state: 'disponible', version: 1 }, activeService: null, paramedicOnDuty: true, pendingRequests: [] },
   '/inventario/existencias': Array.from({ length: 8 }, (_, i) => ({ articulo_id: `x${i}`, codigo: `R-${i}`, nombre: i === 0 ? 'Jeringa de 5 ml' : `Reactivo ${i}`, tipo: 'reactivo', unidad: 'unidad', minimo: 10, disponible: i === 0 ? 0 : 2, vencido: 0, bajo_minimo: true })),
@@ -85,24 +84,22 @@ describe('Inicio · panel del día', () => {
 
   it('REC: ningún dato aparece dos veces', async () => {
     const { container } = montar('REC');
-    await screen.findByRole('region', { name: 'Vinculaciones por verificar' });
     await within(await screen.findByRole('region', { name: 'Cifras del día' })).findByText('7');
     const valores = datos(container);
     expect(valores.length).toBeGreaterThan(4);
     expect(new Set(valores).size).toBe(valores.length);
   });
 
-  it('REC: el nombre largo ocupa su propia línea y el «y N más» abre la bandeja completa', async () => {
+  it('REC: el nombre largo ocupa su propia línea; ya no hay vinculaciones por verificar', async () => {
     montar('REC');
-    // Vinculaciones is past the two most urgent groups: it folds into one line with its count and the way to its section.
-    const otros = await screen.findByRole('list', { name: 'Otros pendientes' });
-    const linea = within(otros).getByText('Vinculaciones por verificar').closest('li')!;
-    expect(within(linea).getByText('5')).toBeTruthy();
-    expect(within(linea).getByRole('link', { name: /Ver/ }).getAttribute('href')).toBe('#/vinculaciones');
+    // Owner observations 2026-11-18 (batch 2): accounts link on their own by verified email, so no tray group asks for it.
+    await screen.findByRole('region', { name: 'Cifras del día' });
+    expect(screen.queryByText('Vinculaciones por verificar')).toBeNull();
+    expect(document.querySelector('a[href="#/vinculaciones"]')).toBeNull();
     cleanup();
-    render(<AttentionList items={[{ id: 'n', title: nombreLargo, detail: 'pide vincular su cuenta', tone: 'warn', href: '#/vinculaciones', action: 'Verificar', tag: 'Por verificar' }]} />);
+    render(<AttentionList items={[{ id: 'n', title: nombreLargo, detail: 'pide una cita', tone: 'warn', href: '#/citas', action: 'Asignar', tag: 'Por asignar' }]} />);
     const nombre = screen.getByText(nombreLargo);
-    // Line 1 is the name alone (no «(pide vincular su cuenta)», no chip, no button inside it).
+    // Line 1 is the name alone (no «(pide una cita)», no chip, no button inside it).
     expect(nombre.className).toContain('tray-row-name');
     expect(nombre.textContent).toBe(nombreLargo);
     expect(nombre.querySelector('.status-tag, .row-action')).toBeNull();

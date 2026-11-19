@@ -2441,7 +2441,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** El paciente pide vincular su cuenta con DUI y fecha de nacimiento */
+        /**
+         * Retirado: la cuenta se une sola al expediente que tiene su correo verificado. Responde 410 (codigo vinculacion_automatica).
+         * @deprecated
+         */
         post: operations["AccountLinkingController_request"];
         delete?: never;
         options?: never;
@@ -2456,7 +2459,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Vinculaciones pendientes con el expediente que coincide */
+        /**
+         * Retirado: ya no hay vinculaciones por verificar; responde siempre una lista vacía
+         * @deprecated
+         */
         get: operations["AccountLinkingController_pending"];
         put?: never;
         post?: never;
@@ -2475,7 +2481,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Aprobar vinculación tras verificar identidad */
+        /**
+         * Retirado: aprobar con DUI y nacimiento ya no vincula. Responde 410 (codigo vinculacion_automatica).
+         * @deprecated
+         */
         post: operations["AccountLinkingController_approve"];
         delete?: never;
         options?: never;
@@ -2507,7 +2516,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Estado de la vinculación de la cuenta: si ya está vinculada y su última solicitud (pendiente, aprobada o rechazada con motivo) */
+        /** Estado de la vinculación automática: si la cuenta ya está unida a su expediente y el correo que Recepción debe anotar en él */
         get: operations["MyLinkController_mine"];
         put?: never;
         post?: never;
@@ -3179,6 +3188,11 @@ export interface components {
         };
         /** @enum {string} */
         PrecisionNacimiento: "exacta" | "anio_mes" | "anio" | "estimada" | "desconocida";
+        /**
+         * @description Cuenta de la app del paciente, con los datos de contacto: vinculada; sin_cuenta (todavía ninguna cuenta verificada con este correo); correo_repetido (otro expediente activo tiene el mismo correo y la cuenta no se une a ninguno)
+         * @enum {string}
+         */
+        EstadoCuentaApp: "vinculada" | "sin_cuenta" | "correo_repetido";
         PatientHistoryEntryResponse: {
             version: number;
             /** Format: date-time */
@@ -3214,6 +3228,8 @@ export interface components {
             phone?: string | null;
             email?: string | null;
             address?: string | null;
+            /** @description Cuenta de la app del paciente, con los datos de contacto: vinculada; sin_cuenta (todavía ninguna cuenta verificada con este correo); correo_repetido (otro expediente activo tiene el mismo correo y la cuenta no se une a ninguno) */
+            appAccount?: components["schemas"]["EstadoCuentaApp"];
             /** @description Solo con pacientes.editar_demograficos */
             history?: components["schemas"]["PatientHistoryEntryResponse"][];
         };
@@ -6404,18 +6420,6 @@ export interface components {
             /** @description "atención"; las filas del módulo retirado de acceso excepcional conservan "acceso excepcional" */
             motivo: string;
         };
-        LinkRequestDto: {
-            /**
-             * @description DUI con o sin guion.
-             * @example 00000000-0
-             */
-            dui: string;
-            /**
-             * Format: date
-             * @example 1990-01-31
-             */
-            birth: string;
-        };
         /** @enum {string} */
         EstadoVinculacion: "pendiente" | "aprobada" | "rechazada";
         LinkRequestResponse: {
@@ -6487,20 +6491,19 @@ export interface components {
             /** @description Sin coincidencia exacta: el expediente más parecido (mismo nacimiento, DUI distinto en un dígito). No se puede aprobar. */
             closest?: components["schemas"]["LinkClosestResponse"] | null;
         };
-        LinkApproveDto: {
-            version: number;
-        };
         LinkRejectDto: {
             version: number;
             reason: string;
         };
         MyLinkResponse: {
-            /** @description La cuenta ya está vinculada a un expediente */
+            /** @description La cuenta ya está unida a su expediente */
             linked: boolean;
-            /** @description Última solicitud de vinculación; null si nunca pidió */
+            /** @description Correo de la cuenta. Sin vincular, la app pide: «Pide en Recepción que anoten este correo: <email>» */
+            email: string | null;
+            /** @description Supabase Auth confirmó el correo. Solo un correo confirmado une la cuenta con el expediente. */
+            emailVerified: boolean;
+            /** @description Obsoleto: siempre null. Ya no hay solicitudes de vinculación. */
             request: components["schemas"]["LinkRequestResponse"] | null;
-            /** @description Lo que la cuenta declaró en esa solicitud, para volver a pedir con el formulario prellenado. Ausente si nunca pidió. */
-            declared?: components["schemas"]["LinkDeclaredResponse"];
         };
         PublicOccupancyRowResponse: {
             planta: number | null;
@@ -7362,7 +7365,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "hito_no_deshacible" | "sin_consulta" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "vinculacion_automatica" | "correo_en_uso" | "correo_de_otra_cuenta" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "hito_no_deshacible" | "sin_consulta" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -7401,7 +7404,7 @@ export interface components {
          * @description Catálogo de eventos que la API emite (docs/arquitectura/tiempo-real.md).
          * @enum {string}
          */
-        TipoEvento: "admision.actualizada" | "admision.cama_asignada" | "admision.creada" | "ambulancia.estado_cambiado" | "ambulancia.hito" | "ambulancia.prehospital" | "ambulancia.solicitud_creada" | "ambulancia.ubicacion" | "aviso.actualizado" | "aviso.publicado" | "cama.estado_cambiado" | "cama.limpieza_pendiente" | "caso_duplicado.abierto" | "cita.actualizada" | "consulta.actualizada" | "espacio.actualizado" | "fila.actualizada" | "fila.estado" | "fila.llamado" | "inventario.actualizado" | "inventario.bajo_minimo" | "laboratorio.actualizado" | "laboratorio.critico" | "metricas.recalculadas" | "paciente.actualizado" | "paciente.creado" | "personal.actualizado" | "signos.registrados" | "turno.actualizado" | "turno.cambiado" | "turno.publicado" | "usuario.actualizado" | "vinculacion.resuelta" | "vinculacion.solicitada";
+        TipoEvento: "admision.actualizada" | "admision.cama_asignada" | "admision.creada" | "ambulancia.estado_cambiado" | "ambulancia.hito" | "ambulancia.prehospital" | "ambulancia.solicitud_creada" | "ambulancia.ubicacion" | "aviso.actualizado" | "aviso.publicado" | "cama.estado_cambiado" | "cama.limpieza_pendiente" | "caso_duplicado.abierto" | "cita.actualizada" | "consulta.actualizada" | "espacio.actualizado" | "fila.actualizada" | "fila.estado" | "fila.llamado" | "inventario.actualizado" | "inventario.bajo_minimo" | "laboratorio.actualizado" | "laboratorio.critico" | "metricas.recalculadas" | "paciente.actualizado" | "paciente.creado" | "personal.actualizado" | "signos.registrados" | "turno.actualizado" | "turno.cambiado" | "turno.publicado" | "usuario.actualizado" | "vinculacion.resuelta";
         EventoDelgado: {
             /** @description Posición en plataforma.outbox (entero de 64 bits como texto); sirve de cursor. */
             seq: string;
@@ -18793,12 +18796,9 @@ export interface operations {
             path?: never;
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LinkRequestDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
+            /** @description Ya no se responde; se conserva para los clientes generados con el contrato anterior */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -18842,6 +18842,13 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
+            };
+            /** @description La vinculación ahora es automática por correo verificado (codigo vinculacion_automatica) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
             default: {
@@ -18921,12 +18928,9 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["LinkApproveDto"];
-            };
-        };
+        requestBody?: never;
         responses: {
+            /** @description Ya no se responde; se conserva para los clientes generados con el contrato anterior */
             201: {
                 headers: {
                     [name: string]: unknown;
@@ -18979,6 +18983,13 @@ export interface operations {
                 content: {
                     "application/problem+json": components["schemas"]["Problem"];
                 };
+            };
+            /** @description La vinculación ahora es automática por correo verificado (codigo vinculacion_automatica) */
+            410: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
             default: {

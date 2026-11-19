@@ -15,11 +15,11 @@ const loaders={
  patients:()=>import('./patients'),personnel:()=>import('./personnel'),spaces:()=>import('./spaces'),ambulance:()=>import('./ambulance'),
  ambulanceLog:()=>import('./ambulance-log'),appointments:()=>import('./appointments'),consultations:()=>import('./consultations'),
  queue:()=>import('./queue'),laboratory:()=>import('./laboratory'),labCatalog:()=>import('./lab-catalog'),inventory:()=>import('./inventory'),
- hospitalization:()=>import('./hospitalization'),privacy:()=>import('./privacy'),accountLinks:()=>import('./account-links'),
+ hospitalization:()=>import('./hospitalization'),privacy:()=>import('./privacy'),
  notices:()=>import('./notices'),metrics:()=>import('./metrics'),
 };
 type LoaderId=keyof typeof loaders;
-const moduleCode:Record<string,LoaderId>={pacientes:'patients',vinculaciones:'accountLinks',personal:'personnel',turnos:'personnel',camas:'spaces',espacios:'spaces',ambulancia:'ambulance','bitacora-ambulancia':'ambulanceLog',auditoria:'privacy',laboratorio:'laboratory','catalogo-laboratorio':'labCatalog',inventario:'inventory',hospitalizacion:'hospitalization',fila:'queue',citas:'appointments',consultas:'consultations',avisos:'notices',metricas:'metrics'};
+const moduleCode:Record<string,LoaderId>={pacientes:'patients',personal:'personnel',turnos:'personnel',camas:'spaces',espacios:'spaces',ambulancia:'ambulance','bitacora-ambulancia':'ambulanceLog',auditoria:'privacy',laboratorio:'laboratory','catalogo-laboratorio':'labCatalog',inventario:'inventory',hospitalizacion:'hospitalization',fila:'queue',citas:'appointments',consultas:'consultations',avisos:'notices',metricas:'metrics'};
 type Loaded={[I in LoaderId]:Awaited<ReturnType<(typeof loaders)[I]>>};
 const warmers:Partial<Record<LoaderId,(()=>Promise<void>)[]>>={};
 /**
@@ -51,7 +51,6 @@ const LabCatalogPage=page('labCatalog',m=>m.LabCatalogPage);
 const InventoryPage=page('inventory',m=>m.InventoryPage);
 const HospitalizationPage=page('hospitalization',m=>m.HospitalizationPage);
 const AuditPage=page('privacy',m=>m.AuditPage);
-const AccountLinksPage=page('accountLinks',m=>m.AccountLinksPage);
 const NoticesPage=page('notices',m=>m.NoticesPage);
 const MetricsPage=page('metrics',m=>m.MetricsPage);
 /** Descarga el código de los módulos visibles cuando el navegador queda libre. Es una sola vez por sesión, no un sondeo. */
@@ -77,7 +76,6 @@ export type Module={id:string;label:string;permission?:string;alsoPermissions?:s
 export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
- {id:'vinculaciones',label:'Vinculaciones',permission:'cuentas.verificar'},
  {id:'personal',label:'Personal',permission:'personal.ver',alsoPermissions:['usuarios.ver']},
  {id:'camas',label:'Camas',permission:'camas.ver_tablero'},
  {id:'espacios',label:'Edificio',permission:'espacios.ver'},
@@ -97,7 +95,7 @@ export const modules:Module[]=[
  {id:'metricas',label:'Métricas',permission:'metricas.ver'},
  {id:'perfil',label:'Perfil'},
 ];
-export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',vinculaciones:'shield',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
+export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
@@ -149,7 +147,6 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  else if(route==='camas')content=<BedsPage api={api} profile={profile} version={version}/>;
  else if(route==='ambulancia')content=<AmbulancePage api={api} profile={profile} version={version}/>;
  else if(route==='bitacora-ambulancia')content=<AmbulanceLogPage api={api} version={version}/>;
- else if(route==='vinculaciones')content=<AccountLinksPage api={api} profile={profile} version={version}/>;
  else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;
  else if(route==='fila')content=<QueuePage api={api} profile={profile} version={version}/>;

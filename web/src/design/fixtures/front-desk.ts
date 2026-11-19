@@ -1,5 +1,5 @@
 /**
- * R7 U1: design data for the front desk journeys (/fila, /citas, /pacientes/selector, /vinculaciones) at realistic
+ * R7 U1: design data for the front desk journeys (/fila, /citas, /pacientes/selector) at realistic
  * volume: 45 doctors, the shared 330 patients of people.ts (the Pacientes module reads the same set), about 60
  * appointments today and long names. Fictitious, in memory, used only by
  * work-preview.html; it never touches the network. `request` and `write` return `undefined` for paths they do not
@@ -107,14 +107,6 @@ export class FrontDeskFixtures {
     }
     if (p === '/citas/catalogos') return { patients: [], doctors: this.doctors.map((d, i) => ({ ...d, type: 'medico', areaId: null, area: 'Consulta externa', tieneTurno: i % 9 !== 8, motivo: i % 9 === 8 ? 'Sin turno ese día' : null })) };
     if (p === '/citas/disponibilidad') { const franjas = this.franjas(q.get('doctorId') ?? '', q.get('date') ?? this.today); return { durationMinutes: 20, workPeriods: [{ start: localInstant(q.get('date') ?? this.today, 8), end: localInstant(q.get('date') ?? this.today, 16) }], slots: franjas.filter(f => f.estado === 'libre'), franjas }; }
-    if (p === '/cuentas/vinculaciones') {
-      const a = this.patients[10], b = this.patients[11];
-      return [
-        { id: uuid(9001), createdAt: new Date(Date.now() - 40 * MIN).toISOString(), version: 1, account: { email: 'maria.jose.hernandez.ejemplo@example.test', name: a.fullName }, declared: { dui: a.dui, birth: a.birth }, candidate: { id: a.id, record: a.record, fullName: a.fullName, birth: a.birth, dui: a.dui, exact: true }, candidates: 1 },
-        { id: uuid(9002), createdAt: new Date(Date.now() - 25 * MIN).toISOString(), version: 1, account: { email: 'jose.roberto.prueba@example.test', name: b.fullName }, declared: { dui: `${b.dui.slice(0, 7)}${(Number(b.dui[7]) + 1) % 10}-${b.dui[9]}`, birth: b.birth }, candidate: null, candidates: 0, closest: { id: b.id, record: b.record, fullName: b.fullName, birth: b.birth, dui: b.dui } },
-        { id: uuid(9003), createdAt: new Date(Date.now() - 5 * MIN).toISOString(), version: 1, account: { email: 'cuenta.nueva@example.test', name: 'Gabriela Alejandra Sin Expediente' }, declared: { dui: '09876543-2', birth: '2001-07-19' }, candidate: null, candidates: 0 },
-      ];
-    }
     return undefined;
   }
 
