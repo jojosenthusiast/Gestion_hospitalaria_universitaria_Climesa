@@ -33,19 +33,59 @@ class SessionGuardTest {
         assertEquals(1, tokens.renewals)
     }
 
-    @Test fun aSecond401ClosesTheSessionWithASpanishMessage() = runTest(UnconfinedTestDispatcher()) {
+    // A 401 with a freshly renewed token: the API no longer accepts the account (deactivated, roles withdrawn).
+    @Test fun aSecond401AfterARenewalClosesTheSessionAsAccessWithdrawn() = runTest(UnconfinedTestDispatcher()) {
         val expiry = SessionExpiry()
         val message = mutableListOf<String>()
         val watcher = launch { message += expiry.expired.first() }
         val tokens = FakeTokens(session("viejo"), renewed = session("nuevo"))
-        try { authorizedCall(tokens, expiry) { throw unauthorized }; fail() }
+        val inactive = AuthRequestException("Esta cuenta no está activa en CLIMESA.", 401, "no_autenticado")
+        try { authorizedCall(tokens, expiry) { throw inactive }; fail() }
         catch (e: AuthRequestException) {
             assertEquals(401, e.statusCode)
-            assertEquals(SessionExpiry.CODE, e.code)
-            assertEquals("Tu sesión expiró. Ingresa nuevamente para continuar.", e.message)
+            assertEquals("acceso_retirado", e.code)
+            assertEquals("Tu acceso fue retirado. Si crees que es un error, contacta a administración.", e.message)
         }
         watcher.join()
-        assertEquals(listOf(SessionExpiry.MESSAGE), message)
+        assertEquals(listOf("Tu acceso fue retirado. Si crees que es un error, contacta a administración."), message)
+    }
+
+    @Test fun aRejectedRefreshTokenSaysTheSessionExpired() = runTest(UnconfinedTestDispatcher()) {
+        val expiry = SessionExpiry()
+        val message = mutableListOf<String>()
+        val watcher = launch { message += expiry.expired.first() }
+        val tokens = FakeTokens(session("viejo"), renewError = AuthRequestException("Refresco inválido.", 401))
+        try { authorizedCall(tokens, expiry) { throw unauthorized }; fail() }
+        catch (e: AuthRequestException) { assertEquals(401, e.statusCode); assertEquals("sesion_expirada", e.code) }
+        watcher.join()
+        assertEquals(listOf("Tu sesión expiró. Ingresa nuevamente para continuar."), message)
+    }
+
+    @Test fun anOrdinary403AfterARenewalIsARefusalAndKeepsTheSession() = runTest(UnconfinedTestDispatcher()) {
+        val expiry = SessionExpiry()
+        var expired = false
+        val watcher = launch { expiry.expired.first(); expired = true }
+        val tokens = FakeTokens(session("viejo"), renewed = session("nuevo"))
+        try { authorizedCall(tokens, expiry) { token -> if (token == "viejo") throw unauthorized; throw AuthRequestException("Tu cuenta no tiene permiso para esta operación.", 403, "sin_permiso") }; fail() }
+        catch (e: AuthRequestException) { assertEquals(403, e.statusCode); assertEquals("sin_permiso", e.code) }
+        assertTrue(!expired)
+        watcher.cancel()
+    }
+
+    // Classification rule: which responses end the session, and with which reason.
+    @Test fun onlyAccountLevelSignalsEndTheSession() {
+        assertEquals(SessionEnd.EXPIRED, SessionEndRules.afterRefreshFailure(400))
+        assertEquals(SessionEnd.EXPIRED, SessionEndRules.afterRefreshFailure(401))
+        assertEquals(null, SessionEndRules.afterRefreshFailure(null))
+        assertEquals(null, SessionEndRules.afterRefreshFailure(500))
+        assertEquals(SessionEnd.REVOKED, SessionEndRules.afterRenewedCall(401))
+        assertEquals(null, SessionEndRules.afterRenewedCall(403))
+        assertEquals(null, SessionEndRules.afterRenewedCall(409))
+        assertEquals(null, SessionEndRules.afterRenewedCall(null))
+        assertEquals(SessionEnd.REVOKED, SessionEndRules.afterProfile(401))
+        assertEquals(SessionEnd.REVOKED, SessionEndRules.afterProfile(403))
+        assertEquals(null, SessionEndRules.afterProfile(503))
+        assertEquals(null, SessionEndRules.afterProfile(null))
     }
 
     @Test fun aRejectedRefreshTokenClosesTheSession() = runTest(UnconfinedTestDispatcher()) {

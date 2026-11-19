@@ -45,7 +45,10 @@ data class PatientAppointmentsState(
     val daySlots: List<DaySlot> = emptyList(),
     val selectedSlot: AppointmentSlot? = null,
     val saving: Boolean = false,
+    /** A failed command (cancel, reschedule, catalog): shown as a notice, never with «Reintentar». */
     val error: String? = null,
+    /** The appointment list itself could not be read: the only failure the shared ErrorState offers «Reintentar» for. */
+    val loadError: String? = null,
     val notice: String? = null,
     /** Reschedule request in progress (CITA-01): the appointment, the day of the grid, its slots and the chosen one. */
     val rescheduleId: String? = null,
@@ -81,12 +84,12 @@ class PatientAppointmentsViewModel @Inject constructor(
             mutable.updateLoading(true)
             try {
                 val appointments = PatientAppointmentRules.parse(api.request(PatientAppointmentRules.listPath(ReceptionScheduling.today())))
-                mutable.update { it.copy(loading = false, appointments = appointments, error = null) }
+                mutable.update { it.copy(loading = false, appointments = appointments, error = null, loadError = null) }
                 if (mutable.value.selectedDoctorId.isNotBlank()) loadAvailability()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                mutable.update { it.copy(loading = false, error = message(e)) }
+                mutable.update { it.copy(loading = false, loadError = userMessage(e, "No se pudieron cargar tus citas.")) }
             }
         }
     }
@@ -320,5 +323,5 @@ class PatientAppointmentsViewModel @Inject constructor(
 
 /** A reload after a command keeps its notice ("Cita cancelada."); "Reintentar" clears messages itself. */
 private fun MutableStateFlow<PatientAppointmentsState>.updateLoading(loading: Boolean) {
-    value = value.copy(loading = loading, error = null)
+    value = value.copy(loading = loading, error = null, loadError = null)
 }

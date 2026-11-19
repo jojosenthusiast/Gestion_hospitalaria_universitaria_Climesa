@@ -61,8 +61,14 @@ class AuthViewModel @Inject constructor(private val auth:SupabaseAuthRepository,
         if(silent&&now.account==null)return
         accessJob=viewModelScope.launch {
         if(!silent)mutableState.update{it.copy(checkingSession=true,error=null)}
-        try {val session=auth.restoreSession();pending=session;val account=session?.let{AuthenticatedAccount(it,backend.profile(it))};mutableState.update{it.copy(checkingSession=false,account=account,accessPending=false)};track(account)}
-        catch(e:Exception){if(e is CancellationException)throw e;if(e is AuthRequestException&&(e.statusCode==400||e.statusCode==401)){expireSession(SessionExpiry.MESSAGE);return@launch};if(silent&&mutableState.value.account!=null)return@launch;mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=userMessage(e, "No se pudo verificar la sesión."))}}
+        // A rejected refresh token means the session expired; a restored session whose own profile is refused (deactivated
+        // account, roles or app access withdrawn, e.g. after a live `usuario` event) means access was withdrawn. Both clear the
+        // session like an expiry and show the login with the reason, also when this check was silent.
+        try {val session=try{auth.restoreSession()}catch(e:AuthRequestException){SessionEndRules.afterRefreshFailure(e.statusCode)?.let{end->expireSession(end.message);return@launch};throw e}
+            pending=session
+            val account=session?.let{s->val profile=try{backend.profile(s)}catch(e:AuthRequestException){SessionEndRules.afterProfile(e.statusCode)?.let{end->expireSession(end.message);return@launch};throw e};AuthenticatedAccount(s,profile)}
+            mutableState.update{it.copy(checkingSession=false,account=account,accessPending=false)};track(account)}
+        catch(e:Exception){if(e is CancellationException)throw e;if(silent&&mutableState.value.account!=null)return@launch;mutableState.update{it.copy(checkingSession=false,account=null,accessPending=pending!=null,error=userMessage(e, "No se pudo verificar la sesión."))}}
     }}
     fun signIn(email:String,password:String){val errors=AuthRules.validate(email,password);if(errors.isNotEmpty()){mutableState.update{it.copy(fieldErrors=errors,error=null)};return}
         viewModelScope.launch{mutableState.update{it.copy(signingIn=true,error=null,fieldErrors=emptyMap(),unconfirmedEmail=null,emailNotice=null)};try {val session=ColdStart.retrying{auth.signIn(email,password)};pending=session;val account=AuthenticatedAccount(session,backend.profile(session));draft.password="";mutableState.update{it.copy(signingIn=false,account=account,accessPending=false)};track(account)}catch(e:Exception){if(e is CancellationException)throw e
