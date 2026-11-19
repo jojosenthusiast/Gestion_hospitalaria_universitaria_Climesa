@@ -140,7 +140,7 @@ internal fun LoadingState(
 @Composable
 internal fun RefreshHint(modifier: Modifier = Modifier) {
     Column(modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        LinearProgressIndicator(Modifier.fillMaxWidth())
+        LinearSpinner(Modifier.fillMaxWidth())
         Text(stringResource(R.string.ui_actualizando), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

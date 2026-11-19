@@ -2,6 +2,7 @@ package sv.edu.catolica.climesa.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import sv.edu.catolica.climesa.domain.UnitStatusBadge
 
 /**
  * Operations states (queue, ambulance, inventory) that the shared [StatusCatalog] colours as neutral or differently.
@@ -21,6 +22,7 @@ internal object OperacionStatus {
         "rechaza_traslado" to StatusTone.WARNING,
         "bajo_minimo" to StatusTone.DANGER,
         "vencido" to StatusTone.DANGER,
+        UnitStatusBadge.BLOCKED to StatusTone.WARNING,
     )
     private val labels = mapOf("atendido" to "Atendido", "cerrado" to "Cerrado sin atender")
 

@@ -212,7 +212,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.patientItems(state: V
             }
         }
     }
-    if (readOnly) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.signos_solo_lectura)) } else item { CaptureForm(state, model) }
+    if (readOnly) item {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            ReadOnlyBadge(who = stringResource(R.string.signos_solo_lectura_quien), what = stringResource(R.string.signos_solo_lectura_que))
+            BlockedReason(stringResource(R.string.signos_solo_lectura))
+        }
+    } else item { CaptureForm(state, model) }
     val measures = history.trendMeasures()
     if (measures.isNotEmpty()) item {
         SectionCard(stringResource(R.string.signos_tendencia)) {

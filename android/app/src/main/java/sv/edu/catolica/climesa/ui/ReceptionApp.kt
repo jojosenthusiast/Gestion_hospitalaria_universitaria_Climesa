@@ -123,8 +123,8 @@ import java.time.format.DateTimeFormatter
         item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text(stringResource(R.string.rec_buscar_label))},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,stringResource(R.string.rec_limpiar_busqueda))}}) }
         item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
             if(PatientAction.SEARCH in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_buscar),Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
-            // R3 A-18: registering is secondary with a fixed label; only the search button shows that it is searching.
-            if(PatientAction.REGISTER in state.actions) SecondaryButton(stringResource(R.string.rec_form_registrar),model::newPatient,icon=Icons.Default.Add,enabled=!state.searching)
+            // S0 (obs 6/10): registering is the shared create action with a fixed label; only the search button shows that it is searching.
+            if(PatientAction.REGISTER in state.actions) CrudButton(CrudKind.Create,stringResource(R.string.rec_form_registrar),model::newPatient,enabled=!state.searching)
             if(PatientAction.REGISTER in state.actions && state.searchedQuery==null && PatientRules.normalize(state.query).replace(" ","").length<2) Text(stringResource(R.string.rec_registrar_sin_busqueda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         } }
         item { LazyRow(horizontalArrangement=Arrangement.spacedBy(8.dp)) {items(3) {i->val label=stringResource(listOf(R.string.rec_filtro_activos,R.string.rec_filtro_inactivos,R.string.rec_filtro_todos)[i]);StatusFilterChip(selected=state.filter==i,onClick={model.filter(i)},label=label,tone=FilterTones.patientActivity(i))}} }
@@ -135,7 +135,8 @@ import java.time.format.DateTimeFormatter
 }
 @Composable private fun PatientRow(p:Patient,click:()->Unit) {
     // R3 A-39: "Activo" is the normal case and gets no badge; only an inactive record is marked.
-    DataRow(p.fullName,meta=stringResource(R.string.rec_exp_corto,p.record),status=if(p.active) null else ({StatusTag("inactivo")}),onClick=click)
+    // Obs 15: age and sex on a second line so two people with the same name can be told apart; never the DUI.
+    DataRow(p.fullName,subtitle=sv.edu.catolica.climesa.domain.PatientSummary.line(p),meta=stringResource(R.string.rec_exp_corto,p.record),status=if(p.active) null else ({StatusTag("inactivo")}),onClick=click)
 }
 /** R7 U1 (G2): the record's shortcuts, the same three as the web `PatientHubActions`, by permission and reachable section. */
 internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSection>):List<Pair<AndroidSection,QuickAction>> = listOfNotNull(
@@ -153,7 +154,7 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
         item {SectionCard(p.fullName,eyebrow=stringResource(R.string.rec_expediente_n,p.record),action={StatusTag(if(p.active) "activo" else "inactivo")}) {Text(if(gaps.isEmpty()) stringResource(R.string.pac_ficha_completa) else stringResource(R.string.pac_ficha_faltan,gaps.joinToString(", ")),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
         item {androidx.compose.material3.TabRow(selectedTabIndex=tab) {listOf(R.string.pac_ficha_datos,R.string.pac_ficha_cambios).forEachIndexed {i,id->androidx.compose.material3.Tab(selected=tab==i,onClick={tab=i},text={Text(stringResource(id))})}}}
         if(tab==0) item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
-            val none=stringResource(R.string.rec_no_registrado);Value(stringResource(R.string.rec_dui),p.dui ?: stringResource(R.string.rec_sin_documento));Value(stringResource(R.string.rec_nacimiento),p.birth?.let { BirthDates.format(it) } ?: none);Value(stringResource(R.string.rec_sexo),p.sex.label);Value(stringResource(R.string.rec_telefono),p.phone.ifBlank {none})
+            val none=stringResource(R.string.rec_no_registrado);Value(stringResource(R.string.rec_dui),p.dui ?: stringResource(R.string.rec_sin_documento));Value(stringResource(R.string.rec_nacimiento),p.birth?.let { b -> BirthDates.format(b) + (sv.edu.catolica.climesa.domain.PatientSummary.ageText(b)?.let { " · $it" } ?: "") } ?: none);Value(stringResource(R.string.rec_sexo),p.sex.label);Value(stringResource(R.string.rec_telefono),p.phone.ifBlank {none})
         }}}
         // One primary per screen: with the hub, its first action ("Emitir número o registrar llegada") is the primary one.
         if(tab==0&&p.active&&hub.isNotEmpty()) item {ClimesaActionGroup {hub.forEachIndexed {i,(section,action)->
@@ -161,9 +162,12 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
             val icon=when(action){QuickAction.ISSUE_NUMBER->Icons.Default.Campaign;QuickAction.SCHEDULE_APPOINTMENT->Icons.Default.CalendarMonth;else->Icons.Default.Bed}
             ClimesaButton(label,icon,{onHub(section,action)},enabled=!state.saving,outlined=i>0)
         }}}
-        val hubShown=p.active&&hub.isNotEmpty()
-        if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) ClimesaButton(stringResource(R.string.rec_editar_datos),Icons.Default.Edit,{model.edit(p)},outlined=hubShown)
-            if(PatientAction.CHANGE_STATUS in state.actions) ClimesaButton(stringResource(if(p.active) R.string.rec_inactivar else R.string.rec_reactivar),Icons.Default.ToggleOff,{dialog=true},enabled=!state.saving,outlined=true)}}
+        // S0: edit is the outlined pencil and inactivate the red trash, the same on every screen; reactivating stays a plain outlined action.
+        if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) CrudButton(CrudKind.Edit,stringResource(R.string.rec_editar_datos),{model.edit(p)})
+            if(PatientAction.CHANGE_STATUS in state.actions) {
+                if(p.active) CrudButton(CrudKind.Deactivate,stringResource(R.string.rec_inactivar),{dialog=true},enabled=!state.saving)
+                else ClimesaButton(stringResource(R.string.rec_reactivar),Icons.Default.ToggleOn,{dialog=true},enabled=!state.saving,outlined=true)
+            }}}
         if(tab==1) item {Text(stringResource(R.string.rec_historial),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         val events=state.registry.audit.filter {it.record==p.record}.reversed()
         if(tab==1&&events.isEmpty()) item {Text(stringResource(R.string.rec_sin_cambios))}

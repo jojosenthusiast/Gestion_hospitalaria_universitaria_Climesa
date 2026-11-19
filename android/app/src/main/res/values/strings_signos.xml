@@ -32,7 +32,7 @@
     <string name="signos_nota">Nota (opcional)</string>
     <string name="signos_nota_contador">%1$d de %2$d caracteres</string>
     <string name="signos_guardar">Guardar signos</string>
-    <string name="signos_solo_lectura">Solo puedes consultar los signos vitales; registrar una toma necesita el permiso «Registrar signos vitales».</string>
+    <string name="signos_solo_lectura">Registrar una toma necesita el permiso «Registrar signos vitales».</string>
     <string name="signos_tendencia">Tendencia</string>
     <string name="signos_tendencia_detalle">Últimas tomas de cada medida, de la más antigua a la más reciente. La franja verde es el rango normal.</string>
     <string name="signos_historial">Historial</string>
@@ -48,4 +48,6 @@
     <string name="signos_normal_ref">Normal: %1$s</string>
     <string name="signos_grafica_desc">%1$s: %2$d tomas, la última %3$s</string>
     <string name="signos_error_historial">No se pudo cargar los signos.</string>
+    <string name="signos_solo_lectura_quien">Enfermería</string>
+    <string name="signos_solo_lectura_que">los signos vitales</string>
 </resources>

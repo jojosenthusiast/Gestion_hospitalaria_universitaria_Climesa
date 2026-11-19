@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Notes
 import androidx.compose.material.icons.filled.Add
@@ -19,6 +20,8 @@ import androidx.compose.material.icons.filled.Bed
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilterChip
@@ -382,7 +385,8 @@ fun HospitalizationScreen(
         if (quickAction == null || state.loading) return@LaunchedEffect
         if (quickAction == QuickAction.ASSIGN_BED && QuickActions.allowed(QuickAction.ASSIGN_BED, profile?.permissions.orEmpty())) state.admissions.firstOrNull { AdmissionAction.ASSIGN_BED in it.allowedActions }?.let(model::open)
         if (quickAction == QuickAction.ADMIT && QuickActions.allowed(QuickAction.ADMIT, profile?.permissions.orEmpty())) {
-            intake.open()
+            // From a patient record the guide starts fresh with that patient; otherwise a kept draft resumes.
+            if (subject != null) intake.restart() else intake.open()
             subject?.let { intake.pickPatient(sv.edu.catolica.climesa.domain.PickerPatient(it.id, it.detail.orEmpty(), it.name, null)) }
         }
         onQuickActionHandled()
@@ -409,8 +413,13 @@ fun HospitalizationScreen(
         state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
         if (state.tray.isNotEmpty()) item { IndicatedTray(state.tray, model) }
         if ("admision.crear" in permissions) item {
-            if (primaryRow == null) PrimaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy)
-            else SecondaryButton(stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, icon = Icons.Default.Add, enabled = !state.busy)
+            // S0: admitting is the shared create action. Lote 2: a kept draft is offered first, never lost silently.
+            val resume = intakeState.resumeName
+            if (resume == null) CrudButton(CrudKind.Create, stringResource(R.string.ing_ingresar), { model.clearMessages(); intake.open() }, enabled = !state.busy)
+            else Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                PrimaryButton(stringResource(R.string.ing_continuar_de, resume), { model.clearMessages(); intake.open() }, icon = Icons.Default.PlayArrow, enabled = !state.busy)
+                SecondaryButton(stringResource(R.string.ing_empezar_de_nuevo), { model.clearMessages(); intake.restart() }, icon = Icons.Default.Refresh, enabled = !state.busy)
+            }
         }
         when {
             state.loading && state.admissions.isEmpty() -> item { LoadingState() }
@@ -443,7 +452,7 @@ private fun IndicatedTray(rows: List<IndicatedAdmission>, model: Hospitalization
                     if (row.admission.unstable) CriticalPill(stringResource(R.string.u5_inestable))
                 }
                 row.admission.motive?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                row.admission.attendingDoctorName?.let { Text(stringResource(R.string.u5_indicado_por, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                HospitalizationRules.indicatedBy(row.admission.attendingDoctorName, row.admission.origin, row.admission.scheduledAt)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 when {
                     row.loading -> Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall)
                     row.bed != null -> Text(stringResource(R.string.u5_cama_sugerida, row.bed.code, row.bed.room), style = MaterialTheme.typography.bodyMedium)
@@ -497,7 +506,8 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         if (AdmissionAction.NURSING_NOTE in actions) SecondaryButton(stringResource(R.string.hosp_notas), { model.openNotes(row) }, icon = Icons.AutoMirrored.Filled.Notes, enabled = !busy)
         HospitalizationRules.vitalsSubject(row)?.let { subject -> onOpenVitals?.let { open -> RowAction(stringResource(R.string.rec7_hosp_signos), { open(subject) }) } }
         if (AdmissionAction.REVOKE_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_revocar_alta), { model.openReason(row, AdmissionAction.REVOKE_DISCHARGE) }, enabled = !busy)
-        if (AdmissionAction.CANCEL in actions) SecondaryButton(stringResource(R.string.hosp_cancelar_admision), { model.openReason(row, AdmissionAction.CANCEL) }, enabled = !busy)
+        // S0: cancelling an admission is the shared red deactivate action.
+        if (AdmissionAction.CANCEL in actions) CrudButton(CrudKind.Deactivate, stringResource(R.string.hosp_cancelar_admision), { model.openReason(row, AdmissionAction.CANCEL) }, enabled = !busy)
     }
 }
 
@@ -515,15 +525,19 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             if (state.loadingSuggestions) Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall)
             else if (state.suggestions.isEmpty() && state.formError == null) Text(stringResource(R.string.hosp_sin_camas_compatibles), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            else state.suggestions.forEach { row ->
-                DataRow(
-                    title = "${row.code} · ${row.room}",
-                    subtitle = "${row.category} · ${row.reason}",
-                    leadingIcon = if (row.id == selected) Icons.Default.Check else Icons.Default.Bed,
-                    onClick = { selected = row.id },
-                    divider = true,
-                    container = false,
-                )
+            else HospitalizationRules.byRoom(state.suggestions).forEach { (room, beds) ->
+                // Lote 2: grouped by room like the intake Cama step, so the choice reads as the floor plan, not a flat list.
+                Text(stringResource(R.string.hosp_habitacion_n, room, beds.size), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.xs))
+                beds.forEach { row ->
+                    DataRow(
+                        title = row.code,
+                        subtitle = listOf(AdmissionIntake.CATEGORY_LABELS[row.category] ?: row.category, row.reason).filter { it.isNotBlank() }.joinToString(" · "),
+                        leadingIcon = if (row.id == selected) Icons.Default.Check else Icons.Default.Bed,
+                        onClick = { selected = row.id },
+                        divider = true,
+                        container = false,
+                    )
+                }
             }
             FormField(stringResource(R.string.hosp_motivo_asignacion), state.assignReason, model::onAssignReason, hint = stringResource(R.string.hosp_motivo_opcional_ayuda), enabled = !state.busy, singleLine = false)
         }
@@ -637,7 +651,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             when {
-                form.loading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { CircularProgressIndicator(Modifier.size(20.dp)); Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall) }
+                form.loading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Spinner(size = 20.dp, strokeWidth = 2.dp); Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall) }
                 form.loadError != null -> NoticeBanner(NoticeKind.ERROR, form.loadError)
                 form.beds.isEmpty() -> NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_traslado_sin_camas))
                 else -> form.beds.forEach { bed ->
@@ -666,7 +680,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             panel.saved?.let { NoticeBanner(NoticeKind.SUCCESS, it) }
             FormField(stringResource(R.string.hosp_nota_nueva), panel.text, model::onNoteText, hint = HospitalizationRules.counter(panel.text, HospitalizationRules.NOTE_MAX), enabled = !state.busy, singleLine = false)
             when {
-                panel.loading && panel.notes.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { CircularProgressIndicator(Modifier.size(20.dp)); Text(stringResource(R.string.ui_cargando_titulo), style = MaterialTheme.typography.bodySmall) }
+                panel.loading && panel.notes.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Spinner(size = 20.dp, strokeWidth = 2.dp); Text(stringResource(R.string.ui_cargando_titulo), style = MaterialTheme.typography.bodySmall) }
                 panel.loadError != null -> { NoticeBanner(NoticeKind.ERROR, panel.loadError); TextButton(onClick = model::retryNotes) { Text(stringResource(R.string.ui_reintentar)) } }
                 panel.notes.isEmpty() -> Text(stringResource(R.string.hosp_notas_vacio), style = MaterialTheme.typography.bodySmall)
                 // ENF/AST audit #6: the note is body text, never cut to two lines.
