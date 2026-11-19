@@ -8,6 +8,7 @@ import { DoctorShiftPicker } from './listas/doctor-shifts';
 import { isPendingCategoryRequest } from './listas/requests';
 import { NO_STAFF_REQUEST_TEXT, NoStaffNotice, besidesNoStaff } from './listas/no-staff';
 import { patientFacts } from './listas/patient-facts';
+import { categorySections } from './listas/category-groups';
 import { ChipGroup, LiveSearch, matches } from './listas/chips';
 import { addDays, dayKey, groupAgenda, minutesBetween, shownState, timeRange, weekOf } from './listas/schedule';
 import './listas/lists.css';
@@ -541,8 +542,8 @@ function CategoryRequestForm({ api, version, onClose, onSaved }: { api: Api; ver
     <fieldset className="rq-fieldset"><legend>¿Por qué necesitas la cita?</legend>
       <LiveSearch label="Buscar motivo" placeholder="Ej.: fiebre, piel, embarazo, presión" value={query} onChange={setQuery} />
       <p className="form-hint" aria-live="polite">{picked.length ? `${picked.length} de 3 elegidos.` : 'Elige uno o hasta tres. Si no sabes cuál, elige Consulta general.'}</p>
-      <RemoteState state={categories} skeletonRows={3}>{() => visible.length ? <div className="rq-cat-grid">{visible.map(c => <button type="button" key={c.code} className="rq-cat" aria-pressed={picked.includes(c.code)} disabled={!picked.includes(c.code) && picked.length >= 3} onClick={() => toggle(c.code)}>
-        <span className="rq-cat-icon"><CategoryGlyph icon={c.icon} /></span><span><strong>{c.name}</strong><small>{c.description}</small></span></button>)}</div>
+      <RemoteState state={categories} skeletonRows={3}>{() => visible.length ? <div className="rq-cat-sections">{categorySections(visible).map(section => <section key={section.id} className="rq-cat-section" aria-label={section.title}><h3>{section.title}</h3><div className="rq-cat-grid">{section.categories.map(c => <button type="button" key={c.code} className="rq-cat" aria-pressed={picked.includes(c.code)} disabled={!picked.includes(c.code) && picked.length >= 3} onClick={() => toggle(c.code)}>
+        <span className="rq-cat-icon"><CategoryGlyph icon={c.icon} /></span><span><strong>{c.name}</strong><small>{c.description}</small></span></button>)}</div></section>)}</div>
         : <p className="form-hint" role="status">Ningún motivo coincide. Prueba otra palabra o elige Consulta general.</p>}</RemoteState>
     </fieldset>
     <div className="rq-fieldset"><span className="eyebrow">Franja preferida</span><ChipGroup label="Franja preferida" value={franja} onChange={setFranja} options={(['manana', 'tarde', 'cualquiera'] as Franja[]).map(value => ({ value, label: FRANJA_LABEL[value] }))} /></div>

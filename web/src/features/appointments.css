@@ -26,6 +26,9 @@
 .rq-main { display: grid; gap: var(--space-1); min-width: 0; }
 .rq-who { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); margin: 0; }
 .rq-who strong { font-size: var(--text-base); }
+.rq-cat-sections { display: grid; gap: var(--space-4); }
+.rq-cat-section { display: grid; gap: var(--space-2); }
+.rq-cat-section > h3 { margin: 0; font-size: var(--text-sm); font-weight: 700; color: var(--muted); }
 .rq-facts { font-size: var(--text-sm); color: var(--ink); }
 .rq-who code { font-family: var(--font-mono); font-size: var(--text-xs); color: var(--muted); font-variant-numeric: tabular-nums; }
 .rq-who small { font-size: var(--text-xs); }

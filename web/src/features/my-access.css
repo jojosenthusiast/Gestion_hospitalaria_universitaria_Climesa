@@ -1,0 +1,10 @@
+.my-access-intro { margin: 0 0 var(--space-4); color: var(--muted); max-width: 65ch; }
+.my-access { display: grid; gap: var(--space-5); }
+.my-access-day { display: grid; gap: var(--space-2); }
+.my-access-day > h2 { margin: 0; font-size: var(--text-md); font-weight: 700; }
+.my-access-day ol { margin: 0; padding: 0; list-style: none; display: grid; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.my-access-day li { display: grid; grid-template-columns: 4.5rem 1fr; gap: var(--space-3); padding: var(--space-3) var(--space-4); }
+.my-access-day li + li { border-top: 1px solid var(--line); }
+.my-access-day time { font-variant-numeric: tabular-nums; color: var(--primary-text); font-weight: 700; }
+.my-access-day li > div { display: grid; gap: 2px; min-width: 0; }
+.my-access-day li span { color: var(--muted); font-size: var(--text-sm); overflow-wrap: anywhere; }
