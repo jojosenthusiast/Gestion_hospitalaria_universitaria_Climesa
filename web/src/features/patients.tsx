@@ -1,5 +1,6 @@
 import { useEffect,useRef,useState,type FormEvent } from 'react';
 import { Field,Icon,Notice } from '../components/ui';
+import { ReadOnlyBadge } from '../components/system';
 import { ExportMenu } from '../components/export-menu';
 import { takePatientSearch } from './patient-handoff';
 import { RegisterExternalResultDialog } from './lab-external-record';
@@ -96,7 +97,7 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  const reasonOf=(p:Patient)=>(typed||receipt)&&/documento|expediente/i.test(p.matchReason??'')?p.matchReason:null;
  const empty=patientEmptyState(filters,{area:areaName,medico:doctorName});
  const exportTable=()=>({filename:'pacientes',title:'Pacientes',subtitle:`${rows.length} expedientes${active.length?` · ${active.map(f=>f.label).join(' · ')}`:''}`,columns:['Expediente','Paciente','Sexo','Nacimiento','Estado'],rows:rows.map(p=>[p.record,p.fullName,sexNames[p.sex]??p.sex,p.birth?formatDate(p.birth,{withYear:true}):p.ageRange?`${p.ageRange} años`:'',p.active?'Activo':'Inactivo'])});
- return <><CompactHeader breadcrumb="Pacientes / Registro compartido" title="Pacientes" actions={register?<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>:<span className="qb-readonly"><Icon name="eye" size={16}/>Solo lectura</span>}/>
+ return <><CompactHeader breadcrumb="Pacientes / Registro compartido" title="Pacientes" actions={register?<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>:<ReadOnlyBadge who="Recepción" what="el registro de pacientes"/>}/>
  {/* R4a: the search first; every filter in one «Filtros» popover that counts what is on. */}
  <section className="data-workbench" aria-label="Registro de pacientes"><div className="cl-toolbar pt-toolbar"><form className="search-form" onSubmit={find}><Field label="Nombre, DUI o expediente" placeholder="Escribe al menos dos caracteres" value={query} onChange={v=>{setQuery(v);setReceipt(null);}} minLength={2} maxLength={100} required/><button className="secondary-button" disabled={search.busy} type="submit"><Icon name="search" size={18}/>{search.busy?'Buscando…':'Buscar'}</button></form>
  <FilterPopover count={filterCount}>

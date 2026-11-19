@@ -1,9 +1,11 @@
 import { useEffect, useId, useRef, useState, type InputHTMLAttributes, type ReactNode, type FormEvent } from 'react';
 import type { DemoAccount } from '../lib/demoLogin';
 
-export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry' | 'download' | 'clock' | 'alert' | 'chart' | 'userPlus' | 'megaphone' | 'steth' | 'drop' | 'pulse' | 'chevronsUp' | 'minus' | 'filter' | 'clipboard' | 'bell';
+export type IconName = 'arrow' | 'shield' | 'mail' | 'user' | 'users' | 'check' | 'close' | 'eye' | 'eyeOff' | 'logout' | 'grid' | 'phone' | 'chevron' | 'info' | 'lock' | 'plus' | 'search' | 'back' | 'home' | 'building' | 'bed' | 'ambulance' | 'calendar' | 'audit' | 'lab' | 'inventory' | 'queue' | 'privacy' | 'menu' | 'retry' | 'download' | 'clock' | 'alert' | 'chart' | 'userPlus' | 'megaphone' | 'steth' | 'drop' | 'pulse' | 'chevronsUp' | 'minus' | 'filter' | 'clipboard' | 'bell' | 'pencil' | 'trash';
 const paths: Record<IconName, ReactNode> = {
   arrow: <><path d="M5 12h14M13 6l6 6-6 6" /></>,
+  pencil: <><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></>,
+  trash: <><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></>,
   bell: <><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></>,
   back: <><path d="M19 12H5M11 6l-6 6 6 6" /></>,
   shield: <><path d="M12 3l8 3v6c0 5-8 9-8 9s-8-4-8-9V6z" /><path d="m8 12 3 3 5-6" /></>,

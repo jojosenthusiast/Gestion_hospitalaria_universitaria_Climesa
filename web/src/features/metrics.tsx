@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { BarChart, LineChart, Legend, type Tone } from '../components/charts';
 import { ExportMenu } from '../components/export-menu';
-import { Field, Notice } from '../components/ui';
+import { Field, Icon, Notice } from '../components/ui';
 import { exportName, type ExportTable } from '../lib/export';
 import { can, type AccessProfile, type Api } from '../lib/api';
 import { CompactHeader, RemoteState, useData, type Remote } from './common';
@@ -109,12 +109,22 @@ export function MetricsPage({ api, profile, version }: { api: Api; profile: Acce
     rows: indicators.flatMap((spec, i) => (states[i].data?.serie ?? []).map(p => [spec.label, units[states[i].data!.unidad] ?? states[i].data!.unidad, p.fecha, p.valor, p.muestras])),
   });
   const active = (days: number) => from === localDay(-(days - 1)) && to === localDay();
+  // Owner batch 1 (S12): say which range drives the data, quick preset or custom dates.
+  const preset = presets.find(p => active(p.days));
+  const day = (iso: string) => new Intl.DateTimeFormat('es-SV', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(new Date(`${iso}T00:00:00Z`));
+  const applied = valid ? `${preset ? preset.label : 'Rango personalizado'}: del ${day(from)} al ${day(to)}` : null;
   return <>
     <CompactHeader breadcrumb="CLIMESA / Métricas" title="Métricas" actions={<ExportMenu label="Exportar todo" table={everything} disabled={!ready}/>}/>
     <div className="metric-controls">
-      <div className="segmented-control" role="group" aria-label="Rangos rápidos">{presets.map(p => <button key={p.days} type="button" aria-pressed={active(p.days)} onClick={() => { setFrom(localDay(-(p.days - 1))); setTo(localDay()); }}>{p.label}</button>)}</div>
-      <div className="form-grid"><Field label="Desde" type="date" value={from} onChange={setFrom} /><Field label="Hasta" type="date" value={to} onChange={setTo} /></div>
+      <fieldset className="metric-range"><legend>Rango rápido</legend>
+        <div className="segmented-control" role="group" aria-label="Rangos rápidos">{presets.map(p => <button key={p.days} type="button" aria-pressed={active(p.days)} onClick={() => { setFrom(localDay(-(p.days - 1))); setTo(localDay()); }}>{p.label}</button>)}</div>
+      </fieldset>
+      <span className="metric-or" aria-hidden="true">o</span>
+      <fieldset className="metric-range"><legend>Fechas exactas</legend>
+        <div className="form-grid"><Field label="Desde" type="date" value={from} onChange={setFrom} /><Field label="Hasta" type="date" value={to} onChange={setTo} /></div>
+      </fieldset>
     </div>
+    {applied && <p className="metric-applied" role="status"><Icon name="calendar" size={16} />Mostrando <strong>{applied}</strong></p>}
     <p className="metric-note">Las franjas de color son referencias de operación para leer los datos con rapidez: no son metas clínicas. Rango máximo: 31 días.</p>
     {!valid ? <Notice kind="info">Elige un rango con el fin igual o posterior al inicio.</Notice>
       : <div className="board-grid board-grid-detail">{indicators.map((spec, i) => <IndicatorCard key={spec.id} spec={spec} state={states[i]} />)}</div>}

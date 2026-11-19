@@ -455,6 +455,8 @@ table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priorit
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+  /* A spinner is progress, not decoration: frozen, it reads as a hung app. It keeps turning, slower. */
+  .spinner, .status-spinner { animation-duration: 1.4s !important; animation-iteration-count: infinite !important; }
 }
 
 /* Header bell: notices one click away from any screen, with the unread count; red tint while a critical is unread. */

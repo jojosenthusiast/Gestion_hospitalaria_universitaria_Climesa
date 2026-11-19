@@ -103,13 +103,14 @@ export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permis
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
 export const hasWebModule=(profile:AccessProfile)=>visibleModules(profile).some(m=>m.permission);
 const readRoute=()=>location.hash.replace(/^#\/?/,'').split('?')[0]||'inicio';
-/** R1 (S5): the hospital day as plain small text; the time is already on the device, so no decorative clock. */
+/** Owner batch 1 (S2): the hospital clock, live: time with seconds over weekday, day and month (El Salvador time). */
 function HospitalDate(){
  const [now,setNow]=useState(()=>new Date());
- // A minute is enough to roll over at midnight; nothing ticks every second.
- useEffect(()=>{const timer=window.setInterval(()=>setNow(new Date()),60_000);return()=>window.clearInterval(timer);},[]);
- const date=new Intl.DateTimeFormat('es-SV',{weekday:'long',day:'numeric',month:'long',timeZone:'America/El_Salvador'}).format(now);
- return <time className="topbar-date" dateTime={new Intl.DateTimeFormat('en-CA',{timeZone:'America/El_Salvador'}).format(now)}>{date}</time>;
+ useEffect(()=>{let timer:number;const tick=()=>{setNow(new Date());timer=window.setTimeout(tick,1000-(Date.now()%1000));};timer=window.setTimeout(tick,1000-(Date.now()%1000));return()=>window.clearTimeout(timer);},[]);
+ const zone='America/El_Salvador';
+ const time=new Intl.DateTimeFormat('es-SV',{hour:'2-digit',minute:'2-digit',second:'2-digit',hourCycle:'h23',timeZone:zone}).format(now);
+ const date=new Intl.DateTimeFormat('es-SV',{weekday:'long',day:'numeric',month:'long',timeZone:zone}).format(now);
+ return <time className="topbar-date topbar-clock" dateTime={now.toISOString()} aria-label={`${date}, ${time}`}><strong>{time}</strong><span>{date}</span></time>;
 }
 export function HospitalShell({api,profile,version=0,connection='live',onLogout,onChangePassword}:{api:Api;profile:AccessProfile;version?:number;connection?:'live'|'offline'|'reconnecting';onLogout:()=>void;onChangePassword?:(current:string,next:string)=>Promise<string|null>}){
  const [route,setRoute]=useState(readRoute),[navOpen,setNavOpen]=useState(false),[mobileNav,setMobileNav]=useState(false),menu=visibleModules(profile),roleLabel=profile.roles.map(r=>roleNames[r]??r).join(' · ');

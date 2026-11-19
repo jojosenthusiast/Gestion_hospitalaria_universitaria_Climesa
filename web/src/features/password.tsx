@@ -55,10 +55,11 @@ export function ChangePasswordForm({ onChange }: { onChange: (current: string, n
     <h3 id="password-change-title"><Icon name="lock" size={18} />Cambiar contraseña</h3>
     {done && <Notice kind="success">Tu contraseña se cambió. Úsala la próxima vez que ingreses.</Notice>}
     {error && <Notice kind="error">{error}</Notice>}
-    <div className="form-grid">
+    <div className="form-grid password-grid">
       <Field label="Contraseña actual" type="password" value={current} onChange={setCurrent} autoComplete="current-password" disabled={busy} error={fieldError('current')} />
-      <Field label="Nueva contraseña" type="password" value={next} onChange={setNext} autoComplete="new-password" disabled={busy} hint={PASSWORD_RULE} error={fieldError('next')} />
+      <Field label="Nueva contraseña" type="password" value={next} onChange={setNext} autoComplete="new-password" disabled={busy} error={fieldError('next')} />
       <Field label="Confirmar nueva contraseña" type="password" value={confirmation} onChange={setConfirmation} autoComplete="new-password" disabled={busy} error={fieldError('confirmation')} />
+      <p className="password-rule">{PASSWORD_RULE}</p>
     </div>
     <div className="dialog-actions"><SubmitButton busy={busy}>Cambiar contraseña</SubmitButton></div>
   </form>;
