@@ -16,14 +16,18 @@ describe('Permisos del PDF · edición propia del paciente, bitácora del médic
     const before = await t.one<any>('SELECT * FROM pacientes.paciente WHERE id=$1', [mine]);
     const otherBefore = await t.one<any>('SELECT * FROM pacientes.paciente WHERE id=$1', [other]);
     const ok = await t.call('PAC', 'PATCH', '/me/paciente', { version: before.version, phone: '7000-1234', email: 'ana@example.test', address: 'Calle ficticia 7' });
-    expect(ok.status).toBe(200);
-    expect(ok.body).toEqual({ id: mine, version: before.version + 1 });
+    // Recepción owns the record email: a patient cannot change it (no lookup against other records).
+    expect(ok.status).toBe(403);
+    expect(ok.body.codigo).toBe('correo_lo_gestiona_recepcion');
+    const okContact = await t.call('PAC', 'PATCH', '/me/paciente', { version: before.version, phone: '7000-1234', address: 'Calle ficticia 7' });
+    expect(okContact.status).toBe(200);
+    expect(okContact.body).toEqual({ id: mine, version: before.version + 1 });
     const after = await t.one<any>('SELECT * FROM pacientes.paciente WHERE id=$1', [mine]);
-    expect(after).toMatchObject({ telefono: '70001234', correo: 'ana@example.test', direccion: 'Calle ficticia 7', nombres: before.nombres, primer_apellido: before.primer_apellido, sexo: before.sexo });
+    expect(after).toMatchObject({ telefono: '70001234', correo: before.correo, direccion: 'Calle ficticia 7', nombres: before.nombres, primer_apellido: before.primer_apellido, sexo: before.sexo });
     expect(String(after.nacimiento)).toBe(String(before.nacimiento));
     expect(await t.one<any>('SELECT * FROM pacientes.paciente WHERE id=$1', [other])).toEqual(otherBefore);
     const history = await t.one<any>('SELECT motivo,cambios FROM pacientes.historial_demografico WHERE paciente_id=$1 ORDER BY version DESC LIMIT 1', [mine]);
-    expect(Object.keys(history.cambios).sort()).toEqual(['correo', 'direccion', 'telefono']);
+    expect(Object.keys(history.cambios).sort()).toEqual(['direccion', 'telefono']);
     expect((await t.one<any>("SELECT count(*)::int AS n FROM plataforma.auditoria WHERE accion='pacientes.editar_propios' AND paciente_id=$1", [mine])).n).toBe(1);
     expect((await t.one<any>("SELECT count(*)::int AS n FROM plataforma.outbox WHERE tipo='paciente.actualizado' AND entidad_id=$1", [mine])).n).toBeGreaterThan(0);
   });
