@@ -17,7 +17,7 @@ Requisitos: REQ-PRV-04 (matriz por rol de endpoints y vistas), REQ-ROL-01 a 06. 
 | LAB | Laboratorista | Web | D-043; R07 | Procesa órdenes de laboratorio: muestra, resultados con rangos, completar; reactivos de inventario. |
 | PAR | Paramédico | Android | D-042; R04 | Tripulación de la única ambulancia: estados del servicio, reporte prehospital, ubicación en vivo. Solo móvil. |
 | DPD | Delegado de protección de datos | Web | D-031; LPDP Art. 15-17 | Revisa la auditoría y verifica su integridad. |
-| PAC | Paciente | Android; iOS | CUR REQ-ROL-04; D-032 a D-034 | Ve su fila, citas, estado de laboratorio, resultados revisados e historial; pide citas y ambulancia. |
+| PAC | Paciente | Android; iOS; Web | CUR REQ-ROL-04; D-032 a D-034 | Ve su fila, citas, estado de laboratorio, resultados revisados e historial; pide citas y ambulancia. |
 
 ## Cómo leer las matrices
 

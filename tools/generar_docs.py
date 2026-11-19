@@ -79,7 +79,9 @@ PERMISOS_RETIRADOS = [
 # Descripción de rol con que la semilla (aplicada) los insertó, cuando roles.csv ya la cambió. La semilla conserva el histórico.
 # Plataformas que tenía el rol cuando se aplicó la semilla (regla 10: no se edita). Ronda 3: Jefe de Operaciones y Laboratorio dejan Android
 # (PDF del curso y decisión del propietario); lo aplica la migración de SALIDA_PLATAFORMAS.
-PLATAFORMAS_SEMILLA = {"JOP": "Android; Web", "LAB": "Web; Android"}
+# Lote 5 (decisión del propietario 2026-11-19, «Sí, habilitar web»): el Paciente también usa la Web; lo aplica la migración
+# 20261129002000_paciente_web.sql (escrita a mano, como 20261030000200_jop_android.sql).
+PLATAFORMAS_SEMILLA = {"JOP": "Android; Web", "LAB": "Web; Android", "PAC": "Android; iOS"}
 PLATAFORMAS_SIN_ANDROID = {"JOP": ["Web"], "LAB": ["Web"]}
 
 DESCRIPCIONES_ROL_SEMILLA = {
