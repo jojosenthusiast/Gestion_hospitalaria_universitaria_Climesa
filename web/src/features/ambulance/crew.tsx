@@ -14,9 +14,21 @@ export function missingCrew(s:AmbulanceStatus):string|null{
 export function crewProblem(code?:string):string|null{
  return code==='sin_paramedico_de_turno'?'No hay un paramédico con turno en curso.':code==='sin_motorista_de_turno'?'No hay un motorista con turno en curso.':code==='sin_tripulacion_de_turno'?'No hay paramédico ni motorista con turno en curso.':null;
 }
-/** Cobertura de la tripulación para la franja de estado: paramédico y motorista por separado. */
+/**
+ * Owner obs. 19: who is on shift for a crew role, by name. The active service's crew wins; otherwise the people on shift
+ * the API lists for dispatch. A person without an app account says so (they cannot record milestones).
+ */
+export function crewNames(s:AmbulanceStatus,role:'paramedico'|'motorista'):string[]{
+ const people=s.activeService?.crew.some(c=>c.role===role)?s.activeService.crew:s.availableCrew??[];
+ return people.filter(c=>c.role===role).map(c=>`${c.name}${c.hasAccount===false?' (sin cuenta en la app)':''}`);
+}
+/** Crew slot of the status strip: the role as label and the person (or the gap) as value, never the role twice. */
+function CrewSlot({label,names,onDuty,missing}:{label:string;names:string[];onDuty:boolean;missing:string}){
+ return <div className={onDuty?'':'is-missing'}><span>{label}</span><strong>{names.length?names.join(' · '):onDuty?'De turno':missing}</strong></div>;
+}
+/** Cobertura de la tripulación para la franja de estado: paramédico y motorista por separado, con nombre. */
 export function CrewCoverage({status:s}:{status:AmbulanceStatus}){
- return <><div><strong>{s.paramedicOnDuty?'Paramédico de turno':'Sin paramédico con turno en curso'}</strong><span>Paramédico</span></div><div><strong>{driverOnDuty(s)?'Motorista de turno':'Sin motorista con turno en curso'}</strong><span>Motorista</span></div></>;
+ return <><CrewSlot label="Paramédico" names={s.paramedicOnDuty?crewNames(s,'paramedico'):[]} onDuty={s.paramedicOnDuty} missing="Sin paramédico de turno"/><CrewSlot label="Motorista" names={driverOnDuty(s)?crewNames(s,'motorista'):[]} onDuty={driverOnDuty(s)} missing="Sin motorista de turno"/></>;
 }
 /**
  * Qué hacer cuando falta tripulación: quien planifica turnos va directo a publicar el turno que falta;

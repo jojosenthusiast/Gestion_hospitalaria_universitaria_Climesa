@@ -41,7 +41,8 @@ describe('Inicio · ambulancia por confirmar: el verbo dice lo que la persona pu
 });
 
 describe('Asignar cama · la lista de camas se pliega', () => {
-  it('muestra las 3 primeras camas sugeridas en su orden y pliega el resto con «Ver N más»', async () => {
+  // S27: the suggestions are room cards now; the first 8 rooms show in their order and the rest fold behind «Ver N más».
+  it('muestra las 8 primeras habitaciones sugeridas en su orden y pliega el resto con «Ver N más»', async () => {
     const beds = Array.from({ length: 14 }, (_, i) => ({ id: `b-${i}`, version: 1, code: `C-${200 + i}`, room: `H-${200 + i}`, category: 'semiprivada', reason: 'habitación vacía' }));
     const admission = { id: 'a-1', patientId: 'p', patientName: 'Paciente Ficticio Uno', origin: 'directa', requestedCategory: 'semiprivada', state: 'pendiente_cama', isolation: false, bed: '', version: 1, allowedActions: ['asignar_cama'], createdAt: hoy };
     const api = { request: vi.fn(async (path: string) => path === '/admisiones' ? [admission] : path.startsWith('/admisiones/a-1/sugerencias-cama') ? beds : []), write: vi.fn(async () => ({})) } as unknown as Api;
@@ -50,9 +51,9 @@ describe('Asignar cama · la lista de camas se pliega', () => {
     await userEvent.click(within(fila).getByRole('button', { name: /Asignar cama/ }));
     const dialog = screen.getByRole('dialog');
     await within(dialog).findByLabelText(/C-200/);
-    expect(within(dialog).getAllByRole('radio').map(r => (r as HTMLInputElement).value)).toEqual(['b-0', 'b-1', 'b-2']);
+    expect(within(dialog).getAllByRole('radio').map(r => (r as HTMLInputElement).value)).toEqual(['b-0', 'b-1', 'b-2', 'b-3', 'b-4', 'b-5', 'b-6', 'b-7']);
     expect(within(dialog).getByLabelText(/C-200/)).toHaveProperty('checked', true);
-    await userEvent.click(within(dialog).getByRole('button', { name: 'Ver 11 más' }));
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Ver 6 más' }));
     expect(within(dialog).getAllByRole('radio')).toHaveLength(14);
   });
 });

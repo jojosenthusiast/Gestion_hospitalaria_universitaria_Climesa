@@ -3,13 +3,13 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
 import { HospitalizationPage } from '../features/hospitalization';
-import { admissionBody, groupBeds, initialForm, isImmediate, salvadorInstant, stepError, stepsFor, visitorError, type AdmissionForm, type BedPick } from '../features/hospitalization/admission-rules';
+import { admissionBody, doctorChoice, groupBeds, initialForm, isImmediate, salvadorInstant, stepError, stepsFor, visitorError, type AdmissionForm, type BedPick } from '../features/hospitalization/admission-rules';
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(() => { cleanup(); history.replaceState(null, '', '#/'); });
+afterEach(() => { cleanup(); sessionStorage.clear(); history.replaceState(null, '', '#/'); });
 
 const bed = (over: Partial<BedPick> = {}): BedPick => ({ id: 'b1', version: 3, code: 'C-201', roomId: 'r1', room: 'H-201', floor: 2, category: 'semiprivada', capacity: 2, state: 'libre', occupiedInRoom: 0, compatible: true, reason: null, suggested: true, ...over });
 const complete = (over: Partial<AdmissionForm> = {}): AdmissionForm => ({
@@ -34,6 +34,14 @@ describe('ingreso guiado · reglas de cada paso', () => {
   });
   // S13 (T10w): category, clinical requirements and visitors share one step, and the bed step only appears when a bed is
   // assigned now (immediate admission and permission). Eight steps become six, or five without a bed.
+  it('obs. 21: un médico sin cuenta en la app queda apagado aunque tenga turno, con su motivo', () => {
+    expect(doctorChoice({ available: true, reason: null, hasAccount: false })).toEqual({ available: false, reason: 'No tiene cuenta en la app: no podrá firmar el alta.', hasAccount: false });
+    expect(doctorChoice({ available: true, reason: null, hasAccount: true })).toEqual({ available: true, reason: null, hasAccount: true });
+    expect(doctorChoice({ available: false, reason: 'Sin turno en ese horario' })).toEqual({ available: false, reason: 'Sin turno en ese horario' });
+    const f = complete({ doctor: { id: 'd3', label: 'Dr. Sin Cuenta', ...doctorChoice({ available: true, reason: null, hasAccount: false }) } });
+    expect(stepError('medico', f, true)).toBe('El médico elegido no tiene cuenta en la app: no podrá firmar el alta.');
+  });
+
   it('el paso de cama solo existe si se asigna cama ahora; la cama es obligatoria en ese paso', () => {
     const now = new Date('2026-11-20T14:30:00Z');
     const f = complete({ at: '2026-11-20T08:30', bed: null });
@@ -79,7 +87,7 @@ const beds = [
 const routes: Record<string, unknown> = {
   '/pacientes/selector': { items: [{ id: 'p9', fullName: 'Paciente Ficticio Nueve', record: 'EXP-000009', age: 41 }], hasMore: false },
   '/admisiones/origenes': [{ id: 'c1', origin: 'cita', at: '2026-11-19T15:00:00Z', label: 'Cita del 19/11/2026', detail: 'Dra. Ficticia · confirmada' }, { id: 'e1', origin: 'emergencia', at: '2026-11-20T09:00:00Z', label: 'Emergencia del 20/11/2026', detail: 'Ticket 3 · atendido' }],
-  '/admisiones/medicos-disponibles': [{ id: 'd1', name: 'Dra. Ficticia', specialty: 'Medicina interna', available: true, reason: null }, { id: 'd2', name: 'Dr. Sin Turno', specialty: null, available: false, reason: 'Sin turno en ese horario' }],
+  '/admisiones/medicos-disponibles': [{ id: 'd1', name: 'Dra. Ficticia', specialty: 'Medicina interna', available: true, reason: null }, { id: 'd2', name: 'Dr. Sin Turno', specialty: null, available: false, reason: 'Sin turno en ese horario' }, { id: 'd3', name: 'Dr. Sin Cuenta', specialty: null, available: true, reason: null, hasAccount: false }],
   '/admisiones/mapa-camas': { categories: [{ category: 'semiprivada', free: 2, compatible: 1 }, { category: 'vip', free: 0, compatible: 0 }], beds },
   '/admisiones/factibilidad': { feasible: true, checks: [{ code: 'medico_en_turno', ok: true, message: 'El médico tiene turno en ese horario.' }] },
 };
@@ -122,6 +130,10 @@ describe('ingreso guiado · recorrido de seis pasos', { timeout: 30000 }, () => 
     const off = await within(dialog).findByRole('option', { name: /Dr\. Sin Turno/ });
     expect(off.getAttribute('aria-disabled')).toBe('true');
     expect(off.textContent).toContain('Sin turno en ese horario');
+    // Obs. 21: on shift but without an app account: off, because only the attending doctor signs the discharge in the app.
+    const noAccount = within(dialog).getByRole('option', { name: /Dr\. Sin Cuenta/ });
+    expect(noAccount.getAttribute('aria-disabled')).toBe('true');
+    expect(noAccount.textContent).toContain('No tiene cuenta en la app: no podrá firmar el alta.');
     await userEvent.click(within(dialog).getByRole('option', { name: /Dra\. Ficticia/ }));
     await next();
     // 4. habitación: categoría (VIP apagada por no tener camas libres), requisitos y visitas en un solo paso

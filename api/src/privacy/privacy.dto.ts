@@ -27,5 +27,6 @@ export class AuditQueryDto {
   @ApiPropertyOptional({ minimum: 1, default: 1, description: 'Página (solo en /auditoria/registros)' }) @IsOptional() @Type(() => Number) @IsInt() @Min(1) @Max(100000) pagina?: number;
   @ApiPropertyOptional({ enum: AUDIT_SORTS, default: 'fecha' }) @IsOptional() @IsIn(AUDIT_SORTS) orden?: (typeof AUDIT_SORTS)[number];
   @ApiPropertyOptional({ enum: ['asc', 'desc'], default: 'desc' }) @IsOptional() @IsIn(['asc', 'desc']) sentido?: 'asc' | 'desc';
+  @ApiPropertyOptional({ description: 'Solo /auditoria/registros: true incluye las consultas a la auditoría de la propia cuenta (auditoria.consultar), que por defecto se ocultan; siguen registradas' }) @IsOptional() @IsBooleanString() incluirConsultasAuditoria?: string;
   @ApiPropertyOptional({ description: 'true cuando la consulta alimenta una exportación: queda auditada como auditoria.exportar' }) @IsOptional() @IsBooleanString() exportar?: string;
 }

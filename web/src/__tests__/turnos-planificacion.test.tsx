@@ -20,6 +20,12 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
+/** Owner obs 8: the batch tools live in one «Herramientas de planificación» menu. */
+async function planningTool(name: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'Herramientas de planificación' }));
+  await userEvent.click(screen.getByRole('menuitem', { name }));
+}
+
 const perfil = (permisos: string[]): AccessProfile => ({
   id: 'u-1', user: { id: 'u-1' }, email: 'jop@example.test', name: 'Jefatura de prueba', roles: ['JOP'], platforms: ['web'],
   permissions: permisos.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId: null,
@@ -119,14 +125,22 @@ describe('turnos · calendario para planificar', () => {
     montar(true);
     await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre/ });
     await userEvent.click(screen.getByRole('button', { name: 'Día' }));
-    const region = screen.getByRole('region', { name: /Hoy, martes, 10 de noviembre/ });
-    expect(within(region).getAllByRole('group')).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: /jueves 12/i }));
-    expect(screen.getByRole('region', { name: /jueves, 12 de noviembre/ })).toBeTruthy();
+    const region = screen.getByRole('region', { name: 'Hoy · martes 10 de noviembre' });
+    expect(within(region).getAllByRole('group').filter(g => g.classList.contains('shift-day'))).toHaveLength(1);
+    // One row of day pills next to the week navigator; only the chosen day reads in full.
+    const pills = within(screen.getByRole('group', { name: 'Día que se muestra' })).getAllByRole('button').map(b => b.textContent);
+    expect(pills).toEqual(['lun 9', 'Hoy · martes 10 de noviembre', 'mié 11', 'jue 12', 'vie 13', 'sáb 14', 'dom 15']);
+    await userEvent.click(screen.getByRole('button', { name: 'jue 12' }));
+    expect(screen.getByRole('region', { name: 'Jueves 12 de noviembre' })).toBeTruthy();
+    // «Asignar turno» in Día proposes the shown day.
+    await userEvent.click(screen.getByRole('button', { name: 'Asignar turno' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Asignar turno' });
+    expect((within(dialogo).getByLabelText('Fecha de inicio') as HTMLInputElement).value).toBe('12/11/2026');
   });
 
   it('con el teclado un borrador se mueve 30 min, se valida en el servidor y se puede deshacer', async () => {
     const api = montar(true, (_path, body) => ({ id: 't-borrador', version: body.version + 1, advertencias: [] }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Ver el día jueves, 12 de noviembre' }));
     const bloque = await screen.findByRole('button', { name: /Luis Enfermero Prueba, Emergencia, 07:00 a 15:00, Diurno, Borrador/ });
     bloque.focus();
     fireEvent.keyDown(bloque, { key: 'ArrowDown', altKey: true });
@@ -137,6 +151,7 @@ describe('turnos · calendario para planificar', () => {
 
   it('mover un turno publicado pide el motivo antes de guardar; si el servidor lo rechaza, vuelve a su lugar con el error', async () => {
     const api = montar(true, () => { throw new ApiError('La persona está en descanso obligatorio hasta mañana.', 409, 'personal_en_descanso'); });
+    await userEvent.click(await screen.findByRole('button', { name: 'Día' }));
     const bloque = await screen.findByRole('button', { name: /Rosa Enfermera Prueba, Emergencia, 13:00 a 19:00/ });
     fireEvent.keyDown(bloque, { key: 'ArrowDown', altKey: true, shiftKey: true });
     const dialogo = await screen.findByRole('dialog', { name: 'Mover turno' });
@@ -148,7 +163,7 @@ describe('turnos · calendario para planificar', () => {
     expect(await within(dialogo).findByText(/descanso obligatorio/)).toBeTruthy();
   });
 
-  it('al asignar, la semana se queda donde estaba y el turno nuevo se resalta', async () => {
+  it('al asignar desde la semana, se abre el día del turno nuevo con el turno resaltado', async () => {
     let lista = turnos;
     const api = montar(true, (path, body) => {
       if (path === '/turnos') { lista = [...turnos, turno('t-nuevo', body.staffId, body.start, body.end)]; return { id: 't-nuevo', version: 1, advertencias: [] }; }
@@ -169,7 +184,7 @@ describe('turnos · calendario para planificar', () => {
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Asignar turno' }));
     const nuevo = await screen.findByRole('button', { name: /Rosa Enfermera Prueba, Emergencia, 07:00 a 15:00/ });
     expect(nuevo.className).toMatch(/is-new/);
-    expect(screen.getByRole('region', { name: /Semana del 9 al 15 de noviembre/ })).toBeTruthy();
+    expect(screen.getByRole('region', { name: 'Viernes 13 de noviembre' })).toBeTruthy();
   });
 });
 
@@ -183,7 +198,7 @@ describe('turnos · lotes como borrador', () => {
       if (path === '/turnos/lote') return { creados: body.items.length, ids: ['b-1'], resultados: [], huecos: [] };
       return {};
     });
-    await userEvent.click(await screen.findByRole('button', { name: 'Generar rotación' }));
+    await planningTool('Generar rotación');
     const dialogo = await screen.findByRole('dialog', { name: 'Generar rotación' });
     await userEvent.selectOptions(within(dialogo).getByLabelText('Área de los turnos'), 'a-1');
     await userEvent.click(within(dialogo).getByLabelText('Rosa Enfermera Prueba'));
@@ -210,7 +225,7 @@ describe('turnos · lotes como borrador', () => {
       { areaId: 'a-1', area: 'Emergencia', role: 'MED', start: iso('2026-11-16', '07:00'), end: iso('2026-11-18', '07:00'), required: 1, actual: 0, motivo: 'sin_personal_elegible', mensaje: 'El grupo no tiene personal de esa función para cubrir el mínimo.' },
       { areaId: 'a-1', area: 'Emergencia', role: 'ENF', start: iso('2026-11-18', '07:00'), end: iso('2026-11-19', '07:00'), required: 1, actual: 0, motivo: 'personal_en_descanso', mensaje: 'Nadie del grupo puede cubrirlo. De las personas probadas: 2 en descanso obligatorio.' },
     ] } : {});
-    await userEvent.click(await screen.findByRole('button', { name: 'Generar rotación' }));
+    await planningTool('Generar rotación');
     const dialogo = await screen.findByRole('dialog', { name: 'Generar rotación' });
     await userEvent.selectOptions(within(dialogo).getByLabelText('Área de los turnos'), 'a-1');
     await userEvent.click(within(dialogo).getByLabelText('Rosa Enfermera Prueba'));
@@ -228,7 +243,7 @@ describe('turnos · lotes como borrador', () => {
 
   it('copiar la semana anterior valida los turnos en el servidor antes de crearlos', async () => {
     const api = montar(true, (path, body) => path === '/turnos/lote/validar' ? { resultados: body.items.map((_: unknown, index: number) => ({ index, ok: true })), huecos: [] } : {});
-    await userEvent.click(await screen.findByRole('button', { name: 'Copiar semana anterior' }));
+    await planningTool('Copiar semana anterior');
     await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/turnos/lote/validar', { items: [{ staffId: 's-1', areaId: 'a-1', start: iso('2026-11-10', '07:00'), end: iso('2026-11-10', '15:00'), type: 'diurno' }] }, 'POST'));
     const previa = await screen.findByRole('dialog', { name: 'Vista previa de los borradores' });
     expect(within(previa).getByText('Ana Ficticia Prueba')).toBeTruthy();
@@ -237,7 +252,7 @@ describe('turnos · lotes como borrador', () => {
 
   it('la asignación masiva da el mismo horario a varias personas', async () => {
     const api = montar(true, (path, body) => path === '/turnos/lote/validar' ? { resultados: body.items.map((_: unknown, index: number) => ({ index, ok: true })), huecos: [] } : {});
-    await userEvent.click(await screen.findByRole('button', { name: 'Asignación masiva' }));
+    await planningTool('Asignación masiva');
     const dialogo = await screen.findByRole('dialog', { name: 'Asignación masiva' });
     await userEvent.selectOptions(within(dialogo).getByLabelText('Área de los turnos'), 'a-1');
     await userEvent.click(within(dialogo).getByLabelText('Rosa Enfermera Prueba'));
@@ -255,7 +270,7 @@ describe('turnos · lotes como borrador', () => {
 
   it('una plantilla se guarda con la semana del área elegida', async () => {
     const api = montar(true, () => ({ id: 'pl-1', version: 1 }));
-    await userEvent.click(await screen.findByRole('button', { name: 'Plantillas' }));
+    await planningTool('Plantillas');
     const dialogo = await screen.findByRole('dialog', { name: 'Plantillas de semana' });
     await userEvent.selectOptions(within(dialogo).getByLabelText('Área de la plantilla'), 'a-1');
     await userEvent.type(within(dialogo).getByLabelText('Nombre de la plantilla'), 'Semana base');

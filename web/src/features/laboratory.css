@@ -14,6 +14,9 @@
 .lab-groups { gap: var(--space-2); }
 .lab-group-head { display: flex; align-items: baseline; gap: var(--space-2); padding: var(--space-3) 0 var(--space-1); border-bottom: 1px solid var(--line); }
 .lab-group-head:first-child { padding-top: 0; }
+/* Owner obs. lote 3: the cards breathe like the other modules (12px apart) and each group starts with clear air above. */
+.cl-master.lab-groups { gap: var(--space-3); }
+.cl-master.lab-groups > .lab-group-head:not(:first-child) { padding-top: var(--space-5); }
 .lab-group-head h3 { margin: 0; font-size: var(--text-sm); font-weight: 700; color: var(--ink); }
 .lab-group-count { color: var(--muted); font-size: var(--text-sm); font-weight: 700; }
 .lab-num { font-variant-numeric: tabular-nums; }
@@ -109,3 +112,44 @@
 /* R7 C-6: the instructions to print for a patient without the app; only this block prints. */
 .lab-external-print p { white-space: pre-wrap; }
 @media print { body * { visibility: hidden; } .lab-external-print, .lab-external-print * { visibility: visible; } .lab-external-print { position: absolute; inset: 0 auto auto 0; } }
+
+/* Owner obs. lote 3: inner spacing like the other workbenches and a list/detail split that adapts to the space. */
+.lab-controls { display: grid; gap: var(--space-3); padding: var(--space-5) var(--space-6) var(--space-4); border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 92%, var(--soft)); }
+.lab-controls > .cl-toolbar, .lab-controls > .cl-filter-row { margin: 0; }
+.lab-body { container: lab-body / inline-size; padding: var(--space-5) var(--space-6) var(--space-6); }
+.lab-body > .cl-active-filters { margin-top: 0; }
+.lab-body > .cl-count { margin-bottom: var(--space-4); }
+/* Flexible columns: the detail keeps at least 420px so value and reference stay readable; the list takes the rest. */
+.cl-master-detail.lab-split { grid-template-columns: minmax(0, 1fr) minmax(420px, 0.8fr); gap: var(--space-6); }
+.cl-detail.lab-detail { container: lab-detail / inline-size; padding: var(--space-5); gap: var(--space-4); }
+.lab-back { display: none; align-items: center; gap: var(--space-1); justify-self: start; min-height: 40px; padding: 0 var(--space-2) 0 0; border: 0; background: none; color: var(--primary-text); font: inherit; font-size: var(--text-sm); font-weight: 700; cursor: pointer; border-radius: var(--radius-control); }
+.lab-back:focus-visible { outline: 2px solid var(--outline); outline-offset: 2px; }
+/* «Pidió: …» stays on one line; the full name is in the tooltip. */
+.lab-row .lw-exams small { flex-basis: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The normal range and the critical limits each on one line: at most two lines, never «crítico < 40 o / > 400» broken in three. */
+.lab-range-part { display: block; white-space: nowrap; }
+.lab-sheet-table td:last-child { white-space: nowrap; }
+/* Not enough room for both: one column. The list shows until an order is chosen; then its detail with «Volver a la lista». */
+@container lab-body (max-width: 959px) {
+  .cl-master-detail.lab-split { grid-template-columns: minmax(0, 1fr); }
+  .lab-split > .lab-detail { position: static; display: none; }
+  .lab-split.is-detail-open > .lab-groups { display: none; }
+  .lab-split.is-detail-open > .lab-detail { display: grid; }
+  .lab-back { display: inline-flex; }
+}
+/* «Agregar observación» always sits under its value, never glued to the unit. */
+.lab-sheet-add { display: block; }
+/* A narrow detail turns each exam into a block: name on top, then value, reference and mark side by side. */
+@container lab-detail (max-width: 600px) {
+  .lab-sheet-table thead { display: none; }
+  .lab-sheet-table tr { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; column-gap: var(--space-3); padding: var(--space-2) 0; border-top: 1px solid var(--line); }
+  .lab-sheet-table tbody tr:first-child { border-top: 0; }
+  .lab-sheet-table th, .lab-sheet-table td { border-top: 0; padding: var(--space-1) 0; }
+  .lab-sheet-table tbody th { grid-column: 1 / -1; display: flex; align-items: baseline; gap: var(--space-2); }
+  .lab-sheet-table tbody th small { display: inline; }
+}
+@media (max-width: 767px) {
+  .lab-controls { padding: var(--space-4) var(--space-4) var(--space-3); }
+  .lab-body { padding: var(--space-4); }
+  .cl-detail.lab-detail { padding: var(--space-4); }
+}

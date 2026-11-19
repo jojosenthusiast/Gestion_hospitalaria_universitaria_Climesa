@@ -66,7 +66,48 @@ describe('W13 · admisiones con acciones según allowedActions (D-02)', () => {
     expect(within(hospitalized).getByText('Alta solicitada hace 10 min')).toBeTruthy();
     const orphan = await rowOf('Paciente Ficticio Cuatro');
     // Without «reasignar_tratante» the row says who can fix it instead of an order this user cannot carry out.
-    expect(within(orphan).getByText('El médico tratante no tiene cuenta en la app; Jefatura de operaciones debe reasignarlo')).toBeTruthy();
+    expect(within(orphan).getByText('Médico tratante sin cuenta en la app')).toBeTruthy();
+    expect(within(orphan).getByText('Dr. Ficticio Sin Cuenta no podrá firmar el alta. Pide a Jefatura de Operaciones que lo reasigne.')).toBeTruthy();
+  });
+
+  it('obs. 21: una acción principal por fila; reasignar es el lápiz azul y cancelar o anular la papelera roja', async () => {
+    mount(['admision.ver'], {}, undefined, [
+      ...jopRow(['solicitar_alta', 'trasladar', 'reasignar_tratante', 'anular', 'revocar_alta']),
+      { ...jopRow([])[0], id: 'a-8', patientName: 'Paciente Ficticio Ocho', state: 'pendiente_cama', bed: '', occupationId: undefined, allowedActions: ['asignar_cama', 'cancelar'] },
+    ]);
+    const row = await rowOf('Paciente Ficticio Nueve');
+    const cell = row.querySelector('td[data-label="Acción"]')!;
+    // The primary next step is the first text action; the rest fold under «Más acciones».
+    expect(cell.querySelector('.row-menu > .row-action')!.textContent).toContain('Solicitar alta al médico tratante');
+    expect(within(row).queryByRole('button', { name: /^Trasladar/ })).toBeNull();
+    await userEvent.click(within(row).getByRole('button', { name: /^Más acciones/ }));
+    expect(within(row).getByRole('button', { name: /^Trasladar/ })).toBeTruthy();
+    expect(within(row).getByRole('button', { name: 'Revocar alta' })).toBeTruthy();
+    const edit = within(row).getByRole('button', { name: 'Reasignar médico tratante' });
+    expect(edit.className).toContain('crud-edit');
+    const annul = within(row).getByRole('button', { name: 'Anular ingreso por error' });
+    expect(annul.className).toContain('crud-deactivate');
+    await userEvent.click(annul);
+    expect(await screen.findByRole('dialog', { name: 'Anular ingreso por error' })).toBeTruthy();
+    const pending = await rowOf('Paciente Ficticio Ocho');
+    expect(within(pending).getByRole('button', { name: /Asignar cama/ }).className).toContain('row-action');
+    expect(within(pending).getByRole('button', { name: 'Cancelar admisión' }).className).toContain('crud-deactivate');
+    expect(within(pending).queryByRole('button', { name: /^Más acciones/ })).toBeNull();
+  });
+
+  it('obs. 21: con el tratante sin cuenta, reasignarlo es la acción principal y la fila lo advierte', async () => {
+    mount(['admision.ver'], {}, undefined, jopRow(['solicitar_alta', 'trasladar', 'reasignar_tratante'], { attendingDoctorName: 'Dr. Ficticio Sin Cuenta', attendingDoctorHasAccount: false }));
+    const row = await rowOf('Paciente Ficticio Nueve');
+    expect(row.querySelector('td[data-label="Acción"] .row-menu > .row-action')!.textContent).toContain('Reasignar médico tratante');
+    expect(within(row).queryByRole('button', { name: 'Reasignar médico tratante' })?.className ?? '').not.toContain('crud-edit');
+    expect(within(row).getByRole('note').textContent).toBe('Médico tratante sin cuenta en la appDr. Ficticio Sin Cuenta no podrá firmar el alta. Reasígnalo a un médico con cuenta.');
+  });
+
+  it('obs. 21: la tabla usa su propia clase para que el encabezado fijo no tape la primera fila', async () => {
+    mount(['admision.ver']);
+    const table = await screen.findByRole('table', { name: 'Admisiones activas' });
+    expect(table.className).toContain('admission-table');
+    expect(table.closest('section')!.className).toContain('admission-workbench');
   });
 
   it('un hospitalizado recién ingresado, sin alta pedida, no dice que espera el alta', async () => {

@@ -17,20 +17,27 @@ export const thisWeek = (now: Date) => { const days = weekDays(mondayOf(now.valu
  * dirección que la semana visible cuando es esta semana) y se actualiza en vivo con los eventos de turnos y personal.
  * Solo un resumen: los huecos y «Cubrir hueco» están en la lista de la semana (`onShow` lleva a ella).
  */
-export function AreaCoverageAlert({ api, version, now, areaId, onShow }: { api: Api; version: number; now: Date; areaId?: string; onShow?: () => void }) {
+// `compact`: one line for the page header's status area (Turnos), with the same count and rule.
+export function AreaCoverageAlert({ api, version, now, areaId, onShow, compact = false }: { api: Api; version: number; now: Date; areaId?: string | ((id: string) => boolean); onShow?: () => void; compact?: boolean }) {
   const { from, to } = thisWeek(now);
   const week = useData<CoverageWeek>(api, `/turnos/cobertura?from=${from}&to=${to}`, version);
   if (week.error?.status === 403) return null;
   const retry = <button type="button" className="secondary-button" onClick={week.refresh}>Volver a intentar</button>;
+  if (week.error && compact) return <span className="shift-status-gaps is-error">No pudimos revisar la cobertura. {retry}</span>;
   if (week.error) return <Notice kind="error">No pudimos revisar la cobertura mínima de esta semana: {week.error.message} {retry}</Notice>;
   if (week.data === undefined || week.data === null) return null;
   const list = week.data.gaps;
   // A 200 without the gap list is a broken answer, not "no gaps": say so instead of hiding the alert.
   if (!Array.isArray(list)) return <Notice kind="error">No pudimos revisar la cobertura mínima de esta semana: la respuesta llegó incompleta. {retry}</Notice>;
-  const { open, inDraft } = pendingGapBlocks(list.filter(g => !areaId || g.areaId === areaId), now);
+  const inScope = typeof areaId === 'function' ? areaId : (id: string) => !areaId || id === areaId;
+  const { open, inDraft } = pendingGapBlocks(list.filter(g => inScope(g.areaId)), now);
   if (!open.length && !inDraft.length) return null;
+  const summary = `${gapCountLabel(open.length, 'esta semana')}${inDraft.length ? ` · ${draftCountLabel(inDraft.length)}` : ''}`;
+  if (compact) return <span className="shift-status-gaps" role="group" aria-label="Cobertura mínima por área">
+    {onShow ? <button type="button" className="row-action" onClick={onShow}>{summary}</button> : summary}
+  </span>;
   return <section className="crew-coverage" aria-label="Cobertura mínima por área">
-    <Notice kind="info"><strong>{gapCountLabel(open.length, 'esta semana')}{inDraft.length ? ` · ${draftCountLabel(inDraft.length)}` : ''}.</strong> Cada área necesita el personal que fija la política de cobertura mínima (RN-15).{inDraft.length ? ' Los borradores cuentan al publicar la semana.' : ''}</Notice>
+    <Notice kind="info"><strong>{summary}.</strong> Cada área necesita el personal que fija la política de cobertura mínima (RN-15).{inDraft.length ? ' Los borradores cuentan al publicar la semana.' : ''}</Notice>
     {onShow && <button type="button" className="secondary-button" onClick={onShow}>Ver los huecos de esta semana</button>}
   </section>;
 }

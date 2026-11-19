@@ -101,3 +101,12 @@
 .rq-days .cl-chip { flex: 0 0 auto; }
 .rq-days .cl-chip[aria-pressed="true"] { border-color: var(--primary); background: var(--soft); color: var(--primary-strong); }
 .rq-more { margin-top: var(--space-2); }
+/* Owner batch 2 (S29): the requests are a segment of the agenda, not a second card. Inside the list they lose the card
+   frame and are split in «Por asignar» and «Por confirmar», each with one line that says what it needs. */
+.data-workbench > .rq-tab { display: grid; gap: var(--space-5); padding: var(--space-4) var(--space-5) var(--space-5); border: 0; border-radius: 0; background: none; }
+.rq-group { display: grid; gap: var(--space-2); min-width: 0; }
+.rq-group-head { display: grid; gap: 2px; padding-bottom: var(--space-2); border-bottom: 1px solid var(--line); }
+.rq-group-head h3 { display: flex; align-items: center; gap: var(--space-2); margin: 0; font-size: var(--text-md); font-weight: 700; }
+.rq-group-head p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
+.rq-tab .rq-row { border-left: 3px solid var(--warning); padding-left: var(--space-3); }
+@media (max-width: 720px) { .data-workbench > .rq-tab { padding: var(--space-3) var(--space-4) var(--space-4); } }

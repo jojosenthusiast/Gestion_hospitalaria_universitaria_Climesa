@@ -16,6 +16,7 @@ export class AuditEntryResponse {
   @StrProp({ nullable: true }) patientRecord!: string | null;
   @EnumProp(RESULTADO_AUDITORIA, 'ResultadoAuditoria') result!: string;
   @StrProp({ nullable: true }) reason!: string | null;
+  @StrProp({ nullable: true, description: 'Nombre de lo que se tocó: cuenta, persona del personal o código de cama/espacio. Los pacientes van por expediente' }) subject!: string | null;
 }
 
 export class AuditPageResponse {

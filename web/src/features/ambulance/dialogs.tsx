@@ -1,7 +1,8 @@
 import { useRef,useState,type FormEvent } from 'react';
 import { SearchPicker,type PickerItem } from '../../components/search-picker';
 import { patientPicker } from '../appointments';
-import { Field,Notice } from '../../components/ui';
+import { Field,Icon,Notice } from '../../components/ui';
+import './call-form.css';
 import { Dialog,SaveButton,Select,WriteError,isVersionConflict,useAction } from '../common';
 import { can,type AccessProfile,type Api,type Patient } from '../../lib/api';
 import { crewProblem,defaultCrew,priorityNames,roleNames,typeNames,type AmbulanceRequest,type CrewCandidate } from './types';
@@ -41,10 +42,15 @@ const joinNames=(names:string[])=>names.length>1?`${names.slice(0,-1).join(', ')
  * S13: if the call is about a registered patient, choosing them copies the caller, phone and address from the record into
  * empty fields the person has not edited, and the notice names only what was copied. The patient goes with the request so
  * the service is linked to the record (and can be the origin of an admission).
+ * S26 (owner, Lote 2: «que el flujo sea mas rapido y snapy»): two compact groups side by side, «Quién llama» and «Dónde y
+ * qué pasa», the first field focused, Enter submits, and after saving the dialog confirms and offers «Registrar otra».
  */
-export function PhoneRequestForm({api,profile,onClose,onSaved}:{api:Api;profile:AccessProfile;onClose:()=>void;onSaved:()=>void}){
+export function PhoneRequestForm({api,profile,onClose,onSaved,onRegistered,doneMessage='Llamada registrada.'}:{api:Api;profile:AccessProfile;onClose:()=>void;onSaved:()=>void;onRegistered?:()=>void;doneMessage?:string}){
  const [address,setAddress]=useState(''),[municipality,setMunicipality]=useState(''),[reason,setReason]=useState(''),[phone,setPhone]=useState(''),[caller,setCaller]=useState(''),[problem,setProblem]=useState(''),action=useAction(api);
  const [patient,setPatient]=useState<PickerItem|null>(null),[filled,setFilled]=useState<CallField[]>([]),[loading,setLoading]=useState(false),[lookupFailed,setLookupFailed]=useState(false);
+ // S26: after a successful save the form shows the confirmation; «Registrar otra» starts a blank form (new key, so the
+ // first field takes the focus again).
+ const [registered,setRegistered]=useState<string|null>(null),[round,setRound]=useState(0);
  const edited=useRef(new Set<CallField>()),values={caller,phone,address};
  const setters:Record<CallField,(v:string)=>void>={caller:setCaller,phone:setPhone,address:setAddress};
  const edit=(k:CallField)=>(v:string)=>{edited.current.add(k);setFilled(f=>f.filter(x=>x!==k));setters[k](v);};
@@ -60,16 +66,34 @@ export function PhoneRequestForm({api,profile,onClose,onSaved}:{api:Api;profile:
   }catch{setFilled([]);setLookupFailed(true);}
   finally{setLoading(false);}
  }
+ function again(){
+  setAddress('');setMunicipality('');setReason('');setPhone('');setCaller('');setProblem('');setPatient(null);setFilled([]);setLookupFailed(false);
+  edited.current=new Set();setRegistered(null);setRound(r=>r+1);
+ }
  async function save(e:FormEvent){e.preventDefault();if(busy)return;
   if(address.trim().length<5||reason.trim().length<5){setProblem('Indica la dirección y el motivo, de al menos 5 caracteres cada uno.');return;}
   if(caller.trim()&&caller.trim().length<2){setProblem('El nombre de quien llama debe tener al menos 2 caracteres.');return;}
   if(!/^[0-9+ -]{8,20}$/.test(phone.trim())){setProblem('Indica un teléfono de contacto de 8 a 20 dígitos.');return;}
-  setProblem('');if(await action.run('/ambulancia/solicitudes',{address:address.trim(),reason:reason.trim(),contactPhone:phone.trim(),...(patient?{patientId:patient.id}:{}),...(caller.trim()?{callerName:caller.trim()}:{}),...(municipality.trim()?{municipality:municipality.trim()}:{})}))onSaved();}
- return <Dialog title="Registrar llamada" onClose={onClose} busy={busy}><form className="module-form" onSubmit={save} noValidate aria-busy={busy}>{problem&&<Notice kind="error">{problem}</Notice>}<WriteError error={action.error}/>
-  <Notice kind="info">Si hay riesgo de vida, indica a la persona que llame al 911.</Notice>
-  {canPick&&<SearchPicker label="Paciente · opcional" value={patient} onChange={item=>void pick(item)} search={patientPicker(api)} hint="Si la llamada es por un paciente con expediente, elígelo para copiar sus datos de contacto." emptyText="No hay pacientes con ese nombre, DUI o expediente."/>}
-  {lookupFailed&&<Notice kind="error">No pudimos leer el expediente. Escribe los datos de contacto a mano.</Notice>}
-  {filled.length>0&&<p className="muted" role="status">Copiamos del expediente: {joinNames(filled.map(k=>callFieldNames[k]))}.</p>}
-  <Field label="Nombre de quien llama" value={caller} onChange={edit('caller')} maxLength={120} autoFocus={!canPick}/><Field label="Dirección" value={address} onChange={edit('address')} required maxLength={300}/><Field label="Municipio" value={municipality} onChange={setMunicipality} maxLength={80}/><Field label="Motivo" value={reason} onChange={setReason} required maxLength={500}/><Field label="Teléfono de contacto" value={phone} onChange={edit('phone')} required inputMode="tel" maxLength={20}/>
+  setProblem('');if(await action.run('/ambulancia/solicitudes',{address:address.trim(),reason:reason.trim(),contactPhone:phone.trim(),...(patient?{patientId:patient.id}:{}),...(caller.trim()?{callerName:caller.trim()}:{}),...(municipality.trim()?{municipality:municipality.trim()}:{})})){setRegistered(address.trim());onRegistered?.();}}
+ if(registered!==null)return <Dialog title="Registrar llamada" onClose={onSaved}><div className="module-form">
+  <Notice kind="success">{doneMessage} <span className="call-done-where">{registered}</span></Notice>
+  <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onSaved}>Listo</button><button type="button" className="primary-button" onClick={again} autoFocus>Registrar otra</button></div></div></Dialog>;
+ return <Dialog title="Registrar llamada" onClose={onClose} busy={busy}><form key={round} className="module-form call-form" onSubmit={save} noValidate aria-busy={busy}>
+  <p className="call-911" role="note"><Icon name="alert" size={16}/>Si hay riesgo de vida, que llame al 911.</p>
+  {problem&&<Notice kind="error">{problem}</Notice>}<WriteError error={action.error}/>
+  <div className="call-groups">
+   <fieldset className="call-group"><legend>Quién llama</legend>
+    {canPick&&<SearchPicker label="Paciente · opcional" value={patient} onChange={item=>void pick(item)} search={patientPicker(api)} autoFocus emptyText="No hay pacientes con ese nombre, DUI o expediente."/>}
+    {lookupFailed&&<Notice kind="error">No pudimos leer el expediente. Escribe los datos de contacto a mano.</Notice>}
+    {filled.length>0&&<p className="muted call-copied" role="status">Copiamos del expediente: {joinNames(filled.map(k=>callFieldNames[k]))}.</p>}
+    <Field label="Nombre de quien llama" value={caller} onChange={edit('caller')} maxLength={120} autoComplete="off" autoFocus={!canPick}/>
+    <Field label="Teléfono de contacto" value={phone} onChange={edit('phone')} required type="tel" inputMode="tel" autoComplete="off" maxLength={20} placeholder="7000-0000"/>
+   </fieldset>
+   <fieldset className="call-group"><legend>Dónde y qué pasa</legend>
+    <Field label="Dirección" value={address} onChange={edit('address')} required maxLength={300} autoComplete="off"/>
+    <Field label="Municipio" value={municipality} onChange={setMunicipality} maxLength={80} autoComplete="off"/>
+    <Field label="Motivo" value={reason} onChange={setReason} required maxLength={500} autoComplete="off"/>
+   </fieldset>
+  </div>
   <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Cancelar</button><SaveButton busy={busy} label="Registrar solicitud"/></div></form></Dialog>;
 }

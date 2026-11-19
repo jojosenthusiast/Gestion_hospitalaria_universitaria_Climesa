@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { useFold } from '../../components/fold';
 import { useQuickAction } from '../personal/accion';
-import { AreaTag, statusFilterLook } from '../../components/system';
+import { AreaTag, CrudActions, CrudButton, statusFilterLook } from '../../components/system';
 import { Field, Icon, Notice } from '../../components/ui';
 import { can, roleNames, type AccessProfile, type Api, type Space } from '../../lib/api';
 import { useRefreshAt } from '../../lib/publico';
@@ -146,10 +146,10 @@ function PublishedNotices({ api, profile, version }: { api: Api; profile: Access
             <td data-label="Estado"><Tag value={stateTag[a.estado] ?? a.estado} label={stateLabel[a.estado] ?? a.estado} />
               {a.estado === 'retirado' && <small>{a.retiradoEn ? `${noticeWhen(a.retiradoEn)} · ` : ''}Motivo: {a.motivoRetiro ?? 'sin motivo registrado'}</small>}</td>
             <td data-label="Acciones">{(a.allowedActions ?? []).length
-              ? <div className="row-actions">
-                {a.allowedActions.includes('editar') && <button type="button" className="row-action" onClick={() => edit(a)}>Editar</button>}
-                {a.allowedActions.includes('retirar') && <button type="button" className="row-action" onClick={() => { setMessage(null); setWithdrawing(a); }}>Retirar</button>}
-              </div>
+              ? <CrudActions>
+                {a.allowedActions.includes('editar') && <CrudButton kind="edit" iconOnly label="Editar" onClick={() => edit(a)} />}
+                {a.allowedActions.includes('retirar') && <CrudButton kind="deactivate" iconOnly label="Retirar" onClick={() => { setMessage(null); setWithdrawing(a); }} />}
+              </CrudActions>
               : <small className="muted">—</small>}</td>
           </tr>; })}</tbody></table>{fold.more}</>
         : <Empty title="Todavía no hay avisos" description="Publica el primero con el formulario de arriba." />}</RemoteState>
@@ -176,7 +176,7 @@ function WithdrawDialog({ api, notice, onClose, onDone, onReload }: { api: Api; 
         <small className="field-hint">{short ? `Escribe al menos ${WITHDRAW_MIN} caracteres; queda en la auditoría.` : 'Queda en la auditoría junto con tu nombre.'}</small></div>
       <div className="dialog-actions">
         <button type="button" className="secondary-button" disabled={action.busy} onClick={onClose}>Cancelar</button>
-        <button type="submit" className="primary-button" disabled={action.busy || short}>{action.busy ? 'Retirando…' : 'Retirar aviso'}</button>
+        <CrudButton kind="deactivate" type="submit" label={action.busy ? 'Retirando…' : 'Retirar aviso'} disabled={action.busy || short} />
       </div>
     </form>
   </Dialog>;
@@ -227,6 +227,14 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
   const submit = (event: FormEvent) => { event.preventDefault(); setDone(false); if (needsConfirm) setConfirming(true); else void publish(false); };
   const confirmAndPublish = async () => { setConfirming(false); await publish(false); };
   const label = editing ? (action.busy ? 'Guardando…' : 'Guardar cambios') : (action.busy ? 'Publicando…' : 'Publicar aviso');
+  // Owner obs. 22: the preview says in plain words who will see it, with area names instead of codes.
+  const areaName = (code: string) => areaOptions.find(a => a.code === code)?.name ?? code;
+  const audience = [
+    ...(isPublic ? ['Pantalla pública y apps sin sesión'] : []),
+    ...(roles.length ? [`Roles: ${roles.map(r => roleNames[r] ?? r).join(', ')}`] : []),
+    ...(areas.length ? [`Áreas: ${areas.map(areaName).join(', ')}`] : []),
+  ];
+  const [previewOpen, setPreviewOpen] = useState(true);
 
   return <section className="notice-composer" aria-label={editing ? 'Editar aviso' : 'Nuevo aviso'}>
     <form className="module-form" onSubmit={submit}>
@@ -236,41 +244,58 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
       {warned
         ? <Notice kind="error">{action.error?.message} <button type="button" className="secondary-button" disabled={action.busy} onClick={() => void publish(true)}>{editing ? 'Guardar de todos modos' : 'Publicar de todos modos'}</button></Notice>
         : <WriteError error={action.error} onReload={editing ? onReload : undefined} />}
-      <Field label="Título" value={title} onChange={setTitle} required minLength={3} maxLength={120} hint="Corto y claro: qué pasa." />
-      <div className="field"><label htmlFor="aviso-cuerpo">Texto del aviso</label><textarea id="aviso-cuerpo" value={body} onChange={e => setBody(e.target.value)} required minLength={3} maxLength={1000} rows={4} /><small className="field-hint">{body.length}/1000 caracteres</small></div>
-      {found.length > 0 && <Notice kind="error">El texto parece contener {found.join(', ')}. Un aviso no debe llevar datos de pacientes ni de personal: quítalos o, si es intencional, confirma al publicar.</Notice>}
-      <fieldset className="notice-fieldset"><legend>Nivel</legend>
-        <div className="segmented-control" role="group" aria-label="Nivel">{levels.map(l => { const look = statusFilterLook(l.status); return <button key={l.id} type="button" className={look?.className} aria-pressed={level === l.id} title={l.hint} onClick={() => setLevel(l.id)}>{look && <Icon name={look.icon} size={14} />}{l.label}</button>; })}</div>
-        <small className="field-hint">{levels.find(l => l.id === level)?.hint}</small>
-      </fieldset>
-      <fieldset className="notice-fieldset"><legend>¿Quién lo ve?</legend>
-        <label className="notice-check"><input type="checkbox" checked={isPublic} onChange={e => setPublic(e.target.checked)} />Público: pantalla pública y apps sin iniciar sesión</label>
-        <div className="notice-roles">{audienceRoles.map(r => <label key={r} className="notice-check"><input type="checkbox" checked={roles.includes(r)} onChange={() => toggle(r)} />{roleNames[r]}</label>)}</div>
-        {!canSeeAreas && <small className="field-hint">Para dirigirlo a un área hace falta el permiso de ver espacios; pídeselo a Administración.</small>}
-        {areaOptions.length > 0 && <div className="notice-roles" role="group" aria-label="Áreas">{areaOptions.map(a => <label key={a.id} className="notice-check"><input type="checkbox" checked={areas.includes(a.code)} onChange={() => toggleArea(a.code)} /><AreaTag code={a.code} />{a.name}</label>)}</div>}
-        <small className="field-hint">Los roles y las áreas lo ven en Avisos, en la web y en las apps; si es crítico, también en su inicio. Un aviso solo para roles o áreas no sale en la pantalla pública.</small>
-        {noAudience && <Notice kind="error">Elige a quién va dirigido: público, uno o más roles o áreas.</Notice>}
-        {reachText && <p className={reachCount === 0 ? 'notice-reach is-empty' : 'notice-reach'} role="status">{reachText}</p>}
-      </fieldset>
-      <fieldset className="notice-fieldset"><legend>Vigencia</legend>
-        <div className="form-grid">
-          {started
-            ? <p className="field-hint">Vigente desde {editing?.desde ? shortWhen(editing.desde) : '—'}; el inicio no cambia.</p>
-            : <Field label="Desde (opcional)" type="datetime-local" value={from} onChange={setFrom} hint={scheduled && editing?.desde ? `Programado para ${shortWhen(editing.desde)}. Si lo vacías, empieza al guardar.` : 'Sin fecha, empieza al publicarlo.'} />}
-          <Field label="Hasta" type="datetime-local" value={until} onChange={setUntil} required hint={editing ? 'Adelántalo para que venza antes.' : undefined} />
+      <div className="notice-form-columns">
+        <div className="notice-form-main">
+          <Field label="Título" value={title} onChange={setTitle} required minLength={3} maxLength={120} hint="Corto y claro: qué pasa." />
+          <div className="field"><label htmlFor="aviso-cuerpo">Texto del aviso</label><textarea id="aviso-cuerpo" value={body} onChange={e => setBody(e.target.value)} required minLength={3} maxLength={1000} rows={4} /><small className="field-hint">{body.length}/1000 caracteres</small></div>
+          {found.length > 0 && <Notice kind="error">El texto parece contener {found.join(', ')}. Un aviso no debe llevar datos de pacientes ni de personal: quítalos o, si es intencional, confirma al publicar.</Notice>}
+          <fieldset className="notice-fieldset"><legend>Nivel</legend>
+            <div className="segmented-control" role="group" aria-label="Nivel">{levels.map(l => { const look = statusFilterLook(l.status); return <button key={l.id} type="button" className={look?.className} aria-pressed={level === l.id} title={l.hint} onClick={() => setLevel(l.id)}>{look && <Icon name={look.icon} size={14} />}{l.label}</button>; })}</div>
+            <small className="field-hint">{levels.find(l => l.id === level)?.hint}</small>
+          </fieldset>
+          <fieldset className="notice-fieldset"><legend>Vigencia</legend>
+            <div className="form-grid">
+              {started
+                ? <p className="field-hint">Vigente desde {editing?.desde ? shortWhen(editing.desde) : '—'}; el inicio no cambia.</p>
+                : <Field label="Desde (opcional)" type="datetime-local" value={from} onChange={setFrom} hint={scheduled && editing?.desde ? `Programado para ${shortWhen(editing.desde)}. Si lo vacías, empieza al guardar.` : 'Sin fecha, empieza al publicarlo.'} />}
+              <Field label="Hasta" type="datetime-local" value={until} onChange={setUntil} required hint={editing ? 'Adelántalo para que venza antes.' : undefined} />
+            </div>
+            <div className="segmented-control" role="group" aria-label="Duración rápida">{durations.map(d => <button key={d.hours} type="button" onClick={() => setUntil(localInput(d.hours))}>{d.label}</button>)}</div>
+            <small className="field-hint">Desaparece solo al llegar a «Hasta».</small>
+          </fieldset>
         </div>
-        <div className="segmented-control" role="group" aria-label="Duración rápida">{durations.map(d => <button key={d.hours} type="button" onClick={() => setUntil(localInput(d.hours))}>{d.label}</button>)}</div>
-        <small className="field-hint">Desaparece solo al llegar a «Hasta».</small>
-      </fieldset>
+        <fieldset className="notice-fieldset notice-audience"><legend>¿Quién lo ve?</legend>
+          <fieldset className="notice-audience-group"><legend>Público</legend>
+            <label className="notice-check"><input type="checkbox" checked={isPublic} onChange={e => setPublic(e.target.checked)} />Público: pantalla pública y apps sin iniciar sesión</label>
+          </fieldset>
+          <fieldset className="notice-audience-group"><legend>Roles{roles.length > 0 && <span className="notice-count">{roles.length}</span>}</legend>
+            <div className="notice-roles">{audienceRoles.map(r => <label key={r} className="notice-check"><input type="checkbox" checked={roles.includes(r)} onChange={() => toggle(r)} />{roleNames[r]}</label>)}</div>
+          </fieldset>
+          <fieldset className="notice-audience-group"><legend>Áreas{areas.length > 0 && <span className="notice-count">{areas.length}</span>}</legend>
+            {!canSeeAreas && <small className="field-hint">Para dirigirlo a un área hace falta el permiso de ver espacios; pídeselo a Administración.</small>}
+            {areaOptions.length > 0 && <div className="notice-roles" role="group" aria-label="Áreas">{areaOptions.map(a => <label key={a.id} className="notice-check"><input type="checkbox" checked={areas.includes(a.code)} onChange={() => toggleArea(a.code)} /><AreaTag code={a.code} />{a.name}</label>)}</div>}
+          </fieldset>
+          <small className="field-hint">Los roles y las áreas lo ven en Avisos, en la web y en las apps; si es crítico, también en su inicio. Un aviso solo para roles o áreas no sale en la pantalla pública.</small>
+          {noAudience && <Notice kind="error">Elige a quién va dirigido: público, uno o más roles o áreas.</Notice>}
+        </fieldset>
+      </div>
       <div className="dialog-actions">
         {editing && <button className="secondary-button" type="button" disabled={action.busy} onClick={onCancel}>Cancelar edición</button>}
         <button className="primary-button" type="submit" disabled={action.busy || invalid}><Icon name="megaphone" size={18} />{label}</button>
       </div>
     </form>
-    <aside className="notice-preview" aria-label="Vista previa">
-      <h3>Vista previa</h3>
-      <NoticeCard notice={{ titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, nivel: level, publico: isPublic, roles, areas, hasta: until ? localToIso(until) : null }} />
-      <p className="muted">Así lo ve quien lo recibe. {isPublic ? 'En la pantalla pública solo se muestran título y texto.' : 'No saldrá en la pantalla pública.'}</p>
+    <aside className="notice-preview" aria-label="Vista previa" data-open={previewOpen ? 'true' : 'false'}>
+      <header className="notice-preview-head"><h3>Vista previa</h3>
+        <button type="button" className="secondary-button notice-preview-toggle" aria-expanded={previewOpen} onClick={() => setPreviewOpen(!previewOpen)}>{previewOpen ? 'Ocultar' : 'Mostrar'}</button></header>
+      <div className="notice-preview-body">
+        <NoticeCard notice={{ titulo: title.trim(), cuerpo: body.trim(), prioridad: priority, nivel: level, publico: isPublic, roles, areas, hasta: until ? localToIso(until) : null }} showAudience={false} />
+        <div className="notice-audience-summary">
+          <strong>Lo verán:</strong>
+          {audience.length ? <ul>{audience.map(line => <li key={line}>{line}</li>)}</ul> : <p>Nadie todavía. Elige público, roles o áreas.</p>}
+          {reachQuery && <p className={reachCount === 0 ? 'notice-reach is-empty' : 'notice-reach'} role="status">{reachText}</p>}
+        </div>
+        <p className="muted">{isPublic ? 'En la pantalla pública solo se muestran título y texto.' : 'No saldrá en la pantalla pública.'}</p>
+      </div>
     </aside>
     {confirming && <Dialog title={editing ? 'Guardar cambios del aviso' : 'Publicar aviso'} onClose={() => setConfirming(false)}>
       <div className="module-form">

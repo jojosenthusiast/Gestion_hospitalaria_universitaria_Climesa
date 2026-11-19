@@ -15,6 +15,16 @@ export type IsolationType = keyof typeof isolationNames;
 
 export type PickItem = { id: string; label: string };
 export type DoctorPick = PickItem & { available: boolean; reason: string | null };
+
+/** Why a doctor without an app account cannot be the attending doctor (the API refuses it the same way). */
+export const NO_ACCOUNT_REASON = 'No tiene cuenta en la app: no podrá firmar el alta.';
+/**
+ * Obs. 21: the attending doctor signs the discharge from the app, so a doctor without an active account is shown off
+ * with that reason, even when on shift. `hasAccount` absent (an older API) keeps the shift verdict alone.
+ */
+export function doctorChoice<T extends { available: boolean; reason: string | null; hasAccount?: boolean }>(row: T): T {
+  return row.hasAccount === false ? { ...row, available: false, reason: NO_ACCOUNT_REASON } : row;
+}
 export type OriginRecord = { id: string; origin: OriginKind; at: string; label: string; detail: string };
 /** R4: the API label carries the full date («Cita del 19/11/2026»); the screen names the record by kind and short date. */
 export const originRecordLabel = (row: Pick<OriginRecord, 'origin' | 'at'>, now: string | Date = new Date()) => `${originNames[row.origin]} · ${formatShortDateTime(row.at, now)}`;
@@ -79,7 +89,8 @@ export function stepError(step: StepId, form: AdmissionForm, canAssignBed: boole
     case 'medico':
       if (!form.at || Number.isNaN(new Date(salvadorInstant(form.at)).getTime())) return 'Indica la fecha y la hora del ingreso.';
       if (!form.doctor) return 'Elige al médico tratante.';
-      return form.doctor.available ? null : `El médico elegido no está disponible: ${form.doctor.reason ?? 'sin turno'}.`;
+      if (form.doctor.available) return null;
+      return form.doctor.reason === NO_ACCOUNT_REASON ? 'El médico elegido no tiene cuenta en la app: no podrá firmar el alta.' : `El médico elegido no está disponible: ${form.doctor.reason ?? 'sin turno'}.`;
     case 'habitacion':
       if (!form.category) return 'Elige la categoría de habitación.';
       if (form.isolationType && !form.isolation) return 'El tipo de aislamiento necesita que el aislamiento esté marcado.';
