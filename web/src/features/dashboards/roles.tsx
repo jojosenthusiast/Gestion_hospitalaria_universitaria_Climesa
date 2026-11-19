@@ -252,7 +252,7 @@ const requestsState = (d: DashboardData): Remote<unknown> => {
 };
 const rec: RoleDashboard = {
   title: 'Recepción',
-  needs: ['summary', 'queue', 'appts', 'apptRequests', 'links', 'admissions', 'ambulance'],
+  needs: ['summary', 'queue', 'appts', 'apptRequests', 'admissions', 'ambulance'],
   actions: [
     { id: 'registrar', label: 'Registrar paciente', hint: 'Busca primero y registra si no existe', icon: 'userPlus', href: '#/pacientes?accion=registrar', permission: 'pacientes.registrar' },
     { id: 'agendar', label: 'Agendar cita', hint: 'Paciente, médico y horario disponible', icon: 'calendar', href: '#/citas?accion=agendar', permission: 'citas.agendar' },
@@ -267,8 +267,6 @@ const rec: RoleDashboard = {
         ...(d.apptRequests.data ?? []).filter(isPendingCategoryRequest).map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: joinParts(r.categories.map(c => c.name).join(', '), r.note, formatRelative(r.createdAt)), tone: 'warn' as Tone, href: `#/citas?asignar=${r.id}`, action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
         ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `${formatDate(a.start, { withYear: false })}, ${timeLabel(a.start)} · ${a.doctorName}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Por confirmar', status: 'solicitada' })),
       ] },
-    { id: 'vinculaciones', title: 'Vinculaciones por verificar', href: '#/vinculaciones', state: asRemote(d.links),
-      items: (d.links.data ?? []).map(l => ({ id: `l-${l.id}`, title: l.account.name || l.account.email, detail: l.candidate ? `Expediente ${l.candidate.record}` : 'Sin expediente sugerido', tone: 'info' as Tone, href: '#/vinculaciones', action: 'Verificar' })) },
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d, profile),
   ],
   figures: ({ d }) => [

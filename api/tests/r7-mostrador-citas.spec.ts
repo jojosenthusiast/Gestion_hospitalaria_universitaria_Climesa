@@ -8,8 +8,8 @@ const MIN = 60_000;
 
 /**
  * R7 U1 (odd/tasks/fase2-recorridos-auditoria.md): first free day for a request (A-1), quick cancel reasons of the
- * patient (tests in r7-mostrador-cancelar.spec.ts), today's appointment and number per patient search result (B-2) and the account link state
- * plus the record's DUI for reception (G-1, G-2).
+ * patient (tests in r7-mostrador-cancelar.spec.ts), today's appointment and number per patient search result (B-2).
+ * The account link state (G-1, G-2) moved to vinculacion-por-correo.spec.ts: linking is automatic by verified email.
  */
 describe('R7 U1 · mostrador: citas, búsqueda y vinculación', () => {
   let t: TestApp;
@@ -78,48 +78,6 @@ describe('R7 U1 · mostrador: citas, búsqueda y vinculación', () => {
       for (const item of lab.body.items) { expect(item).not.toHaveProperty('appointmentToday'); expect(item).not.toHaveProperty('ticketToday'); }
       const med = await t.call('MED', 'GET', '/pacientes/selector?query=T-&limit=10&offset=0');
       for (const item of med.body.items) { expect(item).not.toHaveProperty('appointmentToday'); expect(item).toHaveProperty('ticketToday'); }
-    });
-  });
-
-  describe('G2 · vinculación de cuenta (G-1, G-2)', () => {
-    const dui = '04567891-1';
-    beforeAll(async () => {
-      await t.pg.query('UPDATE acceso.usuario SET paciente_id=NULL WHERE id=$1', [userId('PAC')]);
-    });
-
-    test('the account reads its real state: nothing, then pending, then rejected with the reason', async () => {
-      expect((await t.call('PAC', 'GET', '/me/vinculacion')).body).toEqual({ linked: false, request: null });
-      const sent = await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui, birth: '1990-01-01' });
-      expect(sent.status).toBe(201);
-      const pending = (await t.call('PAC', 'GET', '/me/vinculacion')).body;
-      expect(pending).toMatchObject({ linked: false, request: { id: sent.body.id, state: 'pendiente', rejectionReason: null } });
-      const rejected = await t.call('REC', 'POST', `/cuentas/vinculaciones/${sent.body.id}/rechazar`, { version: sent.body.version, reason: 'Los datos no coinciden con el expediente' });
-      expect(rejected.status).toBe(201);
-      expect((await t.call('PAC', 'GET', '/me/vinculacion')).body.request).toMatchObject({ state: 'rechazada', rejectionReason: 'Los datos no coinciden con el expediente' });
-      expect((await t.call('REC', 'GET', '/me/vinculacion')).status).toBe(403);
-    });
-
-    test('reception compares the record DUI: exact match approvable, one digit away shown as not exact', async () => {
-      const record = await t.patient({ name: 'Vinculada' });
-      await t.pg.query(`INSERT INTO pacientes.identificador(paciente_id,tipo,emisor,valor_original,valor_normalizado,estado,exclusivo) VALUES($1,'dui','RNPN','04567891-1','045678911','sin_verificar',true)`, [record]);
-      const near = await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: '04567892-9', birth: '1990-01-01' });
-      expect(near.status).toBe(201);
-      const row = (await t.call('REC', 'GET', '/cuentas/vinculaciones')).body.find((r: any) => r.id === near.body.id);
-      expect(row.candidates).toBe(0);
-      // Contract kept for released apps (Android REC enables Aprobar on any non-null candidate): a near miss is never
-      // `candidate`; it travels in the new optional `closest`.
-      expect(row.candidate).toBeNull();
-      expect(row.closest).toEqual({ id: record, record: expect.any(String), fullName: expect.any(String), dui: '04567891-1', birth: '1990-01-01' });
-      expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${near.body.id}/aprobar`, { version: near.body.version })).body.codigo).toBe('sin_expediente');
-      await t.call('REC', 'POST', `/cuentas/vinculaciones/${near.body.id}/rechazar`, { version: near.body.version, reason: 'El DUI declarado no coincide' });
-
-      t.setNow(new Date(now.valueOf() + 5 * MIN));
-      const exact = await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui, birth: '1990-01-01' });
-      const match = (await t.call('REC', 'GET', '/cuentas/vinculaciones')).body.find((r: any) => r.id === exact.body.id);
-      expect(match.candidate).toMatchObject({ id: record, dui: '04567891-1', exact: true });
-      expect(match.closest).toBeNull();
-      expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${exact.body.id}/aprobar`, { version: exact.body.version })).status).toBe(201);
-      expect((await t.call('PAC', 'GET', '/me/vinculacion')).body).toMatchObject({ linked: true, request: { state: 'aprobada' } });
     });
   });
 });

@@ -48,7 +48,7 @@ describe('bandeja de pendientes (W04, R4a)', () => {
   });
 
   it('un grupo que falla muestra su error con reintento y no un cero falso', () => {
-    render(<TrayGroup group={{ id: 'c', title: 'Vinculaciones por verificar', href: '#/vinculaciones', items: [], state: { data: null, loading: false, error: { message: 'El servicio no está disponible.', status: 500 } as never, refresh: () => undefined } }} />);
+    render(<TrayGroup group={{ id: 'c', title: 'Solicitudes de cita', href: '#/citas', items: [], state: { data: null, loading: false, error: { message: 'El servicio no está disponible.', status: 500 } as never, refresh: () => undefined } }} />);
     expect(screen.getByText('El servicio no está disponible.')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();
     expect(document.querySelector('.tray-count')).toBeNull();

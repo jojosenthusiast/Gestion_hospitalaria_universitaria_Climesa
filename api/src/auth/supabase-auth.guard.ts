@@ -21,7 +21,9 @@ export class SupabaseAuthGuard implements CanActivate {
     // getUser verifies the token with Auth. Decoded claims and user_metadata never grant permissions.
     const { data, error } = await this.supabase.authClient.auth.getUser(token);
     if (error || !data.user) throw new UnauthorizedException('El token no es válido o ha expirado.');
-    req.actor = await this.access.actor(data.user.id, data.user.email);
+    // Only an email Supabase Auth confirmed (`email_confirmed_at`) can link a patient account to its record.
+    const verified = data.user.email && data.user.email_confirmed_at ? data.user.email : null;
+    req.actor = await this.access.autoLink(await this.access.actor(data.user.id, data.user.email), verified);
     req.user = { id: data.user.id, email: data.user.email };
     return true;
   }

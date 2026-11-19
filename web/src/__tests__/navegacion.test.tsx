@@ -79,7 +79,7 @@ const menuEsperado: Record<string, string[]> = {
   // D-05 y D-091 (MA-REQ-01): el control de recursos del Administrador es Inventario + Edificio.
   ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Catálogo de laboratorio', 'Inventario', 'Avisos', 'Métricas', 'Perfil'],
   JOP: ['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Perfil'],
-  REC: ['Inicio', 'Pacientes', 'Vinculaciones', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Perfil'],
+  REC: ['Inicio', 'Pacientes', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Avisos', 'Perfil'],
   DPD: ['Inicio', 'Personal', 'Bitácora de ambulancia', 'Auditoría', 'Avisos', 'Métricas', 'Perfil'],
 };
@@ -135,7 +135,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     // Un REC al que la API no le concede fila.ver ni citas.ver no ve esas entradas.
     const sinAgenda = permisosDe('REC').filter((p) => !['fila.ver', 'citas.ver'].includes(p.code));
     const nav = await entrar(perfil('REC', sinAgenda));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Vinculaciones', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Avisos', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Avisos', 'Perfil']);
   });
 
   it('un laboratorista sin laboratorio.ver_cola ni inventario.ver no ve esos módulos', async () => {

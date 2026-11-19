@@ -24,7 +24,6 @@ const respuestas: Record<string, unknown> = {
   '/metricas/tablero': tablero,
   '/fila': [{ id: 't1', service: 'consulta', numero: 7, patientName: 'Ana Ficticia', state: 'en_espera', issuedAt: hoy }, { id: 't2', service: 'consulta', numero: 8, state: 'atendido', issuedAt: hoy }],
   '/citas': [{ id: 'c1', patientId: 'p1', patientName: 'Luis Ficticio', doctorId: 'd', doctorName: 'Dra. Ficticia', start: enUnaHora, end: enUnaHora, state: 'solicitada', origin: 'app', version: 1 }],
-  '/cuentas/vinculaciones': [{ id: 'v1', createdAt: hoy, version: 1, account: { email: 'a@example.test', name: 'Cuenta Ficticia' }, declared: { dui: '', birth: '' }, candidate: null, candidates: 0 }],
   '/admisiones': [{ id: 'a1', patientName: 'Paciente Ficticio', state: 'pendiente_cama', requestedCategory: 'vip', isolation: false, bed: '' }],
   '/ambulancia': { unit: { id: 'u', plate: 'P-1', state: 'disponible', version: 1 }, activeService: null, paramedicOnDuty: true, pendingRequests: [] },
   '/laboratorio/ordenes': [{ id: 'o1', patientName: 'Marta Ficticia', priority: 'urgente', state: 'pendiente', createdAt: hoy, items: [{ id: 'i', name: 'Hemograma' }] }, { id: 'o2', patientName: 'Ivo Ficticio', priority: 'rutina', state: 'completado', createdAt: hoy, completedAt: enUnaHora, items: [{ id: 'i', name: 'Glucosa' }] }],
@@ -67,10 +66,8 @@ describe('inicio por rol', () => {
     expect(within(acciones).getByRole('link', { name: /Solicitar ambulancia/ }).getAttribute('href')).toBe('#/ambulancia?accion=solicitud');
     // R4a: «Requiere tu atención» and «Fila del día por estado» became the ONE pending tray and the day's figures.
     const atencion = await screen.findByRole('region', { name: 'Pendientes' });
-    // Only the two most urgent groups open; the rest fold into one line that leads to their section.
-    const otros = await within(atencion).findByRole('list', { name: 'Otros pendientes' });
-    const vinculaciones = within(otros).getByText('Vinculaciones por verificar').closest('li')!;
-    expect(within(vinculaciones).getByRole('link', { name: /Ver/ }).getAttribute('href')).toBe('#/vinculaciones');
+    // Accounts link on their own by verified email (owner observations 2026-11-18, batch 2): no group asks to verify them.
+    expect(within(atencion).queryByText('Vinculaciones por verificar')).toBeNull();
     expect(await screen.findByRole('region', { name: 'Cifras del día' })).toBeTruthy();
     expect(screen.queryByText('Accesos directos')).toBeNull();
   });

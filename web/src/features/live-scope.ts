@@ -43,7 +43,6 @@ const rules: [RegExp, (match: RegExpMatchArray) => LiveScope][] = [
   // Crew coverage (paramedic and driver on duty, RN-30) comes from shifts.
   [/^\/ambulancia(\/|\?|$)/, () => of('unidad', 'solicitud', 'servicio', 'turno')],
   [/^\/inventario(\/|\?|$)/, () => of('articulo')],
-  [/^\/cuentas\/vinculaciones(\/|\?|$)/, () => of('vinculacion_paciente', 'paciente')],
   [/^\/me\/laboratorio(\?|$)/, () => of('orden_laboratorio')],
   // The auditor reads the log on demand (each read is itself audited): it is refreshed by hand or on reconnection, never by other people's events.
   [/^\/auditoria\/(registros|opciones)/, () => []],
