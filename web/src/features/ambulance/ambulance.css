@@ -64,17 +64,17 @@
 .amb-unit-crew > div > span { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
 /* Lote 5 S8: the readiness checklist. Icon, colour and text say the same state (ready, missing, busy). */
 .amb-ready.is-ok > svg { color: var(--success); background: var(--success-soft); }
-.amb-ready.is-missing > svg { color: var(--danger); background: var(--danger-soft); }
-.amb-ready.is-missing strong { color: var(--danger); }
+.amb-ready.is-missing > svg { color: var(--priority-urgente); background: var(--priority-urgente-soft); }
+.amb-ready.is-missing strong { color: var(--priority-urgente); }
 .amb-ready.is-busy > svg { color: var(--warning); background: var(--warning-soft); }
 /* Lote 5 S8: «No se puede despachar» carries weight: a full tinted band with a larger title, danger when someone must act. */
-.amb-unit-block { flex: 1 1 100%; display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid color-mix(in srgb, var(--danger) 40%, transparent); border-radius: var(--radius-card); background: var(--danger-soft); }
+.amb-unit-block { flex: 1 1 100%; display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); border: 1px solid color-mix(in srgb, var(--priority-urgente) 40%, transparent); border-radius: var(--radius-card); background: var(--priority-urgente-soft); }
 .amb-unit-block.is-warning { border-color: color-mix(in srgb, var(--warning) 40%, transparent); background: var(--warning-soft); }
 .data-workbench > .amb-unit > .amb-unit-block { padding: var(--space-3) var(--space-4); }
 .amb-unit-block > p { margin: 0; display: flex; align-items: flex-start; gap: var(--space-3); line-height: 1.5; font-size: var(--text-base); }
-.amb-unit-block > p > svg { flex: 0 0 auto; margin-top: 1px; color: var(--danger); }
+.amb-unit-block > p > svg { flex: 0 0 auto; margin-top: 1px; color: var(--priority-urgente); }
 .amb-unit-block.is-warning > p > svg, .amb-unit-block.is-warning .amb-block-title { color: var(--warning); }
-.amb-block-title { display: block; font-size: var(--text-lg); color: var(--danger); }
+.amb-block-title { display: block; font-size: var(--text-lg); color: var(--priority-urgente); }
 .amb-coverage { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-5); border-bottom: 1px solid var(--line); background: var(--warning-soft); color: var(--ink); font-size: var(--text-md); }
 .amb-coverage > svg { flex: 0 0 auto; margin-top: 2px; color: var(--warning); }
 .amb-unit-block .amb-crew-next { margin: 0; }
