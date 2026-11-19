@@ -737,7 +737,7 @@ private struct MyCategoryRequests: View {
                         .font(Typo.small).foregroundStyle(Theme.primary)
                 }
                 if let reason = CategoryRequestFold.rejection(item.rejectionReason) { Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.muted) }
-                if item.canWithdraw { ClimesaButton(title: L.text("appointments.category.withdraw"), kind: .secondary) { withdrawing = item } }
+                if item.canWithdraw { CrudButton(kind: .deactivate, label: L.text("appointments.category.withdraw")) { withdrawing = item } }
             }
     }
 
@@ -1253,7 +1253,7 @@ private struct HistoryContent: View {
                     PatientTag(history.access.rawValue, label: history.access.label)
                 }
                 if let recordExternal {
-                    ClimesaButton(title: L.text("record.external.open"), kind: .secondary, action: recordExternal)
+                    CrudButton(kind: .create, label: L.text("record.external.open"), action: recordExternal)
                 }
             }
             SectionTitle("history.consultations")
@@ -1410,7 +1410,7 @@ struct AmbulanceRequestView: View {
             Text(verbatim: request.notice).font(Typo.small).foregroundStyle(Theme.muted)
             PatientSubmissionNotice(submission: submission)
             if request.canCancel {
-                ClimesaButton(title: L.text("ambulance.cancel"), kind: .secondary, loading: submission.busy) { cancelReason = ""; cancelling = request }
+                CrudButton(kind: .deactivate, label: L.text("ambulance.cancel"), loading: submission.busy) { cancelReason = ""; cancelling = request }
             }
         }
     }

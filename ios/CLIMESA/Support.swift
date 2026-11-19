@@ -274,6 +274,8 @@ struct ScreenFrame<Content: View>: View {
             ToolbarItem(placement: .cancellationAction) {
                 if let onClose { Button(L.text("common.close"), action: onClose) }
             }
+            // Owner obs. 2: the live clock stays in the bar on pushed screens and sheets too.
+            ToolbarItem(placement: .topBarTrailing) { LiveClock() }
         }
     }
 }

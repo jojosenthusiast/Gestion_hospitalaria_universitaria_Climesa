@@ -303,6 +303,8 @@ public struct PatientCandidate: Decodable, Sendable, Identifiable, Equatable {
     public let fullName: String
     public let active: Bool
     public let birth: String?
+    /// `SexoPaciente` (femenino, masculino, indeterminado, no_registrado); optional so an older payload still decodes.
+    public let sex: String?
     public let matchReason: String
     /// S2: the caller has an appointment, consultation or admission with this patient (the record would open).
     /// Absent on a server before the preconditions sweep: then every row opens as before.

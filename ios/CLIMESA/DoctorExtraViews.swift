@@ -127,7 +127,7 @@ private struct DoctorPatientVitals: View {
                     }
                     // D5 · rule 8: recording depends on `signos.registrar`, never on the role.
                     if VitalsEntryRules.canRecord(account.profile) {
-                        ClimesaButton(title: L.text("vitals.entry.open"), kind: .secondary) { notice = nil; entryOpen = true }
+                        CrudButton(kind: .create, label: L.text("vitals.entry.open")) { notice = nil; entryOpen = true }
                     }
                 }
                 if let notice { PatientNotice(text: notice) }
@@ -408,21 +408,29 @@ struct AmbulanceOverviewView: View {
     }
 
     @ViewBuilder private func statusSection(_ value: AmbulanceStatus) -> some View {
+        // Owner obs. 19: one header with the unit, its real state (never «Disponible» under a dispatch block), the
+        // block's reason and whether a service is active.
+        let tag = AmbulanceLogRules.unitTag(value)
         SectionCard(eyebrow: L.text("ambulance.unit")) {
-            ListRow(title: value.unit.plate, subtitle: value.unit.stateReason, meta: value.unit.stateSince.map { String(format: L.text("ambulance.since"), ClimesaDates.short($0)) }) {
-                StatusTag(value.unit.state)
+            ListRow(title: value.unit.plate, subtitle: value.dispatchBlock?.message ?? value.unit.stateReason, meta: value.unit.stateSince.map { String(format: L.text("ambulance.since"), ClimesaDates.short($0)) }) {
+                StatusTag(tag.value, label: tag.label)
+            }
+            if let line = AmbulanceLogRules.serviceLine(value) {
+                Label { Text(verbatim: line) } icon: { Image(systemName: "cross.case").accessibilityHidden(true) }
+                    .labelStyle(.titleAndIcon).font(Typo.label).foregroundStyle(Theme.ink)
             }
             if let crew = AmbulanceLogRules.crewNotice(value) {
                 Text(verbatim: crew).font(Typo.small).foregroundStyle(Theme.ink)
             }
             if let block = value.dispatchBlock {
-                // A dispatch block is a warning, not a critical value: warning tone, red stays for critical.
+                // A dispatch block is a warning, not a critical value: warning tone, red stays for critical. Its reason
+                // is already the header's subtitle; this line says what to do.
                 HStack(alignment: .top, spacing: Spacing.s) {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning).accessibilityHidden(true)
-                    Text(verbatim: block.message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    Text(verbatim: AmbulanceLogRules.blockAdvice(block, canPlanShifts: account.can("turnos.planificar"))).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 }
-                Text(verbatim: AmbulanceLogRules.blockAdvice(block, canPlanShifts: account.can("turnos.planificar"))).font(Typo.small).foregroundStyle(Theme.ink)
             }
+            ReadOnlyBadge(who: "Jefatura de Operaciones", what: "el estado de la ambulancia")
         }
         if let service = value.activeService {
             SectionCard(eyebrow: L.text("ambulance.active")) {
@@ -441,8 +449,6 @@ struct AmbulanceOverviewView: View {
                     }
                 }
             }
-        } else {
-            EmptyStateView(title: L.text("arrival.none"), symbol: "cross.case")
         }
     }
 

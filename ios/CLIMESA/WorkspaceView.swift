@@ -67,7 +67,7 @@ struct RoleTabsView:View {
                         .climesaNavBar()
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         // Avisos one tap away on every tab (Android/web bell); the count no longer sits on Más.
-                        .toolbar { ToolbarItem(placement:.topBarTrailing) { NoticesBell(model:notices) } }
+                        .toolbar { ToolbarItem(placement:.topBarTrailing) { HStack(spacing:Spacing.space2) { LiveClock(); NoticesBell(model:notices) } } }
                         .refreshable { await refresh(tab) }
                 }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
             }

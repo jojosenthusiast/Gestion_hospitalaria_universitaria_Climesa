@@ -137,6 +137,38 @@ public enum ClimesaDates {
         return parse("\(day)T18:00:00Z")
     }
 
+    // MARK: Live clock of the top bar (owner obs. 2, same text as the web header clock)
+
+    private static let monthsLong = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre",
+                                     "octubre", "noviembre", "diciembre"]
+
+    /// "HH:mm:ss" (24 h) in El Salvador time.
+    public static func clockSeconds(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.hour, .minute, .second], from: date)
+        return String(format: "%02d:%02d:%02d", parts.hour ?? 0, parts.minute ?? 0, parts.second ?? 0)
+    }
+
+    /// "Miércoles 18 de noviembre" in El Salvador time, never with the year.
+    public static func longDay(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.weekday, .day, .month], from: date)
+        let weekday = capitalized(weekdays[((parts.weekday ?? 1) - 1) % 7])
+        return "\(weekday) \(parts.day ?? 0) de \(monthsLong[((parts.month ?? 1) - 1) % 12])"
+    }
+
+    /// "Mié 18 nov": the clock's date line when the bar is too narrow for `longDay`.
+    public static func compactDay(_ date: Date) -> String { capitalized(dayMonth(date)) }
+
+    /// Whole years from a `yyyy-MM-dd` birth day to `now`'s local day in El Salvador; nil when unreadable or in the future.
+    public static func age(birthDay: String?, now: Date = Date()) -> Int? {
+        guard let birthDay, let birth = pickerDate(day: String(birthDay.prefix(10))) else { return nil }
+        let born = calendar.startOfDay(for: birth), today = calendar.startOfDay(for: now)
+        // A birth date in the future is a data error, not age 0.
+        guard born <= today else { return nil }
+        let years = calendar.dateComponents([.year], from: born, to: today).year
+        guard let years, years >= 0 else { return nil }
+        return years
+    }
+
     /// Días completos entre dos instantes (para "días de hospitalización" y plazos).
     public static func days(from start: Date, to end: Date) -> Int {
         var calendar = Calendar(identifier: .gregorian)
