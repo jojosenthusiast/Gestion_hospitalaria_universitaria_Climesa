@@ -223,27 +223,32 @@ public enum DischargeSummaryRules {
     }
 }
 
-/// "Mis datos": el paciente edita solo su contacto con `pacientes.editar_propios` (`PATCH /me/paciente`).
-/// Las reglas espejan `validateContact` de la API: teléfono de 8 dígitos que empieza en 2, 6 o 7, y correo válido.
+/// "Mis datos": el paciente edita solo su teléfono y su dirección con `pacientes.editar_propios` (`PATCH /me/paciente`).
+/// Las reglas espejan `validateContact` de la API: teléfono de 8 dígitos que empieza en 2, 6 o 7. U12: el correo une la
+/// cuenta con el expediente, así que solo lo cambia Recepción; se muestra sin editar y nunca se envía.
 public enum PatientProfileRules {
-    public static func errors(phone: String, email: String, address: String) -> [String: String] {
+    public static func errors(phone: String, address: String) -> [String: String] {
         var errors: [String: String] = [:]
         let phoneText = phone.trimmingCharacters(in: .whitespaces)
         if !phoneText.isEmpty && phoneText.range(of: #"^[267][0-9]{3}-?[0-9]{4}$"#, options: .regularExpression) == nil {
             errors["phone"] = "Escribe el teléfono con 8 dígitos y empieza con 2, 6 o 7 (por ejemplo 7777-7777)."
         }
-        let emailText = email.trimmingCharacters(in: .whitespaces)
-        if !emailText.isEmpty && (emailText.count > 254 || emailText.range(of: #"^[^\s@]+@[^\s@]+\.[^\s@]+$"#, options: .regularExpression) == nil) {
-            errors["email"] = "Ingresa un correo válido."
-        }
         if address.trimmingCharacters(in: .whitespacesAndNewlines).count > 500 { errors["address"] = "La dirección admite hasta 500 caracteres." }
         return errors
     }
 
-    /// Cuerpo de `PATCH /me/paciente`: el texto vacío se envía como `""` para que la API borre el dato.
-    public static func body(version: Int, phone: String, email: String, address: String) -> PatientSelfUpdateBody {
+    /// Cuerpo de `PATCH /me/paciente`: el texto vacío se envía como `""` para que la API borre el dato. Sin correo.
+    public static func body(version: Int, phone: String, address: String) -> PatientSelfUpdateBody {
         func trimmed(_ text: String) -> String { text.trimmingCharacters(in: .whitespacesAndNewlines) }
-        return PatientSelfUpdateBody(version: version, phone: trimmed(phone), email: trimmed(email), address: trimmed(address))
+        return PatientSelfUpdateBody(version: version, phone: trimmed(phone), email: nil, address: trimmed(address))
+    }
+
+    /// 403 `correo_lo_gestiona_recepcion`: the API's fixed message, also when an older server sends another text.
+    public static let emailManagedByReception = "Tu correo lo actualiza Recepción. Pídelo en ventanilla."
+
+    /// The notice for a refused save that the form cannot show on a field (the email is not editable here).
+    public static func failureMessage(code: String?) -> String? {
+        code == "correo_lo_gestiona_recepcion" ? emailManagedByReception : nil
     }
 }
 

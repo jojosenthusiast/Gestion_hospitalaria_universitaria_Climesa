@@ -605,59 +605,39 @@ public enum ReleaseRules {
     }
 }
 
-// MARK: - G2 · Vincular expediente
+// MARK: - G2 · Vincular expediente (U12: automática por correo verificado)
 
-/// G2: the link screen opens in the real state of the request (`GET /me/vinculacion`), so a patient who comes back never
-/// sees an empty form and never asks twice.
+/// U12: linking is automatic. The account joins the record whose email matches the email Supabase Auth confirmed, on its
+/// next session or when Recepción saves that email on the record. The screen shows the linked state, asks to confirm the
+/// email first, or asks the patient to have Recepción write their email on the record. There is no form to send.
 public enum LinkStatusRules {
     public enum Screen: Equatable, Sendable {
-        /// No request yet.
-        case form(prefill: MyLink.Declared?)
-        /// Waiting for reception, since `createdAt`.
-        case pending(since: String)
-        case approved
-        /// With the reason, and «Volver a pedir» with what was declared.
-        case rejected(reason: String?, prefill: MyLink.Declared?)
+        /// The account is joined to its record.
+        case linked
+        /// Supabase Auth has not confirmed the email yet: confirm it first, then ask Recepción.
+        case emailNotVerified(email: String?)
+        /// Confirmed email, no record with it yet: Recepción must write it on the record.
+        case askReception(email: String?)
     }
 
-    /// `sent` is the request this screen just created: until a read returns it, the screen stays pending instead of
-    /// showing the older state (no form, so it is never sent twice).
-    public static func screen(_ link: MyLink, profileLinked: Bool, sent: LinkRequestResult? = nil) -> Screen {
-        if profileLinked || link.linked { return .approved }
-        if let sent, link.request?.id != sent.id { return .pending(since: sent.createdAt) }
-        guard let request = link.request else { return .form(prefill: nil) }
-        switch request.state {
-        case .aprobada: return .approved
-        case .rechazada: return .rejected(reason: request.rejectionReason, prefill: link.declared)
-        // An unknown state is still a request: never the form, so it is not asked twice.
-        case .pendiente, .desconocido: return .pending(since: request.createdAt)
-        }
+    public static func screen(_ link: MyLink, profileLinked: Bool) -> Screen {
+        if profileLinked || link.linked { return .linked }
+        let email = clean(link.email)
+        return link.emailVerified ? .askReception(email: email) : .emailNotVerified(email: email)
     }
 
-    /// "En revisión desde 16/11" (day and month in El Salvador).
-    public static func pendingText(_ createdAt: String) -> String {
-        guard let date = ClimesaDates.parse(createdAt) else { return "En revisión" }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_SV")
-        formatter.timeZone = ClimesaDates.zone
-        formatter.dateFormat = "dd/MM"
-        return "En revisión desde \(formatter.string(from: date))"
+    /// «Pide en Recepción que anoten este correo: {email}».
+    public static func receptionText(_ email: String?) -> String {
+        guard let email = clean(email) else { return "Pide en Recepción que anoten en tu expediente el correo de tu cuenta." }
+        return "Pide en Recepción que anoten este correo: \(email)"
     }
 
-    public static func rejectedText(_ reason: String?) -> String {
-        let text = reason?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-        return text.isEmpty ? "Tu solicitud fue rechazada. Revisa tus datos o acude a recepción." : "Tu solicitud fue rechazada. Motivo: \(text)"
-    }
+    /// Before Recepción can link the account, the patient confirms the email from the sign-up link.
+    public static let confirmEmailText = "Confirma tu correo desde el enlace que te enviamos. Solo un correo confirmado une tu cuenta con tu expediente."
 
-    /// The declared birth day (`yyyy-MM-dd`) as a date for the picker, at noon in `zone` so it never slips a day.
-    public static func birthDate(_ day: String?, zone: TimeZone = .current) -> Date? {
-        guard let day, day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil else { return nil }
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = zone
-        formatter.dateFormat = "yyyy-MM-dd HH:mm"
-        return formatter.date(from: "\(day) 12:00")
+    private static func clean(_ email: String?) -> String? {
+        let text = email?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return text.isEmpty ? nil : text
     }
 }
 

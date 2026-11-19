@@ -36,13 +36,6 @@ public struct LabReviewBody: Encodable, Sendable, Equatable {
     }
 }
 
-/// `LinkRequestDto`
-public struct LinkRequestBody: Encodable, Sendable, Equatable {
-    public let dui: String
-    public let birth: String
-    public init(dui: String, birth: String) { self.dui = dui; self.birth = birth }
-}
-
 /// `AmbulanceRequestDto`
 public struct AmbulanceRequestBody: Encodable, Sendable, Equatable {
     public let address: String

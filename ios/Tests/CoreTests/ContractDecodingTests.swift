@@ -117,8 +117,9 @@ final class ContractDecodingTests: XCTestCase {
         XCTAssertEqual(occupancy.rows.first?.free, 9)
         let doctors = try decode(DoctorsOnDuty.self, #"{"actualizadoEn":"2026-11-20T15:00:00.000Z","medicos":[{"nombre":"Médico Ficticio","especialidad":"Medicina general","area":null,"hasta":null}],"proximoCambio":null}"#)
         XCTAssertEqual(doctors.doctors.count, 1)
-        let link = try decode(LinkRequestResult.self, #"{"id":"v1","state":"pendiente","createdAt":"2026-11-20T15:00:00.000Z","resolvedAt":null,"rejectionReason":null,"version":1}"#)
-        XCTAssertEqual(link.state.label, "En verificación")
+        // U12: `request` stays null for released apps and is not read.
+        let link = try decode(MyLink.self, #"{"linked":false,"email":"paciente.demo@example.com","emailVerified":true,"request":null}"#)
+        XCTAssertEqual(link, MyLink(linked: false, email: "paciente.demo@example.com", emailVerified: true))
     }
 
     /// MA-AVI-01: `/me/avisos` trae los avisos dirigidos a los roles de la cuenta con su prioridad; se muestran del más urgente al menos.

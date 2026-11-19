@@ -105,20 +105,30 @@ final class HospitalRulesTests: XCTestCase {
     }
 
     func testProfileRulesValidateContactLikeTheAPI() {
-        XCTAssertTrue(PatientProfileRules.errors(phone: "7777-7777", email: "ejemplo@example.test", address: "Calle ficticia").isEmpty)
-        XCTAssertTrue(PatientProfileRules.errors(phone: "", email: "", address: "").isEmpty)
-        XCTAssertNotNil(PatientProfileRules.errors(phone: "5777-7777", email: "", address: "")["phone"])
-        let errors = PatientProfileRules.errors(phone: "123", email: "no", address: String(repeating: "x", count: 501))
-        XCTAssertEqual(Set(errors.keys), ["phone", "email", "address"])
+        XCTAssertTrue(PatientProfileRules.errors(phone: "7777-7777", address: "Calle ficticia").isEmpty)
+        XCTAssertTrue(PatientProfileRules.errors(phone: "", address: "").isEmpty)
+        XCTAssertNotNil(PatientProfileRules.errors(phone: "5777-7777", address: "")["phone"])
+        let errors = PatientProfileRules.errors(phone: "123", address: String(repeating: "x", count: 501))
+        XCTAssertEqual(Set(errors.keys), ["phone", "address"])
     }
 
-    func testSelfUpdateBodySendsVersionAndClearsWithEmptyText() throws {
-        let body = PatientProfileRules.body(version: 3, phone: " 7111-1111 ", email: "", address: "Calle ficticia ")
-        XCTAssertEqual(body, PatientSelfUpdateBody(version: 3, phone: "7111-1111", email: "", address: "Calle ficticia"))
+    /// U12: the email links the account with the record, so the patient's own save never sends it.
+    func testSelfUpdateBodySendsVersionClearsWithEmptyTextAndNeverTheEmail() throws {
+        let body = PatientProfileRules.body(version: 3, phone: " 7111-1111 ", address: "Calle ficticia ")
+        XCTAssertEqual(body, PatientSelfUpdateBody(version: 3, phone: "7111-1111", email: nil, address: "Calle ficticia"))
         let json = try JSONSerialization.jsonObject(with: JSONEncoder().encode(body)) as? [String: Any]
-        XCTAssertEqual(Set(json?.keys.map { $0 } ?? []), ["version", "phone", "email", "address"])
+        XCTAssertEqual(Set(json?.keys.map { $0 } ?? []), ["version", "phone", "address"])
         XCTAssertEqual(json?["version"] as? Int, 3)
-        XCTAssertEqual(json?["email"] as? String, "")
+        XCTAssertEqual(PatientProfileRules.body(version: 3, phone: "", address: "").phone, "")
+    }
+
+    /// U12: a 403 `correo_lo_gestiona_recepcion` says who changes the email; other refusals keep their own notice.
+    func testEmailManagedByReceptionMessage() throws {
+        let body = Data(#"{"type":"about:blank","title":"Prohibido","status":403,"detail":"Otro texto","codigo":"correo_lo_gestiona_recepcion"}"#.utf8)
+        let failure = APIFailure.from(status: 403, body: body)
+        XCTAssertEqual(PatientProfileRules.failureMessage(code: failure.code), "Tu correo lo actualiza Recepción. Pídelo en ventanilla.")
+        XCTAssertNil(PatientProfileRules.failureMessage(code: "version_conflicto"))
+        XCTAssertNil(PatientProfileRules.failureMessage(code: nil))
     }
 
     func testHospitalLocationDecodesPublicContractAndBuildsLinks() throws {

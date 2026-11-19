@@ -328,47 +328,35 @@ final class JourneyRulesTests: XCTestCase {
         XCTAssertNil(ReleaseRules.followUpOutcome(proposalId: nil, skipped: "no_pedida"))
     }
 
-    // MARK: - G2 Vincular expediente
+    // MARK: - G2 Vincular expediente (U12: por correo verificado)
 
     private func link(_ json: String) throws -> MyLink { try JSONDecoder().decode(MyLink.self, from: Data(json.utf8)) }
 
-    func testVinculacionAbreEnElEstadoRealDeLaSolicitud() throws {
-        let none = try link(#"{"linked":false,"request":null}"#)
-        XCTAssertEqual(LinkStatusRules.screen(none, profileLinked: false), .form(prefill: nil))
-
-        let pending = try link(#"{"linked":false,"request":{"id":"v1","state":"pendiente","createdAt":"2026-11-16T15:00:00.000Z","resolvedAt":null,"rejectionReason":null,"version":1},"declared":{"dui":"00000000-0","birth":"1990-01-31"}}"#)
-        XCTAssertEqual(LinkStatusRules.screen(pending, profileLinked: false), .pending(since: "2026-11-16T15:00:00.000Z"))
-        XCTAssertEqual(LinkStatusRules.pendingText("2026-11-16T15:00:00.000Z"), "En revisión desde 16/11")
-
-        let approved = try link(#"{"linked":true,"request":{"id":"v1","state":"aprobada","createdAt":"2026-11-16T15:00:00.000Z","resolvedAt":"2026-11-16T16:00:00.000Z","rejectionReason":null,"version":2}}"#)
-        XCTAssertEqual(LinkStatusRules.screen(approved, profileLinked: false), .approved)
-        // The profile already has the record: approved whatever the request says.
-        XCTAssertEqual(LinkStatusRules.screen(none, profileLinked: true), .approved)
-
-        let rejected = try link(#"{"linked":false,"request":{"id":"v1","state":"rechazada","createdAt":"2026-11-16T15:00:00.000Z","resolvedAt":"2026-11-16T16:00:00.000Z","rejectionReason":"El DUI no coincide con el expediente.","version":2},"declared":{"dui":"00000000-0","birth":"1990-01-31"}}"#)
-        let declared = MyLink.Declared(dui: "00000000-0", birth: "1990-01-31")
-        XCTAssertEqual(LinkStatusRules.screen(rejected, profileLinked: false), .rejected(reason: "El DUI no coincide con el expediente.", prefill: declared))
-        XCTAssertEqual(LinkStatusRules.rejectedText("El DUI no coincide con el expediente."), "Tu solicitud fue rechazada. Motivo: El DUI no coincide con el expediente.")
-        XCTAssertEqual(LinkStatusRules.rejectedText(" "), "Tu solicitud fue rechazada. Revisa tus datos o acude a recepción.")
-
-        // Just sent: an older read (no request, or the rejected one) never brings the form back.
-        let sent = try JSONDecoder().decode(LinkRequestResult.self, from: Data(#"{"id":"v2","state":"pendiente","createdAt":"2026-11-17T15:00:00.000Z","resolvedAt":null,"rejectionReason":null,"version":1}"#.utf8))
-        XCTAssertEqual(LinkStatusRules.screen(none, profileLinked: false, sent: sent), .pending(since: "2026-11-17T15:00:00.000Z"))
-        XCTAssertEqual(LinkStatusRules.screen(rejected, profileLinked: false, sent: sent), .pending(since: "2026-11-17T15:00:00.000Z"))
-        XCTAssertEqual(LinkStatusRules.screen(approved, profileLinked: false, sent: sent), .approved)
+    func testVinculacionPorCorreoSinVincularPideARecepcion() throws {
+        let unlinked = try link(#"{"linked":false,"email":"paciente.demo@example.com","emailVerified":true,"request":null}"#)
+        XCTAssertEqual(LinkStatusRules.screen(unlinked, profileLinked: false), .askReception(email: "paciente.demo@example.com"))
+        XCTAssertEqual(LinkStatusRules.receptionText("paciente.demo@example.com"), "Pide en Recepción que anoten este correo: paciente.demo@example.com")
+        // No email on the account: still says what to ask, never an empty email.
+        let blank = try link(#"{"linked":false,"email":" ","emailVerified":true,"request":null}"#)
+        XCTAssertEqual(LinkStatusRules.screen(blank, profileLinked: false), .askReception(email: nil))
+        XCTAssertEqual(LinkStatusRules.receptionText(nil), "Pide en Recepción que anoten en tu expediente el correo de tu cuenta.")
     }
 
-    func testVolverAPedirPrellenaLaFechaDeclarada() throws {
-        let zone = TimeZone(identifier: "America/El_Salvador")!
-        let date = try XCTUnwrap(LinkStatusRules.birthDate("1990-01-31", zone: zone))
-        var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = zone
-        let parts = calendar.dateComponents([.year, .month, .day], from: date)
-        XCTAssertEqual([parts.year, parts.month, parts.day], [1990, 1, 31])
-        XCTAssertNil(LinkStatusRules.birthDate(nil, zone: zone))
-        XCTAssertNil(LinkStatusRules.birthDate("31/01/1990", zone: zone))
-        // A server without `declared` decodes too (no prefill).
-        XCTAssertNil(try link(#"{"linked":false,"request":null}"#).declared)
+    func testVinculacionPorCorreoSinConfirmarPideConfirmarPrimero() throws {
+        let unverified = try link(#"{"linked":false,"email":"paciente.demo@example.com","emailVerified":false,"request":null}"#)
+        XCTAssertEqual(LinkStatusRules.screen(unverified, profileLinked: false), .emailNotVerified(email: "paciente.demo@example.com"))
+        XCTAssertTrue(LinkStatusRules.confirmEmailText.hasPrefix("Confirma tu correo"))
+        // A server before U12 sends no `emailVerified`: not confirmed yet.
+        let old = try link(#"{"linked":false,"request":null}"#)
+        XCTAssertEqual(LinkStatusRules.screen(old, profileLinked: false), .emailNotVerified(email: nil))
+    }
+
+    func testVinculacionPorCorreoVinculada() throws {
+        let linked = try link(#"{"linked":true,"email":"paciente.demo@example.com","emailVerified":true,"request":null}"#)
+        XCTAssertEqual(LinkStatusRules.screen(linked, profileLinked: false), .linked)
+        // The profile already has the record: linked whatever the read says.
+        let unlinked = try link(#"{"linked":false,"email":null,"emailVerified":false,"request":null}"#)
+        XCTAssertEqual(LinkStatusRules.screen(unlinked, profileLinked: true), .linked)
     }
 
     // MARK: - D1 Avisos

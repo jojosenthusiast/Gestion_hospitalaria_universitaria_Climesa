@@ -66,7 +66,7 @@ final class ContractFixtureTests: XCTestCase {
     }
 
     func testContactoDelPropioPaciente() throws {
-        let body = PatientProfileRules.body(version: 4, phone: " 7777-7777 ", email: "paciente.demo@example.com", address: "Colonia Escalón, San Salvador\n")
+        let body = PatientProfileRules.body(version: 4, phone: " 7777-7777 ", address: "Colonia Escalón, San Salvador\n")
         try assertMatches(body, fixture: "me-paciente")
     }
 

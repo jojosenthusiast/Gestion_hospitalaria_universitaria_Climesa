@@ -1,17 +1,6 @@
 {
   "sourceLanguage": "es",
   "strings": {
-    "link.retry": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Volver a pedir"
-          }
-        }
-      }
-    },
     "results.release.followUp": {
       "extractionState": "manual",
       "localizations": {
@@ -2064,7 +2053,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vincula tu cuenta con tu expediente para ver tus exámenes e historial."
+            "value": "Pide en Recepción que anoten tu correo en tu expediente para ver tus exámenes e historial."
           }
         }
       }
@@ -2289,61 +2278,6 @@
         }
       }
     },
-    "link.birth": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fecha de nacimiento"
-          }
-        }
-      }
-    },
-    "link.dui": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "DUI (00000000-0)"
-          }
-        }
-      }
-    },
-    "link.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escribe tu DUI y tu fecha de nacimiento. Recepción verifica tu identidad y aprueba la vinculación."
-          }
-        }
-      }
-    },
-    "link.pending.body": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Te avisaremos aquí cuando recepción la resuelva."
-          }
-        }
-      }
-    },
-    "link.rejected": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La vinculación fue rechazada. Revisa tus datos o acude a recepción."
-          }
-        }
-      }
-    },
     "link.status": {
       "extractionState": "manual",
       "localizations": {
@@ -2351,17 +2285,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vinculación"
-          }
-        }
-      }
-    },
-    "link.submit": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enviar"
           }
         }
       }
@@ -3362,7 +3285,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vincula tu expediente primero para editar tus datos."
+            "value": "Tu cuenta todavía no está unida a tu expediente. Pide en Recepción que anoten tu correo en él."
           }
         }
       }
@@ -6234,6 +6157,17 @@
           "stringUnit": {
             "state": "translated",
             "value": "No tienes acceso a esta información"
+          }
+        }
+      }
+    },
+    "link.reception.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuando Recepción lo anote, tu cuenta se une sola a tu expediente."
           }
         }
       }

@@ -16,7 +16,7 @@ Las pestañas salen del perfil verificado de `/auth/me` (`TabPolicy` en `Core/Ac
 | Rol | Pantalla | Endpoints |
 |---|---|---|
 | Todos | I01 Ingreso, I02 Crear cuenta | Supabase Auth (`/auth/v1/token`, `/auth/v1/signup`), `GET /auth/me` |
-| PAC | I03 Vincular expediente (Más) | `POST /cuentas/vinculacion`; cambia sola con `vinculacion.resuelta` |
+| PAC | I03 Vincular expediente (Más) | `GET /me/vinculacion`: automática por correo verificado; sin vincular pide «Pide en Recepción que anoten este correo: {email}» (sin formulario de DUI) |
 | PAC | I04 Inicio | `GET /fila`, `GET /citas`, `GET /me/laboratorio`, `GET /publico/avisos` |
 | PAC | I05 Mi turno en fila | `GET /fila`, `GET /publico/fila/{servicio}`; vibra al pasar a Llamado |
 | PAC | I06 Mis citas | `GET /citas`, `GET /citas/catalogos`, `GET /citas/disponibilidad`, `POST /citas/solicitudes`, `POST /citas/{id}/cancelar` |
