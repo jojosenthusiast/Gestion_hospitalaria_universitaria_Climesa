@@ -45,7 +45,12 @@ data class QueueTicket(
     val arrivalFromAppointment: Boolean = false,
     /** Lote 5 (S11): reasons of the linked appointment when it came from a request by category (`categories`). */
     val categories: List<CategoryRef> = emptyList(),
+    /** Lote 5: age on the day of the number (`patientAge`) and sex code (`patientSex`); null on older APIs or without permission. */
+    val patientAge: Int? = null,
+    val patientSex: String? = null,
 ) {
+    /** «34 años · Femenino» after the patient name; null when the API sends neither. */
+    val patientSummary: String? get() = PatientSummary.fromAge(patientAge, patientSex)
     fun allows(action: QueueAction) = action in allowedActions
     /** The action is shown: allowed, or blocked with a reason from the server. */
     fun shows(action: QueueAction) = allows(action) || action in blockedActions
@@ -139,6 +144,8 @@ object QueueRules {
                 categories = row.optJSONArray("categories")?.let { list ->
                     (0 until list.length()).mapNotNull { i -> list.optJSONObject(i)?.let { c -> ServerActions.text(c, "code")?.let { code -> CategoryRef(code, ServerActions.text(c, "name") ?: code, c.optString("icon")) } } }
                 } ?: emptyList(),
+                patientAge = if (row.has("patientAge") && !row.isNull("patientAge")) row.optInt("patientAge") else null,
+                patientSex = ServerActions.text(row, "patientSex"),
             )
         } }
     }

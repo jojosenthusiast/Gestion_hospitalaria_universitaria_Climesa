@@ -11,7 +11,7 @@ interface BedRepository {
     suspend fun act(bedId: String, action: BedAction, version: Int, reason: String)
     /**
      * Lote 5 S7: codes of the beds whose occupant is in isolation, read from the active admissions (needs `admision.ver`).
-     * The bed board itself carries no isolation flag; a repository without that source returns none.
+     * Fallback for older APIs whose bed board carries no isolation flag; a repository without that source returns none.
      */
     suspend fun isolatedBedCodes(): Set<String> = emptySet()
 }
@@ -39,6 +39,10 @@ internal fun parseBeds(rows: JSONArray): List<Bed> = (0 until rows.length()).map
             level = if (r.isNull("level")) null else r.optInt("level"),
             roomId = r.optString("roomId"),
             category = r.optString("category"),
+            isolated = r.optBoolean("isolation"),
+            // A room in isolation marks every bed of it; the bed of the isolated patient belongs to that room too.
+            roomIsolated = r.optBoolean("roomIsolation") || r.optBoolean("isolation"),
+            isolationFromApi = r.has("isolation") && r.has("roomIsolation"),
         )
     }
 }

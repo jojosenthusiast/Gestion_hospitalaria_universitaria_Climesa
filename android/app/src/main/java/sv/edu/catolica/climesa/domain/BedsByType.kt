@@ -48,6 +48,9 @@ object BedsByType {
         return beds.map { it.copy(isolated = it.code in isolatedCodes, roomIsolated = it.roomId.ifBlank { it.room } in rooms) }
     }
 
+    /** The board already carries `isolation` / `roomIsolation` (Lote 5 API), so `/admisiones` is not needed. */
+    fun reportsIsolation(beds: List<Bed>): Boolean = beds.isNotEmpty() && beds.all { it.isolationFromApi }
+
     fun matches(bed: Bed, filter: IsolationFilter?): Boolean = when (filter) {
         null -> true
         IsolationFilter.PATIENT -> bed.isolated

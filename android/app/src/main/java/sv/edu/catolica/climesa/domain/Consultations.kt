@@ -55,7 +55,12 @@ data class QueueConsultation(
     val categories: List<CategoryRef> = emptyList(),
     val appointmentAt: String? = null,
     val patientId: String? = null,
+    /** Lote 5: `patientAge` / `patientSex` read fields of `/fila`; null on older APIs or without permission. */
+    val patientAge: Int? = null,
+    val patientSex: String? = null,
 ) {
+    /** «34 años · Femenino» after the patient name; null when the API sends neither. */
+    val patientSummary: String? get() = PatientSummary.fromAge(patientAge, patientSex)
     val code: String get() = "$area $number"
     /**
      * A called number without an own consultation is another office's only when another clinician called it (web
@@ -163,7 +168,8 @@ object ConsultationResume {
                 area = row.text("area") ?: QueueLabels.areaOf(row.text("service") ?: "consulta_general"),
                 allowedActions = ServerActions.allowed(row).mapNotNull(QueueAction::of).distinct(),
                 undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList(),
-                categories = CategoryRequestRules.refs(row), appointmentAt = row.text("appointmentAt"), patientId = row.text("patientId"))
+                categories = CategoryRequestRules.refs(row), appointmentAt = row.text("appointmentAt"), patientId = row.text("patientId"),
+                patientAge = if (row.has("patientAge") && !row.isNull("patientAge")) row.optInt("patientAge") else null, patientSex = row.text("patientSex"))
         } }
     }
 

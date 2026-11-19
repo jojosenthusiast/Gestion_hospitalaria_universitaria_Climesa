@@ -52,12 +52,15 @@ object QueueReception {
     fun summary(tickets: List<QueueTicket>): List<QueueSummaryItem> =
         QueueColumn.entries.map { column -> QueueSummaryItem(column, tickets.count { QueueBoard.column(it) == column }) }
 
-    /** Confirmation of a "Llamar siguiente" answer (`QueueCallNextResponse`); null when the API sent no number. */
+    /**
+     * Confirmation of a "Llamar siguiente" answer (`QueueCallNextResponse`); null when the API sent no number. The room is the
+     * answer's `officeCode` (Lote 5) when present, else the [office] picked before calling (older APIs).
+     */
     fun callNextConfirmation(result: Any?, service: String, office: String?): CallNextConfirmation? {
         val row = result as? JSONObject ?: return null
         val number = row.optInt("numero", 0).takeIf { it > 0 } ?: return null
         val area = ServerActions.text(row, "area") ?: QueueLabels.areaOf(service)
-        return CallNextConfirmation(row.optString("id"), "$area $number", ServerActions.text(row, "patientName"), office, QueueLabels.service(service))
+        return CallNextConfirmation(row.optString("id"), "$area $number", ServerActions.text(row, "patientName"), ServerActions.text(row, "officeCode") ?: office, QueueLabels.service(service))
     }
 
     /**
@@ -69,7 +72,8 @@ object QueueReception {
 
     /**
      * What a doctor reads on a queue row (S11): the reason of the visit (categories of the appointment request, or the
-     * service), whether it is an appointment, and how long the patient has waited. Age and sex are not in `/fila` (gap).
+     * service), whether it is an appointment, and how long the patient has waited. Age and sex go after the name
+     * ([QueueTicket.patientSummary]), from the Lote 5 `/fila` read fields.
      */
     fun doctorSummary(ticket: QueueTicket, nowMillis: Long): String = listOfNotNull(
         ticket.categories.takeIf { it.isNotEmpty() }?.joinToString(", ") { it.name } ?: QueueLabels.service(ticket.service),

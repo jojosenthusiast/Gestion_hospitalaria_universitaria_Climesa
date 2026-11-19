@@ -78,10 +78,13 @@ class BedsViewModel @Inject constructor(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             try {
-                // Lote 5 S7: isolation comes from the admissions; without `admision.ver` (or if it fails) the filter stays hidden.
-                val isolated = if ("admision.ver" in mutable.value.permissions) try { repository.isolatedBedCodes() } catch (e: CancellationException) { throw e } catch (_: Exception) { null } else null
-                val beds = sv.edu.catolica.climesa.domain.BedsByType.withIsolation(repository.beds(), isolated.orEmpty())
-                mutable.update { it.copy(isolationKnown = isolated != null) }
+                // Lote 5 S7: `/camas` carries `isolation` / `roomIsolation` on newer APIs. Older ones fall back to the admissions;
+                // without `admision.ver` (or if it fails) the filter stays hidden.
+                val board = repository.beds()
+                val fromApi = sv.edu.catolica.climesa.domain.BedsByType.reportsIsolation(board)
+                val isolated = if (fromApi || "admision.ver" !in mutable.value.permissions) null else try { repository.isolatedBedCodes() } catch (e: CancellationException) { throw e } catch (_: Exception) { null }
+                val beds = if (fromApi) board else sv.edu.catolica.climesa.domain.BedsByType.withIsolation(board, isolated.orEmpty())
+                mutable.update { it.copy(isolationKnown = fromApi || isolated != null) }
                 mutable.update { it.copy(loading = false, beds = beds, error = null) }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e

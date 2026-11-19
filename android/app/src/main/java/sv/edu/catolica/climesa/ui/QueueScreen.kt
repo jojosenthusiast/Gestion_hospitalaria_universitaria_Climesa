@@ -373,6 +373,8 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Bo
             Text(QueueLabels.service(ticket.service), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.climesa.primaryText)
         }
         Text(ticket.patientName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // Lote 5: «34 años · Femenino» right after the name, on reception and MED rows; absent when the API does not send it.
+        ticket.patientSummary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         if (forDoctor) {
             if (ticket.categories.isNotEmpty()) CategoryMarks(ticket.categories, showNames = true)
             Text(sv.edu.catolica.climesa.domain.QueueReception.doctorSummary(ticket, now), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)

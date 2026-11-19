@@ -334,6 +334,8 @@ private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, o
             if (priorities.isNotEmpty()) PriorityMenu(priorities, enabled = free) { model.changePriority(ticket, it) }
         }
         Text(ticket.patientName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // Lote 5: «34 años · Femenino» right after the name; absent when the API does not send it.
+        ticket.patientSummary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         Text(QueueContext.line(ticket), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (ticket.categories.isNotEmpty()) CategoryMarks(ticket.categories, showNames = true)
     }

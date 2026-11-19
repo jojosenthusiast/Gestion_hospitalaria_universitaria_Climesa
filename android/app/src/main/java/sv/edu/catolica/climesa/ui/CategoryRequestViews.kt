@@ -276,6 +276,8 @@ private fun RequestCard(r: CategoryRequest, state: CategoryRequestsState, model:
         footer = if (assigning) ({ AssignPanel(state, model) }) else null,
     ) {
         Text(r.patientName, style = MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        // Lote 5: «34 años · Femenino» right after the name; absent when the API does not send it.
+        r.patientSummary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         // The reason is the icon and its name together, so the picture never has to be guessed.
         CategoryMarks(r.categories, showNames = true)
         r.note?.let { Text("«$it»", style = MaterialTheme.typography.bodyMedium) }
