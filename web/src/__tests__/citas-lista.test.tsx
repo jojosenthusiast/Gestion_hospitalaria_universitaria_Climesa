@@ -27,6 +27,12 @@ function mount() {
   return api;
 }
 
+/** Owner batch 2 (S29): the requests are the «Solicitudes» segment of the agenda, not a card on top. */
+async function openRequests() {
+  await userEvent.click(within(await screen.findByRole('group', { name: 'Estado de la cita' })).getByRole('button', { name: /^Solicitudes/ }));
+  return screen.findByRole('region', { name: 'Solicitudes' });
+}
+
 describe('Citas · lista por día (R4a)', () => {
   it('barra compacta: a lo sumo 4 estados visibles y el resto en «Más»', async () => {
     mount();
@@ -46,15 +52,38 @@ describe('Citas · lista por día (R4a)', () => {
     expect(container).toBeTruthy();
   });
 
-  it('la bandeja de solicitudes cuenta lo mismo que «Solicitadas»: con médico y por motivo', async () => {
+  // Owner batch 2 (S29): the asked appointments were shown twice (a card on top and «Próximas»); requests by reason
+  // were only on the card. Now both live in one segment of the list, counted once, with no second card above.
+  it('las solicitudes son un segmento de la lista con su conteo, no una tarjeta aparte que repite citas', async () => {
     mount();
-    const bandeja = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
-    expect(await within(bandeja).findByText('Paciente Por Motivo')).toBeTruthy();
-    expect(within(bandeja).getByText('Paciente s1')).toBeTruthy();
-    expect(within(bandeja).getByRole('button', { name: /^Confirmar · Paciente s2/ })).toBeTruthy();
-    expect(within(bandeja).getByLabelText('3 pendientes')).toBeTruthy();
-    const more = within(await screen.findByRole('group', { name: 'Estado de la cita' })).getByRole('combobox');
-    expect(within(more).getByRole('option', { name: 'Solicitadas (3)' })).toBeTruthy();
+    await screen.findByText('Paciente c1');
+    expect(screen.queryByRole('region', { name: 'Solicitudes por asignar' })).toBeNull();
+    const estados = screen.getByRole('group', { name: 'Estado de la cita' });
+    await vi.waitFor(() => expect(within(estados).getByRole('button', { name: /^Solicitudes/ }).textContent).toBe('Solicitudes3'));
+    // «Solicitadas» is not a second door to the same rows.
+    expect(within(within(estados).getByRole('combobox')).queryByRole('option', { name: /Solicitadas/ })).toBeNull();
+    const bandeja = await openRequests();
+    const porAsignar = within(bandeja).getByRole('region', { name: 'Por asignar' });
+    const porConfirmar = within(bandeja).getByRole('region', { name: 'Por confirmar' });
+    expect(within(porAsignar).getByText('Paciente Por Motivo')).toBeTruthy();
+    expect(within(porAsignar).getByText(/sin médico ni hora/)).toBeTruthy();
+    expect(within(porConfirmar).getByText('Paciente s1')).toBeTruthy();
+    expect(within(porConfirmar).getByText(/Eligieron médico y hora en la app/)).toBeTruthy();
+    expect(within(porConfirmar).getByRole('button', { name: /^Confirmar · Paciente s2/ })).toBeTruthy();
+    // The agenda itself (days) is not drawn under the requests, so no row appears twice on the screen.
+    expect(screen.getAllByText('Paciente s1')).toHaveLength(1);
+    expect(document.querySelector('.ag-day')).toBeNull();
+  });
+
+  it('la búsqueda filtra las solicitudes y «Quitar filtros» se queda en el segmento', async () => {
+    mount();
+    const bandeja = await openRequests();
+    await userEvent.type(screen.getByRole('searchbox', { name: 'Buscar citas' }), 'motivo');
+    await vi.waitFor(() => expect(within(bandeja).queryByText('Paciente s1')).toBeNull());
+    expect(within(bandeja).getByText('Paciente Por Motivo')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
+    expect(await within(bandeja).findByText('Paciente s1')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /^Solicitudes/ }).getAttribute('aria-pressed')).toBe('true');
   });
 
   it('una cita confirmada cuya hora ya pasó se ve «Vencida» y no está entre las próximas', async () => {
