@@ -65,6 +65,33 @@ describe('Ingreso guiado · motivo, origen, turno y cama (observación 11)', () 
     expect(row).toMatchObject({ origin: 'cita', originId: appointmentId, motive: 'Ingreso de prueba por emergencia', visitorsAllowed: true, visitorsMax: 1, unstable: false, postSurgical: false, isolationType: null });
   });
 
+  // S27 (owner, Lote 2): «quiero saber si sirve lo de emergencia y registro». Emergency and ambulance origins work end to end.
+  test('un ingreso desde una emergencia o un servicio de ambulancia del paciente se acepta y la lista dice cuándo ocurrió el origen', async () => {
+    const patientId = await t.patient();
+    const emergency = await t.admissionBody(patientId, { requestedCategory: 'semiprivada', isolation: false });
+    const unit = await t.one<{ id: string }>('SELECT id FROM ambulancia.unidad ORDER BY placa LIMIT 1');
+    const dispatchedAt = new Date(now.valueOf() - 3_600_000);
+    const service = await t.one<{ id: string }>(`INSERT INTO ambulancia.servicio(unidad_id,tipo,prioridad,paciente_id,origen,destino,despachado_por,despachado_en,finalizado_en,estado_final)
+      VALUES($1,'emergencia_domicilio','naranja',$2,'Colonia Ficticia','Hospital CLIMESA, emergencia',$3,$4,$5,'completado') RETURNING id`, [unit.id, patientId, randomUUID(), dispatchedAt, new Date(now.valueOf() - 1_800_000)]);
+    const origins = (await t.call('REC', 'GET', `/admisiones/origenes?patientId=${patientId}`)).body.map((o: any) => `${o.origin}:${o.id}`);
+    expect(origins).toEqual(expect.arrayContaining([`emergencia:${emergency.originId}`, `ambulancia:${service.id}`]));
+    const fromEmergency = await post(emergency);
+    expect(fromEmergency.status).toBe(201);
+    const ticket = await t.one<{ at: Date }>('SELECT emitido_en AS at FROM atencion.ticket_fila WHERE id=$1', [emergency.originId]);
+    const rows = (await t.call('REC', 'GET', '/admisiones')).body;
+    const emergencyRow = rows.find((a: any) => a.id === fromEmergency.body.id);
+    expect(emergencyRow).toMatchObject({ origin: 'emergencia', originId: emergency.originId });
+    expect(emergencyRow.createdAt).toEqual(expect.any(String));
+    expect(emergencyRow.originAt === null ? null : new Date(emergencyRow.originAt).valueOf()).toBe(ticket.at ? new Date(ticket.at).valueOf() : null);
+    // A second admission of the same patient from the ambulance service (the first one is cancelled first: one active admission each).
+    expect((await t.call('REC', 'POST', `/admisiones/${fromEmergency.body.id}/cancelar`, { version: fromEmergency.body.version, reason: 'Registrada para la prueba de origen.' })).status).toBe(201);
+    const fromAmbulance = await post({ ...emergency, origin: 'ambulancia', originId: service.id });
+    expect(fromAmbulance.status).toBe(201);
+    const ambulanceRow = (await t.call('REC', 'GET', '/admisiones')).body.find((a: any) => a.id === fromAmbulance.body.id);
+    expect(ambulanceRow).toMatchObject({ origin: 'ambulancia', originId: service.id });
+    expect(new Date(ambulanceRow.originAt).valueOf()).toBe(dispatchedAt.valueOf());
+  });
+
   test('el médico necesita turno en el horario del ingreso', async () => {
     const body = await valid({ scheduledAt: new Date(now.valueOf() + 5 * 86_400_000).toISOString() });
     const refused = await post(body);
@@ -104,6 +131,19 @@ describe('Ingreso guiado · motivo, origen, turno y cama (observación 11)', () 
     expect(during.body.find((d: any) => d.id === doctorId)).toMatchObject({ available: true, reason: null });
     const later = await t.call('REC', 'GET', `/admisiones/medicos-disponibles?at=${new Date(now.valueOf() + 20 * 86_400_000).toISOString()}`);
     expect(later.body.find((d: any) => d.id === doctorId)).toMatchObject({ available: false, reason: 'Sin turno en ese horario' });
+  });
+
+  test('obs. 21: un médico sin cuenta en la app sale apagado con su motivo y el alta del ingreso lo rechaza', async () => {
+    const noAccount = await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT 'Médico','Sin Cuenta Ingreso','medico',id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`);
+    const body = await valid({ attendingDoctorId: noAccount.id });
+    const listed = (await t.call('REC', 'GET', `/admisiones/medicos-disponibles?at=${now.toISOString()}`)).body.find((d: any) => d.id === noAccount.id);
+    expect(listed).toMatchObject({ available: true, hasAccount: false, reason: 'No tiene cuenta en la app: no podrá firmar el alta.' });
+    const before = await t.one<{ n: number }>('SELECT count(*)::int AS n FROM hospitalizacion.admision');
+    const refused = await post(body);
+    expect(refused.status).toBe(400);
+    expect(refused.body).toMatchObject({ codigo: 'validacion', campo: 'attendingDoctorId' });
+    expect(refused.body.detail ?? refused.body.title ?? JSON.stringify(refused.body)).toMatch(/no tiene cuenta en la app/);
+    expect(await t.one<{ n: number }>('SELECT count(*)::int AS n FROM hospitalizacion.admision')).toEqual(before);
   });
 
   test('mapa de camas: conteo por categoría, compatibilidad por sexo y una sugerencia', async () => {

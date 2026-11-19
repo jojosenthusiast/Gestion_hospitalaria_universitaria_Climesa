@@ -48,9 +48,15 @@ export const fieldsFor = (type: MovementType) => ({
   existingLot: type !== 'entrada',
 });
 
-export type Filters = { query: string; types: ArticleType[]; statuses: StockStatus[]; onlyLow: boolean };
-export const emptyFilters: Filters = { query: '', types: [], statuses: [], onlyLow: false };
-export const activeFilterCount = (f: Filters) => f.types.length + f.statuses.length + (f.onlyLow ? 1 : 0) + (f.query.trim() ? 1 : 0);
+/**
+ * Owner obs. 10: one status filter only, the count tiles above the list. The «Filtros» panel keeps category, order and
+ * «Mostrar inactivos»; inactive articles stay out of the list until that box is checked.
+ */
+export type Filters = { query: string; types: ArticleType[]; statuses: StockStatus[]; onlyLow: boolean; showInactive: boolean };
+export const emptyFilters: Filters = { query: '', types: [], statuses: [], onlyLow: false, showInactive: false };
+export const activeFilterCount = (f: Filters) => f.types.length + f.statuses.length + (f.onlyLow ? 1 : 0) + (f.showInactive ? 1 : 0) + (f.query.trim() ? 1 : 0);
+/** Statuses offered as count tiles; «inactivo» is the panel checkbox instead. */
+export const tileStatuses: StockStatus[] = ['agotado', 'bajo_minimo', 'por_vencer', 'ok'];
 
 export type SortKey = 'nombre' | 'estado' | 'existencia' | 'vencimiento';
 export const sortLabels: Record<SortKey, string> = { nombre: 'Nombre', estado: 'Urgencia', existencia: 'Existencia (menor primero)', vencimiento: 'Vencimiento próximo' };
@@ -60,6 +66,7 @@ export function filterArticles(rows: ArticleSummary[], f: Filters): ArticleSumma
   return rows.filter(a =>
     (!q || foldText(`${a.code} ${a.name} ${categories[a.type].label}`).includes(q)) &&
     (!f.types.length || f.types.includes(a.type)) &&
+    (f.showInactive || a.status !== 'inactivo') &&
     (!f.statuses.length || f.statuses.includes(a.status)) &&
     (!f.onlyLow || a.status === 'bajo_minimo' || a.status === 'agotado'));
 }
@@ -143,13 +150,27 @@ export function articleExport(rows: ArticleSummary[], filtersText: string): Expo
     rows: rows.map(a => [a.code, a.name, categories[a.type].label, a.unit, a.available, a.minimum, a.expiringSoon, a.expired, a.nextExpiry ?? '', statusLabels[a.status]]),
   };
 }
-export function movementsExport(article: ArticleDetail): ExportTable {
+export function movementsExport(article: ArticleDetail, names: Map<string, string> = new Map()): ExportTable {
+  const place = (code: string | null) => code ? names.get(code) ?? code : '';
   return {
     filename: `movimientos-${article.code}`, title: `Movimientos de ${article.name}`, subtitle: article.code,
     columns: ['Fecha', 'Tipo', 'Lote', 'Cantidad', 'Origen', 'Destino', 'Motivo', 'Registró'],
-    rows: article.movements.map(m => [m.registeredAt, movementLabels[m.type].label, m.lotNumber, m.quantity, m.originWarehouseCode ?? '', m.destinationWarehouseCode ?? '', m.reason ?? '', m.authorName]),
+    rows: article.movements.map(m => [m.registeredAt, movementLabels[m.type].label, m.lotNumber, m.quantity, place(m.originWarehouseCode), place(m.destinationWarehouseCode), m.reason ?? '', m.authorName]),
   };
 }
+
+/**
+ * Owner obs. 10: history and lots show the warehouse name, not its code («BOD-CEN»). Names come from the article's own
+ * stock rows and from `/inventario/bodegas`; a warehouse found in neither (inactive since) keeps its code.
+ */
+export function warehouseNames(article: Pick<ArticleDetail, 'warehouses' | 'lotList'>, catalog: Warehouse[] = []): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const w of catalog) if (w.name) names.set(w.code, w.name);
+  for (const w of [...article.warehouses, ...article.lotList.flatMap(l => l.warehouses)]) if (w.warehouseName) names.set(w.warehouseCode, w.warehouseName);
+  return names;
+}
+/** Signed quantity as the history shows it: what leaves the warehouse carries a minus sign. */
+export const signedQuantity = (m: Pick<ArticleMovement, 'type' | 'quantity'>) => m.quantity > 0 && m.type !== 'entrada' && m.type !== 'ajuste' && m.type !== 'traslado' ? `−${m.quantity}` : String(m.quantity);
 
 /** Día de hoy en la hora del hospital (yyyy-MM-dd), para contar días hasta el vencimiento. */
 export const todayIso = (now = new Date()) => new Intl.DateTimeFormat('en-CA', { timeZone: 'America/El_Salvador' }).format(now);

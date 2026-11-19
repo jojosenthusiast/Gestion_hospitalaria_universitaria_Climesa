@@ -15713,6 +15713,15 @@
             }
           },
           {
+            "name": "incluirConsultasAuditoria",
+            "required": false,
+            "in": "query",
+            "description": "Solo /auditoria/registros: true incluye las consultas a la auditoría de la propia cuenta (auditoria.consultar), que por defecto se ocultan; siguen registradas",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "exportar",
             "required": false,
             "in": "query",
@@ -15916,6 +15925,15 @@
                 "asc",
                 "desc"
               ]
+            }
+          },
+          {
+            "name": "incluirConsultasAuditoria",
+            "required": false,
+            "in": "query",
+            "description": "Solo /auditoria/registros: true incluye las consultas a la auditoría de la propia cuenta (auditoria.consultar), que por defecto se ocultan; siguen registradas",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -23089,6 +23107,16 @@
           "semiprivada"
         ]
       },
+      "EstadoCama": {
+        "type": "string",
+        "enum": [
+          "ocupada",
+          "limpieza",
+          "bloqueada",
+          "reservada",
+          "libre"
+        ]
+      },
       "SpaceResponse": {
         "type": "object",
         "properties": {
@@ -23145,6 +23173,14 @@
           },
           "freeBeds": {
             "type": "integer"
+          },
+          "bedState": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoCama"
+              }
+            ]
           }
         },
         "required": [
@@ -23160,7 +23196,8 @@
           "version",
           "path",
           "totalBeds",
-          "freeBeds"
+          "freeBeds",
+          "bedState"
         ]
       },
       "SpaceDto": {
@@ -23224,16 +23261,6 @@
           "code",
           "name",
           "type"
-        ]
-      },
-      "EstadoCama": {
-        "type": "string",
-        "enum": [
-          "ocupada",
-          "limpieza",
-          "bloqueada",
-          "reservada",
-          "libre"
         ]
       },
       "BedBoardResponse": {
@@ -29497,6 +29524,17 @@
             "nullable": true,
             "description": "Motivo del ingreso; nulo solo en admisiones anteriores a la regla."
           },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Cuándo se registró la admisión (o se indicó, si nace de una consulta)."
+          },
+          "originAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Cuándo ocurrió el registro de origen (consulta, emergencia, ambulancia o cita); nulo si no se encuentra."
+          },
           "isolationType": {
             "nullable": true,
             "allOf": [
@@ -29575,6 +29613,8 @@
           "occupationId",
           "originId",
           "motive",
+          "createdAt",
+          "originAt",
           "isolationType",
           "unstable",
           "postSurgical",
@@ -31150,6 +31190,11 @@
           "reason": {
             "type": "string",
             "nullable": true
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre de lo que se tocó: cuenta, persona del personal o código de cama/espacio. Los pacientes van por expediente"
           }
         },
         "required": [
@@ -31165,7 +31210,8 @@
           "patientId",
           "patientRecord",
           "result",
-          "reason"
+          "reason",
+          "subject"
         ]
       },
       "AuditPageResponse": {
@@ -31282,6 +31328,11 @@
             "type": "string",
             "nullable": true
           },
+          "subject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre de lo que se tocó: cuenta, persona del personal o código de cama/espacio. Los pacientes van por expediente"
+          },
           "correlation": {
             "type": "string",
             "nullable": true,
@@ -31325,6 +31376,7 @@
           "patientRecord",
           "result",
           "reason",
+          "subject",
           "correlation",
           "detail",
           "hash",

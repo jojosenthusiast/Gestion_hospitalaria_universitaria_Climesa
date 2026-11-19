@@ -60,6 +60,8 @@ export class AdmissionResponse {
   @UuidProp({ nullable: true }) occupationId!: string | null;
   @UuidProp({ nullable: true }) originId!: string | null;
   @StrProp({ nullable: true, description: 'Motivo del ingreso; nulo solo en admisiones anteriores a la regla.' }) motive!: string | null;
+  @DateTimeProp({ description: 'Cuándo se registró la admisión (o se indicó, si nace de una consulta).' }) createdAt!: string;
+  @DateTimeProp({ nullable: true, description: 'Cuándo ocurrió el registro de origen (consulta, emergencia, ambulancia o cita); nulo si no se encuentra.' }) originAt!: string | null;
   @EnumProp(TIPO_AISLAMIENTO, 'TipoAislamiento', { nullable: true }) isolationType!: string | null;
   @BoolProp() unstable!: boolean;
   @BoolProp() postSurgical!: boolean;

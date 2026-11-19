@@ -1,0 +1,28 @@
+/* Owner obs. 15: the patients list is a table with a header row; the open record stays in view next to it. */
+.pt-master-detail { gap: 0; }
+.pt-table-wrap { min-width: 0; overflow-x: auto; }
+/* The wrapper scrolls sideways, so it is the header's scroll container: the shared app-bar offset would push the header
+   over the first row. Inside it the header simply stays at the top of the table. */
+.pt-table th { top: 0; }
+.pt-table td small { display: block; color: var(--muted); font-size: 13px; }
+.pt-table tbody tr.is-clickable { cursor: pointer; }
+.pt-table tbody tr.is-clickable:hover { background: var(--soft); }
+.pt-table tbody tr.is-selected, .pt-table tbody tr.is-selected:hover { background: var(--soft); box-shadow: inset 4px 0 0 var(--primary); }
+.pt-table tbody tr.is-selected .pt-open strong { color: var(--primary-text); }
+.pt-open { padding: 0; border: 0; background: transparent; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.pt-open:hover strong { text-decoration: underline; text-underline-offset: 3px; }
+.pt-open:focus-visible { outline: 3px solid var(--outline); outline-offset: 2px; border-radius: 4px; }
+
+.pt-detail { margin: 16px; scroll-margin-top: 92px; }
+@media (min-width: 961px) {
+  /* The card no longer clips, so the open record sticks below the app bar while the list scrolls. */
+  .data-workbench.pt-workbench { overflow: visible; }
+  .pt-workbench > .table-footnote:last-child { border-radius: 0 0 var(--radius-card) var(--radius-card); }
+  .pt-detail { margin: 16px 16px 16px 0; top: 92px; max-height: calc(100svh - 108px); overflow-y: auto; scrollbar-width: thin; }
+}
+
+/* Paging: where the list is and how to move; the API returns at most 50 per page. */
+.pt-pager { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; }
+.pt-pager-buttons { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+.pt-page-empty { padding: 24px; display: grid; justify-items: start; gap: 12px; color: var(--muted); }
+.pt-page-empty p { margin: 0; }
