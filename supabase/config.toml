@@ -39,6 +39,9 @@ content_path = "./supabase/templates/enlace-magico.html"
 [auth.email.template.email_change]
 subject = "Confirma tu nuevo correo en CLIMESA"
 content_path = "./supabase/templates/cambio-correo.html"
+[auth.email.template.reauthentication]
+subject = "Tu código de verificación de CLIMESA"
+content_path = "./supabase/templates/reverificacion.html"
 [auth.hook.custom_access_token]
 enabled = true
 uri = "pg-functions://postgres/acceso/hook_token"
