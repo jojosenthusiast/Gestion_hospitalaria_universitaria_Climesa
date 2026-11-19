@@ -21,6 +21,6 @@ export const EVENT_TYPES = [
   'signos.registrados',
   'turno.actualizado', 'turno.cambiado', 'turno.publicado',
   'usuario.actualizado',
-  'vinculacion.resuelta', 'vinculacion.solicitada',
+  'vinculacion.resuelta',
 ] as const;
 export type EventType = typeof EVENT_TYPES[number];

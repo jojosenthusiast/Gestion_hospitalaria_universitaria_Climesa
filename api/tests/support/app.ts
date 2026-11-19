@@ -17,9 +17,13 @@ const issuer = 'https://gvmvmrusscsfbndnbvbr.supabase.co/auth/v1';
 export async function createTestApp(start: Date) {
   let current = start;
   const fixture = await createDatabase();
+  /** A role code (its fixture account) or an account id created by the spec itself. */
+  const subject = (role: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(role) ? role : userId(role);
+  /** What Supabase Auth reports for each account: by default an unconfirmed fixture email (nothing auto-links). */
+  const authUsers = new Map<string, { email: string; confirmed: boolean }>();
   const jwt = (role: string) => {
     const h = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
-    const b = Buffer.from(JSON.stringify({ sub: userId(role), iss: issuer, aud: 'authenticated', exp: Math.floor(current.valueOf() / 1000) + 86400 })).toString('base64url');
+    const b = Buffer.from(JSON.stringify({ sub: subject(role), iss: issuer, aud: 'authenticated', exp: Math.floor(current.valueOf() / 1000) + 86400 })).toString('base64url');
     return `${h}.${b}.${createHmac('sha256', 'test-only-key').update(h + '.' + b).digest('base64url')}`;
   };
   const auth = { authClient: { auth: { getUser: async (token: string) => {
@@ -27,7 +31,8 @@ export async function createTestApp(start: Date) {
     const expected = createHmac('sha256', 'test-only-key').update(h + '.' + b).digest('base64url');
     if (!s || s.length !== expected.length || !timingSafeEqual(Buffer.from(s), Buffer.from(expected))) return { data: { user: null }, error: new Error('firma') };
     const p = JSON.parse(Buffer.from(b, 'base64url').toString());
-    return { data: { user: { id: p.sub, email: 'fixture@example.test' } }, error: null };
+    const known = authUsers.get(p.sub);
+    return { data: { user: { id: p.sub, email: known?.email ?? 'fixture@example.test', email_confirmed_at: known?.confirmed ? current.toISOString() : null } }, error: null };
   } } }, admin: { auth: { admin: { inviteUserByEmail: jest.fn() } } }, isConfigured: () => true };
   const clock = { now: () => current, today: () => businessDate(current) };
   // Clinical files never leave the process in tests (no network): the private bucket is an in-memory fake.
@@ -136,6 +141,8 @@ export async function createTestApp(start: Date) {
   return {
     app, pg, call, send, storage, one, staffOf, patient, enroll, shift, driverShift, appointment, consultation, admissionBody, events, audits, crewOnDuty,
     setNow: (value: Date) => { current = value; },
+    /** Sets the email Supabase Auth reports for an account (role code or id) and whether it is confirmed. */
+    authUser: (role: string, email: string, confirmed = true) => { authUsers.set(subject(role), { email, confirmed }); },
     close: async () => { await app.close(); await pg.close(); },
   };
 }

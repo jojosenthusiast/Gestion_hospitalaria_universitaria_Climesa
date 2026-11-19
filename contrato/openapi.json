@@ -16412,6 +16412,7 @@
     },
     "/api/v1/cuentas/vinculacion": {
       "post": {
+        "deprecated": true,
         "operationId": "AccountLinkingController_request",
         "parameters": [
           {
@@ -16427,19 +16428,9 @@
             "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LinkRequestDto"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Ya no se responde; se conserva para los clientes generados con el contrato anterior",
             "content": {
               "application/json": {
                 "schema": {
@@ -16488,6 +16479,9 @@
               }
             }
           },
+          "410": {
+            "description": "La vinculación ahora es automática por correo verificado (codigo vinculacion_automatica)"
+          },
           "default": {
             "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
             "content": {
@@ -16504,7 +16498,7 @@
             "bearer": []
           }
         ],
-        "summary": "El paciente pide vincular su cuenta con DUI y fecha de nacimiento",
+        "summary": "Retirado: la cuenta se une sola al expediente que tiene su correo verificado. Responde 410 (codigo vinculacion_automatica).",
         "tags": [
           "accounts"
         ],
@@ -16513,6 +16507,7 @@
     },
     "/api/v1/cuentas/vinculaciones": {
       "get": {
+        "deprecated": true,
         "operationId": "AccountLinkingController_pending",
         "parameters": [],
         "responses": {
@@ -16575,7 +16570,7 @@
             "bearer": []
           }
         ],
-        "summary": "Vinculaciones pendientes con el expediente que coincide",
+        "summary": "Retirado: ya no hay vinculaciones por verificar; responde siempre una lista vacía",
         "tags": [
           "accounts"
         ],
@@ -16584,6 +16579,7 @@
     },
     "/api/v1/cuentas/vinculaciones/{id}/aprobar": {
       "post": {
+        "deprecated": true,
         "operationId": "AccountLinkingController_approve",
         "parameters": [
           {
@@ -16591,6 +16587,7 @@
             "required": true,
             "in": "path",
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -16607,19 +16604,9 @@
             "description": "Una por intención del usuario; se reutiliza en los reintentos de esa misma intención (docs/arquitectura/convenciones-api.md, Idempotencia)."
           }
         ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/LinkApproveDto"
-              }
-            }
-          }
-        },
         "responses": {
           "201": {
-            "description": "",
+            "description": "Ya no se responde; se conserva para los clientes generados con el contrato anterior",
             "content": {
               "application/json": {
                 "schema": {
@@ -16678,6 +16665,9 @@
               }
             }
           },
+          "410": {
+            "description": "La vinculación ahora es automática por correo verificado (codigo vinculacion_automatica)"
+          },
           "default": {
             "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
             "content": {
@@ -16694,7 +16684,7 @@
             "bearer": []
           }
         ],
-        "summary": "Aprobar vinculación tras verificar identidad",
+        "summary": "Retirado: aprobar con DUI y nacimiento ya no vincula. Responde 410 (codigo vinculacion_automatica).",
         "tags": [
           "accounts"
         ],
@@ -16881,7 +16871,7 @@
             "bearer": []
           }
         ],
-        "summary": "Estado de la vinculación de la cuenta: si ya está vinculada y su última solicitud (pendiente, aprobada o rechazada con motivo)",
+        "summary": "Estado de la vinculación automática: si la cuenta ya está unida a su expediente y el correo que Recepción debe anotar en él",
         "tags": [
           "accounts"
         ],
@@ -20340,6 +20330,15 @@
           "desconocida"
         ]
       },
+      "EstadoCuentaApp": {
+        "type": "string",
+        "enum": [
+          "vinculada",
+          "sin_cuenta",
+          "correo_repetido"
+        ],
+        "description": "Cuenta de la app del paciente, con los datos de contacto: vinculada; sin_cuenta (todavía ninguna cuenta verificada con este correo); correo_repetido (otro expediente activo tiene el mismo correo y la cuenta no se une a ninguno)"
+      },
       "PatientHistoryEntryResponse": {
         "type": "object",
         "properties": {
@@ -20442,6 +20441,14 @@
           "address": {
             "type": "string",
             "nullable": true
+          },
+          "appAccount": {
+            "description": "Cuenta de la app del paciente, con los datos de contacto: vinculada; sin_cuenta (todavía ninguna cuenta verificada con este correo); correo_repetido (otro expediente activo tiene el mismo correo y la cuenta no se une a ninguno)",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoCuentaApp"
+              }
+            ]
           },
           "history": {
             "description": "Solo con pacientes.editar_demograficos",
@@ -31439,25 +31446,6 @@
           "motivo"
         ]
       },
-      "LinkRequestDto": {
-        "type": "object",
-        "properties": {
-          "dui": {
-            "type": "string",
-            "example": "00000000-0",
-            "description": "DUI con o sin guion."
-          },
-          "birth": {
-            "type": "string",
-            "format": "date",
-            "example": "1990-01-31"
-          }
-        },
-        "required": [
-          "dui",
-          "birth"
-        ]
-      },
       "EstadoVinculacion": {
         "type": "string",
         "enum": [
@@ -31670,18 +31658,6 @@
           "candidates"
         ]
       },
-      "LinkApproveDto": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "number",
-            "minimum": 1
-          }
-        },
-        "required": [
-          "version"
-        ]
-      },
       "LinkRejectDto": {
         "type": "object",
         "properties": {
@@ -31705,29 +31681,32 @@
         "properties": {
           "linked": {
             "type": "boolean",
-            "description": "La cuenta ya está vinculada a un expediente"
+            "description": "La cuenta ya está unida a su expediente"
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "description": "Correo de la cuenta. Sin vincular, la app pide: «Pide en Recepción que anoten este correo: <email>»"
+          },
+          "emailVerified": {
+            "type": "boolean",
+            "description": "Supabase Auth confirmó el correo. Solo un correo confirmado une la cuenta con el expediente."
           },
           "request": {
             "nullable": true,
-            "description": "Última solicitud de vinculación; null si nunca pidió",
+            "description": "Obsoleto: siempre null. Ya no hay solicitudes de vinculación.",
             "type": "object",
             "allOf": [
               {
                 "$ref": "#/components/schemas/LinkRequestResponse"
               }
             ]
-          },
-          "declared": {
-            "description": "Lo que la cuenta declaró en esa solicitud, para volver a pedir con el formulario prellenado. Ausente si nunca pidió.",
-            "allOf": [
-              {
-                "$ref": "#/components/schemas/LinkDeclaredResponse"
-              }
-            ]
           }
         },
         "required": [
           "linked",
+          "email",
+          "emailVerified",
           "request"
         ]
       },
@@ -34676,6 +34655,9 @@
           "vinculacion_pendiente",
           "vinculacion_resuelta",
           "sin_expediente",
+          "vinculacion_automatica",
+          "correo_en_uso",
+          "correo_de_otra_cuenta",
           "rol_no_invitable",
           "invitacion_no_pendiente",
           "jerarquia_administrador",
@@ -34825,8 +34807,7 @@
           "turno.cambiado",
           "turno.publicado",
           "usuario.actualizado",
-          "vinculacion.resuelta",
-          "vinculacion.solicitada"
+          "vinculacion.resuelta"
         ],
         "description": "Catálogo de eventos que la API emite (docs/arquitectura/tiempo-real.md)."
       },

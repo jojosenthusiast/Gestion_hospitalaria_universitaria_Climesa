@@ -11,6 +11,7 @@ import { ageOn, ageRange, fichaFields, searchBirthFields, searchShowsBirth } fro
 import { PatientListFilters, assertListFilters, listFilterSql } from './patient-list.filters';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateContact, validateDemographics } from './patient.rules';
 import { careContextPatients, careRelationPatients } from '../platform/care-context';
+import { appAccountState, assertEmailAssignable, linkRecordByEmail } from '../platform/patient-account-link';
 type Row = Record<string, any>;
 /** Patient states the front desk and the clinic can attend (queue, appointment, consultation, admission refuse the rest). */
 const ATTENDABLE:readonly string[]=['activo','provisional'];
@@ -21,13 +22,13 @@ export class PatientsService {
     const words=normalize(query).split(' ').filter(Boolean).map(t=>`%${t}%`);
     const sounds=phonetic(query).split(' ').filter(Boolean).map(t=>`%${t}%`);
     const {sql:filterSql,params:filterParams}=listFilterSql(filters,9,businessDate(this.clock.now()),this.clock.now());
-    const rows=(await c.query(`SELECT p.id,p.expediente,p.estado,p.nombres,p.primer_apellido,p.segundo_apellido,p.alias_provisional,p.sexo,p.nacimiento::text AS nacimiento,p.version,p.busqueda_normalizada,i.valor_original AS dui FROM pacientes.paciente p
+    const rows=(await c.query(`SELECT p.id,p.expediente,p.estado,p.nombres,p.primer_apellido,p.segundo_apellido,p.alias_provisional,p.sexo,p.nacimiento::text AS nacimiento,p.version,p.busqueda_normalizada,p.correo,i.valor_original AS dui FROM pacientes.paciente p
       LEFT JOIN LATERAL (SELECT valor_original FROM pacientes.identificador WHERE paciente_id=p.id AND tipo='dui' AND estado IN ('sin_verificar','verificado') LIMIT 1) i ON true
       WHERE ($1::text[]='{}' OR p.busqueda_normalizada LIKE ALL($1) OR (p.fon_apellido||' '||p.fon_nombres) LIKE ALL($2)
-        OR p.expediente ILIKE $3 OR regexp_replace(coalesce(i.valor_original,''),'[^0-9]','','g') LIKE $4 OR p.nacimiento::text=$5)
+        OR p.expediente ILIKE $3 OR ($3 LIKE '%@%' AND p.correo ILIKE $3) OR regexp_replace(coalesce(i.valor_original,''),'[^0-9]','','g') LIKE $4 OR p.nacimiento::text=$5)
       AND ($6::text IS NULL OR p.estado=$6)${filterSql}
       ORDER BY p.nombres,p.primer_apellido,p.id LIMIT $7 OFFSET $8`,[words,sounds,`%${query.trim()}%`,query.replace(/\D/g,'').length>=4?`%${query.replace(/\D/g,'')}%`:'!no-document!',query,state??null,limit,offset,...filterParams])).rows;
-    return rows.map(p=>({ id:p.id, record:p.expediente, fullName:this.name(p), givenNames:p.nombres??p.alias_provisional??'', surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '), state:p.estado, active:p.estado!=='inactivo', sex:p.sexo, birth:p.nacimiento, version:p.version, matchReason:matchReasons({query,fullName:this.name(p),record:p.expediente,dui:p.dui,birth:p.nacimiento}).join(', ') }));
+    return rows.map(p=>({ id:p.id, record:p.expediente, fullName:this.name(p), givenNames:p.nombres??p.alias_provisional??'', surnames:[p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' '), state:p.estado, active:p.estado!=='inactivo', sex:p.sexo, birth:p.nacimiento, version:p.version, matchReason:matchReasons({query,fullName:this.name(p),record:p.expediente,dui:p.dui,birth:p.nacimiento,email:p.correo}).join(', ') }));
   }
   private name(p:Row) { return [p.nombres,p.primer_apellido,p.segundo_apellido].filter(Boolean).join(' ')||p.alias_provisional; }
   async search(actor:Actor, query:string|undefined, limit=50, state?:string, offset=0, filters:PatientListFilters={}) {
@@ -144,6 +145,8 @@ export class PatientsService {
     if(fields.contact){
       const dui=(await c.query("SELECT valor_original FROM pacientes.identificador WHERE paciente_id=$1 AND tipo='dui' AND estado IN ('sin_verificar','verificado')",[id])).rows[0];
       Object.assign(result,{dui:dui?.valor_original??null,phone:p.telefono,email:p.correo,address:p.direccion});
+      // Owner observations 2026-11-18 (batch 2): whether the app account already joined this record, for who sees its contact.
+      result.appAccount=await appAccountState(c,id,p.correo);
     }    if(hasPermission(actor,'pacientes.editar_demograficos'))result.history=(await c.query('SELECT version,cambiado_en AS at,motivo AS reason,cambios AS changes FROM pacientes.historial_demografico WHERE paciente_id=$1 ORDER BY version DESC',[id])).rows;
     return result;
   }
@@ -176,6 +179,7 @@ export class PatientsService {
       if(!token||token.huella_criterios!==fingerprint(normalize(dto.searchQuery)))throw new BadRequestException('La búsqueda previa no es válida o venció (dura 10 minutos). Busca otra vez antes de registrar.');
       const text=normalize(`${data.givenNames} ${data.surnames} ${data.dui??''} ${data.birth??''}`);
       await this.duplicate(c,data.dui);
+      await assertEmailAssignable(c,data.email);
       if(!data.provisional&&!dto.confirmarNuevo)await this.sameNameAndBirth(c,data);
       const seq=(await c.query("SELECT nextval('pacientes.expediente_seq') AS n")).rows[0].n;
       const alias=data.provisional?(await c.query("SELECT 'NN-'||extract(year from $1::timestamptz)::int||'-'||lpad(nextval('pacientes.provisional_seq')::text,4,'0') AS alias",[this.clock.now()])).rows[0].alias:null;
@@ -185,6 +189,8 @@ export class PatientsService {
       await this.commands.audit(c,actor,{action:'pacientes.registrar',entity:'paciente',entityId:row.id,patientId:row.id,permission});
       await this.commands.event(c,'paciente.creado','paciente',row.id,1,await this.patientChannels(c,row.id));
       await this.openDuplicateCases(c,actor,{id:row.id,fonApellido:phonetic(data.surnames),fonNombres:phonetic(data.givenNames),nacimiento:data.birth});
+      // Flow 2: the patient made the app account first; writing its verified email here joins it to this record now.
+      await linkRecordByEmail(c,this.commands,actor,data.email,permission);
       return {id:row.id,record:recordNumber(seq),version:1};
     });
   }
@@ -215,6 +221,7 @@ export class PatientsService {
       if(!old)throw new NotFoundException('No se encontró el paciente.');
       if(old.version!==dto.version)throw new VersionConflictException(old.version,'La ficha cambió. Vuelve a abrirla antes de guardar.');
       await this.duplicate(c,data.dui,id);
+      if(old.estado==='activo'||old.estado==='provisional')await assertEmailAssignable(c,data.email,id);
       const row=(await c.query(`UPDATE pacientes.paciente SET nombres=$2,primer_apellido=$3,segundo_apellido=NULL,sexo=$4,nacimiento=$5,precision_nacimiento=$6,telefono=$7,correo=$8,direccion=$9,busqueda_normalizada=$10,fon_apellido=$11,fon_nombres=$12,version=version+1 WHERE id=$1 RETURNING *`,[id,data.givenNames,data.surnames,data.sex,data.birth,birthPrecision({birth:old.nacimiento_texto,precision:old.precision_nacimiento},data.birth??null),data.phone,data.email||null,data.address||null,normalize(`${data.givenNames} ${data.surnames} ${data.dui??''} ${data.birth??''}`),phonetic(data.surnames),phonetic(data.givenNames)])).rows[0];
       const previous=(await c.query("SELECT valor_original FROM pacientes.identificador WHERE paciente_id=$1 AND tipo='dui' AND estado IN ('sin_verificar','verificado')",[id])).rows[0]?.valor_original??null;
       await c.query("UPDATE pacientes.identificador SET estado='retirado' WHERE paciente_id=$1 AND tipo='dui' AND estado IN ('sin_verificar','verificado')",[id]);
@@ -224,6 +231,7 @@ export class PatientsService {
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,row.version,actor.id,dto.reason,changes]);
       await this.commands.audit(c,actor,{action:'pacientes.editar',entity:'paciente',entityId:id,patientId:id,permission:'pacientes.editar_demograficos',detail:{fields:Object.keys(changes)}});
       await this.commands.event(c,'paciente.actualizado','paciente',id,row.version,await this.patientChannels(c,id));
+      if(row.estado==='activo'||row.estado==='provisional')await linkRecordByEmail(c,this.commands,actor,data.email,'pacientes.editar_demograficos');
       return {id,version:row.version};
     });
   }
@@ -237,7 +245,8 @@ export class PatientsService {
       const old=(await c.query('SELECT * FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new NotFoundException('No se encontró el paciente.');
       if(old.version!==dto.version)throw new VersionConflictException(old.version,'Tu ficha cambió. Vuelve a abrirla antes de guardar.');
-      const next={telefono:dto.phone===undefined?old.telefono:(dto.phone.replace(/-/g,'')||null),correo:dto.email===undefined?old.correo:(dto.email||null),direccion:dto.address===undefined?old.direccion:(dto.address||null)};
+      const next={telefono:dto.phone===undefined?old.telefono:(dto.phone.replace(/-/g,'')||null),correo:dto.email===undefined?old.correo:(dto.email?.trim()||null),direccion:dto.address===undefined?old.direccion:(dto.address||null)};
+      if(dto.email!==undefined)await assertEmailAssignable(c,next.correo,id);
       const row=(await c.query('UPDATE pacientes.paciente SET telefono=$2,correo=$3,direccion=$4,version=version+1 WHERE id=$1 RETURNING *',[id,next.telefono,next.correo,next.direccion])).rows[0];
       const changes:Row={};for(const field of ['telefono','correo','direccion'])if(String(old[field]??'')!==String(row[field]??''))changes[field]={before:old[field],after:row[field]};
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,row.version,actor.id,'Actualización de contacto por el propio paciente',changes]);
@@ -248,14 +257,17 @@ export class PatientsService {
   }
   async setState(actor:Actor,id:string,dto:PatientStateDto,key?:string) {
     return this.commands.run(actor,`pacientes.editar_demograficos:${id}:estado`,key,dto,async c=>{
-      const old=(await c.query('SELECT estado,version FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
+      const old=(await c.query('SELECT estado,version,correo FROM pacientes.paciente WHERE id=$1 FOR UPDATE',[id])).rows[0];
       if(!old)throw new NotFoundException('No se encontró el paciente.');
       if(old.version!==dto.version)throw new VersionConflictException(old.version,'La ficha cambió. Vuelve a abrirla.');
       const state=dto.active?'activo':'inactivo';
+      // Reactivating must not leave two active records with one email (the automatic link would become ambiguous).
+      if(state==='activo'&&old.estado==='inactivo')await assertEmailAssignable(c,old.correo,id);
       await c.query('UPDATE pacientes.paciente SET estado=$2,version=version+1 WHERE id=$1',[id,state]);
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,old.version+1,actor.id,dto.reason,{estado:{before:old.estado,after:state}}]);
       await this.commands.audit(c,actor,{action:'pacientes.estado',entity:'paciente',entityId:id,patientId:id,permission:'pacientes.editar_demograficos'});
       await this.commands.event(c,'paciente.actualizado','paciente',id,old.version+1,await this.patientChannels(c,id));
+      if(state==='activo')await linkRecordByEmail(c,this.commands,actor,old.correo,'pacientes.editar_demograficos');
       return {id,version:old.version+1,state};
     });
   }

@@ -65,6 +65,7 @@ export class PatientDetailResponse {
   @StrProp({ optional: true, nullable: true }) phone?: string | null;
   @StrProp({ optional: true, nullable: true }) email?: string | null;
   @StrProp({ optional: true, nullable: true }) address?: string | null;
+  @EnumProp(['vinculada', 'sin_cuenta', 'correo_repetido'], 'EstadoCuentaApp', { optional: true, description: 'Cuenta de la app del paciente, con los datos de contacto: vinculada; sin_cuenta (todavía ninguna cuenta verificada con este correo); correo_repetido (otro expediente activo tiene el mismo correo y la cuenta no se une a ninguno)' }) appAccount?: string;
   @ClassArrayProp(PatientHistoryEntryResponse, { optional: true, description: 'Solo con pacientes.editar_demograficos' }) history?: PatientHistoryEntryResponse[];
 }
 

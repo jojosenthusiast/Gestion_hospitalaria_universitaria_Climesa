@@ -19,7 +19,8 @@ jest.setTimeout(120000);
 const base=['active','fullName','givenNames','id','provisional','record','sex','state','surnames','version'];
 const nacimiento=['birth','birthPrecision'];
 const rango=['ageRange'];
-const contacto=['address','dui','email','phone'];
+// appAccount (automatic app link by verified email) travels with the contact fields.
+const contacto=['address','appAccount','dui','email','phone'];
 describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md §2)',()=>{
  let app:NestFastifyApplication,fixture:Awaited<ReturnType<typeof createDatabase>>,patientId:string;
  const call=async(role:string,method:string,path:string,body?:unknown)=>{

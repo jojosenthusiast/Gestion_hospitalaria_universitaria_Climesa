@@ -7,7 +7,7 @@ const now = new Date(Math.floor(Date.now() / 60_000) * 60_000 - 10 * 60_000);
 /** Fictitious DUI with a valid check digit for the given 8-digit body. */
 const dui = (body: string) => body + String((10 - [...body].reduce((sum, c, i) => sum + Number(c) * (9 - i), 0) % 10) % 10);
 
-/** REQ-03, REQ-05: account linking (spec 101), own record and results (102, 107) and clinical history (106). */
+/** REQ-03, REQ-05: automatic account linking by verified email, own record and results (102, 107) and clinical history (106). */
 describe('vinculación de cuenta e historial clínico (REQ-03, REQ-05)', () => {
   let t: TestApp;
   beforeAll(async () => { t = await createTestApp(now); await t.enroll('MED'); });
@@ -19,67 +19,38 @@ describe('vinculación de cuenta e historial clínico (REQ-03, REQ-05)', () => {
     return id;
   };
 
-  describe('vinculación (FR-101-08 a FR-101-11, RN-39)', () => {
-    test('sin vincular no ve nada propio; recepción aprueba y la cuenta queda enlazada en vivo', async () => {
+  describe('vinculación automática por correo verificado (observaciones del dueño 2026-11-18, lote 2)', () => {
+    test('sin vincular no ve nada propio; con su correo verificado en el expediente queda enlazada en vivo', async () => {
       await unlink();
       expect((await t.call('PAC', 'GET', '/me/paciente')).body.codigo).toBe('sin_vinculacion');
       expect((await t.call('PAC', 'GET', '/me/laboratorio')).status).toBe(404);
       const document = dui('10000001');
       const patientId = await withDui(document);
-      expect((await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: document.slice(0, 8) + ((Number(document[8]) + 1) % 10), birth: '1990-01-01' })).status).toBe(400);
-      expect((await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: document, birth: '2999-01-01' })).status).toBe(400);
-      const requested = await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: `${document.slice(0, 8)}-${document[8]}`, birth: '1990-01-01' });
-      expect(requested.status).toBe(201);
-      expect(requested.body).toEqual(expect.objectContaining({ state: 'pendiente', version: 1 }));
-      expect(requested.body).not.toHaveProperty('candidate');
-      expect((await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: document, birth: '1990-01-01' })).body.codigo).toBe('vinculacion_pendiente');
-      const [channels] = await t.events('vinculacion.solicitada', requested.body.id);
-      expect(channels).toEqual(expect.arrayContaining(['rol:REC', `usuario:${userId('PAC')}`]));
-      expect(channels).not.toContain('rol:PAC');
-
-      const queue = await t.call('REC', 'GET', '/cuentas/vinculaciones');
-      expect(queue.status).toBe(200);
-      const row = queue.body.find((r: any) => r.id === requested.body.id);
-      expect(row).toEqual(expect.objectContaining({ declared: { dui: `${document.slice(0, 8)}-${document[8]}`, birth: '1990-01-01' }, candidates: 1 }));
-      expect(row.candidate).toEqual(expect.objectContaining({ id: patientId, birth: '1990-01-01' }));
-      expect((await t.call('PAC', 'GET', '/cuentas/vinculaciones')).status).toBe(403);
-      expect((await t.call('PAC', 'POST', `/cuentas/vinculaciones/${row.id}/aprobar`, { version: 1 })).status).toBe(403);
-
-      const stale = await t.call('REC', 'POST', `/cuentas/vinculaciones/${row.id}/aprobar`, { version: 7 });
-      expect(stale.status).toBe(409);
-      expect(stale.body.versionActual).toBe(1);
-      const approved = await t.call('REC', 'POST', `/cuentas/vinculaciones/${row.id}/aprobar`, { version: 1 });
-      expect(approved.status).toBe(201);
-      expect(approved.body).toEqual(expect.objectContaining({ state: 'aprobada', version: 2 }));
-      expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${row.id}/aprobar`, { version: 2 })).body.codigo).toBe('vinculacion_resuelta');
-      const [resolved] = await t.events('vinculacion.resuelta', row.id);
-      expect(resolved).toEqual(expect.arrayContaining(['rol:REC', `usuario:${userId('PAC')}`]));
+      // The DUI and birth date no longer link anything.
+      expect((await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: document, birth: '1990-01-01' })).status).toBe(410);
+      expect((await t.call('PAC', 'GET', '/me/paciente')).body.codigo).toBe('sin_vinculacion');
+      await t.pg.query('UPDATE pacientes.paciente SET correo=$2 WHERE id=$1', [patientId, 'vinculable@example.test']);
+      t.authUser('PAC', 'vinculable@example.test');
       expect((await t.call('PAC', 'GET', '/auth/me')).body.patientId).toBe(patientId);
       const mine = await t.call('PAC', 'GET', '/me/paciente');
       expect(mine.status).toBe(200);
       expect(mine.body).toEqual(expect.objectContaining({ id: patientId, dui: `${document.slice(0, 8)}-${document[8]}` }));
-      expect((await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: document, birth: '1990-01-01' })).body.codigo).toBe('cuenta_ya_vinculada');
-      expect((await t.audits('vinculacion.aprobar')).map(a => a.paciente_id)).toContain(patientId);
-      // The database keeps a resolved request closed even outside the API.
-      await expect(t.pg.query("UPDATE acceso.vinculacion_paciente SET estado='pendiente' WHERE id=$1", [row.id])).rejects.toThrow(/vinculacion_resuelta/);
+      const [resolved] = await t.events('vinculacion.resuelta', userId('PAC'));
+      expect(resolved).toEqual(expect.arrayContaining([`usuario:${userId('PAC')}`]));
+      expect(resolved).not.toContain('rol:PAC');
+      expect((await t.audits('vinculacion.automatica')).map(a => a.paciente_id)).toContain(patientId);
+      // Later specs unlink and relink the fixture account by hand: its email is no longer reported as verified.
+      t.authUser('PAC', 'fixture@example.test', false);
     });
 
-    test('sin expediente no se aprueba; el rechazo exige motivo y lo conserva para el paciente', async () => {
+    test('las solicitudes antiguas se cierran con motivo y la base las mantiene cerradas', async () => {
       await unlink();
-      const document = dui('20000002');
-      const requested = await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: document, birth: '1985-05-05' });
-      expect(requested.status).toBe(201);
-      const queued = (await t.call('REC', 'GET', '/cuentas/vinculaciones')).body.find((r: any) => r.id === requested.body.id);
-      expect(queued.candidate).toBeNull();
-      expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${requested.body.id}/aprobar`, { version: 1 })).body.codigo).toBe('sin_expediente');
-      expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${requested.body.id}/rechazar`, { version: 1, reason: 'corto' })).status).toBe(400);
-      const rejected = await t.call('REC', 'POST', `/cuentas/vinculaciones/${requested.body.id}/rechazar`, { version: 1, reason: 'Los datos no coinciden con ningún expediente' });
+      const old = (await t.one<{ id: string }>(`INSERT INTO acceso.vinculacion_paciente(usuario_id,dui_declarado,nacimiento_declarado) VALUES($1,$2,'1985-05-05') RETURNING id`, [userId('PAC'), dui('20000002')])).id;
+      expect((await t.call('REC', 'POST', `/cuentas/vinculaciones/${old}/rechazar`, { version: 1, reason: 'corto' })).status).toBe(400);
+      const rejected = await t.call('REC', 'POST', `/cuentas/vinculaciones/${old}/rechazar`, { version: 1, reason: 'La vinculación ahora es por correo verificado' });
       expect(rejected.status).toBe(201);
-      expect(rejected.body).toEqual(expect.objectContaining({ state: 'rechazada', rejectionReason: 'Los datos no coinciden con ningún expediente' }));
-      expect((await t.call('REC', 'GET', '/cuentas/vinculaciones')).body.map((r: any) => r.id)).not.toContain(requested.body.id);
-      await expect(t.pg.query("UPDATE acceso.vinculacion_paciente SET estado='aprobada', paciente_candidato_id=gen_random_uuid(), verificado_por=$2, resuelto_en=now() WHERE id=$1", [requested.body.id, userId('REC')])).rejects.toThrow(/vinculacion_resuelta/);
-      // After rejection the patient may ask again.
-      expect((await t.call('PAC', 'POST', '/cuentas/vinculacion', { dui: document, birth: '1985-05-05' })).status).toBe(201);
+      expect(rejected.body).toEqual(expect.objectContaining({ state: 'rechazada', rejectionReason: 'La vinculación ahora es por correo verificado' }));
+      await expect(t.pg.query("UPDATE acceso.vinculacion_paciente SET estado='aprobada', paciente_candidato_id=gen_random_uuid(), verificado_por=$2, resuelto_en=now() WHERE id=$1", [old, userId('REC')])).rejects.toThrow(/vinculacion_resuelta/);
     });
   });
 

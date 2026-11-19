@@ -27,10 +27,10 @@ export function validateDemographics(data: Demographics, today: Date): Demograph
     if (!/^\d{4}-\d{2}-\d{2}$/.test(data.birth) || Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0,10)!==data.birth || data.birth>today.toISOString().slice(0,10) || data.birth<min.toISOString().slice(0,10)) throw new BadRequestException('Revisa la fecha de nacimiento; no puede ser futura ni superar 120 años.');
   }
   if (data.provisional && (!Number.isInteger(data.estimatedAge) || data.estimatedAge!<0 || data.estimatedAge!>120 || (data.description?.trim().length ?? 0)<10)) throw new BadRequestException('Una identidad provisional necesita edad estimada y señas de al menos diez caracteres.');
-  return {...data, givenNames: data.givenNames?.trim() ?? '', surnames: data.surnames?.trim() ?? '', dui: data.dui ? data.dui.replace(/-/g,'') : null, birth: data.birth || null, phone: data.phone?.replace(/-/g,'') || null};
+  return {...data, givenNames: data.givenNames?.trim() ?? '', surnames: data.surnames?.trim() ?? '', dui: data.dui ? data.dui.replace(/-/g,'') : null, birth: data.birth || null, phone: data.phone?.replace(/-/g,'') || null, email: data.email?.trim() || null};
 }
 
-export type MatchEvidence = { query: string; fullName: string; record: string; dui?: string | null; birth?: string | null };
+export type MatchEvidence = { query: string; fullName: string; record: string; dui?: string | null; birth?: string | null; email?: string | null };
 /** FR-102-01: motivos reales por los que un paciente aparece en la búsqueda, en el orden documento, expediente, fecha, nombre o fonética. */
 export function matchReasons(e: MatchEvidence): string[] {
   const query = e.query.trim();
@@ -40,6 +40,8 @@ export function matchReasons(e: MatchEvidence): string[] {
   if (digits.length>=4 && (e.dui??'').replace(/\D/g,'').includes(digits)) reasons.push('Coincidencia de documento');
   if (e.record.toLowerCase().includes(query.toLowerCase())) reasons.push('Coincidencia de expediente');
   if (e.birth && e.birth===query) reasons.push('Coincidencia de fecha de nacimiento');
+  // Flow 2: Recepción finds a patient by the email of the app account (only a query with «@» searches emails).
+  if (query.includes('@') && (e.email??'').toLowerCase().includes(query.toLowerCase())) reasons.push('Coincidencia de correo');
   const words = normalize(query).split(' ').filter(Boolean);
   const name = normalize(e.fullName);
   if (words.length && words.every(w=>name.includes(w))) reasons.push('Coincidencia de nombre');

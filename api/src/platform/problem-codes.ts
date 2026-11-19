@@ -25,7 +25,7 @@ export const PROBLEM_CODES = [
   'solicitud_cita_resuelta',
   // Accounts, privacy and patients.
   'cuenta_no_verificada', 'cuenta_ya_vinculada', 'expediente_ya_vinculado', 'paciente_ya_vinculado', 'sin_vinculacion', 'vinculacion_pendiente', 'vinculacion_resuelta',
-  'sin_expediente', 'rol_no_invitable', 'invitacion_no_pendiente', 'jerarquia_administrador', 'trabajo_abierto',
+  'sin_expediente', 'vinculacion_automatica', 'correo_en_uso', 'correo_de_otra_cuenta', 'rol_no_invitable', 'invitacion_no_pendiente', 'jerarquia_administrador', 'trabajo_abierto',
   // Inventory, public information and metrics.
   'existencia_insuficiente', 'aviso_con_datos_personales', 'aviso_retirado', 'aviso_vencido', 'indicador_desconocido',
   // Laboratory catalog (MA-LAB-06).

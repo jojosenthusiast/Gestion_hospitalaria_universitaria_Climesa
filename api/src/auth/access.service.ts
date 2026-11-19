@@ -4,6 +4,7 @@ import { CommandService } from '../platform/command.service';
 import { Clock } from '../platform/clock';
 import { Actor, hasPermission } from '../platform/actor';
 import { ACTIVE_AUTHORITY_HOLDERS_SQL, ADMIN_AUTHORITY_PERMISSION } from '../platform/admin-hierarchy';
+import { emailKey, linkOnSession } from '../platform/patient-account-link';
 
 @Injectable()
 export class AccessService {
@@ -24,6 +25,26 @@ export class AccessService {
     if (principal.length) return principal[0].usuario_id === actor.id;
     const admins = await this.db.query(ACTIVE_AUTHORITY_HOLDERS_SQL, [ADMIN_AUTHORITY_PERMISSION]);
     return admins.length === 1 && admins[0].usuario_id === actor.id;
+  }
+  /**
+   * Owner observations 2026-11-18 (batch 2): on every session of a patient account, keep the email Supabase Auth verified
+   * and, while the account has no record, link it to the one active record with that email. A link that cannot be made
+   * leaves the session as it was: it never blocks the request.
+   */
+  async autoLink(actor: Actor, verifiedEmail: string | null): Promise<Actor> {
+    if (!hasPermission(actor, 'cuenta.vincular')) return actor;
+    const key = verifiedEmail ? emailKey(verifiedEmail) || null : null;
+    if (actor.patientId) {
+      // Already linked: only keep the verified email current, so Recepción's checks see the account's real email.
+      await this.db.query('UPDATE acceso.usuario SET correo_verificado=$2 WHERE id=$1 AND correo_verificado IS DISTINCT FROM $2', [actor.id, key]);
+      return actor;
+    }
+    try {
+      const patientId = await this.db.transaction(c => linkOnSession(c, this.commands, actor, key));
+      return patientId ? { ...actor, patientId } : actor;
+    } catch {
+      return actor;
+    }
   }
   async actor(id: string, email = ''): Promise<Actor> {
     const users = await this.db.query('SELECT id,correo,nombre_mostrar,persona_personal_id,paciente_id,estado FROM acceso.usuario WHERE id=$1', [id]);

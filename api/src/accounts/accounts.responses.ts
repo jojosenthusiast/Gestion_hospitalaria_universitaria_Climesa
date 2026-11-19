@@ -49,9 +49,10 @@ export class PendingLinkResponse {
   @ClassProp(LinkClosestResponse, { optional: true, nullable: true, description: 'Sin coincidencia exacta: el expediente más parecido (mismo nacimiento, DUI distinto en un dígito). No se puede aprobar.' }) closest?: LinkClosestResponse | null;
 }
 
-/** G-1: the account's link state. */
+/** The account's automatic link state (owner observations 2026-11-18, batch 2). */
 export class MyLinkResponse {
-  @BoolProp({ description: 'La cuenta ya está vinculada a un expediente' }) linked!: boolean;
-  @ClassProp(LinkRequestResponse, { nullable: true, description: 'Última solicitud de vinculación; null si nunca pidió' }) request!: LinkRequestResponse | null;
-  @ClassProp(LinkDeclaredResponse, { optional: true, description: 'Lo que la cuenta declaró en esa solicitud, para volver a pedir con el formulario prellenado. Ausente si nunca pidió.' }) declared?: LinkDeclaredResponse;
+  @BoolProp({ description: 'La cuenta ya está unida a su expediente' }) linked!: boolean;
+  @StrProp({ nullable: true, description: 'Correo de la cuenta. Sin vincular, la app pide: «Pide en Recepción que anoten este correo: <email>»' }) email!: string | null;
+  @BoolProp({ description: 'Supabase Auth confirmó el correo. Solo un correo confirmado une la cuenta con el expediente.' }) emailVerified!: boolean;
+  @ClassProp(LinkRequestResponse, { nullable: true, description: 'Obsoleto: siempre null. Ya no hay solicitudes de vinculación.' }) request!: LinkRequestResponse | null;
 }
