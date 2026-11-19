@@ -127,6 +127,11 @@ enum Spacing {
     static let xxl: CGFloat = space8
     /// Alto mínimo de un control táctil (min-height: 48px en web; HIG pide al menos 44 pt).
     static let control: CGFloat = 48
+    /// Text input height, label above (web `.field input { min-height: 52px }`).
+    static let input: CGFloat = 52
+    /// One page gutter and one gap between blocks (web board: 16 / 16).
+    static let gutter: CGFloat = space4
+    static let gap: CGFloat = space4
 }
 
 /// Radios de esquina: chip 4, control 6, tarjeta 10, panel 16. Anidados: interno = externo − padding.
@@ -158,6 +163,16 @@ enum Atkinson {
         case regular = "Regular", medium = "Medium", semibold = "SemiBold", bold = "Bold", extraBold = "ExtraBold"
 
         var swiftUI: Font.Weight {
+            switch self {
+            case .regular: return .regular
+            case .medium: return .medium
+            case .semibold: return .semibold
+            case .bold: return .bold
+            case .extraBold: return .heavy
+            }
+        }
+
+        var uiKit: UIFont.Weight {
             switch self {
             case .regular: return .regular
             case .medium: return .medium
@@ -200,6 +215,18 @@ enum Atkinson {
         let weighted = UIFont(descriptor: descriptor, size: size)
         return Font(UIFontMetrics(forTextStyle: style.uiKitStyle).scaledFont(for: weighted))
     }
+
+    /// Atkinson Hyperlegible Next as a UIKit font, for the UIKit bars SwiftUI does not style (navigation title, tab bar,
+    /// segmented control). Falls back to the system font with the same weight.
+    static func uiFont(_ size: CGFloat, _ weight: Weight = .regular) -> UIFont {
+        guard let baseFont = UIFont(name: "AtkinsonHyperlegibleNext-Regular", size: size) else {
+            return UIFont.systemFont(ofSize: size, weight: weight.uiKit)
+        }
+        let variation = UIFontDescriptor.AttributeName(rawValue: kCTFontVariationAttribute as String)
+        let wghtAxis = NSNumber(value: 0x7767_6874) // 'wght'
+        let descriptor = baseFont.fontDescriptor.addingAttributes([variation: [wghtAxis: NSNumber(value: weight.axisValue)]])
+        return UIFont(descriptor: descriptor, size: size)
+    }
 }
 
 /// Estilos de texto. Escalan con Dynamic Type. Título de módulo: 20 pt, peso 700 (`heading`).
@@ -214,8 +241,13 @@ enum Typo {
     static let small = Atkinson.text(13, .regular, relativeTo: .footnote)
     static let caption = Atkinson.text(12, .regular, relativeTo: .caption)
     static let tag = Atkinson.text(12, .bold, relativeTo: .caption).monospacedDigit()
-    static let stat = Atkinson.text(38, .bold, relativeTo: .largeTitle).monospacedDigit()
-    static let eyebrow = Atkinson.mono(12, .regular, relativeTo: .caption)
+    static let stat = Atkinson.text(34, .bold, relativeTo: .largeTitle).monospacedDigit()
+    /// Section label: sans 12/700, uppercase with 0.08em tracking at the call site (mono is only for codes).
+    static let eyebrow = Atkinson.text(12, .bold, relativeTo: .caption)
+    /// Tracking of an uppercase eyebrow (0.08em of 12 pt).
+    static let eyebrowTracking: CGFloat = 0.96
+    /// Times and counters: sans with tabular figures (web `font-variant-numeric: tabular-nums`).
+    static let time = Atkinson.text(13, .regular, relativeTo: .footnote).monospacedDigit()
     static let mono = Atkinson.mono(13, .regular, relativeTo: .footnote)
     /// Número de turno o ficha en grande.
     static func number(_ size: CGFloat) -> Font { Atkinson.text(size, .bold, relativeTo: .largeTitle).monospacedDigit() }
@@ -238,5 +270,50 @@ private extension Font.TextStyle {
         case .body: return .body
         @unknown default: return .body
         }
+    }
+}
+
+/// UIKit bars that SwiftUI leaves on the system font and colours: Atkinson in the navigation title and bar buttons, the
+/// tab bar and the segmented control, the navy bar and the surface tab bar in both modes.
+enum ClimesaAppearance {
+    static func apply() {
+        let white = UIColor.white
+        let navy = UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? 0x0C1220 : 0x0E1B33) }
+        let surface = UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? 0x141C2D : 0xFFFFFF) }
+        let muted = UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? 0x9AA6BA : 0x55617A) }
+        let primaryText = UIColor { traits in UIColor(hex: traits.userInterfaceStyle == .dark ? 0x8DB3FA : 0x0043B2) }
+
+        let bar = UINavigationBarAppearance()
+        bar.configureWithOpaqueBackground()
+        bar.backgroundColor = navy
+        bar.shadowColor = .clear
+        bar.titleTextAttributes = [.font: Atkinson.uiFont(17, .bold), .foregroundColor: white]
+        bar.largeTitleTextAttributes = [.font: Atkinson.uiFont(30, .bold), .foregroundColor: white]
+        let button = UIBarButtonItemAppearance()
+        button.normal.titleTextAttributes = [.font: Atkinson.uiFont(17, .semibold), .foregroundColor: white]
+        bar.buttonAppearance = button
+        bar.doneButtonAppearance = button
+        bar.backButtonAppearance = button
+        UINavigationBar.appearance().standardAppearance = bar
+        UINavigationBar.appearance().compactAppearance = bar
+        UINavigationBar.appearance().scrollEdgeAppearance = bar
+
+        let tabs = UITabBarAppearance()
+        tabs.configureWithOpaqueBackground()
+        tabs.backgroundColor = surface
+        let item = UITabBarItemAppearance()
+        item.normal.iconColor = muted
+        item.normal.titleTextAttributes = [.font: Atkinson.uiFont(11, .semibold), .foregroundColor: muted]
+        item.selected.iconColor = primaryText
+        item.selected.titleTextAttributes = [.font: Atkinson.uiFont(11, .bold), .foregroundColor: primaryText]
+        tabs.stackedLayoutAppearance = item
+        tabs.inlineLayoutAppearance = item
+        tabs.compactInlineLayoutAppearance = item
+        UITabBar.appearance().standardAppearance = tabs
+        UITabBar.appearance().scrollEdgeAppearance = tabs
+
+        let segmented = UISegmentedControl.appearance()
+        segmented.setTitleTextAttributes([.font: Atkinson.uiFont(14, .semibold)], for: .normal)
+        segmented.setTitleTextAttributes([.font: Atkinson.uiFont(14, .bold)], for: .selected)
     }
 }

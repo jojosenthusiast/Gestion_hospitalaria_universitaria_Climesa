@@ -562,7 +562,7 @@ struct DoctorPatientsView: View {
             if trimmed.count == 1 { EmptyNote("patients.search.hint") }
             LoadState(loader: loader, retry: search) { rows in
                 if rows.isEmpty {
-                    EmptyStateView(title: L.text("patients.none"), message: L.text("patients.treating_only"), symbol: "magnifyingglass")
+                    EmptyStateView(title: L.text("patients.none"), message: L.text("patients.treating_only"))
                 } else {
                     // S2: patients the doctor attends first; the rest show why they do not open, with no navigation.
                     ListCard(items: RecordAccess.ordered(rows)) { patient in
@@ -632,7 +632,7 @@ struct ResultsReviewView: View {
             let inInbox = Set((followUps?.value ?? []).map(\.orderId))
             let pending = ReviewRules.pending(orders).filter { !inInbox.contains($0.id) }
             let inProgress = ReviewRules.cancellable(orders)
-            if pending.isEmpty && inInbox.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
+            if pending.isEmpty && inInbox.isEmpty { EmptyStateView(title: L.text("results.none")) }
             else if !pending.isEmpty {
                 ListCard(items: pending) { order in
                     NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
@@ -961,7 +961,7 @@ struct HospitalizedView: View {
         LoadState(loader: loader, retry: load) { admissions in
             // Row 13: discharge requests first, then signed discharges; two shown, the rest folded.
             let listed = DischargeRules.ranked(admissions)
-            if listed.isEmpty { EmptyStateView(title: L.text("hospitalized.none"), symbol: "bed.double") }
+            if listed.isEmpty { EmptyStateView(title: L.text("hospitalized.none")) }
             ForEach(AttentionFold.shown(listed, expanded: expanded)) { admission in
                 HospitalizedRow(admission: admission, actions: HospitalizedRowActions.of(admission), reload: load)
             }
@@ -1251,7 +1251,7 @@ struct AmbulanceArrivalView: View {
             } else if arrival.status.activeService != nil {
                 Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted)
             } else {
-                EmptyStateView(title: L.text("arrival.none"), symbol: "cross.case")
+                EmptyStateView(title: L.text("arrival.none"))
             }
         }
         .task(id: live.snapshot.version(.ambulance)) { await load() }
@@ -1311,7 +1311,7 @@ private struct PrehospitalReportCard: View {
             HStack {
                 MedicoTag(report.priority.rawValue, label: report.priority.label)
                 Spacer()
-                Text(verbatim: ClimesaDates.display(report.capturedAt, .time)).font(Typo.mono).foregroundStyle(Theme.muted)
+                Text(verbatim: ClimesaDates.display(report.capturedAt, .time)).font(Typo.time).foregroundStyle(Theme.muted)
             }
             if let eta = report.estimatedArrival { Text(verbatim: String(format: L.text("arrival.eta"), ClimesaDates.display(eta, .time))).font(Typo.heading).foregroundStyle(Theme.ink) }
             if let reason = report.reason { Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink) }

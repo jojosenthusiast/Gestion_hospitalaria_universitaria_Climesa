@@ -193,9 +193,9 @@ struct NoticesView: View {
     @ViewBuilder private func list(_ inbox: NoticeInbox) -> some View {
         let items = NoticeRules.filter(inbox.notices, by: filter)
         if inbox.notices.isEmpty {
-            EmptyStateView(title: L.text("notices.empty.title"), message: L.text("notices.empty.body"), symbol: "bell")
+            EmptyStateView(title: L.text("notices.empty.title"), message: L.text("notices.empty.body"))
         } else if items.isEmpty {
-            EmptyStateView(title: L.text(filter == .criticos ? "notices.empty.critical" : "notices.empty.read"), message: L.text("notices.empty.filter"), symbol: "checkmark.circle")
+            EmptyStateView(title: L.text(filter == .criticos ? "notices.empty.critical" : "notices.empty.read"), message: L.text("notices.empty.filter"))
         } else {
             let timeline = NoticeRules.timeline(items)
             if !timeline.current.isEmpty {

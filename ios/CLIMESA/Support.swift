@@ -157,7 +157,7 @@ struct PartError: View {
                     .foregroundStyle(retryable ? Theme.danger : Theme.muted).accessibilityHidden(true)
                 Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             }
-            if retryable { ClimesaButton(title: L.text("ds.retry"), kind: .secondary) { Task { await retry() } } }
+            if retryable { RetryButton { Task { await retry() } } }
         }
         .accessibilityElement(children: .contain)
     }
@@ -205,7 +205,7 @@ struct Card<Content: View>: View {
 struct SectionTitle: View {
     let key: LocalizedStringKey
     init(_ key: LocalizedStringKey) { self.key = key }
-    var body: some View { Text(key).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).padding(.top, 6).accessibilityAddTraits(.isHeader) }
+    var body: some View { Text(key).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking).padding(.top, 6).accessibilityAddTraits(.isHeader) }
 }
 
 struct FieldError: View {
@@ -264,9 +264,9 @@ struct ScreenFrame<Content: View>: View {
     var body: some View {
         ScrollView {
             // S1: sin título gigante; el título va en línea en la barra de navegación (HIG).
-            VStack(alignment: .leading, spacing: Spacing.space5) {
+            VStack(alignment: .leading, spacing: Spacing.gap) {
                 content()
-            }.padding(Spacing.space6).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
+            }.padding(Spacing.gutter).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
         }
         .background(Theme.bg).navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .climesaNavBar()

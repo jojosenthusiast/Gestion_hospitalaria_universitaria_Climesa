@@ -60,9 +60,9 @@ struct RoleTabsView:View {
                 NavigationStack {
                     ScrollView {
                         // S1: sin título gigante; el título de la pestaña va en línea en la barra de navegación (HIG).
-                        VStack(alignment:.leading,spacing:Spacing.space6) {
+                        VStack(alignment:.leading,spacing:Spacing.gap) {
                             content(for:tab)
-                        }.padding(Spacing.space6).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
+                        }.padding(Spacing.gutter).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
                     }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
                         .climesaNavBar()
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
@@ -170,7 +170,7 @@ struct ShiftsContent:View {
         VStack(alignment:.leading,spacing:Spacing.space6) {
             if model.loading && model.shifts.isEmpty { Skeleton(label:L.text("shifts.loading")) }
             else if let error=model.error { ErrorStateView(message:error) { Task { await model.load(api:account.api) } } }
-            else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty"),symbol:"calendar") }
+            else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty")) }
             // Por día asignado (Hoy, Mañana, día y fecha) y por hora de inicio; la entrada se confirma sola (ASIS-01).
             // Abre en hoy: lo de hoy en adelante primero; los días anteriores quedan plegados abajo (S12, últimos 7 días).
             let days=ShiftAttendanceRules.byDay(model.shifts,start:{ ShiftAttendanceRules.date($0.start) },end:{ ShiftAttendanceRules.date($0.end) },today:Date())
@@ -241,7 +241,7 @@ struct ProfileContent:View {
                 Text("auth.footer").font(Typo.small).foregroundStyle(Theme.muted)
             }
             if profile.allowedIOSRoles.count>1 {
-                Picker("profile.work_role",selection:$account.role) { ForEach(profile.allowedIOSRoles,id:\.self) { Text(LocalizedStringKey(RolePolicy.labelKey($0))).tag($0) } }.pickerStyle(.segmented)
+                ClimesaSegmented(title:L.text("profile.work_role"),options:profile.allowedIOSRoles.map { ClimesaSegmented<String>.Option($0,L.text(RolePolicy.labelKey($0))) },selection:$account.role)
             }
             ClimesaButton(title:L.text("profile.refresh"),kind:.secondary) { Task { await account.refreshProfile() } }
             // Rojo solo para lo crítico: cerrar sesión es una acción secundaria.

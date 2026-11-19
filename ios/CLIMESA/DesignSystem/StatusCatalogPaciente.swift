@@ -64,7 +64,7 @@ struct PatientTextArea: View {
             Text(verbatim: label).font(Typo.label).foregroundStyle(Theme.ink)
             TextField("", text: $text, axis: .vertical).lineLimit(lines)
                 .font(Typo.body).foregroundStyle(Theme.ink)
-                .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s).frame(minHeight: Spacing.control, alignment: .topLeading)
+                .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.s).frame(minHeight: 96, alignment: .topLeading)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
                 .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(error == nil ? Theme.controlLine : Theme.danger, lineWidth: error == nil ? 1 : 2))
             if let error { Text(verbatim: error).font(Typo.caption).foregroundStyle(Theme.danger) }

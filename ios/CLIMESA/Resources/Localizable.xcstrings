@@ -249,7 +249,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reintentar"
+            "value": "Volver a intentar"
           }
         }
       }
@@ -6212,6 +6212,28 @@
           "stringUnit": {
             "state": "translated",
             "value": "Signos vitales registrados."
+          }
+        }
+      }
+    },
+    "ds.error.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No pudimos cargar esta información"
+          }
+        }
+      }
+    },
+    "ds.info.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tienes acceso a esta información"
           }
         }
       }

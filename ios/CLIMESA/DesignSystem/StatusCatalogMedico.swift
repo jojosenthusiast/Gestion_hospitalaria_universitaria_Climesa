@@ -41,7 +41,7 @@ struct MedicoTextArea: View {
             TextField("", text: $text, axis: .vertical)
                 .lineLimit(lines)
                 .font(Typo.body).foregroundStyle(Theme.ink)
-                .padding(Spacing.m).frame(minHeight: Spacing.control, alignment: .topLeading)
+                .padding(Spacing.m).frame(minHeight: 96, alignment: .topLeading)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
                 .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(error == nil ? Theme.controlLine : Theme.danger, lineWidth: error == nil ? 1 : 2))
             if let error { Text(verbatim: error).font(Typo.caption).foregroundStyle(Theme.danger) }

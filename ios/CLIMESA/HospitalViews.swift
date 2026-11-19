@@ -71,7 +71,7 @@ struct HospitalInfoView: View {
                 }
             }
         } else {
-            EmptyStateView(title: L.text("hospital.unavailable"), symbol: "building.2")
+            EmptyStateView(title: L.text("hospital.unavailable"))
         }
     }
 
@@ -91,7 +91,7 @@ struct HospitalInfoView: View {
                 }
             }
         } else {
-            EmptyStateView(title: L.text("hospital.doctors.none"), symbol: "stethoscope")
+            EmptyStateView(title: L.text("hospital.doctors.none"))
         }
     }
 
@@ -131,7 +131,7 @@ struct LocationView: View {
             }
             SectionTitle("location.floors")
             LoadState(loader: loader, retry: load) { occupancy in
-                if occupancy.rows.isEmpty { EmptyStateView(title: L.text("hospital.unavailable"), symbol: "building.2") }
+                if occupancy.rows.isEmpty { EmptyStateView(title: L.text("hospital.unavailable")) }
                 ForEach(OccupancyRules.floors(occupancy.rows)) { floor in
                     SectionCard(title: floor.floor.map { String(format: L.text("hospital.floor"), $0) } ?? L.text("hospital.floor.none")) {
                         ForEach(Array(floor.rows.enumerated()), id: \.offset) { index, row in
@@ -171,7 +171,7 @@ struct MyRoomView: View {
             } else if RoomRules.waiting(admissions, patientId: profile.patientId) != nil {
                 PatientNotice(text: L.text("room.waiting"))
             } else if discharge == nil {
-                EmptyStateView(title: L.text("room.none"), message: L.text("room.none.body"), symbol: "bed.double")
+                EmptyStateView(title: L.text("room.none"), message: L.text("room.none.body"))
             }
             // D7: resumen del alta firmada (también 30 días después de la salida).
             if let discharge, let summary = discharge.discharge { DischargeSummaryCard(admission: discharge, discharge: summary) }

@@ -301,7 +301,7 @@ struct PatientQueueView: View {
             if let ticket = QueueRules.activeTicket(list) {
                 QueueTicketCard(ticket: ticket, board: board.value)
             } else {
-                EmptyStateView(title: L.text("queue.none.title"), message: L.text("queue.none.body"), symbol: "person.2")
+                EmptyStateView(title: L.text("queue.none.title"), message: L.text("queue.none.body"))
             }
         }
         .task(id: live.snapshot.version(.queue)) { await load() }
@@ -372,7 +372,7 @@ private struct QueueTicketCard: View {
             VStack(alignment: .leading, spacing: Spacing.m) {
                 HStack(spacing: Spacing.s) {
                     AreaTag(QueueBoardRules.area(ticket))
-                    Text(verbatim: ticket.service.label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase)
+                    Text(verbatim: ticket.service.label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking)
                 }
                 HStack(alignment: .firstTextBaseline) {
                     Text(verbatim: "\(ticket.number)").font(Typo.number(96)).foregroundStyle(Theme.ink).minimumScaleFactor(0.5)
@@ -413,7 +413,7 @@ struct PatientAppointmentsView: View {
 
     var body: some View {
         if linked { content } else {
-            EmptyStateView(title: L.text("appointments.unlinked.title"), message: L.text("appointments.unlinked.body"), symbol: "link")
+            EmptyStateView(title: L.text("appointments.unlinked.title"), message: L.text("appointments.unlinked.body"))
         }
     }
 
@@ -436,7 +436,7 @@ struct PatientAppointmentsView: View {
                     VStack(alignment: .leading, spacing: Spacing.space4) {
                         // I-26: one empty state per screen; inside a section, one line.
                         if split.upcoming.isEmpty && split.past.isEmpty {
-                            EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar")
+                            EmptyStateView(title: L.text("appointments.upcoming.none"))
                         } else {
                             if let next = split.upcoming.first {
                                 // A1: the next appointment leads, on its own card; the others follow.
@@ -661,7 +661,7 @@ private struct RescheduleAppointmentSheet: View {
                 SectionTitle("appointments.slots")
                 LoadState(loader: availability, retry: loadSlots) { value in
                     let free = AppointmentRules.freeSlots(value, excluding: appointment.start)
-                    if free.isEmpty { EmptyStateView(title: L.text("appointments.slots.none"), symbol: "calendar.badge.exclamationmark") }
+                    if free.isEmpty { EmptyStateView(title: L.text("appointments.slots.none")) }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 8) {
                         ForEach(free, id: \.self) { period in
                             Button { slot = period } label: {
@@ -781,16 +781,16 @@ private struct CategoryRequestSheet: View {
                 searchField(L.text("appointments.category.search"), text: $query)
                 LoadState(loader: categories, retry: loadCategories) { list in
                     let visible = CategoryRequestRules.filter(list, query: query, picked: picked)
-                    if visible.isEmpty { EmptyStateView(title: L.text("appointments.category.none"), symbol: "magnifyingglass") }
+                    if visible.isEmpty { EmptyStateView(title: L.text("appointments.category.none")) }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
                         ForEach(visible) { category in categoryButton(category) }
                     }
                 }
                 }
                 SectionTitle("appointments.category.franja")
-                Picker("appointments.category.franja", selection: $franja) {
-                    ForEach(RequestFranja.allCases, id: \.self) { Text(LocalizedStringKey($0.titleKey)).tag($0) }
-                }.pickerStyle(.segmented)
+                ClimesaSegmented(title: L.text("appointments.category.franja"),
+                                 options: RequestFranja.allCases.map { ClimesaSegmented<RequestFranja>.Option($0, L.text($0.titleKey)) },
+                                 selection: $franja)
                 PatientTextArea(label: L.text("appointments.category.note"), text: $note, lines: 2...4,
                                 error: note.count > CategoryRequestRules.noteMax ? L.text("appointments.category.note.long") : submission.fieldErrors["note"])
                 doctorSection
@@ -911,7 +911,7 @@ struct PatientExamsView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.space4) {
             if profile.patientId == nil {
-                EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link")
+                EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"))
             } else {
                 LoadState(loader: loader, retry: load) { orders in
                     // Each chip wears the badge of the stage it filters (pending waits, in process, done).
@@ -924,7 +924,7 @@ struct PatientExamsView: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(Text("exams.filter"))
                     let shown = filter.apply(orders)
-                    if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none"), symbol: "testtube.2") }
+                    if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none")) }
                     // Closed results beyond the newest few fold under «Ver N más».
                     let folded = PatientLabRules.fold(shown)
                     if !shown.isEmpty {
@@ -1084,7 +1084,7 @@ struct PatientSectionView: View {
             case .vinculacion: LinkRecordView()
             case .historial:
                 if let patientId = profile.patientId { ClinicalHistoryView(patientId: patientId) }
-                else { EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link") }
+                else { EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked")) }
             case .ambulancia: AmbulanceRequestView()
             case .hospital: HospitalInfoView()
             case .ubicacion: LocationView()
@@ -1224,7 +1224,7 @@ struct ClinicalHistoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let denied = RecordAccess.deniedMessage(for: loader.failure, viewerIsPatient: viewerIsPatient) {
-                EmptyStateView(title: L.text("history.forbidden.title"), message: denied, symbol: "lock.shield")
+                InfoStateView(message: denied, title: L.text("history.forbidden.title"))
             } else {
                 LoadState(loader: loader, retry: load) { history in
                     // S4: the history's `allowedActions` decide when present; otherwise the permission, as before.
@@ -1257,7 +1257,7 @@ private struct HistoryContent: View {
                 }
             }
             SectionTitle("history.consultations")
-            if history.consultations.isEmpty { EmptyStateView(title: L.text("history.none"), symbol: "stethoscope") }
+            if history.consultations.isEmpty { EmptyStateView(title: L.text("history.none")) }
             ForEach(history.consultations) { consultation in
                 NavigationLink {
                     ScreenFrame(title: "history.consultation") { ConsultationRecord(consultation: consultation) }
@@ -1272,7 +1272,7 @@ private struct HistoryContent: View {
                 }.buttonStyle(.plain)
             }
             SectionTitle("history.laboratory")
-            if history.laboratory.isEmpty { EmptyStateView(title: L.text("history.none"), symbol: "testtube.2") }
+            if history.laboratory.isEmpty { EmptyStateView(title: L.text("history.none")) }
             ForEach(history.laboratory) { order in
                 SectionCard {
                     ListRow(title: ClimesaDates.display(order.createdAt, .date)) { PatientTag(order.state.rawValue, label: order.state.label) }
@@ -1337,7 +1337,7 @@ struct LabeledText: View {
     let label: LocalizedStringKey
     let text: String
     var body: some View {
-        SectionCard { Text(label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase); Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink) }
+        SectionCard { Text(label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking); Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink) }
     }
 }
 
@@ -1403,7 +1403,7 @@ struct AmbulanceRequestView: View {
                     HStack {
                         Text(verbatim: AmbulanceRules.milestoneLabel(type)).font(Typo.small).foregroundStyle(done == nil ? Theme.muted : Theme.ink)
                         Spacer()
-                        Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.mono).foregroundStyle(Theme.muted)
+                        Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.time).foregroundStyle(Theme.muted)
                     }
                 }
             }
@@ -1486,7 +1486,7 @@ struct MyAccessView: View {
 
     var body: some View {
         LoadState(loader: loader, retry: load) { rows in
-            if rows.isEmpty { EmptyStateView(title: L.text("accesses.none"), symbol: "eye.slash") }
+            if rows.isEmpty { EmptyStateView(title: L.text("accesses.none")) }
             // Grouped by day ("Hoy · mié 18 nov"); the last week stays open, older days fold under one line.
             let now = Date()
             let days = AccessLogRules.byDay(rows, now: now)

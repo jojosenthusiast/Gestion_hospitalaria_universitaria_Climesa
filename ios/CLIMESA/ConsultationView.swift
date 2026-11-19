@@ -379,7 +379,7 @@ struct ConsultationView: View {
 
     @ViewBuilder private func readOnly(_ key: String, _ text: String) -> some View {
         VStack(alignment: .leading, spacing: Spacing.xs) {
-            Text(verbatim: L.text(key)).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase)
+            Text(verbatim: L.text(key)).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking)
             Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink)
         }
     }
@@ -482,7 +482,7 @@ struct ConsultationView: View {
         SectionCard(title: L.text("consultation.prescriptions")) {
             ForEach(value.prescriptions) { prescription in
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    Text(verbatim: ClimesaDates.short(prescription.issuedAt)).font(Typo.mono).foregroundStyle(Theme.muted)
+                    Text(verbatim: ClimesaDates.short(prescription.issuedAt)).font(Typo.time).foregroundStyle(Theme.muted)
                     ForEach(Array(prescription.items.enumerated()), id: \.offset) { _, item in
                         Text(verbatim: "\(item.medication) \(item.dose) · \(item.route) · \(item.frequency) · \(item.duration)").font(Typo.body).foregroundStyle(Theme.ink)
                     }
@@ -523,10 +523,9 @@ struct ConsultationView: View {
                 }
                 VStack(alignment: .leading, spacing: Spacing.s) {
                     Text("lab.priority").font(Typo.label).foregroundStyle(Theme.ink)
-                    Picker("lab.priority", selection: $priority) {
-                        Text(verbatim: LabPriority.rutina.label).tag(LabPriority.rutina)
-                        Text(verbatim: LabPriority.urgente.label).tag(LabPriority.urgente)
-                    }.pickerStyle(.segmented)
+                    ClimesaSegmented(title: L.text("lab.priority"),
+                                     options: [ClimesaSegmented<LabPriority>.Option(.rutina, LabPriority.rutina.label), ClimesaSegmented<LabPriority>.Option(.urgente, LabPriority.urgente.label)],
+                                     selection: $priority)
                 }
             }
             .task { if catalog.value == nil { await loadCatalog() } }

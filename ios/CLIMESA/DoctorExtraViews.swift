@@ -14,7 +14,7 @@ struct DoctorAgendaView: View {
         LoadState(loader: loader, retry: load) { entries in
             let upcoming = AgendaRules.upcoming(entries, now: Date())
             let past = AgendaRules.past(entries, now: Date())
-            if upcoming.isEmpty { EmptyStateView(title: L.text("agenda.none"), symbol: "calendar") }
+            if upcoming.isEmpty { EmptyStateView(title: L.text("agenda.none")) }
             ForEach(upcoming) { day in dayCard(day) }
             if !past.isEmpty {
                 Toggle("agenda.past", isOn: $showPast).font(Typo.label).tint(Theme.primary)
@@ -444,7 +444,7 @@ struct AmbulanceOverviewView: View {
                         HStack {
                             Text(verbatim: AmbulanceRules.milestoneLabel(type)).font(Typo.small).foregroundStyle(done == nil ? Theme.muted : Theme.ink)
                             Spacer()
-                            Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.mono).foregroundStyle(Theme.muted)
+                            Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.time).foregroundStyle(Theme.muted)
                         }
                     }
                 }
@@ -477,7 +477,7 @@ struct AmbulanceOverviewView: View {
             }
         }
         LoadState(loader: log, retry: loadLog) { entries in
-            if entries.isEmpty { EmptyStateView(title: L.text("ambulance.log.none"), symbol: "list.bullet.rectangle") }
+            if entries.isEmpty { EmptyStateView(title: L.text("ambulance.log.none")) }
             // Day-grouped: today open, the past days folded (open by themselves when nothing happened today).
             let days = AmbulanceLogRules.days(entries)
             if let today = days.today { dayGroup(ClimesaDates.localDay(Date()), today) }

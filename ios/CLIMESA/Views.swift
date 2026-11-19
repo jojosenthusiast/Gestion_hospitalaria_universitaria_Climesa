@@ -64,7 +64,7 @@ private struct AuthField:View {
             .textInputAutocapitalization(plain ? TextInputAutocapitalization.never : TextInputAutocapitalization.words)
             .autocorrectionDisabled(plain)
             .font(Typo.body).foregroundStyle(Theme.ink)
-            .padding(.horizontal,Spacing.m).frame(minHeight:Spacing.control)
+            .padding(.horizontal,14).frame(minHeight:Spacing.input)
             .background(Theme.surface,in:RoundedRectangle(cornerRadius:Radius.control))
             .overlay(RoundedRectangle(cornerRadius:Radius.control).stroke(Theme.controlLine,lineWidth:1))
         }
