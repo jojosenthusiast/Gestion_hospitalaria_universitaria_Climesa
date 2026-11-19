@@ -3,7 +3,7 @@ package sv.edu.catolica.climesa
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.core.content.edit
+import sv.edu.catolica.climesa.data.AppearancePreferences
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -27,16 +27,21 @@ class MainActivity : ComponentActivity() {
     }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val preferences = getSharedPreferences("appearance", MODE_PRIVATE)
+        val appearance = AppearancePreferences(getSharedPreferences(AppearancePreferences.FILE, MODE_PRIVATE))
         setContent {
             // E-18: without an explicit choice the app follows the system dark mode; the toggle stores the person's choice.
-            var chosen by rememberSaveable { mutableStateOf(if (preferences.contains("dark")) preferences.getBoolean("dark", false) else null) }
+            var chosen by rememberSaveable { mutableStateOf(appearance.dark) }
             val dark = chosen ?: isSystemInDarkTheme()
-            ClimesaTheme(dark) {
-                val auth: AuthViewModel = viewModel()
-                ClimesaApp(auth, dark) { enabled ->
-                    chosen = enabled
-                    preferences.edit { putBoolean("dark", enabled) }
+            // Lote 5 S1: "Tamaño de letra" from Perfil, kept on the device and applied to the whole app.
+            var textScale by rememberSaveable { mutableStateOf(appearance.textScale) }
+            val textScaleControl = TextScaleControl(textScale) { step -> textScale = step; appearance.setTextScale(step) }
+            ClimesaTheme(dark, textScale) {
+                CompositionLocalProvider(LocalTextScaleControl provides textScaleControl) {
+                    val auth: AuthViewModel = viewModel()
+                    ClimesaApp(auth, dark) { enabled ->
+                        chosen = enabled
+                        appearance.setDark(enabled)
+                    }
                 }
             }
         }
