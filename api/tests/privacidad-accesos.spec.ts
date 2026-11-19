@@ -84,6 +84,35 @@ describe('110 · auditoría y quién vio mi expediente', () => {
     expect(Number(exported.n)).toBeGreaterThan(0);
   });
 
+  test('S23: la vista del auditor oculta sus propias consultas a la auditoría (siguen registradas) y muestra las acciones de administración', async () => {
+    const version = async (id: string) => (await t.one<{ version: number }>('SELECT version FROM acceso.usuario WHERE id=$1', [id])).version;
+    const off = await t.call('ADM', 'PATCH', `/usuarios/${userId('AST')}/estado`, { state: 'desactivado', version: await version(userId('AST')), reason: 'Baja de prueba para la auditoría' });
+    expect(off.status).toBe(200);
+    for (let i = 0; i < 4; i++) await t.call('DPD', 'GET', '/auditoria/registros?limite=5');   // fills the top with the auditor's own reads
+
+    const page = await t.call('DPD', 'GET', '/auditoria/registros?limite=25');
+    expect(page.status).toBe(200);
+    expect(page.body.filas.some((r: any) => r.action === 'auditoria.consultar' && r.actorId === userId('DPD'))).toBe(false);
+    const admin = page.body.filas.find((r: any) => r.action === 'usuarios.estado');
+    expect(admin).toMatchObject({ role: expect.stringContaining('ADM'), entity: 'usuario', entityId: userId('AST'), result: 'exito' });
+    expect(admin.subject).toEqual(expect.any(String));
+
+    const accounts = await t.call('DPD', 'GET', '/auditoria/registros?accion=usuarios.&limite=25');
+    expect(accounts.body.filas.length).toBeGreaterThan(0);
+    expect(accounts.body.filas.every((r: any) => r.action.startsWith('usuarios.'))).toBe(true);
+
+    const withMine = await t.call('DPD', 'GET', '/auditoria/registros?incluirConsultasAuditoria=true&limite=25');
+    expect(withMine.body.filas.some((r: any) => r.action === 'auditoria.consultar' && r.actorId === userId('DPD'))).toBe(true);
+    expect(withMine.body.total).toBeGreaterThan(page.body.total);
+    const explicit = await t.call('DPD', 'GET', '/auditoria/registros?accion=auditoria.consultar&limite=5');
+    expect(explicit.body.filas.length).toBeGreaterThan(0);
+    expect((await t.call('DPD', 'GET', '/auditoria/registros?incluirConsultasAuditoria=quizas')).status).toBe(400);
+
+    // Hidden is not lost: every page read above is still in the audit.
+    const recorded = await t.one<{ n: string }>("SELECT count(*)::text AS n FROM plataforma.auditoria WHERE accion='auditoria.consultar' AND actor_id=$1", [userId('DPD')]);
+    expect(Number(recorded.n)).toBeGreaterThanOrEqual(5);
+  });
+
   test('escenario 4: Ana ve rol, fecha y motivo de quien vio su expediente, sin nombres', async () => {
     t.setNow(start);
     const patientId = await t.patient({ linkPac: true, name: 'Ana' });
