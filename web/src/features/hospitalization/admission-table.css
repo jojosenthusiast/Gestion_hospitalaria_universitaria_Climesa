@@ -8,7 +8,7 @@
 .admission-table th { top: 0; }
 @media (min-width: 1200px) {
   .data-workbench.admission-workbench { overflow: visible; }
-  .admission-table th { top: 76px; }
+  .data-workbench.admission-workbench .admission-table th { top: 76px; }
   .admission-table thead th:first-child { border-top-left-radius: 6px; }
   .admission-table thead th:last-child { border-top-right-radius: 6px; }
 }
