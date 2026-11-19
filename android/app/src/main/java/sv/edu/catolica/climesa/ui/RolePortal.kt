@@ -178,7 +178,10 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
         page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)->AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding))
         else->PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){
-                profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
+                // Lote 5 S16 ("no se mira quien vio mi expediente"): the access log is one tap from Mis datos too, not only in Más.
+                val accessLink:(@Composable ()->Unit)?=if(AndroidSection.MY_ACCESS in sections){{DataRow(stringResource(R.string.pac_accesos_enlace),subtitle=stringResource(R.string.pac_accesos_enlace_detalle),leadingIcon=ClimesaIcons.Eye,onClick={selectedName=AndroidSection.MY_ACCESS.name})}}else null
+                val ownData="pacientes.editar_propios" in account.profile.permissions
+                profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if(ownData||accessLink!=null){{Column(verticalArrangement=Arrangement.spacedBy(Spacing.block)){if(ownData)MyDataCard();accessLink?.invoke()}}}else null)
             }
             else if(data.loading&&data.data==null)item{LoadingState()}
             else if(data.error!=null&&data.data==null)item{ErrorState(data.error,{model.load(path)})}

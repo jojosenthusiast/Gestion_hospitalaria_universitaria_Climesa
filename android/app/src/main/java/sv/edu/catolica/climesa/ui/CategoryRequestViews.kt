@@ -43,6 +43,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AppointmentAgenda
@@ -135,16 +136,20 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
                 LiveSearchField(state.query, model::search, stringResource(R.string.cat_buscar))
                 val visible = state.visibleCategories
                 if (visible.isEmpty()) Text(stringResource(R.string.cat_sin_coincidencias), style = MaterialTheme.typography.bodySmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    visible.forEach { category ->
-                        val selected = category.code in state.picked
-                        val full = !selected && state.picked.size >= CategoryRequestRules.MAX_CATEGORIES
-                        ClimesaFilterChip(
-                            selected = selected, onClick = { model.toggle(category.code) }, enabled = !full,
-                            label = { Text(category.name) },
-                            leadingIcon = { Icon(categoryIcon(category.icon), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
-                            modifier = Modifier.semantics { contentDescription = "${category.name}: ${category.description}" },
-                        )
+                // Lote 5 S16: the reasons grouped by body, internal, mind, senses and general, each section with its title.
+                sv.edu.catolica.climesa.domain.CategoryGroups.sections(visible).forEach { section ->
+                    Text(section.group.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.primaryText, modifier = Modifier.padding(top = Spacing.xs).semantics { heading() })
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        section.categories.forEach { category ->
+                            val selected = category.code in state.picked
+                            val full = !selected && state.picked.size >= CategoryRequestRules.MAX_CATEGORIES
+                            ClimesaFilterChip(
+                                selected = selected, onClick = { model.toggle(category.code) }, enabled = !full,
+                                label = { Text(category.name) },
+                                leadingIcon = { Icon(categoryIcon(category.icon), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
+                                modifier = Modifier.semantics { contentDescription = "${category.name}: ${category.description}" },
+                            )
+                        }
                     }
                 }
             }
