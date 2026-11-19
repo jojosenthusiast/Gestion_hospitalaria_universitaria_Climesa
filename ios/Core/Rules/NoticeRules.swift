@@ -86,10 +86,10 @@ public enum NoticeRules {
         return unread > 0 ? unread : nil
     }
 
-    /// Text on the bell: "4", "9+" over nine, nil for none.
+    /// Text on the bell: "4", "99+" over ninety-nine (Lote 5 S1, Android `bellBadgeText`), nil for none.
     public static func badgeText(_ count: Int?) -> String? {
         guard let count, count > 0 else { return nil }
-        return count > 9 ? "9+" : String(count)
+        return count > 99 ? "99+" : String(count)
     }
 
     /// Look of the bell count (web `.notices-bell-count`): a white pill with primary text, red only while an in-force

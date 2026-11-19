@@ -39,10 +39,14 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     /// B5: numbers waiting before this one in its area, when the API sends it (today only the issue response does);
     /// nil otherwise, and the public board gives the estimate.
     public var ahead: Int? = nil
+    /// Lote 5 S11: age in years on the ticket's day (`pacientes.ver_nacimiento`) and sex (`pacientes.ver_ficha`); nil on an
+    /// older API or without the permission.
+    public var patientAge: Int? = nil
+    public var patientSex: String? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
-        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead, patientAge, patientSex
     }
 }
 

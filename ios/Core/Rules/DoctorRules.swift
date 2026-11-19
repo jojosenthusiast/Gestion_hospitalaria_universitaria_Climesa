@@ -525,3 +525,423 @@ public struct VitalsEntryBody: Encodable, Sendable, Equatable {
 public struct VitalsEntrySaved: Decodable, Sendable, Equatable {
     public let id: String
 }
+
+// MARK: - Lote 5 (MED): card actions, forms, consultation, Mi día, lab review, record and shift state
+
+/// What a card action does, which decides its look (owner batch 5, S2; Android `ActionRole`, web `crud.css`): `primary`
+/// (the main next step: Iniciar, Atender, Firmar) is solid primary, `edit` (Reanudar, Reprogramar, Volver a llamar) is
+/// outlined primary, `danger` (Rechazar, Cancelar, No se presentó) is outlined red and `neutral` (Ver expediente) is
+/// outlined grey. Each role borrows the CRUD look, so one action keeps one colour on every screen and platform.
+public enum CardActionRole: String, CaseIterable, Sendable {
+    case primary, edit, danger, neutral
+
+    public var crud: CrudKind {
+        switch self {
+        case .primary: return .create
+        case .edit: return .edit
+        case .danger: return .deactivate
+        case .neutral: return .view
+        }
+    }
+
+    /// Only the main step is a filled button.
+    public var filled: Bool { self == .primary }
+}
+
+/// Lote 5 S3: the shared copy of a form with required fields (Android `FormCopy`).
+public enum FormCopy {
+    /// Visible marker after a required field's label; VoiceOver reads `requiredSpoken` instead.
+    public static let requiredMark = "*"
+    public static let requiredSpoken = "obligatorio"
+    /// One line above a form that has required fields.
+    public static let legend = "Los campos con * son obligatorios."
+    /// How many missing items the action bar names before «y N más».
+    public static let maxNamed = 3
+
+    /// «Falta: motivo de consulta y plan» for the bottom action bar; past `maxNamed` items the rest are counted
+    /// («Falta: a, b, c y 2 más»). Blank and repeated names are skipped; nil when nothing is missing.
+    public static func missingSummary(_ missing: [String]) -> String? {
+        var seen = Set<String>()
+        var names: [String] = []
+        for raw in missing {
+            let name = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !name.isEmpty && seen.insert(name).inserted { names.append(name) }
+        }
+        guard let last = names.last else { return nil }
+        let listed = Array(names.prefix(maxNamed))
+        let rest = names.count - listed.count
+        let body: String
+        if rest > 0 { body = listed.joined(separator: ", ") + " y \(rest) más" }
+        else if listed.count == 1 { body = last }
+        else { body = listed.dropLast().joined(separator: ", ") + " y " + last }
+        return "Falta: \(body)"
+    }
+}
+
+/// Lote 5 S12: what signing needs. The API signs only with a reason and a plan; the rest of the consultation is optional.
+public enum ConsultationForm {
+    public static let reasonKey = "reason"
+    public static let planKey = "plan"
+
+    /// What the action bar lists after «Falta:», per field key.
+    public static let names = [reasonKey: "motivo de consulta", planKey: "plan"]
+
+    /// Keys of the required fields still empty, in screen order (reason first).
+    public static func missing(reason: String, plan: String) -> [String] {
+        var keys: [String] = []
+        if reason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { keys.append(reasonKey) }
+        if plan.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { keys.append(planKey) }
+        return keys
+    }
+
+    /// «motivo de consulta», «plan»: what `missing` lacks, worded for `FormCopy.missingSummary`.
+    public static func missingNames(reason: String, plan: String) -> [String] {
+        missing(reason: reason, plan: plan).compactMap { names[$0] }
+    }
+
+    /// The red error under each empty required field once the doctor tried to sign.
+    public static func errors(reason: String, plan: String) -> [String: String] {
+        var result: [String: String] = [:]
+        for key in missing(reason: reason, plan: plan) {
+            result[key] = key == reasonKey
+                ? "Escribe el motivo de consulta: es obligatorio para firmar."
+                : "Escribe el plan (procedimientos, indicaciones y seguimiento): es obligatorio para firmar."
+        }
+        return result
+    }
+}
+
+/// Lote 5 S12: the draft saves itself on the server about 2.5 s after the last key and when the app goes to the
+/// background, through the same `PATCH /consultas/{id}` (with the version) as «Guardar borrador».
+public enum ConsultationAutosave {
+    /// Quiet time after the last keystroke before the draft is sent.
+    public static let debounceNanoseconds: UInt64 = 2_500_000_000
+
+    /// True when the typed notes differ from what the server already has (spaces at the ends do not count).
+    public static func changed(savedReason: String?, savedExam: String?, savedPlan: String?, reason: String, exam: String, plan: String) -> Bool {
+        func same(_ a: String?, _ b: String) -> Bool {
+            (a ?? "").trimmingCharacters(in: .whitespacesAndNewlines) == b.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        return !same(savedReason, reason) || !same(savedExam, exam) || !same(savedPlan, plan)
+    }
+
+    /// «Borrador guardado automáticamente a las 10:42» (hospital time).
+    public static func savedText(_ date: Date) -> String { "Borrador guardado automáticamente a las \(ClimesaDates.clock(date))" }
+
+    /// «Borrador guardado a las 10:42», after «Guardar borrador».
+    public static func savedByHandText(_ date: Date) -> String { "Borrador guardado a las \(ClimesaDates.clock(date))" }
+}
+
+/// One vital sign with its full name and its value with the unit spelled out.
+public struct VitalPart: Equatable, Sendable {
+    public let name: String
+    public let value: String
+    public init(name: String, value: String) { self.name = name; self.value = value }
+}
+
+/// Lote 5 S3/S12: vital signs read with their full names, never «FC», «Temp» or «PA».
+public enum ConsultationVitalsText {
+    public static func parts(_ sign: ConsultationDetail.VitalSigns) -> [VitalPart] {
+        var parts: [VitalPart] = []
+        if let s = sign.systolic, let d = sign.diastolic { parts.append(VitalPart(name: "Presión arterial", value: "\(s)/\(d) mmHg")) }
+        if let value = sign.heartRate { parts.append(VitalPart(name: "Frecuencia cardiaca", value: "\(value) latidos por minuto")) }
+        if let value = sign.respiratoryRate { parts.append(VitalPart(name: "Frecuencia respiratoria", value: "\(value) respiraciones por minuto")) }
+        if let value = sign.temperature, !value.isEmpty { parts.append(VitalPart(name: "Temperatura", value: "\(value) °C")) }
+        if let value = sign.oxygenSaturation { parts.append(VitalPart(name: "Saturación de oxígeno", value: "\(value) %")) }
+        if let value = sign.weightKg, !value.isEmpty { parts.append(VitalPart(name: "Peso", value: "\(value) kg")) }
+        if let value = sign.heightCm, !value.isEmpty { parts.append(VitalPart(name: "Talla", value: "\(value) cm")) }
+        return parts
+    }
+}
+
+/// Lote 5 S12: one open consultation at a time is the norm; another may still be started (the API allows it).
+public enum ConsultationGuard {
+    /// The doctor's unsigned consultation that is not `current`, to ask about before starting another; nil when none.
+    public static func unsignedOther(_ unsigned: [UnsignedConsultation], current: String?) -> UnsignedConsultation? {
+        unsigned.sorted { $0.startedAt < $1.startedAt }.first { $0.id != current }
+    }
+
+    /// «Tienes una consulta sin firmar de Ana López».
+    public static func title(_ open: UnsignedConsultation) -> String {
+        "Tienes una consulta sin firmar de \(open.patientName ?? "otro paciente")"
+    }
+}
+
+/// What the patient asked for, shown when the consultation opens (Lote 5 S12, «Lo que pidió el paciente»).
+public struct VisitContext: Equatable, Sendable {
+    public let origin: String
+    public let reason: String?
+    public let categories: [AppointmentCategoryRef]
+    /// The queue priority when it is not routine («urgente», «emergencia»).
+    public let priority: String?
+}
+
+public enum ConsultationContextRules {
+    /// From the appointment (agenda row) or the queue number the consultation came from; nil with neither.
+    public static func of(appointment: AgendaEntry?, ticket: QueueTicket?) -> VisitContext? {
+        let origin: String
+        if let appointment {
+            let time = ClimesaDates.parse(appointment.start).map(ClimesaDates.clock) ?? "—"
+            origin = "Cita de las \(time)" + (ticket.map { " · \($0.service.label) \(QueueBoardRules.code($0))" } ?? "")
+        } else if let ticket {
+            origin = "Número \(QueueBoardRules.code(ticket)) · " + QueueRowContext.line(ticket)
+        } else {
+            return nil
+        }
+        let reason = appointment?.reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let priority = ticket.map(QueueBoardRules.priority).flatMap { $0 == "rutina" ? nil : $0 }
+        return VisitContext(origin: origin, reason: (reason?.isEmpty ?? true) ? nil : reason,
+                            categories: appointment?.categories ?? [], priority: priority)
+    }
+}
+
+/// Lote 5 S11: what a queue row tells the doctor about the patient (Android `QueueContext`).
+public enum QueueRowContext {
+    /// «Consulta general · Viene de su cita de las 09:00» or «Emergencia · Llegó sin cita».
+    public static func line(_ ticket: QueueTicket) -> String {
+        let origin = ticket.appointmentAt.flatMap { ClimesaDates.parse($0) }.map { "Viene de su cita de las \(ClimesaDates.clock($0))" } ?? "Llegó sin cita"
+        return "\(ticket.service.label) · \(origin)"
+    }
+
+    /// «34 años · Femenino» when the API sends them (`patientAge`, `patientSex`, only with the right permission).
+    public static func demographics(age: Int?, sex: String?) -> String? {
+        let ageText = age.map { $0 == 1 ? "1 año" : "\($0) años" }
+        let sexText: String?
+        switch sex {
+        case "femenino": sexText = "Femenino"
+        case "masculino": sexText = "Masculino"
+        case "indeterminado": sexText = "Sexo indeterminado"
+        default: sexText = nil
+        }
+        let parts = [ageText, sexText].compactMap { $0 }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    /// «Espera 12 min», «Espera 1 h 5 min» while the number waits or is called; nil otherwise or without a readable time.
+    public static func wait(_ ticket: QueueTicket, now: Date) -> String? {
+        guard ticket.state == .enEspera || ticket.state == .llamado, let issued = ClimesaDates.parse(ticket.issuedAt) else { return nil }
+        let minutes = max(0, Int(now.timeIntervalSince(issued) / 60))
+        if minutes < 60 { return "Espera \(minutes) min" }
+        return "Espera \(minutes / 60) h" + (minutes % 60 > 0 ? " \(minutes % 60) min" : "")
+    }
+}
+
+/// Today's appointments of «Mi día» by section (Lote 5 S11).
+public struct DoctorTodaySections: Equatable, Sendable {
+    public let now: [AgendaEntry]
+    public let upcoming: [AgendaEntry]
+    public let done: [AgendaEntry]
+}
+
+public enum DoctorDaySections {
+    /// Upcoming appointments of today shown before «Mostrar N más de hoy».
+    public static let upcomingVisible = 3
+
+    /// Ahora (running or with an open consultation), Próximas and Atendidas hoy (signed, attended or already past). A row
+    /// without a readable time counts as upcoming, never as done.
+    public static func split(_ rows: [AgendaEntry], now: Date) -> DoctorTodaySections {
+        var current: [AgendaEntry] = [], upcoming: [AgendaEntry] = [], done: [AgendaEntry] = []
+        for row in rows.sorted(by: { $0.start < $1.start }) {
+            let start = ClimesaDates.parse(row.start)
+            let end = ClimesaDates.parse(row.end)
+            if row.consultationState == .firmada || row.appointmentState == .atendida {
+                done.append(row)
+            } else if row.consultationId != nil {
+                current.append(row)
+            } else if let start, start <= now, end.map({ $0 > now }) ?? true {
+                current.append(row)
+            } else if let end, end <= now {
+                done.append(row)
+            } else {
+                upcoming.append(row)
+            }
+        }
+        return DoctorTodaySections(now: current, upcoming: upcoming, done: done)
+    }
+
+    /// «Mostrar 3 más de hoy» under the first `upcomingVisible` rows, «Mostrar menos» when open; nil when nothing hides.
+    public static func moreTodayLabel(_ total: Int, expanded: Bool) -> String? {
+        guard total > upcomingVisible else { return nil }
+        return expanded ? "Mostrar menos" : "Mostrar \(total - upcomingVisible) más de hoy"
+    }
+
+    /// Detail of «Historial de días anteriores»: «2 días · 3 citas · lun 16 nov a mar 17 nov»; nil without earlier days.
+    public static func historyDetail(_ past: [AgendaDay]) -> String? {
+        guard !past.isEmpty else { return nil }
+        let days = past.map(\.day).sorted()
+        let count = past.reduce(0) { $0 + $1.entries.count }
+        let dayText = past.count == 1 ? "1 día" : "\(past.count) días"
+        let citas = count == 1 ? "1 cita" : "\(count) citas"
+        let first = dayLabel(days[0]), last = dayLabel(days[days.count - 1])
+        return "\(dayText) · \(citas) · " + (days.count == 1 ? first : "\(first) a \(last)")
+    }
+
+    /// «lun 16 nov» for a `yyyy-MM-dd` day of El Salvador.
+    public static func dayLabel(_ day: String) -> String {
+        ClimesaDates.pickerDate(day: day).map(ClimesaDates.dayMonth) ?? day
+    }
+}
+
+/// Lote 5 S13: how far a result is from its reference, the flag drawn next to the value.
+public enum LabFlag: String, CaseIterable, Sendable {
+    case normal, high, low, criticalHigh, criticalLow, noRange, text, pending
+
+    public var label: String {
+        switch self {
+        case .normal: return "En rango"
+        case .high: return "Alto"
+        case .low: return "Bajo"
+        case .criticalHigh: return "Crítico alto"
+        case .criticalLow: return "Crítico bajo"
+        case .noRange: return "Sin rango"
+        case .text: return "Resultado descriptivo"
+        case .pending: return "Pendiente"
+        }
+    }
+
+    public var outOfRange: Bool { [.high, .low, .criticalHigh, .criticalLow].contains(self) }
+    public var critical: Bool { self == .criticalHigh || self == .criticalLow }
+
+    /// The status code its badge colour comes from (the result mark family of the status catalog).
+    public var statusValue: String {
+        switch self {
+        case .normal: return ResultMark.normal.rawValue
+        case .high: return ResultMark.alto.rawValue
+        case .low: return ResultMark.bajo.rawValue
+        case .criticalHigh: return ResultMark.criticoAlto.rawValue
+        case .criticalLow: return ResultMark.criticoBajo.rawValue
+        case .noRange, .text: return ResultMark.sinRango.rawValue
+        case .pending: return LabOrderState.pendiente.rawValue
+        }
+    }
+}
+
+public enum LabResultView {
+    /// The server's `mark` when it sent one; otherwise from the value and the patient's range (critical limits first). A
+    /// text result is descriptive; no result yet is pending.
+    public static func flag(value: Double?, text: String?, mark: ResultMark?, range: LabItemRange?, hasResult: Bool = true) -> LabFlag {
+        guard hasResult else { return .pending }
+        let written = text.flatMap { $0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : $0 }
+        switch mark {
+        case .normal?: return .normal
+        case .alto?: return .high
+        case .bajo?: return .low
+        case .criticoAlto?: return .criticalHigh
+        case .criticoBajo?: return .criticalLow
+        case .sinRango?: return value == nil && written != nil ? .text : .noRange
+        case .desconocido?, nil: break
+        }
+        guard let value else { return written != nil ? .text : .pending }
+        guard let range, range.min != nil || range.max != nil || range.criticalLow != nil || range.criticalHigh != nil else { return .noRange }
+        if let high = range.criticalHigh, value > high { return .criticalHigh }
+        if let low = range.criticalLow, value < low { return .criticalLow }
+        if let max = range.max, value > max { return .high }
+        if let min = range.min, value < min { return .low }
+        if range.min == nil && range.max == nil { return .noRange }
+        return .normal
+    }
+
+    public static func flag(_ item: LabOrderItem) -> LabFlag {
+        flag(value: item.result?.value, text: item.result?.text, mark: item.result?.mark, range: item.referenceRange, hasResult: item.result != nil)
+    }
+
+    /// «2 fuera de rango · 1 crítico»; nil when every result is in range or still pending.
+    public static func summary(_ flags: [LabFlag]) -> String? {
+        let out = flags.filter(\.outOfRange).count
+        let critical = flags.filter(\.critical).count
+        guard out > 0 else { return nil }
+        var parts = [out == 1 ? "1 fuera de rango" : "\(out) fuera de rango"]
+        if critical > 0 { parts.append(critical == 1 ? "1 crítico" : "\(critical) críticos") }
+        return parts.joined(separator: " · ")
+    }
+
+    public static func summary(_ items: [LabOrderItem]) -> String? { summary(items.map { flag($0) }) }
+
+    /// «Ver imagen» for a photo, «Ver informe PDF» for a PDF, by the attachment's MIME type.
+    public static func attachmentAction(mime: String) -> String {
+        mime.lowercased().hasPrefix("image/") ? "Ver imagen" : "Ver informe PDF"
+    }
+}
+
+/// Why an exam was ordered: the consultation it came from (Lote 5 S13/S15, «Por qué se pidió»).
+public struct LabOrigin: Equatable, Sendable {
+    public let consultationId: String
+    public let date: String
+    public let doctor: String?
+    public let reason: String?
+    /// «A09 · Diarrea», principal first.
+    public let diagnoses: [String]
+}
+
+public enum LabOriginRules {
+    public static func of(_ history: ClinicalHistory, consultationId: String?) -> LabOrigin? {
+        guard let id = consultationId, let consultation = history.consultations.first(where: { $0.id == id }) else { return nil }
+        let reason = consultation.reason?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let diagnoses = consultation.diagnoses.sorted { $0.principal && !$1.principal }.map { "\($0.code) · \($0.description)" }
+        return LabOrigin(consultationId: id, date: consultation.signedAt ?? consultation.startedAt, doctor: consultation.doctor.name,
+                         reason: (reason?.isEmpty ?? true) ? nil : reason, diagnoses: diagnoses)
+    }
+}
+
+/// One master row of the record's exams (Lote 5 S15).
+public struct RecordLabRow: Equatable, Sendable, Identifiable {
+    public let orderId: String
+    public let exams: String
+    public let orderedAt: String
+    public let state: LabOrderState
+    public let outOfRange: Int
+    public let critical: Int
+    public let pending: Int
+    public var id: String { orderId }
+}
+
+public enum ClinicalRecordLab {
+    /// The record's orders, newest first, with how many results fell out of range.
+    public static func rows(_ history: ClinicalHistory) -> [RecordLabRow] {
+        history.laboratory.map { order in
+            let flags = order.items.map { item in
+                LabResultView.flag(value: item.result?.value, text: item.result?.text, mark: item.result?.mark, range: nil, hasResult: item.result != nil)
+            }
+            let names = order.items.map { $0.name.isEmpty ? $0.code : $0.name }.joined(separator: ", ")
+            return RecordLabRow(orderId: order.id, exams: names.isEmpty ? "Orden de laboratorio" : names, orderedAt: order.createdAt, state: order.state,
+                                outOfRange: flags.filter(\.outOfRange).count, critical: flags.filter(\.critical).count,
+                                pending: order.items.filter { $0.result == nil }.count)
+        }
+        .sorted { $0.orderedAt > $1.orderedAt }
+    }
+
+    /// «2 fuera de rango · 1 crítico», «3 resultados pendientes», «Resultados en rango» or «Orden cancelada».
+    public static func summary(_ row: RecordLabRow) -> String {
+        if row.state == .cancelado { return "Orden cancelada" }
+        if row.outOfRange > 0 || row.critical > 0 {
+            var parts: [String] = []
+            if row.outOfRange > 0 { parts.append(row.outOfRange == 1 ? "1 fuera de rango" : "\(row.outOfRange) fuera de rango") }
+            if row.critical > 0 { parts.append(row.critical == 1 ? "1 crítico" : "\(row.critical) críticos") }
+            return parts.joined(separator: " · ")
+        }
+        if row.pending > 0 { return row.pending == 1 ? "1 resultado pendiente" : "\(row.pending) resultados pendientes" }
+        return "Resultados en rango"
+    }
+}
+
+/// Lote 5 S9, `GET /me/turno-activo`: whether the account works by shifts and may run operational commands now. The API
+/// is the guarantee (403 `sin_turno_activo`); this only tells the person before they try.
+public enum ShiftGate {
+    public static let path = "/me/turno-activo"
+    public static let noActiveShiftCode = "sin_turno_activo"
+    public static let noActiveShiftText = "No tienes un turno activo. Pide a Jefatura que publique tu turno."
+    public static let bannerTitle = "Sin turno activo: puedes consultar pero no registrar."
+
+    /// The banner shows only when the account works by shifts and has none now.
+    public static func showsBanner(_ status: ActiveShiftStatus?) -> Bool {
+        guard let status else { return false }
+        return status.required && !status.active
+    }
+
+    /// «Próximo turno: Mañana 07:00 a 15:00 · Consulta externa»; nil without a published next shift.
+    public static func nextText(_ next: ActiveShiftStatus.Window?, now: Date) -> String? {
+        guard let next, let start = ClimesaDates.parse(next.start), let end = ClimesaDates.parse(next.end) else { return nil }
+        let hours = "\(ClimesaDates.short(start, now: now)) a \(ClimesaDates.clock(end))"
+        return "Próximo turno: " + ([hours, next.area].compactMap { $0 }.joined(separator: " · "))
+    }
+}

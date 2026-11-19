@@ -410,3 +410,47 @@ public extension AppointmentRules {
         return days
     }
 }
+
+// MARK: - Lote 5 S16: «Pedir cita» grouped by body area (Android `CategoryGroups`)
+
+/// Sections of «Pedir cita», in display order. They only group the catalog of `GET /citas/categorias`; no code is invented.
+public enum CategoryGroup: String, CaseIterable, Sendable {
+    case cuerpo, interno, mente, sentidos, general
+
+    public var title: String {
+        switch self {
+        case .cuerpo: return "Cuerpo: cabeza, torso y extremidades"
+        case .interno: return "Interno y digestivo"
+        case .mente: return "Mente y emociones"
+        case .sentidos: return "Sentidos: vista, oído, nariz y garganta"
+        case .general: return "General"
+        }
+    }
+}
+
+public struct CategorySection: Equatable, Sendable, Identifiable {
+    public let group: CategoryGroup
+    public let categories: [AppointmentCategory]
+    public var id: String { group.rawValue }
+}
+
+public enum CategoryGroups {
+    /// Real codes of `citas.categoria_motivo`; a code the server adds later falls in General.
+    private static let byCode: [String: CategoryGroup] = [
+        "cabeza_nervios": .cuerpo, "corazon": .cuerpo, "huesos": .cuerpo, "piel": .cuerpo,
+        "digestivo": .interno, "rinon_urinario": .interno, "alergias": .interno,
+        "salud_mental": .mente,
+        "ojos": .sentidos, "oido_garganta": .sentidos,
+        "consulta_general": .general, "ninos": .general, "mujer_embarazo": .general, "cirugia": .general
+    ]
+
+    public static func groupOf(_ code: String) -> CategoryGroup { byCode[code] ?? .general }
+
+    /// Non-empty sections in `CategoryGroup` order; inside each, the server's order.
+    public static func sections(_ categories: [AppointmentCategory]) -> [CategorySection] {
+        CategoryGroup.allCases.compactMap { group in
+            let rows = categories.filter { groupOf($0.code) == group }
+            return rows.isEmpty ? nil : CategorySection(group: group, categories: rows)
+        }
+    }
+}

@@ -112,7 +112,7 @@ struct RoleTabsView:View {
     }
 }
 
-/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("9+" over nine). Web
+/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("99+" over ninety-nine). Web
 /// `.notices-bell-count`: a white pill with primary text, red only while an in-force critical notice is unread.
 struct NoticesBell:View {
     let model:NoticeInboxModel

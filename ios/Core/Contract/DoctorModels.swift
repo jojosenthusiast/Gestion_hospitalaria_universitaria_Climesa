@@ -424,3 +424,29 @@ public struct PatientVitalsHistory: Decodable, Sendable, Equatable {
     public let admissionId: String?
     public let items: [ConsultationDetail.VitalSigns]
 }
+
+/// `ActiveShiftResponse` de `GET /me/turno-activo` (Lote 5 S9). An older API answers 404, read as no banner.
+public struct ActiveShiftStatus: Decodable, Sendable, Equatable {
+    /// `ShiftWindowResponse`: the shift covering now (`shift`) or the next published one (`next`).
+    public struct Window: Decodable, Sendable, Equatable {
+        public let id: String
+        public let start: String
+        public let end: String
+        public let area: String?
+        public let state: String?
+        public init(id: String, start: String, end: String, area: String?, state: String?) {
+            self.id = id; self.start = start; self.end = end; self.area = area; self.state = state
+        }
+    }
+    /// The account works by shifts (REC, ENF, MED, LAB, PAR) and the rule is in force.
+    public let required: Bool
+    /// It may run operational commands now.
+    public let active: Bool
+    public let graceMinutes: Int?
+    public let shift: Window?
+    public let next: Window?
+    public let message: String?
+    public init(required: Bool, active: Bool, graceMinutes: Int? = nil, shift: Window? = nil, next: Window? = nil, message: String? = nil) {
+        self.required = required; self.active = active; self.graceMinutes = graceMinutes; self.shift = shift; self.next = next; self.message = message
+    }
+}
