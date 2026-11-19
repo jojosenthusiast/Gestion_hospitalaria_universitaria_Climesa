@@ -33,6 +33,8 @@ data class LaboratoryOrder(
     val external: Boolean = false, val externalPlace: String? = null, val externalInstructions: String? = null, val externalActions: Set<String> = emptySet(),
     /** R7 C1: the doctor's note for the patient, only once released; [cancellationReason] only on a cancelled order. */
     val patientNote: String? = null, val cancellationReason: String? = null,
+    /** Lote 5 S13/S15: the consultation that ordered it and the patient, to open the record from the result card. */
+    val consultationId: String? = null, val patientId: String? = null,
 ) {
     fun allows(action: LabOrderAction) = action.wire in allowedActions
     fun allowsExternal(action: LabExternalAction) = action.wire in externalActions
@@ -57,6 +59,7 @@ object LaboratoryParser {
             external = row.optBoolean("external"), externalPlace = text(row, "externalPlace"), externalInstructions = text(row, "externalInstructions"),
             externalActions = strings(row.optJSONArray("externalActions")),
             patientNote = text(row, "patientNote"), cancellationReason = text(row, "cancellationReason"),
+            consultationId = text(row, "consultationId"), patientId = text(row, "patientId"),
         )
     }
 

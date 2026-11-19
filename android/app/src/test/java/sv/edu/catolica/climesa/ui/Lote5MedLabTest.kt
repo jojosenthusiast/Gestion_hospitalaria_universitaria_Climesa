@@ -45,4 +45,11 @@ class Lote5MedLabTest {
         assertEquals("2 fuera de rango · 1 crítico", LabResultView.summary(listOf(item(16.0), item(6.0), item(13.0))))
         assertNull(LabResultView.summary(listOf(item(13.0), item(null))))
     }
+
+    @Test fun orderKeepsItsOriginConsultationAndPatient() {
+        val rows = org.json.JSONArray("""[{"id":"o1","patientName":"Ana","state":"completado","consultationId":"k1","patientId":"p1","items":[]},{"id":"o2","patientName":"Luis","state":"pendiente","items":[]}]""")
+        val orders = sv.edu.catolica.climesa.domain.LaboratoryParser.orders(rows)
+        assertEquals("k1", orders[0].consultationId); assertEquals("p1", orders[0].patientId)
+        assertNull(orders[1].consultationId); assertNull(orders[1].patientId)
+    }
 }
