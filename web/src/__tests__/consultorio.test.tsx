@@ -40,22 +40,22 @@ describe('W-consultorio · signos vitales (WEB-09)', () => {
   it('si la API rechaza los signos, conserva lo escrito y muestra el error', async () => {
     const api = mount(['consulta.iniciar', 'signos.registrar'], {}, async () => { throw new ApiError('La presión sistólica está fuera de rango.', 400); });
     const dialog = await openConsultation();
-    await userEvent.type(within(dialog).getByLabelText('PA sistólica'), '130');
-    await userEvent.type(within(dialog).getByLabelText('Frecuencia cardiaca'), '80');
+    await userEvent.type(within(dialog).getByLabelText('Presión sistólica (mmHg)'), '130');
+    await userEvent.type(within(dialog).getByLabelText('Frecuencia cardiaca (lpm)'), '80');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar signos' }));
     expect(await within(dialog).findByText('La presión sistólica está fuera de rango.')).toBeTruthy();
-    expect((within(dialog).getByLabelText('PA sistólica') as HTMLInputElement).value).toBe('130');
-    expect((within(dialog).getByLabelText('Frecuencia cardiaca') as HTMLInputElement).value).toBe('80');
+    expect((within(dialog).getByLabelText('Presión sistólica (mmHg)') as HTMLInputElement).value).toBe('130');
+    expect((within(dialog).getByLabelText('Frecuencia cardiaca (lpm)') as HTMLInputElement).value).toBe('80');
     expect(api.write).toHaveBeenCalledWith('/consultas/cons-1/signos', expect.objectContaining({ systolic: 130, heartRate: 80 }), 'POST');
   });
 
   it('al guardar con éxito limpia los campos y lo confirma', async () => {
     mount(['consulta.iniciar', 'signos.registrar'], {}, async () => ({ id: 'sv-1', takenAt: '2026-11-13T15:05:00Z' }) as never);
     const dialog = await openConsultation();
-    await userEvent.type(within(dialog).getByLabelText('PA sistólica'), '120');
+    await userEvent.type(within(dialog).getByLabelText('Presión sistólica (mmHg)'), '120');
     await userEvent.click(within(dialog).getByRole('button', { name: 'Registrar signos' }));
     expect(await within(dialog).findByText('Signos vitales registrados.')).toBeTruthy();
-    await waitFor(() => expect((within(dialog).getByLabelText('PA sistólica') as HTMLInputElement).value).toBe(''));
+    await waitFor(() => expect((within(dialog).getByLabelText('Presión sistólica (mmHg)') as HTMLInputElement).value).toBe(''));
   });
 });
 

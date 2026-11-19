@@ -745,6 +745,9 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 /* Consulta en cuatro pasos (S9): consulta → procedimientos → receta y exámenes → cerrar. */
 .consult-steps { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0 0 var(--space-3); padding: 0; list-style: none; counter-reset: none; }
 .consult-step-item { display: inline-flex; }
+/* S12: required fields carry a visible mark, explained once by the legend at the top of the form. */
+.consult-form .field:has(> .input-wrap :required) > label::after, .consult-form label.field:has(textarea:required) > span::after { content: ' *'; color: var(--danger); font-weight: 700; }
+.required-legend { margin: 0; }
 .consult-step-item > a, .consult-step-item > span { display: inline-flex; align-items: center; min-height: 32px; padding: 0 var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-chip); color: var(--muted); font-size: var(--text-sm); font-weight: 700; text-decoration: none; font-variant-numeric: tabular-nums; }
 .consult-step-item.is-actual > a, .consult-step-item.is-actual > span { border-color: var(--primary); color: var(--primary-text); }
 .consult-step-item.is-hecho > a, .consult-step-item.is-hecho > span { border-style: dashed; }
