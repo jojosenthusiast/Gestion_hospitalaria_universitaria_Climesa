@@ -9,7 +9,16 @@ data class HistoryConsultation(val id: String, val state: String, val date: Stri
 data class HistoryAdmission(val id: String, val state: String, val date: String, val doctor: String)
 /** Response of `GET /pacientes/{id}/historial` (spec 106). `access`: propio or relacion. */
 /** [allowedActions]: preconditions S4, what the caller may do on this record now (`resultado_externo`); null from an older API. */
-data class ClinicalHistory(val patientName: String, val record: String, val access: String, val consultations: List<HistoryConsultation>, val laboratory: List<LaboratoryOrder>, val admissions: List<HistoryAdmission>, val allowedActions: List<String>? = null)
+data class ClinicalHistory(val patientName: String, val record: String, val access: String, val consultations: List<HistoryConsultation>, val laboratory: List<LaboratoryOrder>, val admissions: List<HistoryAdmission>, val allowedActions: List<String>? = null, val labMeta: Map<String, HistoryLabMeta> = emptyMap())
+
+/** Lote 5 S15: where a lab order of the record came from (`consultationId`) and when it was ordered and completed (local days). */
+data class HistoryLabMeta(val consultationId: String?, val orderedOn: String?, val completedOn: String?)
+
+/** One row of the record's exam list (master): what was ordered, when, its state and how many results fell out of range. */
+data class RecordLabRow(val orderId: String, val exams: String, val orderedOn: String?, val state: String, val reviewed: Boolean, val outOfRange: Int, val critical: Int, val pending: Int)
+
+/** The detail of one exam order: why it was ordered (origin consultation, its diagnoses and doctor) and its results. */
+data class RecordLabDetail(val row: RecordLabRow, val order: LaboratoryOrder, val origin: HistoryConsultation?, val completedOn: String?)
 
 /** Pure parsing of the history so the A08/A22 ViewModel can be tested on the JVM. */
 object ClinicalHistoryParser {
@@ -31,6 +40,9 @@ object ClinicalHistoryParser {
             objects(json.optJSONArray("laboratory")).map(::order),
             objects(json.optJSONArray("admissions")).map { HistoryAdmission(it.optString("id"), it.optString("state"), localDay(it.optString("createdAt")), it.optJSONObject("doctor")?.optString("name").orEmpty()) },
             json.optJSONArray("allowedActions")?.let { a -> (0 until a.length()).map(a::optString) },
+            objects(json.optJSONArray("laboratory")).associate { row ->
+                row.optString("id") to HistoryLabMeta(text(row, "consultationId"), text(row, "createdAt")?.let(::localDay), text(row, "completedAt")?.let(::localDay))
+            },
         )
     }
 
@@ -53,7 +65,44 @@ object ClinicalHistoryParser {
         return LaboratoryOrder(row.optString("id"), "", row.optString("priority"), row.optString("state"), 1, items, !row.isNull("reviewedAt"))
     }
 
+    private fun text(row: JSONObject, key: String) = if (row.isNull(key)) null else row.optString(key).takeIf { it.isNotBlank() }
+
     private fun objects(array: JSONArray?): List<JSONObject> = if (array == null) emptyList() else (0 until array.length()).mapNotNull(array::optJSONObject)
+}
+
+/** Lote 5 S15: the record's exams as master-detail, newest first, joined to the consultation that ordered them. */
+object ClinicalRecordLab {
+    fun rows(history: ClinicalHistory): List<RecordLabRow> = history.laboratory.map { order ->
+        val results = order.items.mapNotNull { it.result }
+        RecordLabRow(
+            order.id,
+            order.items.joinToString(", ") { it.name.ifBlank { it.code } }.ifBlank { "Orden de laboratorio" },
+            history.labMeta[order.id]?.orderedOn,
+            order.state,
+            order.reviewed,
+            outOfRange = results.count { LaboratoryLabels.outOfRange(it.mark) },
+            critical = results.count { it.mark.startsWith("critico") },
+            pending = order.items.count { it.result == null },
+        )
+    }.sortedByDescending { it.orderedOn.orEmpty() }
+
+    fun detail(history: ClinicalHistory, orderId: String): RecordLabDetail? {
+        val order = history.laboratory.firstOrNull { it.id == orderId } ?: return null
+        val row = rows(history).first { it.orderId == orderId }
+        val meta = history.labMeta[orderId]
+        return RecordLabDetail(row, order, meta?.consultationId?.let { id -> history.consultations.firstOrNull { it.id == id } }, meta?.completedOn)
+    }
+
+    /** "2 fuera de rango · 1 crítico", "3 resultados pendientes" or "Resultados en rango"; the line of a master row. */
+    fun summary(row: RecordLabRow): String = when {
+        row.state == "cancelado" -> "Orden cancelada"
+        row.critical > 0 || row.outOfRange > 0 -> listOfNotNull(
+            row.outOfRange.takeIf { it > 0 }?.let { if (it == 1) "1 fuera de rango" else "$it fuera de rango" },
+            row.critical.takeIf { it > 0 }?.let { if (it == 1) "1 crítico" else "$it críticos" },
+        ).joinToString(" · ")
+        row.pending > 0 -> if (row.pending == 1) "1 resultado pendiente" else "${row.pending} resultados pendientes"
+        else -> "Resultados en rango"
+    }
 }
 
 /** History refreshes when a consultation or laboratory order changes (thin events, never clinical data). */
