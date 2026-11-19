@@ -161,7 +161,7 @@ describe('turnos · carga y emergencia (CARGA-01, CARGA-07)', () => {
 describe('turnos · especialistas de la semana (CARGA-04)', () => {
   it('agrupa por día y especialidad y marca al ausente', async () => {
     montar([]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Especialistas de la semana' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Especialistas' }));
     const vista = await screen.findByRole('region', { name: 'Especialistas de la semana' });
     expect(await within(vista).findByText('Pediatría')).toBeTruthy();
     expect(within(vista).getByText('Medicina general')).toBeTruthy();
