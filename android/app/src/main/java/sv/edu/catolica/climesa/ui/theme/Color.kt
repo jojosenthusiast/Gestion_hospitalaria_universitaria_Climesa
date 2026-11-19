@@ -41,6 +41,8 @@ internal data class ClimesaColors(
     val blockedSoft: Color,
     val process: Color,
     val processSoft: Color,
+    /** Hover/pressed shade of the primary fill (web `--primary-strong`). */
+    val primaryStrong: Color,
 )
 
 internal val LightClimesaColors = ClimesaColors(
@@ -52,6 +54,7 @@ internal val LightClimesaColors = ClimesaColors(
     reserved = Color(0xFF6A45A6), reservedSoft = Color(0xFFF1EBFA),
     blocked = Color(0xFF4A5865), blockedSoft = Color(0xFFEDF0F2),
     process = Color(0xFF1F55A3), processSoft = Color(0xFFE8EFF9),
+    primaryStrong = Color(0xFF00358F),
 )
 
 internal val DarkClimesaColors = ClimesaColors(
@@ -63,6 +66,7 @@ internal val DarkClimesaColors = ClimesaColors(
     reserved = Color(0xFFBCA3EE), reservedSoft = Color(0xFF2B2140),
     blocked = Color(0xFFAAB7C1), blockedSoft = Color(0xFF222B36),
     process = Color(0xFF8CB2F0), processSoft = Color(0xFF18284A),
+    primaryStrong = Color(0xFF163F96),
 )
 
 internal val LocalClimesaColors = staticCompositionLocalOf { LightClimesaColors }

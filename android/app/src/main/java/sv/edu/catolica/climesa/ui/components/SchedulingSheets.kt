@@ -11,7 +11,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
@@ -44,7 +43,7 @@ internal fun DayChips(selected: LocalDate, onSelect: (LocalDate) -> Unit, enable
     val shown = if (selected in days) days else listOf(selected) + days
     LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         items(shown, key = { it.toString() }) { day ->
-            FilterChip(selected = day == selected, onClick = { onSelect(day) }, enabled = enabled, label = { Text(DayChipLabels.of(day)) })
+            ClimesaFilterChip(selected = day == selected, onClick = { onSelect(day) }, enabled = enabled, label = { Text(DayChipLabels.of(day)) })
         }
     }
 }
@@ -56,7 +55,7 @@ internal fun DayChips(selected: LocalDate, onSelect: (LocalDate) -> Unit, enable
 @Composable
 internal fun ReasonChips(options: List<String>, selected: String?, onSelect: (String) -> Unit, enabled: Boolean = true, other: String? = null) {
     FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-        (options + listOfNotNull(other)).forEach { option -> FilterChip(selected = option == selected, onClick = { onSelect(option) }, enabled = enabled, label = { Text(option) }) }
+        (options + listOfNotNull(other)).forEach { option -> ClimesaFilterChip(selected = option == selected, onClick = { onSelect(option) }, enabled = enabled, label = { Text(option) }) }
     }
 }
 

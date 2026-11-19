@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -9,8 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -48,7 +47,7 @@ internal fun DoctorShiftRow(name: String, detail: String, hasShift: Boolean, rea
             .padding(horizontal = Spacing.sm, vertical = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
     ) {
-        if (selected) Icon(Icons.Default.CheckCircle, stringResource(R.string.cat_elegido), Modifier.size(20.dp), tint = colors.success)
+        if (selected) Icon(ClimesaIcons.Check, stringResource(R.string.cat_elegido), Modifier.size(20.dp), tint = colors.success)
         Column(Modifier.weight(1f)) {
             Text(name, style = MaterialTheme.typography.titleSmall, color = dim, fontWeight = if (selected) FontWeight.Bold else null)
             Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

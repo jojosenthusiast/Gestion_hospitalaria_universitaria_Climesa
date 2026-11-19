@@ -146,6 +146,13 @@ object NoticeInboxRules {
         return (box.unread - handled).coerceAtLeast(0)
     }
 
+    /**
+     * The header bell turns red only while a critical notice in force is still without "Enterado" (web `NoticesBell`
+     * `is-critical`); the ones acknowledged here and not yet re-read do not count.
+     */
+    fun bellCritical(inbox: NoticeInbox?, hidden: Set<String> = emptySet()): Boolean =
+        inbox?.notices.orEmpty().any { it.state == NoticeState.CURRENT && it.level == NoticeLevel.CRITICAL && it.acknowledgedAt == null && it.id !in hidden }
+
     /** "4", "9+" over nine, null for none (no badge). */
     fun badgeText(count: Int): String? = when {
         count <= 0 -> null

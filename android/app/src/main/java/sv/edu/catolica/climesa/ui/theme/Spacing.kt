@@ -13,7 +13,7 @@ internal object Spacing {
 
     /** Horizontal gutter of a page and gap between its blocks. */
     val page: Dp = 16.dp
-    val block: Dp = 14.dp
+    val block: Dp = 16.dp
 
     /** Minimum touch target of buttons and rows (web `min-height: 48px`). */
     val touch: Dp = 48.dp

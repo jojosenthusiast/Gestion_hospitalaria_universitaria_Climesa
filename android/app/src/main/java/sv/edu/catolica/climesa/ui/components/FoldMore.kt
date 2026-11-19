@@ -25,7 +25,7 @@ object FoldRule {
 @Composable
 internal fun FoldMoreButton(hidden: Int, open: Boolean, onToggle: () -> Unit, modifier: Modifier = Modifier) {
     if (hidden <= 0) return
-    TextButton(onClick = onToggle, modifier = modifier.heightIn(min = Spacing.touch)) {
+    TextButton(shape = ButtonShape, onClick = onToggle, modifier = modifier.heightIn(min = Spacing.touch)) {
         Text(if (open) stringResource(R.string.fold_ver_menos) else stringResource(R.string.fold_ver_mas, hidden))
     }
 }

@@ -65,12 +65,12 @@ internal fun ConfirmDialog(
         }) else null,
         confirmButton = {
             TextButton(
-                onClick = { if (onDone != null) submission.confirm(); onConfirm() },
+                shape = ButtonShape, onClick = { if (onDone != null) submission.confirm(); onConfirm() },
                 enabled = confirmEnabled && !busy,
                 colors = if (destructive) ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.textButtonColors(),
             ) { Text(if (busy) stringResource(R.string.ui_un_momento) else confirmLabel, style = MaterialTheme.typography.labelLarge) }
         },
-        dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) } },
+        dismissButton = { TextButton(shape = ButtonShape, onClick = onDismiss, enabled = !busy) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) } },
     )
 }
 
