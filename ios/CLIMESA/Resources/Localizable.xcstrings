@@ -1409,6 +1409,17 @@
         }
       }
     },
+    "common.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        }
+      }
+    },
     "common.loading": {
       "extractionState": "manual",
       "localizations": {

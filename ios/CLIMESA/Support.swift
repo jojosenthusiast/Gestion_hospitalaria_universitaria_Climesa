@@ -268,6 +268,7 @@ struct ScreenFrame<Content: View>: View {
                 content()
             }.padding(Spacing.gutter).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
         }
+        .dismissibleKeyboard()
         .background(Theme.bg).navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .climesaNavBar()
         .toolbar {
@@ -281,6 +282,20 @@ struct ScreenFrame<Content: View>: View {
 }
 
 extension View {
+    /// The keyboard always has a way out (owner report: on the patient search it covered the tab bar and nothing
+    /// closed it): dragging the content down hides it, and «Listo» sits above the keys on every tab, pushed screen and sheet.
+    func dismissibleKeyboard() -> some View {
+        scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(L.text("common.done")) {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }.font(Typo.label)
+                }
+            }
+    }
+
     /// Barra de navegación azul marino con texto claro: pestañas, detalles empujados y hojas (I-6).
     func climesaNavBar() -> some View {
         toolbarBackground(Theme.navy, for: .navigationBar)

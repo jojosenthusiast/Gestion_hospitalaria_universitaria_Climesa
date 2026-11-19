@@ -63,7 +63,7 @@ struct RoleTabsView:View {
                         VStack(alignment:.leading,spacing:Spacing.gap) {
                             content(for:tab)
                         }.padding(Spacing.gutter).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
-                    }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
+                    }.dismissibleKeyboard().safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
                         .climesaNavBar()
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         // Avisos one tap away on every tab (Android/web bell); the count no longer sits on Más.
