@@ -223,8 +223,8 @@ describe('B2-B3 · tablero', () => {
 
   it('the issuer can void a fresh number from the card menu', async () => {
     const api = montar([ticket({ voidableUntil: new Date(Date.now() + 300_000).toISOString() })]);
-    const menu = await screen.findByRole('combobox', { name: 'Mover o cambiar prioridad de CON 7' });
-    await userEvent.selectOptions(menu, 'anular');
+    await userEvent.click(await screen.findByRole('button', { name: 'Más acciones de CON 7' }));
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Anular número (emitido por error)' }));
     expect(api.write).toHaveBeenCalledWith('/fila/t-7/anular', { version: 2 }, 'POST');
   });
 });
