@@ -371,24 +371,41 @@ public enum CategoryRequestRules {
         return Array(doctors.filter { $0.active && fold("\($0.fullName) \($0.specialty ?? "")").contains(needle) }.prefix(limit))
     }
 
-    /// Clave estable del ícono de la categoría a SF Symbol; una clave desconocida usa un ícono genérico.
-    public static func symbol(_ icon: String) -> String {
+    /// Stable category key to its web glyph (`CategoryGlyph` in category.tsx); `general` and unknown keys use the
+    /// stethoscope, like the web.
+    public static func icon(_ icon: String) -> ClimesaIconName {
         switch icon {
-        case "general": return "stethoscope"
-        case "nino": return "figure.and.child.holdinghands"
-        case "mujer": return "figure.dress.line.vertical.figure"
-        case "corazon": return "heart"
-        case "hueso": return "figure.walk"
-        case "piel": return "hand.raised"
-        case "ojo": return "eye"
-        case "oido": return "ear"
-        case "mente": return "brain.head.profile"
-        case "neuro": return "brain"
-        case "digestivo": return "fork.knife"
-        case "rinon": return "drop"
-        case "alergia": return "allergens"
-        case "cirugia": return "bandage"
-        default: return "cross.case"
+        case "nino": return .catNino
+        case "mujer": return .catMujer
+        case "corazon": return .catCorazon
+        case "hueso": return .catHueso
+        case "piel": return .catPiel
+        case "ojo": return .catOjo
+        case "oido": return .catOido
+        case "mente": return .catMente
+        case "neuro": return .catNeuro
+        case "digestivo": return .catDigestivo
+        case "rinon": return .catRinon
+        case "alergia": return .catAlergia
+        case "cirugia": return .catCirugia
+        default: return .steth
+        }
+    }
+
+    /// Identity tone of a category (web `categoryTone`); unknown keys are slate.
+    public static func tone(_ icon: String) -> IdentityTone {
+        switch icon {
+        case "nino", "piel": return .amber
+        case "mujer": return .magenta
+        case "corazon": return .red
+        case "hueso", "alergia": return .orange
+        case "ojo": return .blue
+        case "oido": return .teal
+        case "mente": return .purple
+        case "neuro": return .indigo
+        case "digestivo": return .green
+        case "rinon": return .cyan
+        default: return .slate
         }
     }
 

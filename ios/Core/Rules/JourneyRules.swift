@@ -64,12 +64,12 @@ public enum PatientHomeRules {
             }
         }
 
-        public var symbol: String {
+        public var icon: ClimesaIconName {
             switch self {
-            case .requestAppointment: return "calendar.badge.plus"
-            case .ambulance: return "cross.case"
-            case .exams: return "testtube.2"
-            case .hospital: return "building.2"
+            case .requestAppointment: return .calendar
+            case .ambulance: return .ambulance
+            case .exams: return .lab
+            case .hospital: return .building
             }
         }
     }

@@ -154,7 +154,7 @@ final class PlatformParityRulesTests: XCTestCase {
     func testCitasYAgendaTraenSusCategorias() throws {
         let appointment = try JSONDecoder().decode(Appointment.self, from: Data(#"{"id":"c1","patientId":"p1","patientName":null,"doctorId":"d1","doctorName":"Médico Ficticio","start":"2026-11-21T15:00:00.000Z","end":"2026-11-21T15:20:00.000Z","reason":null,"state":"confirmada","origin":"paciente","rejectionReason":null,"version":1,"categories":[{"code":"CAR","name":"Corazón","icon":"corazon"}]}"#.utf8))
         XCTAssertEqual(appointment.categories?.map(\.icon), ["corazon"])
-        XCTAssertEqual(appointment.categories.map { $0.map { CategoryRequestRules.symbol($0.icon) } }, ["heart"])
+        XCTAssertEqual(appointment.categories.map { $0.map { CategoryRequestRules.icon($0.icon) } }, [.catCorazon])
         let old = try JSONDecoder().decode(Appointment.self, from: Data(#"{"id":"c1","patientId":"p1","patientName":null,"doctorId":"d1","doctorName":"Médico Ficticio","start":"2026-11-21T15:00:00.000Z","end":"2026-11-21T15:20:00.000Z","reason":null,"state":"confirmada","origin":"paciente","rejectionReason":null,"version":1}"#.utf8))
         XCTAssertNil(old.categories)
         let agenda = try JSONDecoder().decode(AgendaEntry.self, from: Data(#"{"appointmentId":"c1","patientId":"p1","patientName":"Paciente Ficticio","start":"2026-11-20T15:00:00.000Z","end":"2026-11-20T15:20:00.000Z","reason":null,"appointmentState":"confirmada","consultationId":null,"consultationState":null,"version":null,"signedAt":null,"categories":[{"code":"PIE","name":"Piel","icon":"piel"},{"code":"OJO","name":"Ojos","icon":"ojo"}]}"#.utf8))

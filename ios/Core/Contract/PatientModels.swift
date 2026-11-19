@@ -560,7 +560,7 @@ public struct AppointmentCategory: Decodable, Sendable, Identifiable, Equatable 
     public let code: String
     public let name: String
     public let description: String
-    /// Clave estable del ícono (`piel`, `corazon`...); la app la traduce a un SF Symbol (`CategoryRequestRules.symbol`).
+    /// Clave estable del ícono (`piel`, `corazon`...); la app la traduce a su glifo web (`CategoryRequestRules.icon`).
     public let icon: String
     public let specialties: [String]
     public let keywords: String

@@ -49,10 +49,13 @@ final class CategoryRequestRulesTests: XCTestCase {
         XCTAssertEqual(CategoryRequestRules.cancelPath("s1"), "/citas/solicitudes-categoria/s1/cancelar")
     }
 
-    func testCadaIconoTieneSimboloYUnoDesconocidoUsaElGenerico() {
-        for key in ["general", "nino", "mujer", "corazon", "hueso", "piel", "ojo", "oido", "mente", "neuro", "digestivo", "rinon", "alergia", "cirugia"] {
-            XCTAssertNotEqual(CategoryRequestRules.symbol(key), "cross.case", key)
-        }
-        XCTAssertEqual(CategoryRequestRules.symbol("nuevo"), "cross.case")
+    func testCadaIconoTieneSuGlifoWebYUnoDesconocidoUsaElEstetoscopio() {
+        let keys = ["nino", "mujer", "corazon", "hueso", "piel", "ojo", "oido", "mente", "neuro", "digestivo", "rinon", "alergia", "cirugia"]
+        for key in keys { XCTAssertNotEqual(CategoryRequestRules.icon(key), .steth, key) }
+        XCTAssertEqual(Set(keys.map(CategoryRequestRules.icon)).count, keys.count)
+        XCTAssertEqual(CategoryRequestRules.icon("general"), .steth)
+        XCTAssertEqual(CategoryRequestRules.icon("nuevo"), .steth)
+        XCTAssertEqual(CategoryRequestRules.tone("ojo"), .blue)
+        XCTAssertEqual(CategoryRequestRules.tone("nuevo"), .slate)
     }
 }

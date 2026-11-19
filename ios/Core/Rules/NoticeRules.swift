@@ -92,6 +92,13 @@ public enum NoticeRules {
         return count > 9 ? "9+" : String(count)
     }
 
+    /// Look of the bell count (web `.notices-bell-count`): a white pill with primary text, red only while an in-force
+    /// critical notice is unread. Nil when there is no count to show.
+    public static func bellBadgeTone(_ inbox: NoticeInbox?, hiding hidden: Set<String> = []) -> BellBadgeTone? {
+        guard badgeText(badge(inbox, hiding: hidden)) != nil else { return nil }
+        return bellIsCritical(inbox, hiding: hidden) ? .critical : .neutral
+    }
+
     /// The bell turns red while an in-force critical notice is still unread (and was not handled here).
     public static func bellIsCritical(_ inbox: NoticeInbox?, hiding hidden: Set<String> = []) -> Bool {
         (inbox?.notices ?? []).contains { $0.state == .vigente && $0.level == .critico && $0.acknowledgedAt == nil && !hidden.contains($0.id) }
@@ -199,4 +206,9 @@ public enum NoticeRules {
         default: return error.userMessage
         }
     }
+}
+
+/// Bell count look: `neutral` is the white pill with primary text, `critical` the red one.
+public enum BellBadgeTone: Equatable, Sendable {
+    case neutral, critical
 }

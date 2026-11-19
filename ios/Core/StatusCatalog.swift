@@ -27,7 +27,7 @@ public enum StatusCatalog {
         "disponible": "Disponible", "en_servicio": "En servicio", "en_mantenimiento": "En mantenimiento",
         "vencida": "Vencida", "reprogramada": "Reprogramada", "cerrado": "Cerrado sin atender",
         "atendido": "Atendido", "agotado": "Agotado", "por_vencer": "Por vencer", "ok": "En orden", "coincide": "Coincide",
-        "revisar": "Revisar"
+        "revisar": "Revisar", "requiere_atencion": "Requiere atención"
     ]
 
     private static let tones: [String: StatusTone] = [

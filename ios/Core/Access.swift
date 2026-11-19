@@ -71,18 +71,19 @@ public enum AppTab: String, Equatable, Hashable, Sendable, CaseIterable {
     /// Clave de Localizable.xcstrings con el título de la pestaña.
     public var titleKey: String { "tab.\(rawValue)" }
 
-    public var symbol: String {
+    /// Web icon of the tab (same concept as the web module).
+    public var icon: ClimesaIconName {
         switch self {
-        case .miDia: return "calendar.day.timeline.left"
-        case .pacientes: return "person.2"
-        case .resultados: return "doc.text"
-        case .turnos: return "clock"
-        case .perfil: return "person.crop.circle"
-        case .inicio: return "house"
-        case .fila: return "list.number"
-        case .citas: return "calendar"
-        case .examenes: return "testtube.2"
-        case .mas: return "ellipsis.circle"
+        case .miDia: return .home
+        case .pacientes: return .users
+        case .resultados: return .lab
+        case .turnos: return .clock
+        case .perfil: return .user
+        case .inicio: return .home
+        case .fila: return .queue
+        case .citas: return .calendar
+        case .examenes: return .lab
+        case .mas: return .menu
         }
     }
 
@@ -141,22 +142,31 @@ public enum AppSection: String, CaseIterable, Hashable, Sendable {
 
     public var titleKey: String { "section.\(rawValue)" }
 
+    /// Web icon of the section; nil where the web has no icon for the concept (the view keeps `symbol`).
+    public var icon: ClimesaIconName? {
+        switch self {
+        case .vinculacion, .ubicacion: return nil
+        case .historial: return .audit
+        case .ambulancia: return .ambulance
+        case .hospital: return .building
+        case .accesos: return .privacy
+        case .perfil: return .user
+        case .hospitalizados: return .bed
+        case .llegadaAmbulancia: return .ambulance
+        case .misDatos: return .clipboard
+        case .miHabitacion: return .bed
+        case .agenda: return .calendar
+        case .ambulanciaEstado: return .ambulance
+        case .avisos: return .bell
+        }
+    }
+
+    /// SF Symbol outline for the sections without a web icon (`icon == nil`).
     public var symbol: String {
         switch self {
         case .vinculacion: return "link"
-        case .historial: return "doc.text.magnifyingglass"
-        case .ambulancia: return "cross.case"
-        case .hospital: return "building.2"
-        case .accesos: return "eye"
-        case .perfil: return "person.crop.circle"
-        case .hospitalizados: return "bed.double"
-        case .llegadaAmbulancia: return "light.beacon.max"
-        case .misDatos: return "person.text.rectangle"
-        case .miHabitacion: return "bed.double.fill"
         case .ubicacion: return "map"
-        case .agenda: return "calendar.badge.clock"
-        case .ambulanciaEstado: return "cross.case"
-        case .avisos: return "bell"
+        default: return "circle"
         }
     }
 

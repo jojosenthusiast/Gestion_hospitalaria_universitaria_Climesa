@@ -13,12 +13,12 @@ public enum NoticeLevel: String, Sendable, Equatable, CaseIterable {
         }
     }
 
-    /// Ícono SF Symbols del nivel (alerta, doble flecha, información), como `NoticeLevelBadge` de la web.
-    public var symbol: String {
+    /// Web icon of the level (alert, double chevron, info), like `NoticeLevelBadge` on the web.
+    public var icon: ClimesaIconName {
         switch self {
-        case .critico: return "exclamationmark.triangle"
-        case .importante: return "chevron.up.2"
-        case .informativo: return "info.circle"
+        case .critico: return .alert
+        case .importante: return .chevronsUp
+        case .informativo: return .info
         }
     }
 
