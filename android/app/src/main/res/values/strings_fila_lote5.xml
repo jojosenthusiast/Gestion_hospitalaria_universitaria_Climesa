@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lote 5 S5 and S11: queue board confirmation of a call and the doctor's rows. -->
+    <string name="fila_l5_ver_expediente">Ver expediente</string>
+    <string name="fila_l5_consultorio">Consultorio %1$s</string>
+    <string name="fila_l5_llamaste">Llamaste %1$s</string>
+    <string name="fila_l5_sin_consultorio">Sin consultorio asignado</string>
+    <string name="fila_l5_en_espera_detalle">En espera: %1$s</string>
+    <string name="fila_l5_cerrar_confirmacion">Cerrar aviso del llamado</string>
+</resources>
