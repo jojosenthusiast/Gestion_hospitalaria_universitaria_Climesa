@@ -10,7 +10,7 @@ import { COVERAGE_ROLES, RotationOptions, RotationPattern, daysBetween, rotation
 import { AttendancePolicy, LoadPolicy, allowedActions, attendanceOf, consecutiveDays, isLate, stateByClock, windowLoad } from './shift.rules';
 import { PolicyRegistry } from '../platform/policy.registry';
 import { validDui } from '../platform/identity.rules';
-import { NO_ACTIVE_SHIFT_MESSAGE, SHIFT_GRACE_MINUTES, SHIFT_ROLES, activeShift, nextShift, shiftGateEnabled } from '../platform/shift-gate';
+import { NO_ACTIVE_SHIFT_MESSAGE, SHIFT_GRACE_MINUTES, activeShift, nextShift, shiftRoles } from '../platform/shift-gate';
 const HOUR=3600_000,DAY=24*HOUR,LOCAL_OFFSET=6*HOUR;
 /** Turnos que devuelve `GET /turnos`: los de las últimas semanas y toda la planificación próxima. */
 export const SHIFT_WINDOW={pastDays:31,futureDays:93} as const;
@@ -257,7 +257,7 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
   async activeShift(actor:Actor) {
     const at=this.clock.now();
     return this.db.transaction(async c=>{
-      const required=actor.roles.some(r=>(SHIFT_ROLES as readonly string[]).includes(r))&&await shiftGateEnabled(c,at);
+      const roles=await shiftRoles(c,at),required=actor.roles.some(r=>roles.includes(r));
       const [shift,next]=await Promise.all([activeShift(c,actor.id,at),nextShift(c,actor.id,at)]);
       const window=(s:Awaited<ReturnType<typeof activeShift>>)=>s&&{id:s.id,start:new Date(s.start).toISOString(),end:new Date(s.end).toISOString(),area:s.area,state:s.state};
       const active=!required||!!shift;

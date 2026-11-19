@@ -5,7 +5,7 @@ import { DatabaseService } from './database.service';
 import { Actor } from './actor';
 import { Clock } from './clock';
 import { ProblemException } from './problem';
-import { activeShift, NO_ACTIVE_SHIFT_CODE, NO_ACTIVE_SHIFT_MESSAGE, permissionNeedsShift, shiftGateEnabled } from './shift-gate';
+import { activeShift, NO_ACTIVE_SHIFT_CODE, NO_ACTIVE_SHIFT_MESSAGE, permissionNeedsShift, shiftRoles } from './shift-gate';
 
 export const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
@@ -50,7 +50,7 @@ export class CommandService {
       if (row.estado === 'completada') return row.respuesta as T;
       // Lote 5, S9: after the replay (a completed command answers the same once the shift ends) and before any work.
       const at = this.clock.now();
-      if (await shiftGateEnabled(c, at) && await permissionNeedsShift(c, actor.id, permission) && !(await activeShift(c, actor.id, at))) {
+      if (await permissionNeedsShift(c, actor.id, permission, await shiftRoles(c, at)) && !(await activeShift(c, actor.id, at))) {
         throw new ProblemException(NO_ACTIVE_SHIFT_CODE, 403, NO_ACTIVE_SHIFT_MESSAGE);
       }
       const response = await work(c);
