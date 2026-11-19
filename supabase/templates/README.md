@@ -15,7 +15,7 @@ Supabase → **Authentication → Emails → Templates**. En cada pestaña pega 
 | Change Email Address | `cambio-correo.html` | Confirma tu nuevo correo en CLIMESA |
 | Reauthentication | `reverificacion.html` | Tu código de verificación de CLIMESA |
 
-Las plantillas usan `{{ .ConfirmationURL }}`, `{{ .Email }}`, en la reverificación `{{ .Token }}` y, en el cambio de correo, `{{ .NewEmail }}`. `{{ .ConfirmationURL }}` ya incluye la página de destino que pide cada aplicación (`redirect_to`), así que no hace falta editar los enlaces.
+Las genera `python tools/email/gen_auth_emails.py` desde un solo diseño (`--check` comprueba que estén al día); no se editan a mano. Usan `{{ .ConfirmationURL }}` y, en la reverificación, `{{ .Token }}`. Nunca muestran el correo de la cuenta en el cuerpo. `{{ .ConfirmationURL }}` ya incluye la página de destino que pide cada aplicación (`redirect_to`), así que no hace falta editar los enlaces.
 
 ## Configuración que deben acompañar (una sola vez)
 
