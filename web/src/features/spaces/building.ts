@@ -51,12 +51,33 @@ export function bedsOf(node: SpaceNode): Space[] {
   return node.children.flatMap(bedsOf);
 }
 
+/** A building node as `/espacios` returns it: `cama` nodes carry their state (never who occupies them). */
+export type SpaceWithState = Space & { bedState?: string | null };
+
+/**
+ * State of every bed by id: from the bed board when the account reads it, otherwise from the building tree
+ * (`bedState`). Null only when neither source has a state (an older API), so the map falls back to free counts.
+ */
+export function bedStateMap(spaces: SpaceWithState[], beds: Bed[] | null): Map<string, string> | null {
+  if (beds) return new Map(beds.map(b => [b.id, b.state]));
+  const fromTree = spaces.filter(s => s.type === 'cama' && s.bedState).map(s => [s.id, s.bedState as string] as const);
+  return fromTree.length ? new Map(fromTree) : null;
+}
+
+/** Hospital totals for the header line: active beds with a known state, free and occupied. */
+export function bedTotals(spaces: Space[], states: Map<string, string> | null) {
+  if (!states) return null;
+  const ids = spaces.length ? spaces.filter(s => s.type === 'cama' && s.active && states.has(s.id)).map(s => s.id) : [...states.keys()];
+  const of = (state: string) => ids.filter(id => states.get(id) === state).length;
+  return { total: ids.length, free: of('libre'), occupied: of('ocupada') };
+}
+
 export type Counts = { total: number; byState: Record<BedStateKey, number>; unknown: number };
-export function countBeds(beds: Space[], states: Map<string, Bed> | null): Counts {
+export function countBeds(beds: Space[], states: Map<string, string> | null): Counts {
   const byState = { libre: 0, ocupada: 0, reservada: 0, limpieza: 0, bloqueada: 0 } as Record<BedStateKey, number>;
   let unknown = 0;
   for (const bed of beds) {
-    const state = states?.get(bed.id)?.state as BedStateKey | undefined;
+    const state = states?.get(bed.id) as BedStateKey | undefined;
     if (state && state in byState) byState[state]++; else unknown++;
   }
   return { total: beds.length, byState, unknown };

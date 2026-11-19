@@ -23107,6 +23107,16 @@
           "semiprivada"
         ]
       },
+      "EstadoCama": {
+        "type": "string",
+        "enum": [
+          "ocupada",
+          "limpieza",
+          "bloqueada",
+          "reservada",
+          "libre"
+        ]
+      },
       "SpaceResponse": {
         "type": "object",
         "properties": {
@@ -23163,6 +23173,14 @@
           },
           "freeBeds": {
             "type": "integer"
+          },
+          "bedState": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoCama"
+              }
+            ]
           }
         },
         "required": [
@@ -23178,7 +23196,8 @@
           "version",
           "path",
           "totalBeds",
-          "freeBeds"
+          "freeBeds",
+          "bedState"
         ]
       },
       "SpaceDto": {
@@ -23242,16 +23261,6 @@
           "code",
           "name",
           "type"
-        ]
-      },
-      "EstadoCama": {
-        "type": "string",
-        "enum": [
-          "ocupada",
-          "limpieza",
-          "bloqueada",
-          "reservada",
-          "libre"
         ]
       },
       "BedBoardResponse": {
