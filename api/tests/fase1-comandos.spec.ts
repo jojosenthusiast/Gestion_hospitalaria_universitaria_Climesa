@@ -87,6 +87,9 @@ describe('Fase 1 · comandos (CON-02, CON-07, API-08..11)', () => {
       const taken = await t.call('REC', 'POST', '/citas', body(await t.patient()));
       expect([taken.status, taken.body.codigo]).toEqual([409, 'franja_ocupada']);
       const outside = new Date(shiftStart.valueOf() + 10 * 60 * MINUTE);
+      // Lote 5 S6: another doctor of the same service works then, so only this doctor is off (else sin_personal_disponible).
+      const colleague = (await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,especialidad,area_id) SELECT 'Colega','De Turno','medico',coalesce((SELECT especialidad FROM personal.persona WHERE id=$1),'Medicina general'),id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`, [doctorId])).id;
+      await t.pg.transaction(async tx => { await tx.exec('SET LOCAL session_replication_role = replica'); await tx.query(`INSERT INTO personal.turno(persona_id,area_id,periodo,tipo,estado) SELECT $1,id,tstzrange($2::timestamptz,$3::timestamptz,'[)'),'diurno','publicado' FROM infra.espacio WHERE codigo='P1-CON'`, [colleague, new Date(outside.valueOf() - 60 * MINUTE), new Date(outside.valueOf() + 3 * 60 * MINUTE)]); });
       const noShift = await t.call('REC', 'POST', '/citas', { patientId, doctorId, start: outside.toISOString(), end: new Date(outside.valueOf() + 20 * MINUTE).toISOString() });
       expect([noShift.status, noShift.body.codigo]).toEqual([409, 'medico_sin_jornada']);
     });

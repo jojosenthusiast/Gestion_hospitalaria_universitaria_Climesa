@@ -208,13 +208,13 @@ describe('Fase 2 · fila del día y tablero (S9)', () => {
       expect((await ticketOf('MED', byAst)).calledByColleague).toBe(false);
 
       // The assistant account as a second clinician: once its role holds `consulta.iniciar`, its call is a colleague's.
-      await t.pg.query("INSERT INTO acceso.rol_permiso(rol_codigo,permiso_codigo,contexto) VALUES('AST','consulta.iniciar','x')");
+      await t.pg.query("INSERT INTO acceso.rol_permiso(rol_codigo,permiso_codigo,contexto) VALUES('ENF','consulta.iniciar','x')");
       try {
         const byClinician = await calledBy('AST');
         expect((await ticketOf('MED', byClinician)).calledByColleague).toBe(true);
         expect((await ticketOf('AST', byClinician)).calledByColleague).toBe(false);
       } finally {
-        await t.pg.query("DELETE FROM acceso.rol_permiso WHERE rol_codigo='AST' AND permiso_codigo='consulta.iniciar'");
+        await t.pg.query("DELETE FROM acceso.rol_permiso WHERE rol_codigo='ENF' AND permiso_codigo='consulta.iniciar'");
       }
     });
 

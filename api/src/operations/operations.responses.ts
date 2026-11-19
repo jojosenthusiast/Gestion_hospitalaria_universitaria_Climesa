@@ -335,6 +335,8 @@ export class BedBoardResponse {
   @BoolProp() cleaningCompleted!: boolean;
   @BoolProp() cleanedByCurrentUser!: boolean;
   @StrProp({ nullable: true }) path!: string | null;
+  @BoolProp({ optional: true, description: 'Lote 5: quien ocupa o tiene reservada la cama está en aislamiento' }) isolation?: boolean;
+  @BoolProp({ optional: true, description: 'Lote 5: la habitación tiene un paciente en aislamiento (sus otras camas no se asignan)' }) roomIsolation?: boolean;
   @StrProp({ optional: true, description: 'Nombre completo o iniciales según camas.ver_ocupante; solo si la cama tiene paciente' }) occupant?: string;
   @UuidProp({ optional: true, description: 'Solo con acceso completo al ocupante' }) patientId?: string;
   @BoolProp({ optional: true, description: 'Solo si la cama tiene paciente' }) occupantRestricted?: boolean;
@@ -363,4 +365,22 @@ export class BedCleaningCompletedResponse extends BedCleaningResponse {
 
 export class BedCleaningVerifiedResponse extends BedCleaningResponse {
   @DateTimeProp() verificadaEn!: string;
+}
+
+/** Lote 5, S9: a shift window of the account (the one that lets it work now, or the next one). */
+export class ShiftWindowResponse {
+  @UuidProp() id!: string;
+  @DateTimeProp() start!: string;
+  @DateTimeProp() end!: string;
+  @StrProp({ nullable: true }) area!: string | null;
+  @EnumProp(ESTADO_TURNO_ASISTENCIA, 'EstadoTurno') state!: string;
+}
+/** Lote 5, S9: whether the account needs a shift to run operational commands and whether it has one now. */
+export class ActiveShiftResponse {
+  @BoolProp({ description: 'La cuenta tiene un rol que trabaja por turnos (REC, AST, ENF, MED, LAB, PAR) y la regla está vigente' }) required!: boolean;
+  @BoolProp({ description: 'Puede ejecutar comandos operativos ahora: no los necesita o tiene un turno que cubre la hora con el margen' }) active!: boolean;
+  @IntProp({ description: 'Minutos de margen antes del inicio y después del fin del turno' }) graceMinutes!: number;
+  @ClassProp(ShiftWindowResponse, { nullable: true, description: 'Turno que cubre la hora actual (con el margen)' }) shift!: ShiftWindowResponse | null;
+  @ClassProp(ShiftWindowResponse, { nullable: true, description: 'Próximo turno publicado' }) next!: ShiftWindowResponse | null;
+  @StrProp({ nullable: true, description: 'Mensaje para mostrar cuando `required` y no `active`' }) message!: string | null;
 }

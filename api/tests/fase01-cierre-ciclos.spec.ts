@@ -9,7 +9,7 @@ const MINUTE = 60_000;
 /** Auditoría final, Fase 0: BL-03 (ciclo de alta), BL-04 (cancelar o anular) y MA-HOS-02 (revocar alta). */
 describe('Fase 0 · cierre del ciclo de la admisión', () => {
   let t: TestApp;
-  beforeAll(async () => { t = await createTestApp(now); await t.enroll('MED'); });
+  beforeAll(async () => { t = await createTestApp(now, { nursingByArea: true }); await t.enroll('MED'); });
   afterAll(async () => { await t?.close(); });
 
   const admit = async (extra: Record<string, unknown> = {}) => {

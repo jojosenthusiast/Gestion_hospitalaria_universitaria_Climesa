@@ -33,7 +33,7 @@ describe('HU-104 · disponibilidad recursiva, tablero por permiso y capacidad ba
  };
  const bedsOf=async(room:string)=>(await call('REC','GET','/camas')).body.filter((b:any)=>b.room===room);
  beforeAll(async()=>{
-  fixture=await createDatabase();
+  fixture=await createDatabase({nursingByArea:true});
   const auth={authClient:{auth:{getUser:async(token:string)=>{
    const [h,b,s]=token.split('.');
    const expected=createHmac('sha256','test-only-key').update(h+'.'+b).digest('base64url');

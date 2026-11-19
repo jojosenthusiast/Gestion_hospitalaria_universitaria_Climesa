@@ -8,16 +8,27 @@ const {unaccent}=require('@electric-sql/pglite/contrib/unaccent');
 const {pgcrypto}=require('@electric-sql/pglite/contrib/pgcrypto');
 export const roleNames=['ADM','JOP','REC','AST','ENF','MED','LAB','PAR','DPD','PAC'];
 export const userId=(role:string)=>`00000000-0000-4000-8000-${String(roleNames.indexOf(role)+1).padStart(12,'0')}`;
-export async function createDatabase(){
+/**
+ * `shiftGate`: Lote 5 S9 refuses operational commands of shift roles without a shift. Specs about other modules run
+ * without it (their fixture accounts have no shifts); tests/turno-activo.spec.ts turns it on.
+ * `nursingByArea`: puts back the `area` context ENF had before 20261129005000 («Todo el hospital», Lote 5 S10), for specs
+ * that pin the shift-area rule itself; tests/enfermeria-todo-el-hospital.spec.ts covers the whole-hospital catalog.
+ */
+export const NURSING_WHOLE_HOSPITAL=['admision.ver','pacientes.ver_ficha','camas.ver_ocupante','enfermeria.registrar'];
+export async function createDatabase(options:{shiftGate?:boolean;nursingByArea?:boolean}={}){
  const pg=await PGlite.create({extensions:{btree_gist,pg_trgm,unaccent,pgcrypto}});
  const root=resolve(__dirname,'../../../supabase');
  await pg.exec(readFileSync(resolve(root,'pruebas/00_simular_supabase.sql'),'utf8'));
  for(const file of readdirSync(resolve(root,'migrations')).sort())await pg.exec(readFileSync(resolve(root,'migrations',file),'utf8'));
  await pg.exec(readFileSync(resolve(root,'seed.sql'),'utf8'));
+ if(!options.shiftGate)await pg.query("DELETE FROM plataforma.politica WHERE clave='turnos.exigir_turno_activo'");
+ if(options.nursingByArea)await pg.query("UPDATE acceso.rol_permiso SET contexto='area' WHERE rol_codigo='ENF' AND permiso_codigo=ANY($1::text[])",[NURSING_WHOLE_HOSPITAL]);
  for(const role of roleNames){
   const id=userId(role);
   await pg.query('INSERT INTO auth.users(id,email,raw_user_meta_data,raw_app_meta_data) VALUES($1,$2,$3,$4)',[id,`${role.toLowerCase()}@example.test`,{nombre:`Cuenta ficticia ${role}`},{invitado:true}]);
-  await pg.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo) VALUES($1,$2)',[id,role]);
+  // Lote 5 S10: AST is retired and 20261129004000 moved its accounts to ENF. The "AST" fixture account stays as a
+  // former assistant (persona tipo asistente) that now holds ENF, so specs about the consulting-room station keep working.
+  await pg.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo) VALUES($1,$2)',[id,role==='AST'?'ENF':role]);
   if(['REC','AST','ENF','MED','LAB','PAR'].includes(role)){
    const types:Record<string,string>={REC:'recepcionista',AST:'asistente',ENF:'enfermero',MED:'medico',LAB:'laboratorista',PAR:'paramedico'};
    const person=(await pg.query<{id:string}>("INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT $1,'Prueba', $2,id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id",[role,types[role]])).rows[0];

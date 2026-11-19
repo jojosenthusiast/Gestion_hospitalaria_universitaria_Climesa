@@ -1,3 +1,4 @@
+import { businessDate } from '../platform/clock';
 /** Reglas puras del servicio de ambulancia (RN-28 a RN-34). La base repite las garantías con restricciones y disparadores. */
 export type UnitState = 'disponible' | 'en_servicio' | 'en_mantenimiento';
 export const milestoneTypes = ['salida', 'en_escena', 'trasladando', 'en_hospital', 'finalizado'] as const;
@@ -137,4 +138,37 @@ export function undoMilestoneError(last: { tipo: string; registrado_en: Date } |
   if (last.tipo === 'en_hospital' && received) return 'El hospital ya registró la entrega del paciente; la llegada no se puede deshacer.';
   if (now.getTime() - new Date(last.registrado_en).getTime() > UNDO_MILESTONE_MS) return 'Pasaron más de 15 minutos desde que se registró; ya no se puede deshacer.';
   return null;
+}
+
+/** Lote 5, S8: how far ahead the crew coverage looks (the week the dashboards warn about). */
+export const CREW_COVERAGE_DAYS = 7;
+export const HOUR_MS = 3600_000;
+export type CrewShift = { role: string; start: number; end: number };
+/** Most days `GET /ambulancia/cobertura?dias=` accepts. */
+export const CREW_COVERAGE_MAX_DAYS = 14;
+export type CrewGap = { date: string; start: string; end: string; hours: number; missing: 'paramedico' | 'motorista' | 'tripulacion' };
+/**
+ * Hours in [from, to) without a paramedic or a driver whose shift covers the whole hour, merged into consecutive gaps
+ * with the same missing role and split at local midnight, so each gap belongs to one local day (`date`). `days` lists
+ * every local day of the range with its hours without crew. `hoursWithoutCrew` counts all the hours.
+ */
+export function crewCoverageGaps(shifts: CrewShift[], from: number, to: number) {
+  const gaps: CrewGap[] = [];
+  const days = new Map<string, number>();
+  let hours = 0;
+  for (let h = from; h < to; h += HOUR_MS) {
+    const covered = (role: string) => shifts.some(s => s.role === role && s.start <= h && s.end >= h + HOUR_MS);
+    const paramedic = covered('paramedico'), driver = covered('motorista');
+    const date = businessDate(new Date(h));
+    if (!days.has(date)) days.set(date, 0);
+    if (paramedic && driver) continue;
+    hours++;
+    days.set(date, days.get(date)! + 1);
+    const missing = !paramedic && !driver ? 'tripulacion' : !paramedic ? 'paramedico' : 'motorista';
+    const last = gaps.at(-1);
+    if (last && last.missing === missing && last.date === date && new Date(last.end).valueOf() === h) { last.end = new Date(h + HOUR_MS).toISOString(); last.hours++; }
+    else gaps.push({ date, start: new Date(h).toISOString(), end: new Date(h + HOUR_MS).toISOString(), hours: 1, missing });
+  }
+  return { from: new Date(from).toISOString(), to: new Date(to).toISOString(), hoursWithoutCrew: hours, covered: hours === 0,
+    days: [...days].map(([date, without]) => ({ date, hoursWithoutCrew: without })), gaps };
 }

@@ -8,7 +8,7 @@ import { DatabaseService } from '../platform/database.service';
 import { PersonnelService } from './personnel.service';
 import { InfrastructureService } from './infrastructure.service';
 import { AttendanceDto, BedBlockDto, BedTransitionDto, PublishDto, RegistrationDto, RotationDto, ShiftBatchDto, ShiftCandidatesQuery, ShiftDto, SpaceDto, StaffDto, WeekTemplateDto, WeekTemplateRetireDto } from './operations.dto';
-import { BatchCreatedResponse, BatchValidationResponse, RotationPreviewResponse, WeekTemplateResponse, BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, GapCandidatesResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
+import { ActiveShiftResponse, BatchCreatedResponse, BatchValidationResponse, RotationPreviewResponse, WeekTemplateResponse, BedBoardResponse, BedCleaningCompletedResponse, BedCleaningRequestedResponse, BedCleaningVerifiedResponse, BedStateResponse, CoverageResponse, GapCandidatesResponse, HomeDashboardResponse, PublishShiftsResponse, ShiftAttendanceResponse, ShiftCatalogResponse, ShiftResponse, ShiftSavedResponse, SpecialistWeekResponse, SpaceResponse, SpecialtyResponse, StaffResponse } from './operations.responses';
 import { IdVersionResponse } from '../platform/responses';
 @ApiTags('operations') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller()
 export class OperationsController {
@@ -31,6 +31,8 @@ export class OperationsController {
   shiftCatalog(){return this.people.shiftCatalog();}
   @Get('turnos/mios') @RequirePermission('turnos.ver') @ApiOperation({summary:'Turnos publicados de la persona vinculada a la cuenta'}) @ApiOkResponse({ type: [ShiftResponse] })
   myShifts(@Req() r:ActorRequest){return this.people.shifts(r.actor,true);}
+  @Get('me/turno-activo') @RequirePermission('sesion.perfil') @ApiOperation({summary:'Lote 5 S9: si la cuenta necesita turno para operar, su turno vigente (con margen) y el próximo'}) @ApiOkResponse({ type: ActiveShiftResponse })
+  activeShift(@Req() r:ActorRequest){return this.people.activeShift(r.actor);}
   @Get('turnos/cobertura') @RequirePermission('turnos.ver') @ApiOperation({summary:'Huecos de cobertura por área y hora frente al mínimo vigente'}) @ApiQuery({name:'from',type:String,description:'Primer día local, yyyy-MM-dd'}) @ApiQuery({name:'to',type:String,description:'Último día local, yyyy-MM-dd'}) @ApiQuery({name:'areaId',type:String,format:'uuid',required:false}) @ApiOkResponse({ type: CoverageResponse })
   coverage(@Query('from') from='',@Query('to') to='',@Query('areaId') areaId?:string){return this.people.coverage(from,to,areaId);}
   @Get('turnos/candidatos') @RequirePermission('turnos.planificar') @ApiOperation({summary:'R7 F-1: quiénes pueden cubrir un hueco de cobertura con las reglas de un turno suelto (descanso, tope de 7 días, días seguidos, traslape, inscripción); no guarda nada'}) @ApiOkResponse({ type: GapCandidatesResponse })

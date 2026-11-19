@@ -14,9 +14,9 @@ import { InMemoryClinicalFileStorage } from './clinical-storage';
 const issuer = 'https://gvmvmrusscsfbndnbvbr.supabase.co/auth/v1';
 
 /** Full Nest application over PGlite with a controllable clock and fictitious accounts per role. */
-export async function createTestApp(start: Date) {
+export async function createTestApp(start: Date, options: { shiftGate?: boolean; nursingByArea?: boolean } = {}) {
   let current = start;
-  const fixture = await createDatabase();
+  const fixture = await createDatabase(options);
   /** A role code (its fixture account) or an account id created by the spec itself. */
   const subject = (role: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(role) ? role : userId(role);
   /** What Supabase Auth reports for each account: by default an unconfirmed fixture email (nothing auto-links). */

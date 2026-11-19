@@ -58,8 +58,8 @@ describe('Bandeja de avisos · vigentes, programados y vencidos', () => {
 
   test('unread and critical counts only count in-force notices; "Enterado" is refused on expired and scheduled ones', async () => {
     const before = await inbox('AST');
-    const expired = await insert('Crítico vencido', at(-3 * DAY), at(-DAY), { roles: ['AST'], nivel: 'critico' });
-    const scheduled = await insert('Crítico programado', at(DAY), at(2 * DAY), { roles: ['AST'], nivel: 'critico' });
+    const expired = await insert('Crítico vencido', at(-3 * DAY), at(-DAY), { roles: ['ENF'], nivel: 'critico' });
+    const scheduled = await insert('Crítico programado', at(DAY), at(2 * DAY), { roles: ['ENF'], nivel: 'critico' });
     const after = await inbox('AST');
     expect(after.avisos.map(a => a.id)).toEqual(expect.arrayContaining([expired, scheduled]));
     expect(after.noLeidos).toBe(before.noLeidos);
@@ -67,7 +67,7 @@ describe('Bandeja de avisos · vigentes, programados y vencidos', () => {
     expect(after.avisos.filter(a => a.destacado).map(a => a.id)).not.toContain(expired);
     expect((await t.call('AST', 'POST', `/me/avisos/${expired}/enterado`, {})).status).toBe(409);
     expect((await t.call('AST', 'POST', `/me/avisos/${scheduled}/enterado`, {})).status).toBe(404);
-    const current = await insert('Crítico vigente', at(-HOUR), at(DAY), { roles: ['AST'], nivel: 'critico' });
+    const current = await insert('Crítico vigente', at(-HOUR), at(DAY), { roles: ['ENF'], nivel: 'critico' });
     const withCurrent = await inbox('AST');
     expect(withCurrent.avisos.find(a => a.id === current)).toMatchObject({ estado: 'vigente', destacado: true });
     expect(withCurrent.noLeidos).toBe(before.noLeidos + 1);
