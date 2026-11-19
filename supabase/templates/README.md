@@ -1,6 +1,6 @@
 # Plantillas de correo de Supabase Auth (BL-07)
 
-Cinco plantillas HTML en español con la marca CLIMESA. Cada una tiene un botón y, debajo, el mismo enlace en texto para copiarlo (Gmail desactiva los botones de los correos que caen en spam). Usan tablas y estilos en línea para que se vean igual en Gmail, Outlook y el correo del teléfono.
+Seis plantillas HTML en español con la marca CLIMESA. Cinco tienen un botón y, debajo, el mismo enlace en texto para copiarlo (Gmail desactiva los botones de los correos que caen en spam); la de reverificación muestra un código para escribir. Usan tablas y estilos en línea para que se vean igual en Gmail, Outlook y el correo del teléfono.
 
 ## Dónde pegar cada una
 
@@ -13,8 +13,9 @@ Supabase → **Authentication → Emails → Templates**. En cada pestaña pega 
 | Reset Password | `recuperacion.html` | Restablece tu contraseña de CLIMESA |
 | Magic Link | `enlace-magico.html` | Tu enlace de acceso a CLIMESA |
 | Change Email Address | `cambio-correo.html` | Confirma tu nuevo correo en CLIMESA |
+| Reauthentication | `reverificacion.html` | Tu código de verificación de CLIMESA |
 
-Las plantillas usan `{{ .ConfirmationURL }}`, `{{ .Email }}` y, en el cambio de correo, `{{ .NewEmail }}`. `{{ .ConfirmationURL }}` ya incluye la página de destino que pide cada aplicación (`redirect_to`), así que no hace falta editar los enlaces.
+Las plantillas usan `{{ .ConfirmationURL }}`, `{{ .Email }}`, en la reverificación `{{ .Token }}` y, en el cambio de correo, `{{ .NewEmail }}`. `{{ .ConfirmationURL }}` ya incluye la página de destino que pide cada aplicación (`redirect_to`), así que no hace falta editar los enlaces.
 
 ## Configuración que deben acompañar (una sola vez)
 
