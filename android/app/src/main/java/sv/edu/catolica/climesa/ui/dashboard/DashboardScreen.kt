@@ -111,13 +111,13 @@ fun RoleDashboardScreen(
         when {
             state.loading && dashboard == null -> item { LoadingState() }
             state.error != null && dashboard == null -> item { ErrorState(state.error, model::reload) }
-            dashboard != null -> dashboardContent(dashboard, onAction)
+            dashboard != null -> dashboardContent(dashboard, onAction, state.extras)
         }
     }
 }
 
 @OptIn(ExperimentalLayoutApi::class)
-private fun LazyListScope.dashboardContent(dashboard: DashboardModel, onAction: (QuickActionRequest) -> Unit) {
+private fun LazyListScope.dashboardContent(dashboard: DashboardModel, onAction: (QuickActionRequest) -> Unit, extras: sv.edu.catolica.climesa.domain.DashboardExtras = sv.edu.catolica.climesa.domain.DashboardExtras()) {
     if (dashboard.unavailable.isNotEmpty()) item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.dash_datos_parciales)) }
     if (dashboard.kpis.isEmpty() && dashboard.actions.isEmpty() && dashboard.attention.isEmpty()) {
         item { EmptyState(stringResource(R.string.dash_vacio), detail = stringResource(R.string.dash_vacio_detalle)) }
@@ -133,7 +133,7 @@ private fun LazyListScope.dashboardContent(dashboard: DashboardModel, onAction: 
         item { SectionLabel(stringResource(R.string.dash_resumen)) }
         items(dashboard.kpis.chunked(2)) { pair ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                pair.forEach { kpi -> KpiTile(kpi, Modifier.weight(1f)) { kpi.target?.let { onAction(QuickActionRequest(it, kpi.action)) } } }
+                pair.forEach { kpi -> KpiTile(kpi, Modifier.weight(1f), extra = kpiExtra(kpi, extras)) { kpi.target?.let { onAction(QuickActionRequest(it, kpi.action)) } } }
                 if (pair.size == 1) Spacer(Modifier.weight(1f))
             }
         }
@@ -165,7 +165,7 @@ private fun DashboardHeader(name: String, roleLabel: String, @Suppress("UNUSED_P
 
 /** State tile: coloured top edge, a shape icon, the big value and its label. Tappable when it leads to a section. */
 @Composable
-private fun KpiTile(kpi: DashboardKpi, modifier: Modifier, onClick: () -> Unit) {
+private fun KpiTile(kpi: DashboardKpi, modifier: Modifier, extra: (@Composable () -> Unit)? = null, onClick: () -> Unit) {
     val (fg, soft) = kpi.tone.colors()
     val content: @Composable () -> Unit = {
         Column {
@@ -180,6 +180,7 @@ private fun KpiTile(kpi: DashboardKpi, modifier: Modifier, onClick: () -> Unit) 
                     kpi.suffix?.let { Text(" $it", Modifier.padding(bottom = 4.dp), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 kpi.hint?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = if (kpi.tone.signals) fg else MaterialTheme.colorScheme.onSurfaceVariant) }
+                extra?.invoke()
             }
         }
     }
@@ -242,4 +243,33 @@ private fun ActionChip(action: DashboardAction, onClick: () -> Unit) {
         leadingIcon = { Icon(iconFor(action.request.section), null, Modifier.size(18.dp), tint = MaterialTheme.climesa.primaryText) },
         modifier = Modifier.heightIn(min = Spacing.touch),
     )
+}
+
+/** Lote 5 S4: the split under «En espera» and the free beds by room type under «Camas libres»; nothing for other tiles. */
+private fun kpiExtra(kpi: DashboardKpi, extras: sv.edu.catolica.climesa.domain.DashboardExtras): (@Composable () -> Unit)? = when {
+    kpi.label == sv.edu.catolica.climesa.domain.DashboardSplits.WAITING && extras.waiting != null -> ({ WaitingSplitLine(extras.waiting) })
+    kpi.label == sv.edu.catolica.climesa.domain.DashboardSplits.FREE_BEDS && extras.bedTypes.isNotEmpty() -> ({ FreeBedsByType(extras.bedTypes) })
+    else -> null
+}
+
+/** «5 de fila · 3 con cita» in body size, so the split reads at a glance and not as a footnote. */
+@Composable
+private fun WaitingSplitLine(split: sv.edu.catolica.climesa.domain.WaitingSplit) {
+    Text(split.text, style = MaterialTheme.typography.bodyMedium.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.colorScheme.onSurface)
+}
+
+/** One line per room type with its free count; a type with none is warning-coloured with its alert icon (never colour alone). */
+@Composable
+private fun FreeBedsByType(counts: List<sv.edu.catolica.climesa.domain.BedTypeCount>) {
+    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        counts.forEach { c ->
+            val none = c.free == 0
+            val ink = if (none) MaterialTheme.climesa.warning else MaterialTheme.colorScheme.onSurface
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                if (none) Icon(sv.edu.catolica.climesa.ui.icons.ClimesaIcons.Alert, null, Modifier.size(14.dp), tint = ink)
+                Text(c.label, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = ink, maxLines = 1)
+                Text(c.free.toString(), style = MaterialTheme.typography.bodyMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontFeatureSettings = "tnum"), color = ink)
+            }
+        }
+    }
 }
