@@ -37,6 +37,8 @@ data class BedsUiState(
     val submitting: Boolean = false,
     val message: String? = null,
     val actionError: String? = null,
+    /** Lote 5 S7: isolation could be read from the admissions, so the isolation filters mean something. */
+    val isolationKnown: Boolean = false,
 )
 
 @HiltViewModel
@@ -76,7 +78,10 @@ class BedsViewModel @Inject constructor(
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             try {
-                val beds = repository.beds()
+                // Lote 5 S7: isolation comes from the admissions; without `admision.ver` (or if it fails) the filter stays hidden.
+                val isolated = if ("admision.ver" in mutable.value.permissions) try { repository.isolatedBedCodes() } catch (e: CancellationException) { throw e } catch (_: Exception) { null } else null
+                val beds = sv.edu.catolica.climesa.domain.BedsByType.withIsolation(repository.beds(), isolated.orEmpty())
+                mutable.update { it.copy(isolationKnown = isolated != null) }
                 mutable.update { it.copy(loading = false, beds = beds, error = null) }
             } catch (e: Exception) {
                 if (e is CancellationException) throw e

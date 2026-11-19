@@ -13,6 +13,14 @@ data class Bed(
     /** Floor of the bed (`level`), null when the API does not know it. */
     val level: Int? = null,
     val roomId: String = "",
+    /** Room type (`category`: vip, semiprivada...), for free beds by type (Lote 5 S4). Empty when the API does not send it. */
+    val category: String = "",
+    /**
+     * Lote 5 S7: the occupant is in isolation ([isolated]) or shares the room with a patient in isolation ([roomIsolated]).
+     * `/camas` has no isolation flag; both come from the active admissions (`/admisiones`, `isolation` and `bed`).
+     */
+    val isolated: Boolean = false,
+    val roomIsolated: Boolean = false,
 )
 
 /** One room of the board with its beds, in code order. */

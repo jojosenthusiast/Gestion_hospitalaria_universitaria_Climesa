@@ -40,6 +40,11 @@ data class QueueTicket(
     val calledByMe: Boolean = false,
     /** The patient of the number (`patientId`), for "Tomar signos" from the card; null for an unidentified number. */
     val patientId: String? = null,
+    /** Lote 5 (S4): the appointment linked to the number (`appointmentId`) and whether it was issued at its arrival. */
+    val appointmentId: String? = null,
+    val arrivalFromAppointment: Boolean = false,
+    /** Lote 5 (S11): reasons of the linked appointment when it came from a request by category (`categories`). */
+    val categories: List<CategoryRef> = emptyList(),
 ) {
     fun allows(action: QueueAction) = action in allowedActions
     /** The action is shown: allowed, or blocked with a reason from the server. */
@@ -129,6 +134,11 @@ object QueueRules {
                 voidableUntilMillis = ServerActions.text(row, "voidableUntil")?.let(::parseMillis),
                 calledByMe = row.optBoolean("calledByMe", false),
                 patientId = ServerActions.text(row, "patientId"),
+                appointmentId = ServerActions.text(row, "appointmentId"),
+                arrivalFromAppointment = row.optBoolean("arrivalFromAppointment", false),
+                categories = row.optJSONArray("categories")?.let { list ->
+                    (0 until list.length()).mapNotNull { i -> list.optJSONObject(i)?.let { c -> ServerActions.text(c, "code")?.let { code -> CategoryRef(code, ServerActions.text(c, "name") ?: code, c.optString("icon")) } } }
+                } ?: emptyList(),
             )
         } }
     }

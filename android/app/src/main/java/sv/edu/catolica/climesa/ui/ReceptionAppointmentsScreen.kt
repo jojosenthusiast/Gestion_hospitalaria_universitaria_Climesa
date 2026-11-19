@@ -4,7 +4,10 @@ package sv.edu.catolica.climesa.ui
 import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -86,7 +89,12 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     }
     BackHandler(enabled = state.scheduling) { model.leaveScheduling() }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
-    PageList(modifier) {
+    // Lote 5 S6: «Agendar cita» stays docked at the bottom, right above the navigation bar (thumb reach), while the list
+    // scrolls; from 600dp the cards use two columns instead of stretching one line across the screen.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
+    val columns = if (maxWidth >= 600.dp) 2 else 1
+    Column(Modifier.fillMaxSize()) {
+    PageList(Modifier.weight(1f)) {
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = ClimesaIcons.Retry) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         actionState.error?.takeIf { actionState.target == null }?.let { error -> item {
@@ -98,14 +106,14 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 }
             }
         } }
-        if (canSchedule) item { CompactHeader("", actions = { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = ClimesaIcons.Plus, fill = false) }) }
         if (canSchedule) {
-            requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+            // S6: an assign or reject error shows on its card; here only when that card is gone (or it was not a card's).
+            requestState.error?.takeIf { requestState.errorRequestId == null || requestState.inbox.none { it.id == requestState.errorRequestId } }?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
             requestState.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
             // Empty inboxes collapse into one line so the appointment list starts on the first screen.
             val inboxEmpty = requestState.inbox.isEmpty() && !requestState.loading
             val followUpsEmpty = followUpState.proposals.isEmpty() && !followUpState.loading && followUpState.error == null && followUpState.notice == null
-            if (!inboxEmpty) item { CategoryRequestInbox(requestState, requests) }
+            if (!inboxEmpty) item { CategoryRequestInbox(requestState, requests, columns) }
             if (!followUpsEmpty) item { LabProposalInbox(followUpState, followUps) }
             if (inboxEmpty && followUpsEmpty) item { Text(stringResource(R.string.citas_bandejas_al_dia), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
@@ -130,15 +138,34 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 if (foldPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, pastDays), { showPast = true }) }
                 groups.filter { !foldPast || it.first >= today }.forEach { (day, rows) ->
                     item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                    items(rows, key = { it.id }) { row ->
-                        // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
-                        val pending = actionState.pendingNoShows.firstOrNull { it.key == row.id }
-                        if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow(row.id) }
-                        else AppointmentRow(row, arrival = if (canArrive) ArrivalControl(today, queueState, { queue.clearMessages(); queue.registerArrivalFor(row.id, row.patientId, row.patientName.ifBlank { "Paciente" }) }) else null) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
+                    items(rows.chunked(columns), key = { chunk -> chunk.joinToString("|") { it.id } }) { chunk ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.block)) {
+                            chunk.forEach { row ->
+                                Box(Modifier.weight(1f)) {
+                                    // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
+                                    val pending = actionState.pendingNoShows.firstOrNull { it.key == row.id }
+                                    if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow(row.id) }
+                                    else AppointmentRow(row, arrival = if (canArrive) ArrivalControl(today, queueState, { queue.clearMessages(); queue.registerArrivalFor(row.id, row.patientId, row.patientName.ifBlank { "Paciente" }) }) else null) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
+                                }
+                            }
+                            repeat(columns - chunk.size) { Spacer(Modifier.weight(1f)) }
+                        }
                     }
                 }
             }
         }
+    }
+    if (canSchedule) ScheduleDock { model.clearMessages(); model.openScheduling() }
+    }
+    }
+}
+
+/** Lote 5 S6: the bottom bar of Citas with «Agendar cita» full width, the one primary action of the screen. */
+@Composable
+private fun ScheduleDock(onSchedule: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+        HorizontalDivider(color = MaterialTheme.climesa.line)
+        PrimaryButton(stringResource(R.string.rec_citas_agendar), onSchedule, Modifier.padding(horizontal = Spacing.page, vertical = Spacing.sm), icon = ClimesaIcons.Plus)
     }
 }
 
