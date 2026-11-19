@@ -96,7 +96,7 @@ Fuente única: `api/src/platform/event-types.ts` (enum `TipoEvento` del contrato
 | `ambulancia.hito` | `servicio` | Hito del servicio | `ambulancia`, `usuario:<paciente solicitante>`; `trasladando`, `en_hospital` y `finalizado` también a `ambulancia.recibir_prehospital` (MA-AMB-04) | 109 |
 | `ambulancia.prehospital` | `servicio` | Reporte prehospitalario; entrega al hospital (MA-AMB-04) | `ambulancia`, `ambulancia.recibir_prehospital` | 109 |
 | `ambulancia.ubicacion` | `servicio` | Ubicación en vivo | `ambulancia` | 109 |
-| `vinculacion.solicitada` / `vinculacion.resuelta` | `vinculacion_paciente` | Solicitud, aprobación o rechazo | `cuentas.verificar`, `usuario:<solicitante>` | 101 |
+| `vinculacion.resuelta` | `usuario` / `vinculacion_paciente` | La cuenta se une sola a su expediente por correo verificado, o Recepción cierra una solicitud antigua | `usuario:<cuenta>` (unión automática); `cuentas.verificar`, `usuario:<solicitante>` (cierre). `vinculacion.solicitada` ya no se emite | 101 |
 | `inventario.actualizado` | `articulo` | Movimiento | `inventario.ver` | 111 |
 | `inventario.bajo_minimo` | `articulo` | Movimiento o mínimo que cruza el umbral | `inventario.mover` según tipo de artículo | 111 |
 | `aviso.publicado` | `aviso` | Publicar aviso | `publico` y `rol:<código>` de la audiencia; un aviso por área (Fase 2, S11) va a `usuario:<id>` de cada cuenta activa de esa área (ficha o turno en curso), porque no hay canal por área | 112 |
@@ -148,7 +148,7 @@ Revisión de producción (solo lectura, 2026-11-14): la publicación existe con 
 | Avisos | `aviso` | Sí: `/me/avisos`, `/avisos` | Sí: avisos del tablero | Público: `publico` y toda cuenta con sesión (`sesion.perfil`). Dirigido: sus roles. Siempre: `avisos.publicar` | Un aviso público solo iba a `publico`, que web y Android no escuchan con sesión: no aparecía hasta recargar |
 | Pacientes y duplicados | `paciente`, `caso_duplicado` | Sí | Sí | Permisos de pacientes; duplicados a `pacientes.gestionar_duplicados` | Duplicados solo a REC (JOP también los revisa) |
 | Personal y usuarios | `personal`, `usuario` | Sí | Sí | ADM, JOP y roles con `personal.ver` o `usuarios.ver` | DPD no recibía cambios de usuarios |
-| Vinculación de cuentas | `vinculacion_paciente` | Sí | Sí | `cuentas.verificar`, el solicitante | Sin cambio |
+| Vinculación de cuentas | `usuario`, `vinculacion_paciente` | Sí | Sí | La cuenta unida (`usuario:<id>`); `cuentas.verificar` y el solicitante al cerrar una solicitud antigua | Sin cambio |
 | Información pública | `publico` | Sí (pantalla sin sesión, canal `publico`) | No (ver límites) | `publico` | Sin cambio |
 | Métricas | `metricas` | Sí | Sí (tablero) | `metricas.ver` | Sin cambio |
 | Auditoría | — | Bajo demanda (cada lectura se audita) | No aplica | — | Por diseño |

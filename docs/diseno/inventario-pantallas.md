@@ -80,7 +80,7 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 
 - **Para:** REC; LAB; DPD
 - **Propósito:** Bandeja de lo que toca hacer
-- **Muestra:** REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar. Todos: aviso crítico dirigido a su rol o área hasta su «Enterado» (S11)
+- **Muestra:** REC: solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar. Todos: aviso crítico dirigido a su rol o área hasta su «Enterado» (S11)
 - **Acciones:** Abrir cada pendiente; Enterado
 - **En vivo:** Contadores en vivo
 - **Spec:** 113
@@ -279,13 +279,13 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **Privacidad:** Búsqueda auditada
 - **Spec:** 102
 
-### W27 · Vinculaciones por verificar (R)
+### W27 · Vinculaciones por verificar (retirada) (R)
 
 - **Para:** REC
-- **Propósito:** Validar cuentas de pacientes
-- **Muestra:** Cuenta, datos que dio, candidato de expediente
-- **Acciones:** Aprobar; rechazar con motivo
-- **En vivo:** Nuevas entran solas
+- **Propósito:** Retirada: la cuenta se une sola por correo verificado
+- **Muestra:** Recepción anota el correo del paciente en su expediente (W de expediente); conflictos de correo se muestran en ese campo
+- **Acciones:** Ninguna
+- **Privacidad:** Ya no existe en el menú
 - **Spec:** 101
 
 ### W28 · Citas y solicitudes (R)
@@ -540,11 +540,11 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 ### A03 · Vincular expediente (R)
 
 - **Para:** PAC
-- **Propósito:** Unir cuenta y expediente
-- **Muestra:** DUI, fecha de nacimiento; estado: en verificación, aprobada, rechazada
-- **Acciones:** Enviar
-- **En vivo:** Cambia sola al aprobarse
-- **Privacidad:** Sin aprobar no se ve nada privado
+- **Propósito:** Unir cuenta y expediente por correo
+- **Muestra:** Correo de la cuenta; si no está confirmado, pide confirmarlo; si no está unida, pide que Recepción lo anote en el expediente
+- **Acciones:** Ninguna
+- **En vivo:** Cambia sola al unirse
+- **Privacidad:** Sin unir no se ve nada privado
 - **Spec:** 101
 
 ### A04 · Inicio del paciente (R)
@@ -716,13 +716,13 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 - **En vivo:** En vivo
 - **Spec:** 105
 
-### A33 · Verificar vinculaciones (R)
+### A33 · Verificar vinculaciones (retirada) (R)
 
 - **Para:** REC
-- **Propósito:** Aprobar cuentas
-- **Muestra:** Datos de la cuenta y candidato
-- **Acciones:** Aprobar; rechazar
-- **En vivo:** En vivo
+- **Propósito:** Retirada: la cuenta se une sola por correo verificado
+- **Muestra:** Recepción anota el correo del paciente en su expediente
+- **Acciones:** Ninguna
+- **Privacidad:** Ya no existe en el menú
 - **Spec:** 101
 
 ### A34 · Admisión y cama (R)
@@ -924,11 +924,11 @@ El curso pide el mapeo de flujos de todas las pantallas. Estos son los recorrido
 ### I03 · Vincular expediente (R)
 
 - **Para:** PAC
-- **Propósito:** Unir cuenta y expediente
-- **Muestra:** DUI, fecha de nacimiento; estado: en verificación, aprobada, rechazada
-- **Acciones:** Enviar
-- **En vivo:** Cambia sola al aprobarse
-- **Privacidad:** Sin aprobar no se ve nada privado
+- **Propósito:** Unir cuenta y expediente por correo
+- **Muestra:** Correo de la cuenta; si no está confirmado, pide confirmarlo; si no está unida, pide que Recepción lo anote en el expediente
+- **Acciones:** Ninguna
+- **En vivo:** Cambia sola al unirse
+- **Privacidad:** Sin unir no se ve nada privado
 - **Spec:** 101
 
 ### I04 · Inicio del paciente (R)
