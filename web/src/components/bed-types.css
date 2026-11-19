@@ -1,0 +1,9 @@
+/* Owner batch 5 (S4): free beds per room type. The shape tells the type (diamond VIP, half circle semiprivada, ring other). */
+.bed-types { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: var(--text-xs, 0.75rem); color: var(--muted); font-weight: 500; line-height: 1.3; }
+.bed-type { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.bed-type strong { color: var(--ink); font-variant-numeric: tabular-nums; font-weight: 700; }
+.bed-type.is-none { color: var(--urgent); }
+.bed-type.is-none strong { color: var(--urgent); }
+.bed-type-mark { width: 8px; height: 8px; flex: none; border: 1.5px solid currentColor; border-radius: 50%; }
+.bed-type-mark.type-vip { border-radius: 1px; transform: rotate(45deg) scale(0.85); background: currentColor; }
+.bed-type-mark.type-semiprivada { background: linear-gradient(90deg, currentColor 50%, transparent 50%); }

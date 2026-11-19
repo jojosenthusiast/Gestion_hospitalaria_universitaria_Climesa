@@ -14,6 +14,8 @@ import { unitPlural } from '../inventory/model';
 import { auditActionLabel } from './labels';
 import { coverageTodayGroup } from './coverage-tray';
 import { needsStaffLink } from '../personal/filters';
+import { waitingSplit, waitingSplitText } from '../listas/queue-board';
+import { BedTypeBreakdown, bedTypeCounts } from '../../components/bed-types';
 import { AttentionList, Panel, PanelState, isToday, localDay, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
 export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'AST' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
@@ -29,6 +31,10 @@ const todays = (rows: Appointment[]) => rows.filter(a => isToday(a.start) && ope
 const tickets = (rows: QueueTicket[], state: string) => rows.filter(t => t.state === state);
 const fig = <T,>(id: string, label: string, state: Remote<T>, read: (data: T) => number | string | null, extra: Partial<Figure> = {}): Figure => ({ id, label, state: state as Remote<unknown>, value: state.data ? read(state.data) : null, ...extra });
 const grid = (children: ReactNode) => <div className="dash-grid">{children}</div>;
+/** Owner batch 5 (S4): «En espera» says how many came to the queue today and how many have an appointment. */
+const waitingFigure = (d: DashboardData) => fig('espera', 'En espera', d.queue, r => waitingSplit(r).total, { href: '#/fila', detail: d.queue.data ? waitingSplitText(waitingSplit(d.queue.data)) : undefined });
+/** Owner batch 5 (S4): free beds per room type under the total, read from the bed board when the account has it. */
+const freeByType = (d: DashboardData) => d.beds.data ? <BedTypeBreakdown counts={bedTypeCounts(d.beds.data.map(b => ({ category: b.category, free: b.state === 'libre' })))} /> : undefined;
 const shiftText = (s: Shift) => `${isToday(s.start) ? 'Hoy' : formatDate(s.start, { withYear: false })} · ${timeLabel(s.start)}–${timeLabel(s.end)} · ${s.area}`;
 const nextShift = (rows: Shift[]) => [...rows].filter(s => s.state !== 'cancelado' && new Date(s.end).getTime() > Date.now()).sort((a, b) => a.start.localeCompare(b.start))[0];
 const PRIORITY_ORDER: Record<string, number> = { emergencia: 0, urgente: 1, rutina: 2 };
@@ -187,7 +193,7 @@ const adm: RoleDashboard = {
 // ───────────────────────────── JOP · operación (agregados, sin nombres)
 const jop: RoleDashboard = {
   title: 'Operación del hospital',
-  needs: ['board', 'admissions', 'stock', 'ambulance'],
+  needs: ['board', 'queue', 'beds', 'admissions', 'stock', 'ambulance'],
   actions: [
     { id: 'admision', label: 'Nueva admisión', hint: 'Ingresar a un paciente para hospitalizar', icon: 'bed', href: '#/hospitalizacion?accion=admision', permission: 'admision.crear' },
     { id: 'turno', label: 'Planificar turno', hint: 'Asignar personal a un área', icon: 'calendar', href: '#/turnos?accion=planificar', permission: 'turnos.planificar' },
@@ -199,9 +205,9 @@ const jop: RoleDashboard = {
     indicatedAdmissions(d), noBed(d), unclosedAmbulance(d), pendingAmbulance(d, profile), lowStock(d),
   ],
   figures: ({ d }) => [
-    fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined }),
+    fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined, detail: freeByType(d) }),
     fig('limpieza', 'En limpieza', d.board, b => b.camas.limpieza),
-    fig('espera', 'En espera', d.board, b => b.fila.enEspera, { href: '#/fila' }),
+    waitingFigure(d),
     fig('llamados', 'Llamados', d.board, b => b.fila.llamados),
     fig('lab-pendiente', 'Órdenes por tomar', d.board, b => b.laboratorio.pendiente, { href: '#/laboratorio' }),
     fig('lab-proceso', 'Órdenes en proceso', d.board, b => b.laboratorio.enProceso),
@@ -252,7 +258,7 @@ const requestsState = (d: DashboardData): Remote<unknown> => {
 };
 const rec: RoleDashboard = {
   title: 'Recepción',
-  needs: ['summary', 'queue', 'appts', 'apptRequests', 'admissions', 'ambulance'],
+  needs: ['summary', 'queue', 'beds', 'appts', 'apptRequests', 'admissions', 'ambulance'],
   actions: [
     { id: 'registrar', label: 'Registrar paciente', hint: 'Busca primero y registra si no existe', icon: 'userPlus', href: '#/pacientes?accion=registrar', permission: 'pacientes.registrar' },
     { id: 'agendar', label: 'Agendar cita', hint: 'Paciente, médico y horario disponible', icon: 'calendar', href: '#/citas?accion=agendar', permission: 'citas.agendar' },
@@ -270,10 +276,10 @@ const rec: RoleDashboard = {
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d, profile),
   ],
   figures: ({ d }) => [
-    fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
+    waitingFigure(d),
     fig('llamados', 'Llamados', d.queue, r => tickets(r, 'llamado').length, { href: '#/fila' }),
     fig('citas-hoy', 'Citas de hoy', d.appts, r => todays(r).length, { href: '#/citas' }),
-    fig('camas-libres', 'Camas libres', d.summary, s => s.beds ? s.beds.free : null, { href: '#/camas', of: d.summary.data?.beds ? `de ${d.summary.data.beds.total}` : undefined }),
+    fig('camas-libres', 'Camas libres', d.summary, s => s.beds ? s.beds.free : null, { href: '#/camas', of: d.summary.data?.beds ? `de ${d.summary.data.beds.total}` : undefined, detail: freeByType(d) }),
     fig('pacientes', 'Pacientes activos', d.summary, s => s.patients ? s.patients.active : null, { href: '#/pacientes' }),
   ],
   panels: ({ d }) => grid(<AppointmentsToday appts={d.appts} />),
@@ -290,7 +296,7 @@ const ast: RoleDashboard = {
   ],
   tray: () => [],
   figures: ({ d }) => [
-    fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
+    waitingFigure(d),
     fig('llamados', 'Llamados', d.queue, r => tickets(r, 'llamado').length),
     fig('atendidos', 'Atendidos hoy', d.queue, r => tickets(r, 'atendido').length),
   ],
@@ -338,7 +344,7 @@ const med: RoleDashboard = {
   }],
   figures: ({ d }) => [
     fig('citas-hoy', 'Citas de hoy', d.agenda, r => r.filter(a => isToday(a.start)).length, { href: '#/consultas' }),
-    fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
+    waitingFigure(d),
     fig('hospitalizados', 'Hospitalizados', d.admissions, r => r.filter(a => a.state === 'hospitalizado').length, { href: '#/hospitalizacion' }),
   ],
   panels: ({ d }) => grid(<>

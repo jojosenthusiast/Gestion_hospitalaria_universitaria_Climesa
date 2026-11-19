@@ -68,3 +68,4 @@
 .on-shift-roles li { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .on-shift-roles strong { font-variant-numeric: tabular-nums; }
 .on-shift-gaps { margin: 0; }
+.figure-detail { color: var(--muted); font-size: var(--text-xs, 0.75rem); line-height: 1.35; font-variant-numeric: tabular-nums; }

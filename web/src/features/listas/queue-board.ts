@@ -31,3 +31,15 @@ export function boardSummary(tickets: BoardTicket[], now: number) {
 /** Los que esperan, por número (el más bajo se llama primero); los terminados, los más recientes arriba. */
 export const sortColumn = <T extends BoardTicket>(tickets: T[], column: Column) =>
   [...tickets].sort((a, b) => column === 'cerrado' ? b.numero - a.numero : a.numero - b.numero);
+
+/** Owner batch 5 (S4): a number is booked when the API links it to an appointment (`appointmentAt`, `appointmentId` or a registered arrival). */
+export type BookingMarks = { appointmentAt?: string | null; appointmentId?: string | null; arrivalFromAppointment?: boolean | null };
+export const isBooked = (ticket: BookingMarks) => !!(ticket.appointmentAt || ticket.appointmentId || ticket.arrivalFromAppointment);
+
+/** Waiting numbers split into walk-ins of the day («de fila») and appointments («con cita»). */
+export function waitingSplit(tickets: (Pick<BoardTicket, 'state'> & BookingMarks)[]) {
+  const waiting = tickets.filter(t => t.state === 'en_espera'), booked = waiting.filter(isBooked).length;
+  return { total: waiting.length, walkIn: waiting.length - booked, booked };
+}
+/** «5 de fila, 3 con cita»: the same words on Inicio and in Fila del día. */
+export const waitingSplitText = (split: { walkIn: number; booked: number }) => `${split.walkIn} de fila, ${split.booked} con cita`;

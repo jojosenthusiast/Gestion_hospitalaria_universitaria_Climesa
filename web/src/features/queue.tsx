@@ -13,7 +13,7 @@ import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Select, WriteErr
 import { LiveSearch, matches } from './listas/chips';
 import { Segmented } from '../components/segmented';
 import { formatDuration, formatTime, plural } from '../lib/format';
-import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
+import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, waitingSplit, waitingSplitText, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
 import './listas/lists.css';
 import { CategoryBadges, type CategoryRef } from '../components/category';
 import { QueueCardMenu, type CardMenuItem } from './queue/card-menu';
@@ -241,7 +241,7 @@ export function QueueSummary({ visible, now, proposal, onCallNext, callDisabled,
         <span className="qb-summary-value">{serving ? <><AreaTag code={areaOfTicket(serving)} /><strong className="mono-data">{serving.numero}</strong></> : <strong className="qb-summary-none">Nadie</strong>}</span></div>
       <div className="qb-summary-stat"><span className="qb-summary-label">Sigue</span>
         <span className="qb-summary-value">{nextNumber !== null && nextArea ? <><AreaTag code={nextArea} /><strong className="mono-data">{nextNumber}</strong></> : <strong className="qb-summary-none">Nadie</strong>}
-          {waiting.length > 0 && <small>{waiting.length} en espera</small>}</span></div>
+          {waiting.length > 0 && <small>{waiting.length} en espera · {waitingSplitText(waitingSplit(waiting))}</small>}</span></div>
       <div className="qb-summary-stat qb-summary-wait"><span className="qb-summary-label">Espera promedio</span>
         <span className="qb-summary-value"><strong>{formatDuration(summary.averageWait)}</strong><small>Máxima {formatDuration(summary.longestWait)}</small></span></div>
     </div>
