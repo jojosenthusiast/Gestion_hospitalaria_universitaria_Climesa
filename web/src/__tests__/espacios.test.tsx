@@ -58,8 +58,8 @@ const planta = (nombre: RegExp) => screen.getByRole('button', { name: nombre });
 describe('W12 · plano de camas por planta', () => {
   it('las plantas salen de los datos y cada una reparte sus camas', async () => {
     montar('camas');
-    expect(await screen.findByText('Camas de hospitalización')).toBeTruthy();
-    expect(screen.getByText('17')).toBeTruthy();
+    const totales = await screen.findByLabelText('Camas del hospital');
+    expect(totales.textContent).toBe(`17camas${libres(2) + libres(3)}libres3ocupadas`);
     expect(planta(/Planta 2/)).toBeTruthy();
     expect(planta(/Planta 3/)).toBeTruthy();
     expect(habitacionesVisibles()).toHaveLength(6);
@@ -117,36 +117,52 @@ describe('W12 · plano de camas por planta', () => {
 });
 
 describe('W09 · edificio', () => {
-  it('muestra plantas, habitaciones y camas con sus camas libres por nodo', async () => {
+  it('muestra plantas con sus libres y cada habitación con el estado de sus camas', async () => {
     montar('espacios');
     expect(await screen.findByRole('button', { name: /Planta 2/ })).toBeTruthy();
     expect(planta(/Planta 2/).textContent).toContain(`${libres(2)}/12 libres`);
     expect(planta(/Planta 3/).textContent).toContain(`${libres(3)}/5 libres`);
     const hab204 = screen.getByRole('article', { name: 'Habitación HAB-204' });
-    expect(within(hab204).getByText('2/2 libres')).toBeTruthy();
-    expect(within(screen.getByRole('article', { name: 'Habitación HAB-201' })).getByText('0/2 libres')).toBeTruthy();
+    expect(within(hab204).getAllByText('Libre')).toHaveLength(2);
+    expect(within(screen.getByRole('article', { name: 'Habitación HAB-201' })).getAllByText('Ocupada')).toHaveLength(2);
+    expect(hab204.querySelector('.plan-free, .plan-free-pill')).toBeNull();
   });
 
   it('al tocar una habitación abre su detalle y, con permiso, ofrece editar y agregar dentro', async () => {
     montar('espacios', ['espacios.ver', 'espacios.configurar']);
     await userEvent.click(await screen.findByRole('button', { name: 'Ver habitación HAB-201' }));
     const panel = screen.getByRole('complementary', { name: 'Detalle del espacio' });
-    expect(within(panel).getByText(/Capacidad configurada: 2 camas/)).toBeTruthy();
-    expect(within(panel).getByRole('button', { name: 'Editar habitación' })).toBeTruthy();
+    const dato = (label: string) => within(panel).getByText(label).nextElementSibling?.textContent;
+    expect(dato('Tipo')).toBe('Habitación');
+    expect(dato('Categoría')).toBe('Semiprivada');
+    expect(dato('Planta')).toBe('2');
+    expect(dato('Capacidad')).toBe('2 camas');
+    expect(dato('Estado')).toBe('Activo');
+    expect(within(panel).getByRole('button', { name: 'Editar habitación' }).className).toContain('crud-edit');
+    expect(within(panel).getByRole('button', { name: /Agregar espacio dentro/ }).className).toContain('crud-create');
     await userEvent.click(within(panel).getByRole('button', { name: /Agregar espacio dentro/ }));
     expect(await screen.findByRole('dialog', { name: 'Agregar dentro de HAB-201' })).toBeTruthy();
   });
 
-  it('sin espacios.configurar no ofrece crear ni editar', async () => {
+  it('sin espacios.configurar no ofrece crear ni editar y lo dice con «Solo lectura»', async () => {
     montar('espacios');
     await userEvent.click(await screen.findByRole('button', { name: 'Ver habitación HAB-201' }));
     expect(screen.queryByRole('button', { name: 'Crear espacio' })).toBeNull();
     expect(screen.queryByRole('button', { name: /Editar habitación/ })).toBeNull();
+    expect(screen.getByText('Solo lectura')).toBeTruthy();
+    expect(screen.getByRole('tooltip').textContent).toContain('contacta a Administración');
   });
 
-  it('explica en una línea qué es asignar espacios', async () => {
+  it('con espacios.configurar ofrece «Crear espacio» con el botón de crear y sin «Solo lectura»', async () => {
+    montar('espacios', ['espacios.ver', 'espacios.configurar']);
+    expect((await screen.findByRole('button', { name: 'Crear espacio' })).className).toContain('crud-create');
+    expect(screen.queryByText('Solo lectura')).toBeNull();
+  });
+
+  it('explica en una sola línea cómo se usa el plano', async () => {
     montar('espacios');
-    expect(await screen.findByText(/Asignar espacios es decidir dónde está cada cosa/)).toBeTruthy();
+    expect((await screen.findByText(/Toca un espacio o una cama para ver su detalle/)).textContent).toBe('Planta → área → habitación → cama. Toca un espacio o una cama para ver su detalle.');
+    expect(screen.queryByText(/Asignar espacios es decidir/)).toBeNull();
   });
 
   it('?accion=crear abre el formulario de crear espacio y limpia el parámetro', async () => {
@@ -155,5 +171,51 @@ describe('W09 · edificio', () => {
     expect(await screen.findByRole('dialog', { name: 'Crear espacio' })).toBeTruthy();
     expect(location.hash).toBe('#/espacios');
     location.hash = '';
+  });
+});
+
+// Obs. 7: ADM configures the building without the bed board; /espacios carries each bed's state (never its occupant).
+describe('Edificio de Administración · estado de cada cama sin datos del paciente (obs. 7)', () => {
+  const conEstado = espacios.map(s => (s.type === 'cama' ? { ...s, bedState: camas.find(c => c.id === s.id)!.state } : { ...s, bedState: null }));
+  function montarAdm(arbol: Space[] = conEstado) {
+    const api = {
+      request: vi.fn(async (path: string): Promise<unknown> => (path.startsWith('/espacios') ? arbol : [])),
+      write: vi.fn(async () => ({ ok: true })),
+    };
+    const profile = { ...perfil, roles: ['ADM'], permissions: ['espacios.ver', 'espacios.configurar'].map(code => ({ code, context: 'global' })) };
+    render(<SpacesPage api={api as unknown as Api} profile={profile} version={0} />);
+    return api;
+  }
+
+  it('ve los mismos colores, leyenda con conteo y filtro de estado que Operaciones, sin pedir /camas', async () => {
+    const api = montarAdm();
+    expect(await screen.findByRole('button', { name: 'Cama HAB-201-A, Ocupada' })).toBeTruthy();
+    expect(screen.getByLabelText('Estado de cama')).toBeTruthy();
+    const leyenda = screen.getByRole('list', { name: 'Leyenda y conteo de camas de la planta' });
+    expect(within(leyenda).getByRole('button', { name: /Ocupada/ }).textContent).toBe('Ocupada3');
+    expect(within(leyenda).getByRole('button', { name: /Libre/ }).textContent).toBe(`Libre${libres(2)}`);
+    await userEvent.click(within(leyenda).getByRole('button', { name: /Bloqueada/ }));
+    expect(glifos()).toHaveLength(1);
+    expect(screen.getByLabelText('Camas del hospital').textContent).toBe(`17camas${libres(2) + libres(3)}libres3ocupadas`);
+    expect(api.request.mock.calls.map(([path]) => path).filter(path => String(path).startsWith('/camas'))).toEqual([]);
+    expect(screen.queryByText(/Operaciones/)).toBeNull();
+  });
+
+  it('el detalle de una cama da su estado, sin ocupante ni mensajes de «lo consulta Operaciones»', async () => {
+    montarAdm();
+    await userEvent.click(await screen.findByRole('button', { name: 'Cama HAB-201-A, Ocupada' }));
+    const panel = screen.getByRole('complementary', { name: 'Detalle del espacio' });
+    expect(within(panel).getByText('Tiene un paciente')).toBeTruthy();
+    expect(panel.textContent).not.toMatch(/Operaciones|Identidad|Asignar/);
+    expect(within(panel).getByRole('button', { name: 'Editar cama' })).toBeTruthy();
+  });
+
+  it('si el árbol no trae estados, la habitación muestra sus libres en una sola cápsula', async () => {
+    montarAdm(espacios);
+    const hab204 = await screen.findByRole('article', { name: 'Habitación HAB-204' });
+    expect(hab204.querySelector('.plan-free-pill')!.textContent).toBe('2 libres');
+    expect(within(screen.getByRole('article', { name: 'Habitación HAB-201' })).getByText('0 libres')).toBeTruthy();
+    expect(screen.queryByLabelText('Estado de cama')).toBeNull();
+    expect(screen.queryByLabelText('Camas del hospital')).toBeNull();
   });
 });

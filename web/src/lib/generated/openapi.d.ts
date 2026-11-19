@@ -4004,6 +4004,8 @@ export interface components {
         };
         /** @enum {string} */
         CategoriaHabitacion: "vip" | "semiprivada";
+        /** @enum {string} */
+        EstadoCama: "ocupada" | "limpieza" | "bloqueada" | "reservada" | "libre";
         SpaceResponse: {
             /** Format: uuid */
             id: string;
@@ -4020,6 +4022,7 @@ export interface components {
             path: string | null;
             totalBeds: number;
             freeBeds: number;
+            bedState: components["schemas"]["EstadoCama"] | null;
         };
         SpaceDto: {
             code: string;
@@ -4036,8 +4039,6 @@ export interface components {
             version?: number;
             reason?: string;
         };
-        /** @enum {string} */
-        EstadoCama: "ocupada" | "limpieza" | "bloqueada" | "reservada" | "libre";
         BedBoardResponse: {
             /** Format: uuid */
             id: string;
@@ -6344,6 +6345,8 @@ export interface components {
             patientRecord: string | null;
             result: components["schemas"]["ResultadoAuditoria"];
             reason: string | null;
+            /** @description Nombre de lo que se tocó: cuenta, persona del personal o código de cama/espacio. Los pacientes van por expediente */
+            subject: string | null;
         };
         AuditPageResponse: {
             filas: components["schemas"]["AuditEntryResponse"][];
@@ -6376,6 +6379,8 @@ export interface components {
             patientRecord: string | null;
             result: components["schemas"]["ResultadoAuditoria"];
             reason: string | null;
+            /** @description Nombre de lo que se tocó: cuenta, persona del personal o código de cama/espacio. Los pacientes van por expediente */
+            subject: string | null;
             /** @description Identificador de correlación de la petición */
             correlation: string | null;
             /** @description Metadatos del evento (sin el evento canónico firmado); nunca valores clínicos */
@@ -18340,6 +18345,8 @@ export interface operations {
                 pagina?: number;
                 orden?: "fecha" | "persona" | "rol" | "accion" | "entidad" | "paciente" | "resultado";
                 sentido?: "asc" | "desc";
+                /** @description Solo /auditoria/registros: true incluye las consultas a la auditoría de la propia cuenta (auditoria.consultar), que por defecto se ocultan; siguen registradas */
+                incluirConsultasAuditoria?: string;
                 /** @description true cuando la consulta alimenta una exportación: queda auditada como auditoria.exportar */
                 exportar?: string;
             };
@@ -18417,6 +18424,8 @@ export interface operations {
                 pagina?: number;
                 orden?: "fecha" | "persona" | "rol" | "accion" | "entidad" | "paciente" | "resultado";
                 sentido?: "asc" | "desc";
+                /** @description Solo /auditoria/registros: true incluye las consultas a la auditoría de la propia cuenta (auditoria.consultar), que por defecto se ocultan; siguen registradas */
+                incluirConsultasAuditoria?: string;
                 /** @description true cuando la consulta alimenta una exportación: queda auditada como auditoria.exportar */
                 exportar?: string;
             };

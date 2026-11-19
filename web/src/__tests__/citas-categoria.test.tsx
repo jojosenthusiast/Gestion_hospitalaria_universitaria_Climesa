@@ -101,10 +101,16 @@ describe('A06 web · el paciente pide cita por motivo', () => {
   });
 });
 
+/** Owner batch 2 (S29): the requests are the «Solicitudes» segment of the agenda, not a card on top. */
+async function openRequests() {
+  await userEvent.click(within(await screen.findByRole('group', { name: 'Estado de la cita' })).getByRole('button', { name: /^Solicitudes/ }));
+  return screen.findByRole('region', { name: 'Solicitudes' });
+}
+
 describe('W28 · bandeja de solicitudes por asignar (Recepción)', () => {
   it('muestra la nota y asigna con médico sugerido y franja de la tarde ya elegidos', async () => {
     const api = mount(rec());
-    const inbox = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
+    const inbox = await openRequests();
     expect(within(inbox).getByText('Mancha en el brazo')).toBeTruthy();
     expect(within(inbox).getByText('EXP-000001')).toBeTruthy();
     await userEvent.click(within(inbox).getByRole('button', { name: /Asignar · Paciente Ficticio Uno/ }));
@@ -120,7 +126,7 @@ describe('W28 · bandeja de solicitudes por asignar (Recepción)', () => {
 
   it('rechaza con motivo y la bandeja vacía dice que está al día', async () => {
     const api = mount(rec());
-    const inbox = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
+    const inbox = await openRequests();
     await userEvent.click(within(inbox).getByRole('button', { name: /Rechazar · Paciente Ficticio Uno/ }));
     const dialog = screen.getByRole('dialog');
     await userEvent.type(within(dialog).getByLabelText(/Motivo del rechazo/), 'No hay dermatología este mes');
@@ -129,13 +135,14 @@ describe('W28 · bandeja de solicitudes por asignar (Recepción)', () => {
     cleanup();
     requests = [];
     mount(rec());
-    expect(await screen.findByText(/Al día: no hay solicitudes por asignar/)).toBeTruthy();
+    await openRequests();
+    expect(await screen.findByText(/Al día: no hay solicitudes por atender/)).toBeTruthy();
   });
 
   it('las acciones salen del servidor: sin allowedActions no hay botones', async () => {
     requests = [{ ...pending, allowedActions: [] }];
     mount(rec());
-    const inbox = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
+    const inbox = await openRequests();
     expect(within(inbox).queryByRole('button', { name: /Asignar/ })).toBeNull();
   });
 });

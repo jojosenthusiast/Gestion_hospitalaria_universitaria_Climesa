@@ -72,12 +72,13 @@ class ModuleBoundary extends Component<{label:string;children:ReactNode},{failed
 /** Lo que se ve mientras llega el código de un módulo: la barra y el contenido reservan su lugar. */
 function ModuleFallback({label}:{label:string}){return <><CompactHeader title={label}/><Skeleton rows={6} label={`Cargando ${label.toLowerCase()}…`}/></>;}
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
-export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean};
+/** `replacedBy`: the module hides when the account also sees that one (obs. 17: Edificio replaces Camas); its deep links go there. */
+export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean;replacedBy?:string};
 export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
  {id:'personal',label:'Personal',permission:'personal.ver',alsoPermissions:['usuarios.ver']},
- {id:'camas',label:'Camas',permission:'camas.ver_tablero'},
+ {id:'camas',label:'Camas',permission:'camas.ver_tablero',replacedBy:'espacios'},
  {id:'espacios',label:'Edificio',permission:'espacios.ver'},
  {id:'ambulancia',label:'Ambulancia',permission:'ambulancia.ver_estado'},
  {id:'bitacora-ambulancia',label:'Bitácora de ambulancia',permission:'ambulancia.ver_bitacora'},
@@ -97,7 +98,8 @@ export const modules:Module[]=[
 ];
 export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
-export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
+const allowed=(profile:AccessProfile,m:Module)=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p));
+export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>{if(!allowed(profile,m))return false;const replacement=m.replacedBy&&modules.find(x=>x.id===m.replacedBy);return !(replacement&&allowed(profile,replacement));});
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
 export const hasWebModule=(profile:AccessProfile)=>visibleModules(profile).some(m=>m.permission);
 const readRoute=()=>location.hash.replace(/^#\/?/,'').split('?')[0]||'inicio';
@@ -115,7 +117,14 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  const navRef=useRef<HTMLElement>(null),toggleRef=useRef<HTMLButtonElement>(null);
  // Una ruta de la sesión anterior (o escrita a mano) que esta cuenta no ve vuelve a Inicio: nunca queda una pantalla «Sin permiso» fuera del menú.
  const menuIds=menu.map(m=>m.id).join('|');
- useLayoutEffect(()=>{const current=readRoute();if(modules.some(m=>m.id===current)&&!menuIds.split('|').includes(current)){history.replaceState(null,'','#/inicio');setRoute('inicio');}},[menuIds]);
+ useLayoutEffect(()=>{
+  const current=readRoute(),ids=menuIds.split('|');
+  if(!modules.some(m=>m.id===current)||ids.includes(current))return;
+  // Obs. 17: a link to a replaced module (#/camas) opens its replacement (#/espacios) with the same query.
+  const replacement=modules.find(m=>m.id===current)?.replacedBy,target=replacement&&ids.includes(replacement)?replacement:'inicio';
+  const query=target==='inicio'?'':location.hash.split('?').slice(1).join('?');
+  history.replaceState(null,'',`#/${target}${query?`?${query}`:''}`);setRoute(target);
+ },[menuIds,route]);
  useEffect(()=>{try{window.scrollTo(0,0);document.getElementById('main-content')?.scrollTo?.(0,0);}catch{/* jsdom has no scrolling */}},[route]);
  useEffect(()=>{const handle=()=>{setRoute(readRoute());setNavOpen(false);};window.addEventListener('hashchange',handle);return()=>window.removeEventListener('hashchange',handle);},[]);
  // S3: con el armazón ya pintado, se descarga en segundo plano el código de los módulos del menú (una vez).

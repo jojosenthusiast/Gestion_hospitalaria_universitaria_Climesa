@@ -64,6 +64,30 @@ export function MyShift({ shifts }: { shifts: Remote<Shift[]> }) {
   </Panel>;
 }
 
+/** Shifts that put someone at work right now: published or in progress, already started and not over. */
+const onShiftNow = (rows: (Shift & { staffType?: string | null })[], now = Date.now()) => rows.filter(s => (s.state === 'publicado' || s.state === 'en_curso') && Date.parse(s.start) <= now && Date.parse(s.end) > now);
+
+/**
+ * Owner obs 3/14: an account without a staff record (Administración, Jefatura de Operaciones) has no shift of its own,
+ * so instead of an empty «Mi turno» it sees who is at work now: people on shift per role (counts only, no names) and,
+ * when the pending tray does not already list them, today's coverage holes. The link opens today in Turnos · Día.
+ */
+export function OnShiftNow({ shifts, gapsToday }: { shifts: Remote<Shift[]>; gapsToday?: number | null }) {
+  return <Panel title="De turno ahora" icon="users" action={{ label: 'Ver turnos de hoy', href: '#/turnos?dia=hoy' }}>
+    <PanelState state={shifts} empty={rows => onShiftNow(rows).length === 0 ? 'Nadie está de turno en este momento.' : null}>{rows => {
+      const now = onShiftNow(rows), by = new Map<string, number>();
+      for (const s of now as (Shift & { staffType?: string | null })[]) { const type = s.staffType ?? 'otro'; by.set(type, (by.get(type) ?? 0) + 1); }
+      return <div className="on-shift-now">
+        <p className="on-shift-total"><strong>{now.length}</strong> {now.length === 1 ? 'persona de turno' : 'personas de turno'}</p>
+        <ul className="on-shift-roles" aria-label="De turno por rol">
+          {[...by].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([type, count]) => <li key={type}><span>{staffTypeNames[type] ?? type}</span><strong>{count}</strong></li>)}
+        </ul>
+        {typeof gapsToday === 'number' && <p className="on-shift-gaps">{gapsToday === 0 ? 'Sin huecos de cobertura por cubrir hoy.' : <a className="row-action" href="#/turnos?dia=hoy">{gapsToday === 1 ? '1 turno por cubrir hoy' : `${gapsToday} turnos por cubrir hoy`}</a>}</p>}
+      </div>;
+    }}</PanelState>
+  </Panel>;
+}
+
 /** Zero stock reads «Agotado» (urgent), never «Bajo mínimo» with the waiting clock (coordinator, prod). */
 const stockState = (r: { disponible: number; vencido: number; bajo_minimo: boolean }) => r.disponible <= 0 ? { tag: 'Agotado', status: 'agotado' } : r.vencido > 0 ? { tag: 'Vencido', status: 'vencido' } : r.bajo_minimo ? { tag: 'Bajo mínimo', status: 'bajo_minimo' } : { tag: 'Por vencer', status: 'por_vencer' };
 const unitsOf = unitPlural;

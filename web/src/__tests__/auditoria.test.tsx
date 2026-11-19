@@ -3,7 +3,8 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Api } from '../lib/api';
 import { AuditPage } from '../features/audit/AuditPage';
-import { describeAction, emptyFilters, pageQuery, defaultSort, removeChip, chips, presets } from '../features/audit/query';
+import { emptyFilters, pageQuery, defaultSort, removeChip, chips, views, effectiveFilters } from '../features/audit/query';
+import { actionSentence, entityName } from '../features/audit/labels';
 
 afterEach(() => { cleanup(); location.hash = ''; });
 
@@ -11,7 +12,7 @@ const row = (seq: string, extra: Record<string, unknown> = {}) => ({ seq, at: '2
 const detail = { ...row('7'), permission: 'consulta.ver', correlation: 'req-123', detail: { filtros: { persona: true } }, hash: 'a'.repeat(64), previousHash: 'b'.repeat(64), previousSeq: '6', nextSeq: '8' };
 function fakeApi(handlers: Record<string, unknown> = {}) {
   const request = vi.fn(async (path: string) => {
-    if (path.startsWith('/auditoria/opciones')) return { acciones: ['consulta.leer', 'usuarios.roles'], entidades: ['consulta', 'paciente'], roles: ['MED', 'DPD'] };
+    if (path.startsWith('/auditoria/opciones')) return { acciones: ['consulta.leer', 'usuarios.roles'], entidades: ['consulta', 'paciente', 'usuario'], roles: ['MED', 'DPD', 'ADM'] };
     if (path.startsWith('/auditoria/registros/')) return handlers.detail ?? detail;
     if (path.startsWith('/auditoria/registros')) return handlers.page ?? { filas: [row('7'), row('6', { actor: 'Otra Persona', result: 'denegado', reason: 'acceso_excepcional' })], total: 60, pagina: 1, limite: 25 };
     throw new Error(`ruta sin simular: ${path}`);
@@ -28,6 +29,13 @@ describe('W32 · espacio del auditor', () => {
     expect(await screen.findByText('Persona Ficticia')).toBeTruthy();
     expect(screen.getByText(/1–2 de 60 registros/)).toBeTruthy();
     expect(screen.getByText('Acceso excepcional (módulo retirado)')).toBeTruthy();
+    // S23: the table speaks in words; raw codes and sequence numbers live only in the detail.
+    const table = screen.getByRole('table');
+    expect(within(table).getAllByText('Consultó una consulta médica')).toHaveLength(2);
+    expect(within(table).getAllByText('Medicina')).toHaveLength(2);
+    expect(within(table).getAllByText('Expediente 000412-7')).toHaveLength(2);
+    expect(within(table).queryByText(/consulta\.leer|^MED$|N\.º/)).toBeNull();
+    expect(within(table).getAllByRole('columnheader').map(th => th.textContent?.replace(/[▲▼]/g, ''))).toEqual(['Fecha', 'Persona', 'Rol', 'Qué hizo', 'Sobre qué', 'Resultado', 'Detalle']);
     await userEvent.click(screen.getByRole('button', { name: /^Persona/ }));
     await waitFor(() => expect(lastPage(api)).toContain('orden=persona&sentido=desc'));
     await userEvent.click(screen.getByRole('button', { name: /^Persona/ }));
@@ -47,31 +55,77 @@ describe('W32 · espacio del auditor', () => {
     await userEvent.click(screen.getByLabelText('Denegado'));
     await waitFor(() => expect(lastPage(api)).toMatch(/rol=MED.*resultado=denegado|resultado=denegado.*rol=MED/));
     const bar = screen.getByLabelText('Filtros activos');
-    expect(within(bar).getByText('Rol: MED')).toBeTruthy();
+    expect(within(bar).getByText('Rol: Medicina')).toBeTruthy();
     expect(within(bar).getByText('Resultado: Denegado')).toBeTruthy();
-    await userEvent.click(within(bar).getByRole('button', { name: 'Quitar filtro Rol: MED' }));
+    await userEvent.click(within(bar).getByRole('button', { name: 'Quitar filtro Rol: Medicina' }));
     await waitFor(() => expect(lastPage(api)).not.toContain('rol=MED'));
     await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));
     await waitFor(() => expect(lastPage(api)).not.toContain('persona='));
     expect(screen.queryByLabelText('Filtros activos')).toBeNull();
   });
 
-  it('las vistas rápidas aplican sus filtros', async () => {
+  it('abre en «Toda la actividad», explica cada vista y la vista no se repite en el panel de filtros', async () => {
     const api = fakeApi();
     render(<AuditPage api={api} version={0} />);
     await screen.findByText('Persona Ficticia');
+    expect(screen.getByRole('button', { name: 'Toda la actividad' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByText(/Todo lo que hicieron las personas en el sistema/)).toBeTruthy();
+    expect(lastPage(api)).not.toMatch(/accion=|resultado=|incluirConsultasAuditoria/);
     await userEvent.click(screen.getByRole('button', { name: 'Fallos y denegaciones' }));
     await waitFor(() => expect(lastPage(api)).toContain('resultado=denegado%2Cfallido'));
-    await userEvent.click(screen.getByRole('button', { name: 'Cambios de permisos' }));
-    await waitFor(() => expect(lastPage(api)).toContain('accion=usuarios.roles%2Cusuarios.estado%2Cusuarios.invitar'));
+    expect(screen.getByText(/Intentos sin permiso/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Cambios de permisos y cuentas' }));
+    await waitFor(() => expect(lastPage(api)).toContain('accion=usuarios.%2Cpersonal.'));
     expect(lastPage(api)).not.toContain('resultado=');
+    expect(screen.getByText(/Invitaciones, roles, cuentas activadas o desactivadas/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
+    expect((screen.getByLabelText('Qué hizo') as HTMLInputElement).value).toBe('');
+    expect(screen.queryByText('Cambiar')).toBeNull();
+    expect(screen.queryByLabelText('Filtros activos')).toBeNull();
+  });
+
+  it('el filtro «Qué hizo» lista las acciones en palabras, agrupadas por área, y el rol por su nombre', async () => {
+    const api = fakeApi();
+    render(<AuditPage api={api} version={0} />);
+    await screen.findByText('Persona Ficticia');
+    await userEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
+    expect(screen.getByRole('option', { name: 'Administración' })).toBeTruthy();
+    expect(screen.queryByRole('option', { name: /\(ADM\)/ })).toBeNull();
+    await userEvent.click(screen.getByLabelText('Qué hizo'));
+    const list = await screen.findByRole('listbox');
+    expect(within(list).getByText('Todo en Cuentas y permisos')).toBeTruthy();
+    expect(within(list).queryByText('usuarios.roles')).toBeNull();
+    await userEvent.click(within(list).getByText('Cambió los roles de una cuenta'));
+    await waitFor(() => expect(lastPage(api)).toContain('accion=usuarios.roles'));
+    expect(within(screen.getByLabelText('Filtros activos')).getByText('Qué hizo: Cambió los roles de una cuenta')).toBeTruthy();
+  });
+
+  it('oculta mis consultas a la auditoría salvo que marque «Incluir mis consultas a la auditoría»', async () => {
+    const api = fakeApi();
+    render(<AuditPage api={api} version={0} />);
+    await screen.findByText('Persona Ficticia');
+    expect(lastPage(api)).not.toContain('incluirConsultasAuditoria');
+    await userEvent.click(screen.getByLabelText('Incluir mis consultas a la auditoría'));
+    await waitFor(() => expect(lastPage(api)).toContain('incluirConsultasAuditoria=true'));
+  });
+
+  it('«Sobre qué» nombra la cuenta, la cama o el expediente', async () => {
+    const api = fakeApi({ page: { filas: [row('9', { role: 'ADM', action: 'usuarios.roles', entity: 'usuario', patientRecord: null, subject: 'Ana Ficticia López' })], total: 1, pagina: 1, limite: 25 } });
+    render(<AuditPage api={api} version={0} />);
+    const table = await screen.findByRole('table');
+    expect(within(table).getByText('Cambió los roles de una cuenta')).toBeTruthy();
+    expect(within(table).getByText('Administración')).toBeTruthy();
+    expect(within(table).getByText('Cuenta')).toBeTruthy();
+    expect(within(table).getByText('Ana Ficticia López')).toBeTruthy();
   });
 
   it('abre el detalle de una fila con quién, qué, cuándo, dónde y la cadena de hash', async () => {
     const api = fakeApi();
     render(<AuditPage api={api} version={0} />);
-    await userEvent.click(await screen.findByRole('button', { name: 'Ver detalle del registro 7' }));
+    await screen.findByText('Persona Ficticia');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Ver detalle: Consultó una consulta médica' })[0]);
     const drawer = await screen.findByRole('dialog', { name: 'Detalle del registro 7' });
+    expect(await within(drawer).findByText('Código de la acción: consulta.leer')).toBeTruthy();
     expect(await within(drawer).findByText('req-123')).toBeTruthy();
     expect(within(drawer).getByText('a'.repeat(64))).toBeTruthy();
     expect(within(drawer).getByText(/no guarda valores anteriores ni nuevos/)).toBeTruthy();
@@ -116,10 +170,19 @@ describe('audit/query', () => {
     expect(removeChip(filters, 'result:denegado').results).toEqual(['fallido']);
     expect(removeChip(filters, 'from')).toMatchObject({ from: '', to: '', role: 'MED' });
   });
-  it('describe las acciones conocidas y deja las desconocidas tal cual', () => {
-    expect(describeAction('consulta.leer')).toBe('Consulta · lectura');
-    expect(describeAction('xyz.abc')).toBe('xyz.abc');
-    expect(presets.map(p => p.id)).toEqual(['expedientes-hoy', 'permisos', 'fallos']);
+  it('describe las acciones en palabras y las desconocidas por su área', () => {
+    expect(actionSentence('admision.leer')).toBe('Consultó la hospitalización');
+    expect(actionSentence('usuarios.roles')).toBe('Cambió los roles de una cuenta');
+    expect(actionSentence('turnos.algo_nuevo')).toBe('Turnos: algo nuevo');
+    expect(actionSentence('xyz.abc')).toBe('Xyz abc');
+    expect(entityName('admision')).toBe('Hospitalización');
+    expect(views.map(v => v.id)).toEqual(['todo', 'expedientes', 'cuentas', 'fallos']);
+  });
+  it('el panel acota la vista sin repetirla', () => {
+    expect(effectiveFilters(emptyFilters, 'cuentas').action).toBe('usuarios.,personal.');
+    expect(effectiveFilters({ ...emptyFilters, action: 'usuarios.roles' }, 'cuentas').action).toBe('usuarios.roles');
+    expect(effectiveFilters(emptyFilters, 'fallos').results).toEqual(['denegado', 'fallido']);
+    expect(effectiveFilters(emptyFilters, 'todo')).toEqual(emptyFilters);
   });
 });
 
@@ -130,6 +193,7 @@ describe('W32 · enlaces desde el Inicio del DPD', () => {
     render(<AuditPage api={api} version={0} />);
     await screen.findByText('Persona Ficticia');
     await waitFor(() => expect(lastPage(api)).toContain('resultado=denegado%2Cfallido'));
+    expect(screen.getByRole('button', { name: 'Fallos y denegaciones' }).getAttribute('aria-pressed')).toBe('true');
     expect(location.hash).toBe('#/auditoria');
   });
 

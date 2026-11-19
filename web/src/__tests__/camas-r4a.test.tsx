@@ -66,11 +66,11 @@ describe('Camas · plano (R4a)', () => {
     expect(room.querySelector('.area-tag')?.textContent).toContain('HOS');
   });
 
-  it('el código de la habitación y «libres» no se parten', async () => {
+  it('el código de la habitación no se parte y la tarjeta no repite «libres» bajo el título (obs. 7)', async () => {
     montar('camas');
     const title = await screen.findByRole('button', { name: 'Ver habitación HAB-201' });
     expect(title.querySelector('strong')!.className).toContain('nowrap-code');
-    expect(habitacionesVisibles()[0].querySelector('.plan-free')!.textContent).toMatch(/^\d+\/\d+ libres$/);
+    expect(habitacionesVisibles()[0].querySelector('.plan-free, .plan-free-pill')).toBeNull();
   });
 
   it('sin selección no hay columna de detalle vacía', async () => {

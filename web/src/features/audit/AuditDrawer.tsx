@@ -1,8 +1,9 @@
 import { useEffect, useRef } from 'react';
 import { Icon, Notice } from '../../components/ui';
-import { roleNames, type Api } from '../../lib/api';
+import type { Api } from '../../lib/api';
 import { RemoteState, Tag, useData } from '../common';
-import { describeAction, fullDate, resultNames, type AuditDetailData } from './query';
+import { fullDate, resultNames, roleText, type AuditDetailData } from './query';
+import { actionSentence, entityName } from './labels';
 
 const BEFORE = ['antes', 'before', 'anterior'];
 const AFTER = ['despues', 'después', 'after', 'nuevo'];
@@ -30,10 +31,10 @@ export function AuditDrawer({ api, seq, version, onClose, onOpen }: { api: Api; 
         const before = pick(row.detail, BEFORE), after = pick(row.detail, AFTER);
         const extra = Object.entries(row.detail).filter(([key]) => ![...BEFORE, ...AFTER].includes(key));
         return <div className="audit-drawer-body">
-          <p className="audit-drawer-action"><strong>{describeAction(row.action)}</strong><code>{row.action}</code></p>
+          <p className="audit-drawer-action"><strong>{actionSentence(row.action)}</strong><code>Código de la acción: {row.action}</code></p>
           <dl className="audit-facts">
-            <div><dt>Quién</dt><dd>{row.actor ?? 'Sistema'}<small>{(row.role ?? '').split(',').filter(Boolean).map(r => roleNames[r] ?? r).join(' · ') || 'Sin rol'}</small>{row.actorId && <small className="mono">{row.actorId}</small>}</dd></div>
-            <div><dt>Qué</dt><dd>{row.entity}{row.entityId ? <small className="mono">{row.entityId}</small> : null}<small>Permiso: {row.permission ?? 'sin permiso asociado'}</small></dd></div>
+            <div><dt>Quién</dt><dd>{row.actor ?? 'Sistema'}<small>{roleText(row.role) || 'Sin rol'}{row.role && <> (<span className="mono">{row.role}</span>)</>}</small>{row.actorId && <small className="mono">{row.actorId}</small>}</dd></div>
+            <div><dt>Sobre qué</dt><dd>{entityName(row.entity)}{row.subject && <small>{row.subject}</small>}<small>Tipo: <span className="mono">{row.entity}</span></small>{row.entityId ? <small className="mono">{row.entityId}</small> : null}<small>Permiso: {row.permission ?? 'sin permiso asociado'}</small></dd></div>
             <div><dt>Cuándo</dt><dd>{fullDate(row.at)}<small className="mono">{row.at}</small></dd></div>
             <div><dt>Dónde</dt><dd><small>{row.correlation ? <>Petición <span className="mono">{row.correlation}</span></> : 'Sin identificador de petición'}</small><small>La auditoría no guarda direcciones IP ni ubicación del equipo.</small></dd></div>
             <div><dt>Paciente</dt><dd>{row.patientRecord ? <>Expediente <span className="mono">{row.patientRecord}</span></> : 'No se refiere a un paciente'}</dd></div>

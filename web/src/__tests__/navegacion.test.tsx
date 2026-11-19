@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile } from '../lib/api';
@@ -78,8 +78,8 @@ afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); window.l
 const menuEsperado: Record<string, string[]> = {
   // D-05 y D-091 (MA-REQ-01): el control de recursos del Administrador es Inventario + Edificio.
   ADM: ['Inicio', 'Personal', 'Edificio', 'Turnos', 'Catálogo de laboratorio', 'Inventario', 'Avisos', 'Métricas', 'Perfil'],
-  JOP: ['Inicio', 'Pacientes', 'Personal', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Perfil'],
-  REC: ['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Perfil'],
+  JOP: ['Inicio', 'Pacientes', 'Personal', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Métricas', 'Perfil'],
+  REC: ['Inicio', 'Pacientes', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Fila del día', 'Citas', 'Avisos', 'Perfil'],
   LAB: ['Inicio', 'Pacientes', 'Turnos', 'Laboratorio', 'Inventario', 'Avisos', 'Perfil'],
   DPD: ['Inicio', 'Personal', 'Bitácora de ambulancia', 'Auditoría', 'Avisos', 'Métricas', 'Perfil'],
 };
@@ -135,7 +135,7 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
     // Un REC al que la API no le concede fila.ver ni citas.ver no ve esas entradas.
     const sinAgenda = permisosDe('REC').filter((p) => !['fila.ver', 'citas.ver'].includes(p.code));
     const nav = await entrar(perfil('REC', sinAgenda));
-    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Avisos', 'Perfil']);
+    expect(etiquetas(nav)).toEqual(['Inicio', 'Pacientes', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Hospitalización', 'Avisos', 'Perfil']);
   });
 
   it('un laboratorista sin laboratorio.ver_cola ni inventario.ver no ve esos módulos', async () => {
@@ -177,8 +177,8 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 // verían exactamente lo que el catálogo les da si una cuenta suya tuviera la web habilitada.
 const menuCatalogo: Record<string, string[]> = {
   AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
-  ENF: ['Pacientes', 'Camas', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
-  MED: ['Pacientes', 'Camas', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
+  ENF: ['Pacientes', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
+  MED: ['Pacientes', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos'],
   PAC: ['Hospitalización', 'Fila del día', 'Citas'],
 };
@@ -327,5 +327,29 @@ describe('módulos abiertos por un segundo permiso', () => {
     const nav = await entrar(perfil('MED'));
     expect(within(nav).getByRole('link', { name: 'Laboratorio' })).toBeTruthy();
     expect(within(nav).getByRole('link', { name: 'Mi consultorio' })).toBeTruthy();
+  });
+});
+
+describe('Edificio reemplaza a Camas (obs. 17)', () => {
+  it('quien ve Edificio no tiene la entrada Camas; quien solo lee el tablero de camas la conserva', async () => {
+    const nav = await entrar(perfil('JOP'));
+    expect(within(nav).queryByRole('link', { name: 'Camas' })).toBeNull();
+    expect(within(nav).getByRole('link', { name: 'Edificio' })).toBeTruthy();
+    cleanup();
+    const soloCamas = permisosDe('REC').filter((p) => p.code !== 'espacios.ver');
+    const navCamas = await entrar(perfil('REC', soloCamas));
+    expect(within(navCamas).getByRole('link', { name: 'Camas' })).toBeTruthy();
+    expect(within(navCamas).queryByRole('link', { name: 'Edificio' })).toBeNull();
+  });
+
+  it('un enlace a #/camas abre Edificio, al entrar y también después', async () => {
+    await entrar(perfil('JOP'), {}, '#/camas?accion=limpieza');
+    // Edificio then consumes the quick action, so only the route is asserted.
+    await waitFor(() => expect(window.location.hash).toMatch(/^#\/espacios/), { timeout: 4000 });
+    expect(await screen.findByRole('heading', { name: 'Espacios' }, { timeout: 4000 })).toBeTruthy();
+    window.location.hash = '#/camas';
+    window.dispatchEvent(new HashChangeEvent('hashchange'));
+    await waitFor(() => expect(window.location.hash).toBe('#/espacios'), { timeout: 4000 });
+    expect(screen.queryByText('Sin permiso')).toBeNull();
   });
 });

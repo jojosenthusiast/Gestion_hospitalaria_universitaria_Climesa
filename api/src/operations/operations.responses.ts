@@ -317,6 +317,8 @@ export class SpaceResponse {
   @StrProp({ nullable: true }) path!: string | null;
   @IntProp() totalBeds!: number;
   @IntProp() freeBeds!: number;
+  /** Bed state for `cama` nodes (null for any other space); it never carries who occupies the bed. */
+  @EnumProp(ESTADO_CAMA, 'EstadoCama', { nullable: true }) bedState!: string | null;
 }
 
 export class BedBoardResponse {
