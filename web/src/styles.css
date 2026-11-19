@@ -342,6 +342,8 @@ table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priorit
 .account-menu summary { min-height: 44px; padding: 6px; display: flex; align-items: center; gap: 9px; border-radius: var(--radius-control); cursor: pointer; list-style: none; }
 .account-menu summary:hover { background: rgb(255 255 255 / 0.1); }
 .account-menu summary::-webkit-details-marker { display: none; }
+/* «Mi cuenta» stays on one line on a narrow top bar (768 px portrait tablet). */
+.account-menu-label { white-space: nowrap; }
 .account-avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: var(--soft); color: var(--primary-text); font-weight: 700; }
 .account-chevron { color: #d3dbe6; }
 .account-popover { position: absolute; top: calc(100% + 10px); right: 0; z-index: 40; width: 300px; max-width: calc(100vw - 24px); padding: 20px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-float); animation: reveal-up var(--motion-fast) ease both; }
