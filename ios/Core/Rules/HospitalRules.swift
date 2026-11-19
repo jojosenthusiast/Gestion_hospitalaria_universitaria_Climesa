@@ -318,6 +318,19 @@ public enum RecordAccess {
         candidate.careRelation == false ? .blocked(reason: unrelatedReason) : .available
     }
 
+    /// Owner obs. 15: the search row's detail line, «0012345 · 34 años · F» (web `patientLine`). Age only when the
+    /// response carries the exact birth day; sex only when it is femenino or masculino. Never the DUI.
+    public static func rowMeta(_ candidate: PatientCandidate, now: Date = Date()) -> String {
+        var parts = [candidate.record]
+        if let age = ClimesaDates.age(birthDay: candidate.birth, now: now) { parts.append(age == 1 ? "1 año" : "\(age) años") }
+        switch candidate.sex {
+        case "femenino": parts.append("F")
+        case "masculino": parts.append("M")
+        default: break
+        }
+        return parts.joined(separator: " · ")
+    }
+
     /// S2: patients the doctor attends first, the rest after them; the API's order is kept inside each group.
     public static func ordered(_ candidates: [PatientCandidate]) -> [PatientCandidate] {
         candidates.filter { gate($0).isAvailable } + candidates.filter { !gate($0).isAvailable }
@@ -469,6 +482,17 @@ public enum AmbulanceLogRules {
         case "sin_tripulacion_de_turno": return "Faltan los turnos del paramédico y del motorista: avisa a la Jefatura de Operaciones."
         default: return "\(block.action) Avisa a quien planifica los turnos."
         }
+    }
+
+    /// Owner obs. 19: the unit's tag never says «Disponible» while a dispatch block is in force; it reads «No se puede
+    /// despachar» (closed family) and the block's reason sits in the same header. Without a block it is the unit state.
+    public static func unitTag(_ status: AmbulanceStatus) -> (value: String, label: String?) {
+        status.dispatchBlock == nil ? (status.unit.state, nil) : ("bloqueada", "No se puede despachar")
+    }
+
+    /// Owner obs. 19: the header's service line, so «Sin servicio activo» is seen with the unit, not in a card below.
+    public static func serviceLine(_ status: AmbulanceStatus) -> String? {
+        status.activeService == nil ? "Sin servicio activo" : nil
     }
 
     /// Tripulación que falta en la unidad, o `nil` si está completa o la API no lo informa.

@@ -312,3 +312,36 @@ public enum MotionToken {
     /// Con «Reducir movimiento» no hay animación.
     public static func duration(_ base: Double, reduceMotion: Bool) -> Double? { reduceMotion ? nil : base }
 }
+
+// MARK: - CRUD convention (S0, mirror of web `CrudButton` in system.tsx)
+
+/// One colour and one symbol per CRUD action, the same on every screen: create is filled primary with «plus», edit is
+/// outlined primary with «pencil», deactivate (retire, cancel, withdraw) is outlined danger with «trash» and view is
+/// outlined neutral with «eye».
+public enum CrudKind: String, CaseIterable, Sendable {
+    case create, edit, deactivate, view
+
+    /// SF Symbol of the action.
+    public var symbol: String {
+        switch self {
+        case .create: return "plus"
+        case .edit: return "pencil"
+        case .deactivate: return "trash"
+        case .view: return "eye"
+        }
+    }
+
+    /// Only create is a filled button; the rest are outlined.
+    public var filled: Bool { self == .create }
+}
+
+/// Read-only cue (S0, mirror of web `ReadOnlyBadge`): a «Solo lectura» pill whose help says what can be read and whom
+/// to ask for a change.
+public enum ReadOnlyCue {
+    public static let label = "Solo lectura"
+
+    /// «Puedes consultar tus datos. Para hacer cambios, contacta a Recepción.»
+    public static func help(who: String, what: String) -> String {
+        "Puedes consultar \(what). Para hacer cambios, contacta a \(who)."
+    }
+}

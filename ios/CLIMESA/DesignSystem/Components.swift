@@ -164,6 +164,17 @@ struct FormField: View {
 
 enum ClimesaButtonKind {
     case primary, secondary, destructive
+    /// S0 CRUD convention (`CrudKind`): one colour per action on every screen.
+    case create, edit, deactivate, view
+
+    init(_ crud: CrudKind) {
+        switch crud {
+        case .create: self = .create
+        case .edit: self = .edit
+        case .deactivate: self = .deactivate
+        case .view: self = .view
+        }
+    }
 
     /// S13: the button style for an action's emphasis on its screen (one primary per screen).
     init(_ emphasis: ActionEmphasis) {
@@ -179,6 +190,8 @@ enum ClimesaButtonKind {
 struct ClimesaButtonStyle: ButtonStyle {
     var kind: ClimesaButtonKind = .primary
     var loading = false
+    /// A square 48 pt button that only shows its symbol (CRUD actions on a row); the label goes to VoiceOver.
+    var iconOnly = false
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -188,8 +201,8 @@ struct ClimesaButtonStyle: ButtonStyle {
             configuration.label.font(Typo.label).lineLimit(2).multilineTextAlignment(.center)
         }
         .foregroundStyle(foreground)
-        .frame(maxWidth: .infinity, minHeight: Spacing.control)
-        .padding(.horizontal, Spacing.l)
+        .frame(minWidth: iconOnly ? Spacing.control : nil, maxWidth: iconOnly ? Spacing.control : CGFloat.infinity, minHeight: Spacing.control)
+        .padding(.horizontal, iconOnly ? 0 : Spacing.l)
         .background(background, in: RoundedRectangle(cornerRadius: Radius.control))
         .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(border, lineWidth: 1))
         .opacity(configuration.isPressed ? 0.85 : 1)
@@ -200,25 +213,27 @@ struct ClimesaButtonStyle: ButtonStyle {
     private var foreground: Color {
         if !enabled { return Theme.muted }
         switch kind {
-        case .primary: return Theme.onPrimary
-        case .secondary: return Theme.ink
-        case .destructive: return Theme.danger
+        case .primary, .create: return Theme.onPrimary
+        case .secondary, .view: return Theme.ink
+        case .destructive, .deactivate: return Theme.danger
+        case .edit: return Theme.primaryText
         }
     }
     private var background: Color {
         if !enabled { return Theme.disabled }
         switch kind {
-        case .primary: return Theme.primary
-        case .secondary: return Theme.surface
+        case .primary, .create: return Theme.primary
+        case .secondary, .edit, .deactivate, .view: return Theme.surface
         case .destructive: return Theme.dangerSoft
         }
     }
     private var border: Color {
         if !enabled { return Theme.disabled }
         switch kind {
-        case .primary: return Theme.primary
-        case .secondary: return Theme.controlLine
-        case .destructive: return Theme.danger
+        case .primary, .create: return Theme.primary
+        case .secondary, .view: return Theme.controlLine
+        case .destructive, .deactivate: return Theme.danger
+        case .edit: return Theme.primaryText
         }
     }
 }
@@ -240,6 +255,102 @@ struct ClimesaButton: View {
                 .disabled(loading || blockedReason != nil)
                 .accessibilityHint(blockedReason.map { Text(verbatim: $0) } ?? Text(verbatim: ""))
             if let blockedReason { BlockedReasonLine(text: blockedReason).accessibilityHidden(true) }
+        }
+    }
+}
+
+/// S0 CRUD convention (mirror of web `CrudButton`): create, edit, deactivate and view each keep one colour and one
+/// symbol everywhere (`CrudKind`). With `iconOnly` only the symbol shows; the label stays for VoiceOver. A blocked
+/// action is disabled and says why below it, like `ClimesaButton`.
+struct CrudButton: View {
+    let kind: CrudKind
+    let label: String
+    var iconOnly = false
+    var loading = false
+    var blockedReason: String? = nil
+    let action: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Button(action: action) { CrudLabel(kind: kind, label: label, iconOnly: iconOnly) }
+                .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(kind), loading: loading, iconOnly: iconOnly))
+                .disabled(loading || blockedReason != nil)
+                .accessibilityHint(blockedReason.map { Text(verbatim: $0) } ?? Text(verbatim: ""))
+            if let blockedReason { BlockedReasonLine(text: blockedReason).accessibilityHidden(true) }
+        }
+    }
+}
+
+/// Symbol and text of a CRUD action, for a `NavigationLink` styled with `ClimesaButtonStyle(kind: ClimesaButtonKind(kind))`.
+struct CrudLabel: View {
+    let kind: CrudKind
+    let label: String
+    var iconOnly = false
+
+    var body: some View {
+        Group {
+            if iconOnly {
+                Image(systemName: kind.symbol).accessibilityLabel(Text(verbatim: label))
+            } else {
+                Label { Text(verbatim: label) } icon: { Image(systemName: kind.symbol).accessibilityHidden(true) }
+                    .labelStyle(.titleAndIcon)
+            }
+        }
+        .help(Text(verbatim: label))
+    }
+}
+
+/// S0 read-only cue (mirror of web `ReadOnlyBadge`): a lock pill «Solo lectura»; a tap shows what can be read and whom
+/// to contact for a change. For screens that show data the account cannot change (a 403 keeps `InfoStateView`).
+struct ReadOnlyBadge: View {
+    let who: String
+    let what: String
+    @State private var open = false
+
+    private var help: String { ReadOnlyCue.help(who: who, what: what) }
+
+    var body: some View {
+        Button { open = true } label: {
+            Label { Text(verbatim: ReadOnlyCue.label) } icon: { Image(systemName: "lock.fill").accessibilityHidden(true) }
+                .labelStyle(.titleAndIcon)
+                .font(Typo.tag).foregroundStyle(Theme.muted)
+                .padding(.horizontal, Spacing.space3).padding(.vertical, Spacing.space1)
+                .background(Theme.blockedSoft, in: Capsule())
+                .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
+                .frame(minHeight: 44).contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: ReadOnlyCue.label))
+        .accessibilityHint(Text(verbatim: help))
+        .popover(isPresented: $open) {
+            Text(verbatim: help).font(Typo.small).foregroundStyle(Theme.ink)
+                .fixedSize(horizontal: false, vertical: true)
+                .padding(Spacing.l).frame(maxWidth: 320)
+                .presentationCompactAdaptation(.popover)
+        }
+    }
+}
+
+/// Owner obs. 2: live clock of the navy top bar, next to the bell. Time «HH:mm:ss» (24 h) and the day below it, both in
+/// El Salvador time: «Miércoles 18 de noviembre» with room (regular width), «Mié 18 nov» on a phone so it fits an
+/// iPhone SE. `TimelineView` redraws only this view once a second; it is a display clock, never a data refresh.
+struct LiveClock: View {
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    var body: some View {
+        TimelineView(.periodic(from: .now, by: 1)) { context in
+            let date = context.date
+            VStack(alignment: .trailing, spacing: 0) {
+                Text(verbatim: ClimesaDates.clockSeconds(date))
+                    .font(Typo.tag).foregroundStyle(Theme.onPrimary)
+                Text(verbatim: sizeClass == .regular ? ClimesaDates.longDay(date) : ClimesaDates.compactDay(date))
+                    .font(Typo.caption).foregroundStyle(Theme.onPrimary.opacity(0.85))
+            }
+            .lineLimit(1)
+            .fixedSize()
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(Text(verbatim: "\(ClimesaDates.longDay(date)), \(ClimesaDates.clock(date))"))
+            .accessibilityAddTraits(.updatesFrequently)
         }
     }
 }
