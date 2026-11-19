@@ -61,6 +61,13 @@
 .amb-unit-crew > div { display: grid; gap: 2px; min-width: 0; }
 .amb-unit-crew strong { font-size: var(--text-md); font-weight: 600; }
 .amb-unit-crew span { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+/* Owner obs. 19: a missing crew member or service reads as a gap, and the dispatch block lives in the same strip. */
+.amb-unit-crew > div.is-missing strong { color: var(--priority-urgente); }
+.amb-unit-block { flex: 1 1 100%; display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); border-left: 4px solid var(--priority-urgente); border-radius: var(--radius-control); background: var(--priority-urgente-soft); }
+.data-workbench > .amb-unit > .amb-unit-block { padding: var(--space-3) var(--space-4); }
+.amb-unit-block > p { margin: 0; display: flex; align-items: flex-start; gap: var(--space-2); line-height: 1.5; }
+.amb-unit-block > p > svg { flex: 0 0 auto; margin-top: 2px; color: var(--priority-urgente); }
+.amb-unit-block .amb-crew-next { margin: 0; }
 .amb-service > header .priority-badge + .priority-badge { margin-left: 0; }
 @media (max-width: 520px) { .amb-unit { padding: var(--space-3) var(--space-4); } }
 /* Bitácora por día: hoy abierto, días anteriores plegados. */

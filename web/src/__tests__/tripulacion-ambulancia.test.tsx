@@ -25,8 +25,8 @@ const sinMotorista: AmbulanceStatus = {
 describe('ambulancia sin motorista de turno (RN-30)', () => {
   it('muestra la cobertura de paramédico y de motorista por separado', async () => {
     render(<AmbulancePage api={apiWith(sinMotorista)} profile={profile(['ambulancia.ver_estado'])} version={0} />);
-    expect(await screen.findByText('Paramédico de turno')).toBeTruthy();
-    expect(screen.getByText('Sin motorista con turno en curso')).toBeTruthy();
+    expect(await screen.findByText('De turno')).toBeTruthy();
+    expect(screen.getByText('Sin motorista de turno')).toBeTruthy();
   });
 
   it('quien despacha y planifica turnos ve el motivo y el atajo para publicar el turno de motorista', async () => {
@@ -54,7 +54,9 @@ describe('ambulancia sin motorista de turno (RN-30)', () => {
   it('una API anterior sin driverOnDuty no muestra una alarma falsa', async () => {
     const { driverOnDuty: _omit, ...antigua } = { ...sinMotorista, dispatchBlock: null };
     render(<AmbulancePage api={apiWith(antigua as AmbulanceStatus)} profile={profile(['ambulancia.ver_estado'])} version={0} />);
-    expect(await screen.findByText('Motorista de turno')).toBeTruthy();
+    await screen.findByText('P-000-001');
+    expect(screen.queryByText('Sin motorista de turno')).toBeNull();
+    expect(screen.getAllByText('De turno')).toHaveLength(2);
   });
 });
 
