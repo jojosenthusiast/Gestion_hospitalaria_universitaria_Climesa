@@ -64,15 +64,37 @@ describe('Fila del día · tablero (S9)', () => {
     await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/llamar', { version: 2 }, 'POST'));
   });
 
-  it('el menú de la tarjeta mueve sin arrastrar (teclado y móvil)', async () => {
-    const api = montar(['fila.ver', 'fila.gestionar'], [ticket({ state: 'llamado', llamados: 1, allowedActions: ['atender'] })]);
-    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Mover o cambiar prioridad de CON 7' }), 'mover:atencion');
+  // Owner batch 2 (S28): the next step is a button on the card; the «Más» menu holds only what the card does not show.
+  it('la tarjeta muestra su siguiente paso como botón y el menú «Más» no lo repite', async () => {
+    const api = montar(['fila.ver', 'fila.gestionar', 'fila.llamar'], [ticket({ state: 'llamado', llamados: 1, allowedActions: ['atender', 'no_se_presento'], undoActions: ['deshacer_llamado'] })]);
+    const card = within(await screen.findByRole('region', { name: 'Llamados' })).getByRole('listitem');
+    expect(within(card).queryByRole('combobox')).toBeNull();
+    await userEvent.click(within(card).getByRole('button', { name: 'Más acciones de CON 7' }));
+    const menu = within(card).getByRole('menu', { name: 'Más acciones de CON 7' });
+    const labels = within(menu).getAllByRole('menuitem').map(item => item.textContent);
+    expect(labels).toEqual(['Mover a En espera', 'Cambiar a Emergencia', 'Cambiar a Urgente']);
+    expect(labels.some(text => /Iniciar atención|Completar|No se presentó|Mover…|Mover a$/.test(text ?? ''))).toBe(false);
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Mover a En espera' }));
+    await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/deshacer-llamado', { version: 2 }, 'POST'));
+    expect(screen.queryByRole('menu')).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: /^Iniciar atención/ }));
     await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/atender', { version: 2 }, 'POST'));
   });
 
-  it('el menú cambia la prioridad', async () => {
+  it('una tarjeta en atención ofrece «Completar» una sola vez y sin menú de mover', async () => {
+    montar(['fila.ver', 'fila.gestionar'], [ticket({ state: 'en_atencion', allowedActions: ['completar'] })]);
+    const card = within(await screen.findByRole('region', { name: 'En atención' })).getByRole('listitem');
+    expect(within(card).getAllByRole('button', { name: /Completar/ })).toHaveLength(1);
+    expect(within(card).queryByRole('button', { name: /Más acciones/ })).toBeNull();
+  });
+
+  it('el menú cambia la prioridad y se cierra con Escape', async () => {
     const api = montar(['fila.ver', 'fila.gestionar'], [ticket()]);
-    await userEvent.selectOptions(await screen.findByRole('combobox', { name: 'Mover o cambiar prioridad de CON 7' }), 'prioridad:emergencia');
+    await userEvent.click(await screen.findByRole('button', { name: 'Más acciones de CON 7' }));
+    await userEvent.keyboard('{Escape}');
+    expect(screen.queryByRole('menu')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Más acciones de CON 7' }));
+    await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Cambiar a Emergencia' }));
     await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/prioridad', { version: 2, priority: 'emergencia' }, 'POST'));
   });
 
@@ -116,9 +138,10 @@ describe('Fila del día · tablero (S9)', () => {
     expect(destinations(twice).map(d => d.to)).toEqual(['atencion']);
     expect(moveFor({ ...twice, llamados: 1 }, 'espera')).toEqual({ action: 'deshacer_llamado', allowed: true });
     const api = montar(['fila.ver', 'fila.llamar'], [ticket({ state: 'llamado', llamados: 2, allowedActions: ['atender'], undoActions: ['deshacer_llamado'] })]);
-    const menu = await screen.findByRole('combobox', { name: 'Mover o cambiar prioridad de CON 7' });
-    expect(within(menu).queryByRole('option', { name: /En espera/ })).toBeNull();
-    await userEvent.selectOptions(menu, 'quitar-llamado');
+    await userEvent.click(await screen.findByRole('button', { name: 'Más acciones de CON 7' }));
+    const menu = screen.getByRole('menu');
+    expect(within(menu).queryByRole('menuitem', { name: /En espera/ })).toBeNull();
+    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Quitar un llamado (van 2)' }));
     await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/deshacer-llamado', { version: 2 }, 'POST'));
   });
 

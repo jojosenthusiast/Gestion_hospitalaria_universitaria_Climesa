@@ -79,8 +79,8 @@ describe('Fila · tablero (R4a)', () => {
   });
 });
 
-// Android parity (QueueDock): what matters stays docked at the bottom with the two actions sharing the full width.
-describe('Fila · dock inferior', () => {
+// Owner batch 2 (S28): the summary and the line's actions sit on top of the board, so many numbers never hide them.
+describe('Fila · resumen arriba', () => {
   it('muestra en atención, quién sigue con su área, los en espera y la espera promedio y máxima', async () => {
     const now = Date.now();
     const issued = (minutes: number) => new Date(now - minutes * 60_000).toISOString();
@@ -90,7 +90,11 @@ describe('Fila · dock inferior', () => {
       ticket({ id: 't-8', numero: 8, issuedAt: issued(10) }),
     ]);
     const dock = await screen.findByRole('region', { name: 'Resumen de atención' });
-    expect(dock.classList.contains('qb-dock')).toBe(true);
+    expect(dock.classList.contains('qb-summary')).toBe(true);
+    // Above the board, right under the title: it comes before the first lane in the page.
+    const board = await screen.findByRole('region', { name: 'Tablero de la fila' });
+    expect(dock.compareDocumentPosition(board) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(document.querySelector('.qb-dock')).toBeNull();
     expect(within(dock).getByText('En atención').parentElement!.textContent).toMatch(/CON\s*3/);
     // «Sigue» is the server proposal (number 9) once it arrives.
     await vi.waitFor(() => expect(within(dock).getByText('Sigue').parentElement!.textContent).toMatch(/CON\s*9/));
@@ -100,21 +104,24 @@ describe('Fila · dock inferior', () => {
     const buttons = within(dock).getAllByRole('button');
     expect(buttons.map(b => b.textContent)).toEqual(['Llamar siguiente', 'Emitir número']);
     expect(buttons[0].className).toBe('secondary-button');
-    expect(buttons[1].className).toBe('primary-button');
+    // «Emitir número» is a create action: the shared CRUD look (solid blue with a plus).
+    expect(buttons[1].classList.contains('crud-create')).toBe(true);
     // «Emitir número» is not repeated in the header.
     expect(screen.getAllByRole('button', { name: /Emitir número/ })).toHaveLength(1);
   });
 
-  it('sin permisos de llamar ni emitir no hay botones, y con uno solo ocupa todo el ancho como principal', async () => {
+  it('solo lectura ve el resumen y el aviso, sin botones; con solo emitir hay un único botón de crear', async () => {
     montar(['fila.ver'], [ticket()]);
     const dock = await screen.findByRole('region', { name: 'Resumen de atención' });
     expect(within(dock).queryAllByRole('button')).toHaveLength(0);
     expect(within(dock).getByText('Nadie')).toBeTruthy();
+    expect(screen.getByText('Solo lectura')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Emitir número/ })).toBeNull();
     cleanup();
     montar(['fila.ver', 'fila.emitir', 'fila.gestionar'], [ticket()]);
     const solo = await screen.findByRole('region', { name: 'Resumen de atención' });
     const only = within(solo).getAllByRole('button');
     expect(only.map(b => b.textContent)).toEqual(['Emitir número']);
-    expect(only[0].className).toBe('primary-button');
+    expect(only[0].classList.contains('crud-create')).toBe(true);
   });
 });
