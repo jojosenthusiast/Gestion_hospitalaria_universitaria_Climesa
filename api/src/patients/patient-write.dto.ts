@@ -23,7 +23,7 @@ export class PatientUpdateDto extends PatientWriteDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!: number;
   @Text(10,500) reason!: string;
 }
-/** Datos de contacto que el propio paciente puede cambiar; nombre, DUI, nacimiento y sexo solo los corrige Recepción. */
+/** Datos de contacto que el propio paciente puede cambiar; nombre, DUI, nacimiento, sexo y correo (une la cuenta de la app) solo los corrige Recepción. `email` se conserva para clientes publicados: solo se acepta sin cambios. */
 export class PatientSelfUpdateDto {
   @ApiProperty({minimum:1}) @IsInt() @Min(1) version!: number;
   @Text(0,9,true) phone?: string;

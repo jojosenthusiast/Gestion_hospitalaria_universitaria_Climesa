@@ -82,6 +82,10 @@ describe('vinculación automática por correo verificado', () => {
     const created = await create({ givenNames: 'Tercera', email: 'Compartido@Example.test' });
     expect(created.status).toBe(409);
     expect(created.body.codigo).toBe('correo_en_uso');
+    // The REC message names the record; the body carries no other patient id.
+    expect(created.body).not.toHaveProperty('paciente');
+    expect(JSON.stringify(created.body)).not.toContain(first);
+    expect(JSON.stringify(created.body)).not.toContain(second);
     const other = await record('otra.persona@example.test', 'Cuarta');
     const edited = await edit(other, 'compartido@example.test');
     expect(edited.status).toBe(409);
@@ -142,20 +146,33 @@ describe('vinculación automática por correo verificado', () => {
     const refused = await edit(different, 'duena@example.test');
     expect(refused.status).toBe(409);
     expect(refused.body.codigo).toBe('correo_de_otra_cuenta');
+    expect(refused.body).not.toHaveProperty('paciente');
+    expect(JSON.stringify(refused.body)).not.toContain(owned);
     const createdRefused = await create({ givenNames: 'Quinta', email: 'duena@example.test' });
     expect(createdRefused.body.codigo).toBe('correo_de_otra_cuenta');
   });
 
-  test('the patient cannot put on its own record an email another active record already has', async () => {
+  test('the patient cannot change its record email, and the refusal never depends on other records', async () => {
     const id = await account('propia@example.test');
     const own = await record('propia@example.test', 'Propia');
     await record('ajena@example.test', 'Ajena');
     t.authUser(id, 'propia@example.test');
     expect((await t.call(id, 'GET', '/auth/me')).body.patientId).toBe(own);
-    const mine = (await t.call(id, 'GET', '/me/paciente')).body;
-    const res = await t.call(id, 'PATCH', '/me/paciente', { version: mine.version, email: 'ajena@example.test' });
-    expect(res.status).toBe(409);
-    expect(res.body.codigo).toBe('correo_en_uso');
+    const version = async () => (await t.call(id, 'GET', '/me/paciente')).body.version as number;
+    const taken = await t.call(id, 'PATCH', '/me/paciente', { version: await version(), email: 'ajena@example.test' });
+    const free = await t.call(id, 'PATCH', '/me/paciente', { version: await version(), email: 'nadie.la.usa@example.test' });
+    expect(taken.status).toBe(403);
+    expect(taken.body.codigo).toBe('correo_lo_gestiona_recepcion');
+    expect(taken.body.detail).toBe('Tu correo lo actualiza Recepción. Pídelo en ventanilla.');
+    // Same answer whether or not another record has the email: nothing to learn about other patients.
+    const strip = (body: Record<string, unknown>) => { const rest = { ...body }; delete rest.requestId; return rest; };
+    expect({ status: free.status, body: strip(free.body) }).toEqual({ status: taken.status, body: strip(taken.body) });
+    expect(JSON.stringify(taken.body)).not.toMatch(/ajena|paciente/);
+    expect((await t.one<{ correo: string }>('SELECT correo FROM pacientes.paciente WHERE id=$1', [own])).correo).toBe('propia@example.test');
+    // Phone and address still change; the same email (any case) is accepted for released clients.
+    const ok = await t.call(id, 'PATCH', '/me/paciente', { version: await version(), phone: '7000-2222', address: 'Calle ficticia 2', email: 'PROPIA@example.test' });
+    expect(ok.status).toBe(200);
+    expect((await t.one<{ telefono: string; correo: string }>('SELECT telefono,correo FROM pacientes.paciente WHERE id=$1', [own]))).toEqual({ telefono: '70002222', correo: 'propia@example.test' });
   });
 
   test('the DUI request and the approval answer 410, and the W27 tray is empty', async () => {

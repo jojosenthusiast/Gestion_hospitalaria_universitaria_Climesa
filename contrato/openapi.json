@@ -1116,7 +1116,7 @@
             "bearer": []
           }
         ],
-        "summary": "El paciente edita su teléfono, correo y dirección; versión optimista e historial",
+        "summary": "El paciente edita su teléfono y dirección; versión optimista e historial. El correo solo lo cambia Recepción: un correo distinto responde 403 (codigo correo_lo_gestiona_recepcion); enviar el mismo correo se acepta.",
         "tags": [
           "patients"
         ],
@@ -34658,6 +34658,7 @@
           "vinculacion_automatica",
           "correo_en_uso",
           "correo_de_otra_cuenta",
+          "correo_lo_gestiona_recepcion",
           "rol_no_invitable",
           "invitacion_no_pendiente",
           "jerarquia_administrador",

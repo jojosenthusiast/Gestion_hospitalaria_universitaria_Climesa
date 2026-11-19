@@ -81,7 +81,7 @@ export async function assertEmailAssignable(c: PoolClient, email: string | null 
   if (!key) return;
   await lockEmail(c, key);
   const other = (await activeRecordsWith(c, key, patientId))[0];
-  if (other) throw new ProblemException('correo_en_uso', 409, `Ese correo ya está en el expediente activo ${other.expediente}. Cada correo puede estar en un solo expediente activo: revisa si es la misma persona o usa otro correo.`, 'email', { paciente: { id: other.id, record: other.expediente } });
+  if (other) throw new ProblemException('correo_en_uso', 409, `Ese correo ya está en el expediente activo ${other.expediente}. Cada correo puede estar en un solo expediente activo: revisa si es la misma persona o usa otro correo.`, 'email');
   for (const account of await verifiedAccountsWith(c, key)) {
     if (account.paciente_id && account.paciente_id !== patientId) {
       const record = (await c.query('SELECT expediente FROM pacientes.paciente WHERE id=$1', [account.paciente_id])).rows[0]?.expediente ?? '';

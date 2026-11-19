@@ -11,7 +11,7 @@ import { ageOn, ageRange, fichaFields, searchBirthFields, searchShowsBirth } fro
 import { PatientListFilters, assertListFilters, listFilterSql } from './patient-list.filters';
 import { DuplicateKey, birthPrecision, canonicalPair, isPossibleDuplicate, matchReasons, normalize, phonetic, recordNumber, validateContact, validateDemographics } from './patient.rules';
 import { careContextPatients, careRelationPatients } from '../platform/care-context';
-import { appAccountState, assertEmailAssignable, linkRecordByEmail } from '../platform/patient-account-link';
+import { appAccountState, assertEmailAssignable, emailKey, linkRecordByEmail } from '../platform/patient-account-link';
 type Row = Record<string, any>;
 /** Patient states the front desk and the clinic can attend (queue, appointment, consultation, admission refuse the rest). */
 const ATTENDABLE:readonly string[]=['activo','provisional'];
@@ -246,7 +246,10 @@ export class PatientsService {
       if(!old)throw new NotFoundException('No se encontró el paciente.');
       if(old.version!==dto.version)throw new VersionConflictException(old.version,'Tu ficha cambió. Vuelve a abrirla antes de guardar.');
       const next={telefono:dto.phone===undefined?old.telefono:(dto.phone.replace(/-/g,'')||null),correo:dto.email===undefined?old.correo:(dto.email?.trim()||null),direccion:dto.address===undefined?old.direccion:(dto.address||null)};
-      if(dto.email!==undefined)await assertEmailAssignable(c,next.correo,id);
+      // The record email links the app account, so only Recepción changes it. The refusal depends only on this record,
+      // never on other records, so it cannot tell the patient whether an email is in use elsewhere.
+      if(dto.email!==undefined&&emailKey(next.correo)!==emailKey(old.correo))throw new ProblemException('correo_lo_gestiona_recepcion',403,'Tu correo lo actualiza Recepción. Pídelo en ventanilla.','email');
+      next.correo=old.correo;
       const row=(await c.query('UPDATE pacientes.paciente SET telefono=$2,correo=$3,direccion=$4,version=version+1 WHERE id=$1 RETURNING *',[id,next.telefono,next.correo,next.direccion])).rows[0];
       const changes:Row={};for(const field of ['telefono','correo','direccion'])if(String(old[field]??'')!==String(row[field]??''))changes[field]={before:old[field],after:row[field]};
       await c.query('INSERT INTO pacientes.historial_demografico(paciente_id,version,actor_id,motivo,cambios) VALUES($1,$2,$3,$4,$5)',[id,row.version,actor.id,'Actualización de contacto por el propio paciente',changes]);

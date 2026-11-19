@@ -17,7 +17,7 @@ export class MePatientController {
     if (!req.actor.patientId) throw new ProblemException('sin_vinculacion', 404, 'Tu cuenta todavía no está vinculada a un expediente.');
     return this.patients.get(req.actor, req.actor.patientId);
   }
-  @Patch('paciente') @RequirePermission('pacientes.editar_propios') @ApiOperation({ summary: 'El paciente edita su teléfono, correo y dirección; versión optimista e historial' }) @ApiOkResponse({ type: IdVersionResponse })
+  @Patch('paciente') @RequirePermission('pacientes.editar_propios') @ApiOperation({ summary: 'El paciente edita su teléfono y dirección; versión optimista e historial. El correo solo lo cambia Recepción: un correo distinto responde 403 (codigo correo_lo_gestiona_recepcion); enviar el mismo correo se acepta.' }) @ApiOkResponse({ type: IdVersionResponse })
   update(@Req() req: ActorRequest, @Body() dto: PatientSelfUpdateDto, @Headers('idempotency-key') key?: string) {
     return this.patients.updateOwn(req.actor, dto, key);
   }
