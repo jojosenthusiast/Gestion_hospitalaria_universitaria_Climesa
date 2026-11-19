@@ -434,6 +434,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/turno-activo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lote 5 S9: si la cuenta necesita turno para operar, su turno vigente (con margen) y el próximo */
+        get: operations["OperationsController_activeShift"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/turnos/cobertura": {
         parameters: {
             query?: never;
@@ -2833,6 +2850,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ambulancia/cobertura": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lote 5 S8: horas de los próximos días (7 por omisión) sin paramédico y motorista de turno, por día (no bloquea publicar turnos) */
+        get: operations["AmbulanceController_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ambulancia/mantenimiento": {
         parameters: {
             query?: never;
@@ -2842,7 +2876,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Entrar o salir de mantenimiento; salir exige paramédico con turno en curso */
+        /** Entrar o salir de mantenimiento (Jefatura o la tripulación); salir exige paramédico y motorista con turno en curso */
         post: operations["AmbulanceController_maintenance"];
         delete?: never;
         options?: never;
@@ -3624,6 +3658,30 @@ export interface components {
             areas: components["schemas"]["ShiftCatalogAreaResponse"][];
             staff: components["schemas"]["ShiftCatalogStaffResponse"][];
         };
+        ShiftWindowResponse: {
+            /** Format: uuid */
+            id: string;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            area: string | null;
+            state: components["schemas"]["EstadoTurno"];
+        };
+        ActiveShiftResponse: {
+            /** @description La cuenta tiene un rol que trabaja por turnos (REC, AST, ENF, MED, LAB, PAR) y la regla está vigente */
+            required: boolean;
+            /** @description Puede ejecutar comandos operativos ahora: no los necesita o tiene un turno que cubre la hora con el margen */
+            active: boolean;
+            /** @description Minutos de margen antes del inicio y después del fin del turno */
+            graceMinutes: number;
+            /** @description Turno que cubre la hora actual (con el margen) */
+            shift: components["schemas"]["ShiftWindowResponse"] | null;
+            /** @description Próximo turno publicado */
+            next: components["schemas"]["ShiftWindowResponse"] | null;
+            /** @description Mensaje para mostrar cuando `required` y no `active` */
+            message: string | null;
+        };
         CoverageGapResponse: {
             /** Format: uuid */
             areaId: string;
@@ -4055,6 +4113,10 @@ export interface components {
             cleaningCompleted: boolean;
             cleanedByCurrentUser: boolean;
             path: string | null;
+            /** @description Lote 5: quien ocupa o tiene reservada la cama está en aislamiento */
+            isolation?: boolean;
+            /** @description Lote 5: la habitación tiene un paciente en aislamiento (sus otras camas no se asignan) */
+            roomIsolation?: boolean;
             /** @description Nombre completo o iniciales según camas.ver_ocupante; solo si la cama tiene paciente */
             occupant?: string;
             /**
@@ -4477,6 +4539,10 @@ export interface components {
             reason: string;
         };
         QueueTicketResponse: {
+            /** @description Lote 5: edad en años el día del número; solo con pacientes.ver_nacimiento */
+            patientAge?: number | null;
+            /** @description Lote 5: sexo del paciente; solo con pacientes.ver_ficha */
+            patientSex?: string | null;
             /** Format: uuid */
             id: string;
             service: components["schemas"]["ServicioFila"];
@@ -4612,6 +4678,13 @@ export interface components {
             version: number;
             state: components["schemas"]["EstadoFila"];
             llamados: number;
+            /**
+             * Format: uuid
+             * @description Lote 5: consultorio con que se llamó (el enviado o el que ya tenía)
+             */
+            officeId?: string | null;
+            /** @description Lote 5: código del consultorio, por ejemplo P1-CON-02 */
+            officeCode?: string | null;
             numero: number;
             patientName: string | null;
             area: components["schemas"]["AreaFila"];
@@ -5030,9 +5103,15 @@ export interface components {
             patientId: string;
             patientName: string | null;
             record: string | null;
+            /** @description Lote 5: edad en años hoy; solo con pacientes.ver_nacimiento */
+            patientAge?: number | null;
+            /** @description Lote 5: sexo del paciente; solo con pacientes.ver_ficha */
+            patientSex?: string | null;
             categories: components["schemas"]["CategoryRefResponse"][];
             /** @description Especialidades sugeridas por las categorías, sin repetir */
             specialties: string[];
+            /** @description Lote 5 S6: algún médico de esas especialidades (o cualquiera, si ninguno las tiene) tiene turno publicado en los próximos 14 días; si es false, asignar responde sin_personal_disponible */
+            staffAvailable: boolean;
             franja: components["schemas"]["FranjaSolicitudCita"];
             note: string | null;
             /** Format: uuid */
@@ -7054,6 +7133,8 @@ export interface components {
         AmbulanceStatusResponse: {
             unit: components["schemas"]["AmbulanceUnitResponse"];
             activeService: components["schemas"]["ActiveServiceResponse"] | null;
+            /** @description Lote 5 S8: quien consulta puede poner o quitar mantenimiento (Jefatura o la tripulación) */
+            canSetMaintenance: boolean;
             paramedicOnDuty: boolean;
             /** @description Hay motorista con turno en curso (RN-30 exige paramédico y motorista) */
             driverOnDuty: boolean;
@@ -7065,6 +7146,46 @@ export interface components {
             pendingRequests?: components["schemas"]["PendingAmbulanceRequestResponse"][];
             /** @description Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02) */
             availableCrew?: components["schemas"]["CrewMemberResponse"][];
+        };
+        CrewDayResponse: {
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            date: string;
+            hoursWithoutCrew: number;
+        };
+        /**
+         * @description Quién falta: paramédico, motorista o los dos
+         * @enum {string}
+         */
+        FaltaTripulacion: "paramedico" | "motorista" | "tripulacion";
+        CrewGapResponse: {
+            /**
+             * Format: date
+             * @description Día local al que pertenece el hueco (los huecos se cortan a medianoche local)
+             */
+            date: string;
+            hours: number;
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            /** @description Quién falta: paramédico, motorista o los dos */
+            missing: components["schemas"]["FaltaTripulacion"];
+        };
+        CrewCoverageResponse: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** @description Horas sin paramédico y motorista de turno */
+            hoursWithoutCrew: number;
+            /** @description Cada hora tiene paramédico y motorista de turno */
+            covered: boolean;
+            /** @description Cada día local del rango con sus horas sin tripulación (0 si está cubierto) */
+            days: components["schemas"]["CrewDayResponse"][];
+            gaps: components["schemas"]["CrewGapResponse"][];
         };
         MaintenanceDto: {
             version: number;
@@ -7370,7 +7491,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "vinculacion_automatica" | "correo_en_uso" | "correo_de_otra_cuenta" | "correo_lo_gestiona_recepcion" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "hito_no_deshacible" | "sin_consulta" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "sin_turno_activo" | "sin_personal_disponible" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "vinculacion_automatica" | "correo_en_uso" | "correo_de_otra_cuenta" | "correo_lo_gestiona_recepcion" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "hito_no_deshacible" | "sin_consulta" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -9375,6 +9496,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ShiftResponse"][];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    OperationsController_activeShift: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActiveShiftResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
@@ -20211,6 +20387,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AmbulanceStatusResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AmbulanceController_coverage: {
+        parameters: {
+            query?: {
+                /** @description Días desde la hora en curso, 1 a 14; 7 por omisión */
+                dias?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewCoverageResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
