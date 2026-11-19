@@ -82,6 +82,12 @@ create or replace function pg_temp.origen_ts(o text, id uuid) returns timestampt
 -- ---------------------------------------------------------------------------------------------------------
 create temp table cuentas (rol text primary key, usuario_id uuid, persona_id uuid) on commit drop;
 
+-- Cuentas de prueba (Lote 5, S17): prueba.<algo>@climesa.com y admin@climesa.com en el proyecto del curso, y
+-- <rol>@example.test o prueba.<rol>@example.test en las pruebas locales. Misma regla en limpiar-demo.sql y conteo-demo.sql.
+create or replace function pg_temp.es_cuenta_prueba(correo text) returns boolean language sql immutable as
+$$ select lower(coalesce(correo, '')) ~ '^(prueba\.[a-z0-9._-]+|admin)@climesa\.com$'
+       or lower(coalesce(correo, '')) ~ '^(prueba\.)?(adm|jop|dpd|rec|ast|enf|med|lab|par|pac)@example\.test$' $$;
+
 insert into cuentas (rol, usuario_id, persona_id)
 select r.rol, u.id, u.persona_personal_id
 from (values ('ADM'), ('JOP'), ('DPD'), ('REC'), ('AST'), ('ENF'), ('MED'), ('LAB'), ('PAR'), ('PAC')) r(rol)
@@ -89,9 +95,9 @@ left join lateral (
   select x.id, x.persona_personal_id
   from acceso.usuario x
   join acceso.asignacion_rol a on a.usuario_id = x.id and a.rol_codigo = r.rol
-  where x.estado = 'activo' and x.id::text not like 'de300000-%'
-    and lower(x.correo) ~ ('(^|[._-])' || lower(r.rol) || '@example\.test$')
-  order by x.creado_en limit 1) u on true;
+  where x.estado = 'activo' and x.id::text not like 'de300000-%' and pg_temp.es_cuenta_prueba(x.correo)
+  -- La cuenta cuyo correo nombra el rol va primero (prueba.med para MED); admin@climesa.com cubre ADM.
+  order by (lower(x.correo) ~ ('(^|[._-])' || lower(r.rol) || '@')) desc, x.creado_en limit 1) u on true;
 
 -- Persona de personal para los roles de trabajo cuya cuenta aún no tiene una (o si no hay cuenta, una suelta).
 create temp table persona_cuenta (rol text primary key, idx int, nombres text, apellidos text, tipo text, especialidad text, area text)
@@ -144,7 +150,7 @@ insert into infra.equipo (id, tipo, serie, espacio_id, estado) values
 on conflict do nothing;
 
 -- ---------------------------------------------------------------------------------------------------------
--- 3. Personal demo, inscripciones y turnos de los próximos 14 días
+-- 3. Personal demo, inscripciones y turnos de los 7 días pasados y los próximos 14
 -- ---------------------------------------------------------------------------------------------------------
 insert into personal.persona (id, nombres, apellidos, tipo, especialidad, area_id, telefono, dui, activo)
 select pg_temp.did('0002', v.idx), v.nombres, v.apellidos, v.tipo, v.especialidad, pg_temp.espacio(v.area),
@@ -187,7 +193,13 @@ from (values
   (47, 'Gustavo Adolfo',       'Reyes Chávez',       'recepcionista', null,                         'P1-REC'),
   -- Motoristas de noche: RN-30 exige paramédico y motorista con turno en curso para despachar la ambulancia.
   (48, 'Wilber Arnoldo',       'Quintanilla Mejía',  'motorista',     null,                         'P1-AMB'),
-  (49, 'Edwin Mauricio',       'Rivas Cornejo',      'motorista',     null,                         'P1-AMB')
+  (49, 'Edwin Mauricio',       'Rivas Cornejo',      'motorista',     null,                         'P1-AMB'),
+  -- Lote 5 (S17): noches de recepción, laboratorio y emergencia, para que cada función tenga cobertura las 24 h.
+  (50, 'Marta Lidia',          'Escobar Rosales',    'recepcionista', null,                         'P1-REC'),
+  (51, 'Kevin Alexander',      'Mejía Landaverde',   'recepcionista', null,                         'P1-REC'),
+  (52, 'Iris Yamileth',        'Pineda Carranza',    'laboratorista', null,                         'P1-LAB'),
+  (53, 'Fernando José',        'Alas Monterrosa',    'medico',        'Emergencias',                'P1-EMG'),
+  (54, 'Brenda Lisseth',       'Orellana Nolasco',   'enfermero',     null,                         'P1-EMG')
 ) v(idx, nombres, apellidos, tipo, especialidad, area)
 on conflict do nothing;
 
@@ -311,11 +323,34 @@ insert into plan_turno values
   (39, pg_temp.did('0002', 46), 'BOD-CEN', 'D5'),
   (40, pg_temp.did('0002', 47), 'P1-REC', 'T7'),
   (41, pg_temp.did('0002', 48), 'P1-AMB', 'N2'),
-  (42, pg_temp.did('0002', 49), 'P1-AMB', 'N2B');
+  (42, pg_temp.did('0002', 49), 'P1-AMB', 'N2B'),
+  -- Lote 5 (S17): recepción y laboratorio de noche todos los días; emergencia con médico y enfermería todas las noches,
+  -- salvo un hueco a propósito (N2X: el médico 53 no cubre la noche del día +3) para que los tableros avisen.
+  (43, pg_temp.did('0002', 50), 'P1-REC', 'N2'),
+  (44, pg_temp.did('0002', 51), 'P1-REC', 'N2B'),
+  (45, pg_temp.did('0002', 52), 'P1-LAB', 'N2B'),
+  (46, pg_temp.did('0002', 53), 'P1-EMG', 'N2X'),
+  (47, pg_temp.did('0002', 54), 'P1-EMG', 'N2B');
 -- Escala (S6): R5M y R5T rotan cinco días de cada siete (descansa cuando (d + idx) mod 7 es 5 o 6); nunca más de cinco
 -- días seguidos ni 35 h en siete días, así que no necesitan excepción de carga. El plan usa el mismo idx que la persona.
 insert into plan_turno select s.idx, pg_temp.did('0002', s.idx), s.area, s.patron from staff2 s;
 -- La cardióloga (persona demo 4) no tiene plan a propósito: en la agenda aparece como "Sin turno".
+
+-- Lote 5 (S17): las cuentas de prueba trabajan todos los días de 06:00 a 22:00 (C16), así la regla «sin turno activo» de
+-- la API no las bloquea de día. Se aplica a toda cuenta de prueba de un rol por turnos que tenga persona de personal, no
+-- solo a la elegida por rol (por ejemplo una cuenta AST que pasó a ENF). 16 h al día superan el tope de 72 h en 7 días:
+-- llevan excepción de carga escrita. El descanso de 8 h entre turnos (RN-13) se cumple.
+update plan_turno p set patron = 'C16' where p.persona in (select persona_id from cuentas where persona_id is not null);
+insert into plan_turno (idx, persona, area, patron)
+select 900 + row_number() over (order by u.creado_en, u.id), u.persona_personal_id,
+       case (select tipo from personal.persona where id = u.persona_personal_id)
+         when 'recepcionista' then 'P1-REC' when 'laboratorista' then 'P1-LAB' when 'paramedico' then 'P1-AMB'
+         when 'motorista' then 'P1-AMB' when 'enfermero' then 'P2-HOS' else 'P1-CON' end, 'C16'
+from acceso.usuario u
+where u.estado = 'activo' and u.id::text not like 'de300000-%' and pg_temp.es_cuenta_prueba(u.correo)
+  and u.persona_personal_id is not null
+  and u.persona_personal_id not in (select persona from plan_turno where persona is not null)
+  and exists (select 1 from acceso.asignacion_rol a where a.usuario_id = u.id and a.rol_codigo in ('REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'));
 
 insert into personal.turno (id, persona_id, area_id, periodo, tipo, estado, justificacion, publicado_por, publicado_en, creado_por, excepcion_carga)
 select pg_temp.did('0003', b.idx * 100 + b.d + 2), b.persona, pg_temp.espacio(b.area),
@@ -335,21 +370,26 @@ select pg_temp.did('0003', b.idx * 100 + b.d + 2), b.persona, pg_temp.espacio(b.
        pg_temp.actor('JOP'), now() - interval '1 day', pg_temp.actor('JOP'),
        -- D7/T7 cover the area every day of the demo window with one person: written exception, so a later
        -- consecutive-days rule in the database does not reject the demo plan.
-       case when b.patron in ('D7', 'T7') then '[DEMO] Plan de cobertura diaria de la demostración: excepción documentada a los días consecutivos' end
+       case when b.patron in ('D7', 'T7') then '[DEMO] Plan de cobertura diaria de la demostración: excepción documentada a los días consecutivos'
+            when b.patron = 'C16' then '[DEMO] Cuenta de prueba: jornada diaria de 06:00 a 22:00 para que el propietario pruebe sin quedar fuera de turno' end
 from (
   select p.idx, p.persona, p.area, p.patron, d.d,
-         case when p.patron = 'D7' or (p.patron = 'D5' and extract(isodow from pg_temp.hoy() + d.d) <= 5)
+         case when p.patron = 'C16' then pg_temp.ts(pg_temp.hoy() + d.d, 6)
+              when p.patron = 'D7' or (p.patron = 'D5' and extract(isodow from pg_temp.hoy() + d.d) <= 5)
                    or (p.patron = 'A2' and mod(mod(d.d, 2) + 2, 2) = 0)
                    or (p.patron = 'R5M' and mod(mod(d.d + p.idx, 7) + 7, 7) < 5) then pg_temp.ts(pg_temp.hoy() + d.d, 7)
               when (p.patron = 'T5' and extract(isodow from pg_temp.hoy() + d.d) <= 5) or p.patron = 'T7'
                    or (p.patron = 'R5T' and mod(mod(d.d + p.idx, 7) + 7, 7) < 5) then pg_temp.ts(pg_temp.hoy() + d.d, 13)
-              when (p.patron = 'N2' and mod(mod(d.d, 2) + 2, 2) = 0) or (p.patron = 'N2B' and mod(mod(d.d, 2) + 2, 2) = 1) then pg_temp.ts(pg_temp.hoy() + d.d, 19)
+              when (p.patron = 'N2' and mod(mod(d.d, 2) + 2, 2) = 0) or (p.patron = 'N2B' and mod(mod(d.d, 2) + 2, 2) = 1)
+                   or (p.patron = 'N2X' and mod(mod(d.d, 2) + 2, 2) = 1 and d.d <> 3) then pg_temp.ts(pg_temp.hoy() + d.d, 19)
               when p.patron = 'G4' and mod(mod(d.d, 4) + 4, 4) = 0 then pg_temp.ts(pg_temp.hoy() + d.d, 7) end as ini,
-         case when p.patron in ('D7', 'D5', 'A2', 'R5M') then pg_temp.ts(pg_temp.hoy() + d.d, 14)
+         case when p.patron = 'C16' then pg_temp.ts(pg_temp.hoy() + d.d, 22)
+              when p.patron in ('D7', 'D5', 'A2', 'R5M') then pg_temp.ts(pg_temp.hoy() + d.d, 14)
               when p.patron in ('T5', 'T7', 'R5T') then pg_temp.ts(pg_temp.hoy() + d.d, 20)
-              when p.patron in ('N2', 'N2B', 'G4') then pg_temp.ts(pg_temp.hoy() + d.d + 1, 7) end as fin,
-         case when p.patron in ('N2', 'N2B') then 'nocturno' when p.patron = 'G4' then 'guardia' else 'diurno' end as tipo
-  from plan_turno p cross join generate_series(-1, 13) d(d)
+              when p.patron in ('N2', 'N2B', 'N2X', 'G4') then pg_temp.ts(pg_temp.hoy() + d.d + 1, 7) end as fin,
+         case when p.patron in ('N2', 'N2B', 'N2X') then 'nocturno' when p.patron in ('G4', 'C16') then 'guardia' else 'diurno' end as tipo
+  -- Lote 5 (S17): siete días hacia atrás (turnos completados, historial de "Mis turnos") y 14 hacia adelante.
+  from plan_turno p cross join generate_series(-7, 13) d(d)
 ) b
 where b.ini is not null and b.persona is not null
 on conflict do nothing;
@@ -2062,5 +2102,234 @@ from (values
 ) v(n, u, clave, nombre, rol, estado, hace)
 join cuentas c on c.rol = 'ADM' and c.usuario_id is not null
 on conflict do nothing;
+
+-- ---------------------------------------------------------------------------------------------------------
+-- 14. Lote 5 (S17): conexiones entre módulos para probar cada flujo con las cuentas de prueba
+--     * la cuenta PAC de prueba queda unida a la paciente demo 4 (Ana Cecilia Portillo) y ella lleva su correo;
+--     * números de fila de hoy ligados a la cita cuya llegada registran (citados y sin cita en la misma fila);
+--     * reprogramaciones pendientes, rechazada y vencida; dos solicitudes por categoría más;
+--     * resultados por revisar del médico (críticos y observación) e informes externos que no son texto (imagen y PDF);
+--     * avisos de cada nivel (informativo, importante, crítico) y uno dirigido a un área;
+--     * historial de mantenimiento de la ambulancia en su bitácora;
+--     * lecturas del expediente de la paciente de la cuenta PAC, para la pantalla «Quién vio mi expediente».
+-- ---------------------------------------------------------------------------------------------------------
+
+-- 14a. Cuenta PAC de prueba -> paciente demo 4. Solo si la cuenta no tiene expediente y nadie más tiene ese expediente.
+--      El correo de la ficha pasa a ser el de la cuenta (regla de unión por correo verificado de la API), salvo que otra
+--      ficha activa ya lo use. limpiar-demo.sql deshace la unión.
+update pacientes.paciente p set correo = lower(u.correo)
+from acceso.usuario u
+where p.id = pg_temp.did('0001', 4) and u.id = (select usuario_id from cuentas where rol = 'PAC')
+  and u.paciente_id is null and u.correo is not null
+  and not exists (select 1 from acceso.usuario o where o.paciente_id = p.id)
+  and not exists (select 1 from pacientes.paciente o where lower(o.correo) = lower(u.correo) and o.id <> p.id and o.estado in ('activo', 'provisional'))
+  and p.correo is distinct from lower(u.correo);
+update acceso.usuario u set paciente_id = pg_temp.did('0001', 4), version = u.version + 1
+where u.id = (select usuario_id from cuentas where rol = 'PAC') and u.paciente_id is null
+  and exists (select 1 from pacientes.paciente where id = pg_temp.did('0001', 4))
+  and not exists (select 1 from acceso.usuario o where o.paciente_id = pg_temp.did('0001', 4));
+do $$ begin
+  if (select usuario_id from pg_temp.cuentas where rol = 'PAC') is not null
+     and (select paciente_id from acceso.usuario where id = (select usuario_id from pg_temp.cuentas where rol = 'PAC')) is distinct from pg_temp.did('0001', 4) then
+    raise notice 'La cuenta PAC de prueba ya tenía otro expediente: no se unió a la paciente demo 4. Corre limpiar-demo.sql antes de sembrar.';
+  end if;
+end $$;
+
+-- 14b. Fila de hoy: los números de consulta general de pacientes con cita hoy quedan ligados a esa cita (llegada registrada).
+update atencion.ticket_fila t set cita_id = x.cita
+from (
+  select distinct on (t2.id) t2.id as ticket, c.id as cita
+  from atencion.ticket_fila t2
+  join atencion.cita c on c.paciente_id = t2.paciente_id and c.id::text like 'de300000-%'
+   and (lower(c.horario) at time zone 'America/El_Salvador')::date = t2.fecha
+   and ((t2.estado in ('en_espera', 'llamado', 'en_atencion') and c.estado = 'confirmada') or (t2.estado = 'atendido' and c.estado = 'atendida'))
+  where t2.id::text like 'de300000-%' and t2.fecha = pg_temp.hoy() and t2.servicio = 'consulta_general' and t2.cita_id is null
+  order by t2.id, lower(c.horario)) x
+where t.id = x.ticket and not exists (select 1 from atencion.ticket_fila o where o.cita_id = x.cita);
+
+-- 14c0. Dos citas próximas de la paciente de la cuenta PAC con el médico de la cuenta MED, en la primera franja libre de su
+--       turno de ese día (desde la hora indicada si se puede): una confirmada en dos días (la reprograma abajo) y una por confirmar en seis días.
+insert into atencion.cita (id, paciente_id, medico_id, horario, motivo, estado, origen, creado_por, creado_en)
+select pg_temp.did('0004', 5000 + v.n), pg_temp.did('0001', 4), pg_temp.persona('MED'), f.h,
+       v.motivo, v.estado, 'paciente', pg_temp.actor('PAC'), now() - interval '1 day'
+from (values
+  (1, 2, 10.5, 'confirmada', '[DEMO] Control general pedido desde la app; tiene una reprogramación pendiente'),
+  (2, 6, 15.5, 'solicitada', '[DEMO] Cita pedida desde la app, por confirmar en recepción')
+) v(n, dd, h, estado, motivo)
+cross join lateral (
+  select tstzrange(s, s + interval '20 minutes', '[)') as h
+  from personal.turno t
+  cross join generate_series(lower(t.periodo), upper(t.periodo) - interval '20 minutes', interval '20 minutes') s
+  where t.persona_id = pg_temp.persona('MED') and t.estado = 'publicado'
+    and (lower(t.periodo) at time zone 'America/El_Salvador')::date = pg_temp.hoy() + v.dd
+    and not exists (select 1 from atencion.cita o where o.estado in ('solicitada', 'confirmada')
+                    and (o.medico_id = pg_temp.persona('MED') or o.paciente_id = pg_temp.did('0001', 4))
+                    and o.horario && tstzrange(s, s + interval '20 minutes', '[)'))
+  order by s < pg_temp.ts(pg_temp.hoy() + v.dd, v.h), s limit 1) f
+where not exists (select 1 from atencion.cita c where c.id = pg_temp.did('0004', 5000 + v.n))
+on conflict do nothing;
+
+-- 14c. Reprogramaciones (CITA-02): cuatro pendientes (la primera, si la hay, de la paciente de la cuenta PAC), una rechazada y
+--      una vencida. La franja pedida es del mismo médico, dentro de un turno publicado suyo y libre para médico y paciente.
+insert into atencion.reprogramacion (id, cita_id, medico_id, horario, estado, origen, motivo, motivo_rechazo, solicitado_por,
+  decidido_por, decidido_en, creado_en)
+select pg_temp.did('0008', x.r), x.cita, x.medico, f.h,
+       case when x.r <= 4 then 'pendiente' when x.r = 5 then 'rechazada' else 'vencida' end,
+       case when x.r in (1, 3, 5) then 'paciente' else 'recepcion' end,
+       '[DEMO] ' || pg_temp.pick(array['El paciente pidió cambiar la hora por el trabajo', 'Recepción propone otra hora porque el médico tiene junta',
+         'La paciente viaja ese día y pide la semana siguiente', 'El familiar que lo acompaña no puede ese día',
+         'Pidió una hora más temprano', 'Pidió cambio, pero no se respondió a tiempo'], x.r),
+       case when x.r = 5 then '[DEMO] El médico no tiene cupo en esa franja; se ofreció otra hora por teléfono' end,
+       case when x.r in (1, 3, 5) then pg_temp.actor('PAC') else pg_temp.actor('REC') end,
+       case when x.r = 5 then pg_temp.actor('REC') end,
+       case when x.r = 5 then now() - interval '2 hours' end,
+       now() - x.r * interval '3 hours'
+from (
+  select (row_number() over (order by (c.paciente_id = pg_temp.did('0001', 4)) desc, c.id))::int as r, c.id as cita, c.medico_id as medico,
+         c.paciente_id as paciente, c.horario
+  from atencion.cita c
+  where c.id::text like 'de300000-%' and c.estado = 'confirmada' and lower(c.horario) > now() + interval '1 day'
+    and not exists (select 1 from atencion.solicitud_cita s where s.cita_id = c.id)
+  order by (c.paciente_id = pg_temp.did('0001', 4)) desc, c.id limit 6) x
+cross join lateral (
+  select tstzrange(s, s + interval '20 minutes', '[)') as h
+  from personal.turno t
+  cross join generate_series(lower(t.periodo), upper(t.periodo) - interval '20 minutes', interval '20 minutes') s
+  where t.persona_id = x.medico and t.estado = 'publicado' and lower(t.periodo) > upper(x.horario)
+    and not exists (select 1 from atencion.cita o where o.medico_id = x.medico and o.estado in ('solicitada', 'confirmada')
+                    and o.horario && tstzrange(s, s + interval '20 minutes', '[)'))
+    and not exists (select 1 from atencion.cita o where o.paciente_id = x.paciente and o.estado in ('solicitada', 'confirmada')
+                    and o.horario && tstzrange(s, s + interval '20 minutes', '[)'))
+  order by s limit 1) f
+on conflict do nothing;
+
+-- 14d. Dos solicitudes por categoría más, por asignar: una de la paciente de la cuenta PAC y otra que pide a la cardióloga
+--      demo, que no tiene ningún turno (no hay a quién asignarla: el caso «no hay médico disponible»).
+insert into atencion.solicitud_cita (id, paciente_id, categorias, medico_preferido_id, franja, nota, estado, creado_por, creado_en)
+select pg_temp.did('0007', v.r), pg_temp.did('0001', v.pac), v.cats, v.medico, v.franja, v.nota, 'pendiente', v.por, now() - v.hace
+from (values
+  (31, 4,  array['consulta_general'], null::uuid, 'manana',
+       '[DEMO] Pedida desde la app por la cuenta PAC de prueba: control general', pg_temp.actor('PAC'), interval '40 minutes'),
+  (32, 12, array['corazon'], pg_temp.did('0002', 4), 'cualquiera',
+       '[DEMO] Pide a la Dra. Salazar Magaña, que no tiene turnos: no hay médico disponible para asignarla', null::uuid, interval '5 hours')
+) v(r, pac, cats, medico, franja, nota, por, hace)
+where exists (select 1 from pacientes.paciente where id = pg_temp.did('0001', v.pac))
+  and (v.medico is null or exists (select 1 from personal.persona where id = v.medico))
+on conflict do nothing;
+
+-- 14e. Laboratorio: «Resultados por revisar» del médico (dos críticos pendientes, uno revisado y una observación) e
+--      informes externos que no son texto. Los adjuntos guardan solo la referencia (ruta nula): la semilla no sube
+--      archivos a Storage; la pantalla los muestra como informe sin archivo.
+insert into laboratorio.pendiente_medico (id, orden_id, paciente_id, medico_id, motivo, detalle, estado, creado_en, actualizado_en,
+  revisado_en, revisado_por)
+select pg_temp.did('0009', x.r), x.id, x.paciente_id, x.medico_id, x.motivo,
+       case x.motivo when 'critico' then '[DEMO] Valor crítico liberado por laboratorio: avisar al paciente y decidir conducta'
+            else '[DEMO] Observación del laboratorio: muestra levemente hemolizada, interpretar con cautela' end,
+       case when x.r = 3 then 'revisado' else 'pendiente' end,
+       coalesce(x.revisada_en, now()) - interval '30 minutes', now() - interval '10 minutes',
+       case when x.r = 3 then now() - interval '10 minutes' end,
+       case when x.r = 3 then pg_temp.actor('MED') end
+from (
+  select (row_number() over (order by z.grupo, z.id))::int as r, z.* from (
+    (select 1 as grupo, o.id, o.paciente_id, o.medico_id, o.revisada_en, 'critico' as motivo from laboratorio.orden o
+      where o.id::text like 'de300000-%' and o.estado = 'completado'
+        and exists (select 1 from laboratorio.orden_item i join laboratorio.resultado s on s.orden_item_id = i.id
+                    where i.orden_id = o.id and s.marca like 'critico%')
+      order by o.id limit 3)
+    union all
+    (select 2, o.id, o.paciente_id, o.medico_id, o.revisada_en, 'observacion' from laboratorio.orden o
+      where o.id::text like 'de300000-%' and o.estado = 'completado'
+        and not exists (select 1 from laboratorio.orden_item i join laboratorio.resultado s on s.orden_item_id = i.id
+                        where i.orden_id = o.id and s.marca like 'critico%')
+      order by o.id limit 1)) z) x
+on conflict do nothing;
+
+insert into laboratorio.adjunto (id, orden_id, nombre_archivo, tipo_mime, tamano_bytes, nota, subido_por, subido_en)
+select pg_temp.did('0014', v.n), o.id, v.nombre, v.mime, v.bytes, v.nota, pg_temp.actor('LAB'), now() - v.hace
+from (values
+  (1, 'radiografia-torax-pa.jpg', 'image/jpeg', 845312, '[DEMO] Radiografía de tórax PA de un centro externo: resultado que no es texto', interval '1 day'),
+  (2, 'informe-ultrasonido-abdominal.pdf', 'application/pdf', 214016, '[DEMO] Informe de ultrasonido abdominal en PDF, firmado por el radiólogo externo', interval '20 hours')
+) v(n, nombre, mime, bytes, nota, hace)
+cross join lateral (select o.id from laboratorio.orden o where o.id::text like 'de300000-%' and o.estado = 'completado'
+                    order by (o.paciente_id = pg_temp.did('0001', 4)) desc, o.id limit 1) o
+on conflict do nothing;
+
+-- 14f. Avisos de cada nivel para el personal (informativo, importante, crítico) y uno dirigido solo al área de emergencia.
+insert into publico.aviso (id, titulo, cuerpo, vigencia, publicado_por, prioridad, publico, roles, nivel, areas) values
+  (pg_temp.did('0090', 40), 'Nueva guía de triaje',
+     '[DEMO] Aviso informativo para el personal clínico: la guía de triaje actualizada está en la carpeta compartida.',
+     tstzrange(now() - interval '2 hours', now() + interval '7 days', '[)'), pg_temp.actor('ADM'), 'atencion', false, array['MED','ENF','REC'], 'informativo', '{}'),
+  (pg_temp.did('0090', 41), 'Faltan insumos en la bodega de urgencias',
+     '[DEMO] Aviso importante: hay artículos bajo el mínimo en la bodega de urgencias; pide reposición antes del fin de turno.',
+     tstzrange(now() - interval '1 hour', now() + interval '3 days', '[)'), pg_temp.actor('ADM'), 'urgente', false, array['ENF','JOP'], 'importante', '{}'),
+  (pg_temp.did('0090', 42), 'Emergencia sin médico esta noche',
+     '[DEMO] Aviso crítico: la noche del día +3 la emergencia queda sin médico de turno; Jefatura debe cubrir el hueco.',
+     tstzrange(now() - interval '30 minutes', now() + interval '4 days', '[)'), pg_temp.actor('ADM'), 'critico', false, array['JOP','ADM','MED'], 'critico', '{}'),
+  (pg_temp.did('0090', 43), 'Simulacro de código azul en emergencia',
+     '[DEMO] Aviso dirigido solo al personal del área de emergencia (por área, no por rol).',
+     tstzrange(now() - interval '30 minutes', now() + interval '2 days', '[)'), pg_temp.actor('ADM'), 'urgente', false, '{}', 'importante', array['P1-EMG'])
+on conflict do nothing;
+
+-- 14g. Bitácora de la ambulancia: mantenimiento preventivo de la semana pasada (salió y volvió a estar disponible).
+insert into ambulancia.cambio_estado (unidad_id, desde, hacia, motivo, por, en)
+select u.id, v.desde, v.hacia, v.motivo, pg_temp.actor('JOP'), now() - v.hace
+from ambulancia.unidad u
+cross join (values
+  ('disponible', 'en_mantenimiento', '[DEMO] Mantenimiento preventivo: cambio de aceite y revisión de frenos', interval '6 days'),
+  ('en_mantenimiento', 'disponible', '[DEMO] Mantenimiento terminado: la unidad vuelve a estar disponible', interval '6 days' - interval '5 hours')
+) v(desde, hacia, motivo, hace)
+where not exists (select 1 from ambulancia.cambio_estado c where c.motivo = v.motivo);
+
+-- 14h. «Quién vio mi expediente» (FR-110-08): lecturas del expediente de la paciente de la cuenta PAC por las cuentas de
+--      prueba del personal. plataforma.auditoria es de solo inserción y encadenada: cada fila se firma igual que en la API
+--      (api/src/platform/command.service.ts: sha256 del hash anterior y del evento canónico), así la verificación de la
+--      cadena sigue en verde. NO se borran al limpiar (la cadena no admite huecos); evento_id fijo de300000-0098-..., así
+--      sembrar de nuevo no las repite.
+do $$
+declare
+  v_pac uuid := (select paciente_id from acceso.usuario where id = (select usuario_id from pg_temp.cuentas where rol = 'PAC'));
+  r record;
+  v_actor uuid;
+  v_prev bytea;
+  v_at timestamptz;
+  v_det text := '{"nota":"[DEMO] Lectura sembrada para la pantalla Quien vio mi expediente"}';
+  v_ev text;
+begin
+  if v_pac is null or v_pac::text not like 'de300000-%' then return; end if;
+  perform pg_advisory_xact_lock(671003);
+  for r in select * from (values
+      (1, 'MED', 'expediente.leer',   'paciente',          true,  'expediente.ver',   interval '6 days 2 hours'),
+      (2, 'MED', 'consulta.leer',     'consulta',          false, 'expediente.ver',   interval '6 days 1 hour'),
+      (3, 'ENF', 'signos.leer',       'signos_vitales',    false, 'signos.registrar', interval '3 days 4 hours'),
+      (4, 'LAB', 'laboratorio.leer',  'orden_laboratorio', false, 'laboratorio.ver',  interval '2 days 5 hours'),
+      (5, 'REC', 'citas.leer',        'cita',              false, 'citas.ver',        interval '1 day 3 hours'),
+      (6, 'MED', 'expediente.leer',   'paciente',          true,  'expediente.ver',   interval '5 hours'),
+      (7, 'ENF', 'expediente.leer',   'paciente',          true,  'expediente.ver',   interval '2 hours')
+    ) v(n, rol, accion, entidad, con_id, permiso, hace)
+  loop
+    continue when exists (select 1 from plataforma.auditoria where evento_id = pg_temp.did('0098', r.n));
+    v_actor := (select usuario_id from pg_temp.cuentas where rol = r.rol);
+    continue when v_actor is null;
+    v_prev := coalesce((select hash from plataforma.auditoria order by seq desc limit 1), decode(repeat('00', 32), 'hex'));
+    v_at := date_trunc('milliseconds', now() - r.hace);
+    -- Claves en orden alfabético, como canonical() de la API.
+    v_ev := '{"action":' || to_json(r.accion)::text
+         || ',"actorId":' || to_json(v_actor::text)::text
+         || ',"actorRole":' || to_json(r.rol)::text
+         || ',"at":' || to_json(to_char(v_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"'))::text
+         || ',"detailHash":' || to_json(encode(sha256(convert_to(v_det, 'UTF8')), 'hex'))::text
+         || ',"entity":' || to_json(r.entidad)::text
+         || case when r.con_id then ',"entityId":' || to_json(v_pac::text)::text else '' end
+         || ',"id":' || to_json(pg_temp.did('0098', r.n)::text)::text
+         || ',"patientId":' || to_json(v_pac::text)::text
+         || ',"permission":' || to_json(r.permiso)::text
+         || ',"result":"exito"}';
+    insert into plataforma.auditoria (evento_id, registrado_en, actor_id, actor_rol, permiso, accion, entidad, entidad_id, paciente_id,
+      motivo, resultado, detalle, hash_previo, hash)
+    values (pg_temp.did('0098', r.n), v_at, v_actor, r.rol, r.permiso, r.accion, r.entidad, case when r.con_id then v_pac::text end, v_pac,
+      null, 'exito', v_det::jsonb || jsonb_build_object('canonicalEvent', v_ev), v_prev,
+      sha256(v_prev || convert_to(v_ev, 'UTF8')));
+  end loop;
+end $$;
 
 commit;
