@@ -1,5 +1,6 @@
 import { useEffect,useState } from 'react';
 import { Notice } from '../../components/ui';
+import { CrudButton } from '../../components/system';
 import { formatDateTime } from '../common';
 import { channelNames,minutesBetween,requesterLabel,waitingLabel,type AmbulanceRequest,type AmbulanceStatus } from './types';
 
@@ -36,8 +37,8 @@ function RequestDetail({request:r,now,available,block,onDispatch,onDiscard}:{req
    <div><dt>Motivo de la llamada</dt><dd>{r.reason}</dd></div>
    <div><dt>Recibida</dt><dd>{formatDateTime(r.createdAt)} · {waitingLabel(wait).toLowerCase()}</dd></div>
   </dl>
-  {!available&&block&&<Notice kind="info"><strong>No se puede despachar ahora.</strong> {block.message} {block.code==='en_servicio'?'Despacha cuando la unidad termine ese servicio.':block.action}</Notice>}
-  <div className="row-actions amb-request-actions"><button type="button" className="primary-button" disabled={!available} onClick={()=>onDispatch(r)}>Confirmar y despachar</button><button type="button" className="secondary-button" onClick={()=>onDiscard(r)}>Descartar</button></div>
+  {!available&&block&&<Notice kind={block.code==='en_servicio'?'warning':'error'}><strong>No se puede despachar ahora.</strong> {block.message} {block.code==='en_servicio'?'Despacha cuando la unidad termine ese servicio.':block.action}</Notice>}
+  <div className="row-actions amb-request-actions"><button type="button" className="primary-button" disabled={!available} onClick={()=>onDispatch(r)}>Confirmar y despachar</button><CrudButton kind="deactivate" label="Descartar" onClick={()=>onDiscard(r)}/></div>
   {!available&&!block&&<p className="muted">La unidad no está disponible; confirma por teléfono y despacha cuando vuelva a estarlo.</p>}
  </article>;
 }

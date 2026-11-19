@@ -8,6 +8,7 @@ import { DiscardForm,DispatchForm,PhoneRequestForm } from './ambulance/dialogs';
 import { MaintenancePanel } from './ambulance/maintenance';
 import { RequestsBoard } from './ambulance/requests';
 import { CrewAction,CrewCoverage,missingCrew } from './ambulance/crew';
+import { CrewCoverageWarning,DispatchBlockStrip,ReadinessItem,noActiveService } from './ambulance/readiness';
 import { AdminCloseAction } from './ambulance/admin-close';
 import { useQuickAction } from './personal/accion';
 import { isUnclosed,mapLink,milestoneNames,priorityLevel,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type PrehospitalView } from './ambulance/types';
@@ -18,7 +19,9 @@ const signNames:Record<string,string>={heartRate:'Frecuencia cardiaca',systolic:
 function beep(){try{const Ctx=(window as unknown as {AudioContext?:typeof AudioContext}).AudioContext;if(!Ctx)return;const ctx=new Ctx(),osc=ctx.createOscillator();osc.frequency.value=880;osc.connect(ctx.destination);osc.start();osc.stop(ctx.currentTime+0.25);}catch{/* sin audio */}}
 /** W18 Centro de despacho (FR-109-01, 04, 07): estado, solicitudes por confirmar, servicio activo con hitos y prehospital; todo se vuelve a pedir con la versión del canal en vivo. */
 export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfile;version:number}){
- const data=useData<AmbulanceStatus>(api,'/ambulancia',version),manage=can(profile,'ambulancia.mantenimiento');
+ const data=useData<AmbulanceStatus>(api,'/ambulancia',version);
+ // Lote 5 S8: who may put the unit in maintenance is the API's `canSetMaintenance` (Jefatura or the crew); an older API without it falls back to the permission.
+ const manage=data.data&&typeof data.data.canSetMaintenance==='boolean'?data.data.canSetMaintenance:can(profile,'ambulancia.mantenimiento');
  const dispatcher=can(profile,'ambulancia.despachar'),phoneDesk=profile.permissions.some(p=>p.code==='ambulancia.solicitar'&&p.context!=='propio'),receiver=can(profile,'ambulancia.recibir_prehospital');
  const [dispatching,setDispatching]=useState<AmbulanceRequest|'direct'|null>(null),[discarding,setDiscarding]=useState<AmbulanceRequest|null>(null),[calling,setCalling]=useState(false),[report,setReport]=useState<string|null>(null);
  const pendingCount=data.data?.pendingRequests?.length??0,previous=useRef<number|null>(null);
@@ -33,8 +36,9 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Centro de despacho" actions={phoneDesk?<CrudButton kind="create" label="Registrar llamada" onClick={()=>setCalling(true)}/>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
   {/* Owner obs. 19: one status strip with everything base: unit and its real state, crew by name, the active service,
       and, when the unit cannot be dispatched, why and what to do. «Disponible» never sits next to a dispatch block. */}
-  <div className="amb-unit"><div className="amb-unit-id"><span className="sr-only">Unidad</span><strong className="nowrap-code">{s.unit.plate}</strong><UnitBadge status={s}/></div><div className="amb-unit-crew"><CrewCoverage status={s}/><div className={s.activeService?'':'is-missing'}><span>Servicio</span><strong>{s.activeService?`En curso · ${typeNames[s.activeService.type]??s.activeService.type}`:'Sin servicio activo'}</strong></div></div>
-   {s.dispatchBlock&&<section className="amb-unit-block" aria-label="Despacho bloqueado"><p><Icon name="alert" size={18}/><span><strong>No se puede despachar.</strong> {s.dispatchBlock.message}{dispatcher&&blockAction(s)?<> {blockAction(s)}</>:null}</span></p>{dispatcher&&closeInNotice(s)&&<p className="amb-crew-next"><AdminCloseAction api={api} service={s.activeService!} onSaved={()=>saved(ADMIN_CLOSED)}/></p>}{dispatcher&&missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}</div>
+  <div className="amb-unit"><div className="amb-unit-id"><span className="sr-only">Unidad</span><strong className="nowrap-code">{s.unit.plate}</strong><UnitBadge status={s}/></div><div className="amb-unit-crew" role="list" aria-label="Preparación de la unidad"><ReadinessItem state={noActiveService(s)?'ok':'busy'} label="Servicio" value={s.activeService?`En curso · ${typeNames[s.activeService.type]??s.activeService.type}`:noActiveService(s)?'Sin servicio activo':'Servicio en curso'}/><CrewCoverage status={s}/></div>
+   <DispatchBlockStrip status={s} action={dispatcher?blockAction(s):undefined}>{dispatcher&&closeInNotice(s)&&<p className="amb-crew-next"><AdminCloseAction api={api} service={s.activeService!} onSaved={()=>saved(ADMIN_CLOSED)}/></p>}{dispatcher&&missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</DispatchBlockStrip></div>
+  {(dispatcher||manage)&&<CrewCoverageWarning api={api} version={version}/>}
   {done&&<Notice kind="success">{done}</Notice>}
   {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} closeAbove={dispatcher&&closeInNotice(s)} onSaved={saved} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:null}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
