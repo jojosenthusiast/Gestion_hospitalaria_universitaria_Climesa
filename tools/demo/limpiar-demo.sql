@@ -25,9 +25,27 @@
 --   * atencion.contador_fila: los números de fila ya emitidos no se reutilizan (quedan huecos en la numeración).
 --   * La vinculación de las cuentas de prueba a una persona demo (solo cuando la cuenta no tenía persona) se
 --     deshace; la cuenta no se borra ni se modifica de otro modo.
+--
+-- Lote 5 (S17): la sección 0 borra además lo que crearon las cuentas de prueba (ver su cabecera).
+--
+-- CONFIRMACIÓN OBLIGATORIA: este archivo borra datos. Solo corre si antes, en la misma sesión, se ejecuta
+--   set demo.confirmar = 'limpiar';
+-- tools/demo/demo.cjs lo hace solo con «limpiar --ejecutar» o «reiniciar --ejecutar». Sin esa marca se detiene sin
+-- borrar nada. Para ver antes qué cambiaría: node tools/demo/demo.cjs limpiar (simulación, deshace todo al final).
 -- ============================================================================================================
 
 begin;
+
+do $$ begin
+  if coalesce(current_setting('demo.confirmar', true), '') <> 'limpiar' then
+    raise exception 'limpiar-demo.sql borra datos: ejecuta antes  set demo.confirmar = ''limpiar'';  o usa  node tools/demo/demo.cjs limpiar --ejecutar';
+  end if;
+end $$;
+
+-- Misma regla de cuentas de prueba que semilla-demo.sql.
+create or replace function pg_temp.es_cuenta_prueba(correo text) returns boolean language sql immutable as
+$$ select lower(coalesce(correo, '')) ~ '^(prueba\.[a-z0-9._-]+|admin)@climesa\.com$'
+       or lower(coalesce(correo, '')) ~ '^(prueba\.)?(adm|jop|dpd|rec|ast|enf|med|lab|par|pac)@example\.test$' $$;
 
 create or replace function pg_temp.paciente_en_uso(p uuid) returns boolean language sql stable as $$
   select exists (select 1 from atencion.cita where paciente_id = p)
@@ -69,6 +87,168 @@ create or replace function pg_temp.espacio_en_uso(e uuid) returns boolean langua
       or exists (select 1 from infra.limpieza_cama where cama_id = e)
       or exists (select 1 from infra.bloqueo_cama where cama_id = e)
       or exists (select 1 from atencion.ticket_fila where consultorio_id = e) $$;
+
+-- ---------------------------------------------------------------------------------------------------------
+-- 0. Datos que crearon las cuentas de prueba (Lote 5, S17)
+--    Cuentas de prueba: prueba.<algo>@climesa.com, admin@climesa.com (y <rol>@example.test en pruebas locales); la
+--    misma regla que en semilla-demo.sql y conteo-demo.sql. Las cuentas NO se borran ni cambian, salvo que la cuenta PAC
+--    de prueba se separa de su expediente. Se borra lo que esas cuentas crearon o atienden al probar, cuando su id no es
+--    demo (lo demo sale en las secciones 1 a 8):
+--      * turnos de las personas de personal de las cuentas de prueba;
+--      * citas creadas por ellas o de su médico, solicitudes por categoría y números de fila emitidos por ellas, y todo
+--        lo del expediente unido a la cuenta PAC de prueba;
+--      * consultas de su médico (con diagnósticos, recetas, signos y addendum), órdenes de laboratorio de su médico o de
+--        esas consultas, admisiones que crearon o que atiende su médico (con camas, traslados, altas y notas), servicios
+--        de ambulancia que despacharon o en los que fue su paramédico, solicitudes de ambulancia que registraron;
+--      * avisos que publicaron, «Enterado» que marcaron, solicitudes de vinculación no aprobadas, bloqueos de cama que
+--        crearon, limpiezas pendientes de camas de esas admisiones, casos de duplicado que abrieron, y los expedientes
+--        que crearon si ya nada los usa.
+--    Se conserva (lo dice un NOTICE): una cita o número que una consulta de otra cuenta usa. No se tocan inventario
+--    (los movimientos ya cambiaron las existencias), invitaciones, plantillas de turnos ni la auditoría.
+-- ---------------------------------------------------------------------------------------------------------
+create temp table cp_usuario on commit drop as
+  select id from acceso.usuario where id::text not like 'de300000-%' and pg_temp.es_cuenta_prueba(correo);
+create temp table cp_persona on commit drop as
+  select distinct persona_personal_id as id from acceso.usuario where id in (select id from cp_usuario) and persona_personal_id is not null;
+create temp table cp_paciente on commit drop as
+  select distinct paciente_id as id from acceso.usuario where id in (select id from cp_usuario) and paciente_id is not null;
+
+create temp table cp_consulta on commit drop as
+  select id from atencion.consulta where id::text not like 'de300000-%'
+    and (medico_id in (select id from cp_persona) or paciente_id in (select id from cp_paciente));
+create temp table cp_cita on commit drop as
+  select id from atencion.cita where id::text not like 'de300000-%'
+    and (medico_id in (select id from cp_persona) or creado_por in (select id from cp_usuario) or paciente_id in (select id from cp_paciente));
+create temp table cp_ticket on commit drop as
+  select id from atencion.ticket_fila where id::text not like 'de300000-%'
+    and (emitido_por in (select id from cp_usuario) or paciente_id in (select id from cp_paciente));
+create temp table cp_solicitud on commit drop as
+  select id from atencion.solicitud_cita where id::text not like 'de300000-%'
+    and (creado_por in (select id from cp_usuario) or paciente_id in (select id from cp_paciente));
+create temp table cp_servicio on commit drop as
+  select s.id from ambulancia.servicio s where s.id::text not like 'de300000-%'
+    and (s.despachado_por in (select id from cp_usuario) or s.paciente_id in (select id from cp_paciente)
+         or exists (select 1 from ambulancia.tripulacion t where t.servicio_id = s.id and t.persona_id in (select id from cp_persona)));
+create temp table cp_solicitud_amb on commit drop as
+  select id from ambulancia.solicitud where id::text not like 'de300000-%'
+    and (registrada_por in (select id from cp_usuario) or solicitante_usuario_id in (select id from cp_usuario) or paciente_id in (select id from cp_paciente));
+create temp table cp_admision on commit drop as
+  select id from hospitalizacion.admision where id::text not like 'de300000-%'
+    and (creado_por in (select id from cp_usuario) or medico_tratante_id in (select id from cp_persona) or paciente_id in (select id from cp_paciente)
+         or (origen = 'consulta' and origen_id in (select id from cp_consulta)) or (origen = 'cita' and origen_id in (select id from cp_cita))
+         or (origen = 'emergencia' and origen_id in (select id from cp_ticket)) or (origen = 'ambulancia' and origen_id in (select id from cp_servicio)));
+create temp table cp_orden on commit drop as
+  select id from laboratorio.orden where id::text not like 'de300000-%'
+    and (medico_id in (select id from cp_persona) or paciente_id in (select id from cp_paciente)
+         or consulta_id in (select id from cp_consulta) or admision_id in (select id from cp_admision));
+
+-- Lo que otra cuenta todavía usa se queda (llaves foráneas reales): citas y números de una consulta ajena, citas de una
+-- solicitud, número, reprogramación, propuesta o cita reprogramada ajenas, y solicitudes de un servicio ajeno.
+delete from cp_cita c where exists (select 1 from atencion.consulta k where k.cita_id = c.id and k.id not in (select id from cp_consulta))
+  or exists (select 1 from atencion.solicitud_cita s where s.cita_id = c.id and s.id not in (select id from cp_solicitud))
+  or exists (select 1 from atencion.ticket_fila t where t.cita_id = c.id and t.id not in (select id from cp_ticket))
+  or exists (select 1 from laboratorio.propuesta_cita p where p.cita_id = c.id and p.orden_id not in (select id from cp_orden))
+  or exists (select 1 from atencion.cita o where o.reprogramada_de = c.id and o.id not in (select id from cp_cita));
+delete from cp_ticket t where exists (select 1 from atencion.consulta k where k.ticket_id = t.id and k.id not in (select id from cp_consulta));
+delete from cp_solicitud_amb a where exists (select 1 from ambulancia.servicio s where s.solicitud_id = a.id and s.id not in (select id from cp_servicio));
+
+-- 0.1 Ambulancia
+delete from ambulancia.ubicacion where servicio_id in (select id from cp_servicio);
+delete from ambulancia.reporte_prehospital where servicio_id in (select id from cp_servicio);
+do $$ begin
+  if to_regclass('ambulancia.hito_anulado') is not null then
+    execute 'delete from ambulancia.hito_anulado where servicio_id in (select id from cp_servicio)';
+  end if;
+  if exists (select 1 from pg_trigger where tgrelid = 'ambulancia.hito'::regclass and tgname = 'hito_borrado_guardia') then
+    execute 'alter table ambulancia.hito disable trigger hito_borrado_guardia';
+  end if;
+end $$;
+delete from ambulancia.hito where servicio_id in (select id from cp_servicio);
+do $$ begin
+  if exists (select 1 from pg_trigger where tgrelid = 'ambulancia.hito'::regclass and tgname = 'hito_borrado_guardia') then
+    execute 'alter table ambulancia.hito enable trigger hito_borrado_guardia';
+  end if;
+end $$;
+delete from ambulancia.tripulacion where servicio_id in (select id from cp_servicio);
+delete from ambulancia.servicio where id in (select id from cp_servicio);
+delete from ambulancia.solicitud where id in (select id from cp_solicitud_amb);
+-- Si el servicio activo era de una cuenta de prueba, la unidad queda disponible (sin servicio no puede seguir En Servicio).
+update ambulancia.unidad u set estado = 'disponible', version = u.version + 1
+where u.estado = 'en_servicio' and not exists (select 1 from ambulancia.servicio s where s.unidad_id = u.id and s.finalizado_en is null);
+
+-- 0.2 Laboratorio
+delete from laboratorio.adjunto where orden_id in (select id from cp_orden);
+delete from laboratorio.pendiente_medico where orden_id in (select id from cp_orden);
+delete from laboratorio.propuesta_cita where orden_id in (select id from cp_orden);
+delete from laboratorio.resultado_historial where orden_item_id in (select i.id from laboratorio.orden_item i where i.orden_id in (select id from cp_orden));
+delete from laboratorio.resultado where orden_item_id in (select i.id from laboratorio.orden_item i where i.orden_id in (select id from cp_orden));
+delete from laboratorio.orden_item where orden_id in (select id from cp_orden);
+delete from laboratorio.orden where id in (select id from cp_orden);
+
+-- 0.3 Hospitalización y camas
+delete from infra.limpieza_cama l where l.id::text not like 'de300000-%' and l.verificada_en is null
+  and l.cama_id in (select o.cama_id from hospitalizacion.ocupacion_cama o where o.admision_id in (select id from cp_admision));
+delete from hospitalizacion.nota_enfermeria where admision_id in (select id from cp_admision);
+delete from hospitalizacion.alta where admision_id in (select id from cp_admision);
+delete from hospitalizacion.cambio_tratante where admision_id in (select id from cp_admision);
+delete from hospitalizacion.traslado where admision_id in (select id from cp_admision);
+delete from hospitalizacion.reserva_cama where admision_id in (select id from cp_admision);
+delete from hospitalizacion.ocupacion_cama where admision_id in (select id from cp_admision);
+delete from hospitalizacion.admision where id in (select id from cp_admision);
+delete from infra.bloqueo_cama where id::text not like 'de300000-%' and creado_por in (select id from cp_usuario);
+
+-- 0.4 Atención clínica (los cuatro disparadores *_consulta_abierta se desactivan solo aquí, como en la sección 5)
+alter table atencion.diagnostico disable trigger diagnostico_consulta_abierta;
+alter table atencion.receta disable trigger receta_consulta_abierta;
+alter table atencion.receta_item disable trigger receta_item_consulta_abierta;
+alter table atencion.signos_vitales disable trigger signos_consulta_abierta;
+delete from atencion.diagnostico where consulta_id in (select id from cp_consulta);
+delete from atencion.receta_item where receta_id in (select id from atencion.receta where consulta_id in (select id from cp_consulta));
+delete from atencion.receta where consulta_id in (select id from cp_consulta);
+delete from atencion.signos_vitales where id::text not like 'de300000-%'
+  and (consulta_id in (select id from cp_consulta) or admision_id in (select id from cp_admision));
+alter table atencion.diagnostico enable trigger diagnostico_consulta_abierta;
+alter table atencion.receta enable trigger receta_consulta_abierta;
+alter table atencion.receta_item enable trigger receta_item_consulta_abierta;
+alter table atencion.signos_vitales enable trigger signos_consulta_abierta;
+delete from atencion.addendum where consulta_id in (select id from cp_consulta);
+delete from atencion.relacion_atencion where id::text not like 'de300000-%'
+  and (origen_id in (select id from cp_consulta union select id from cp_admision) or profesional_id in (select id from cp_persona));
+delete from atencion.consulta where id in (select id from cp_consulta);
+delete from atencion.reprogramacion where id::text not like 'de300000-%'
+  and (cita_id in (select id from cp_cita) or cita_nueva_id in (select id from cp_cita) or solicitado_por in (select id from cp_usuario));
+delete from atencion.solicitud_cita where id in (select id from cp_solicitud);
+delete from atencion.ticket_fila where id in (select id from cp_ticket);
+delete from atencion.cita where id in (select id from cp_cita);
+
+-- 0.5 Turnos, avisos, vinculaciones y duplicados
+delete from personal.turno where id::text not like 'de300000-%' and persona_id in (select id from cp_persona);
+delete from publico.aviso_enterado where usuario_id in (select id from cp_usuario)
+  or aviso_id in (select id from publico.aviso where id::text not like 'de300000-%' and publicado_por in (select id from cp_usuario));
+delete from publico.aviso where id::text not like 'de300000-%' and publicado_por in (select id from cp_usuario);
+delete from acceso.vinculacion_paciente where id::text not like 'de300000-%' and usuario_id in (select id from cp_usuario) and estado <> 'aprobada';
+delete from pacientes.caso_duplicado where id::text not like 'de300000-%' and abierto_por in (select id from cp_usuario);
+
+-- 0.6 La cuenta PAC de prueba se separa de su expediente (la semilla la une a la paciente demo 4) y se borran los
+--     expedientes que crearon las cuentas de prueba, si ya ningún dato los usa.
+update acceso.usuario set paciente_id = null, version = version + 1 where id in (select id from cp_usuario) and paciente_id is not null;
+create temp table cp_paciente_borrar on commit drop as
+  select id from pacientes.paciente where id::text not like 'de300000-%' and creado_por in (select id from cp_usuario)
+    and not pg_temp.paciente_en_uso(id);
+delete from pacientes.caso_duplicado where pacientes_ids && array(select id from cp_paciente_borrar);
+delete from pacientes.historial_demografico where paciente_id in (select id from cp_paciente_borrar);
+delete from pacientes.identificador where paciente_id in (select id from cp_paciente_borrar);
+delete from pacientes.paciente where id in (select id from cp_paciente_borrar);
+
+do $$
+declare
+  v_citas int := (select count(*) from atencion.cita c where c.id::text not like 'de300000-%'
+                    and (c.medico_id in (select id from cp_persona) or c.creado_por in (select id from cp_usuario)));
+begin
+  if v_citas > 0 then
+    raise notice 'Se conservaron % cita(s) de cuentas de prueba porque una consulta, número o solicitud de otra cuenta las usa.', v_citas;
+  end if;
+end $$;
 
 -- Estado previo de la unidad de ambulancia, guardado por la semilla en la bitácora.
 create temp table unidad_previa on commit drop as
@@ -178,6 +358,8 @@ delete from atencion.consulta where id::text like 'de300000-%';
 -- Solicitudes de cita por categoría demo (S6) antes que sus citas asignadas. Las solicitudes reales se quedan, aunque
 -- sean de un paciente demo o prefieran a un médico demo (esos se conservan con el NOTICE de abajo).
 delete from atencion.solicitud_cita where id::text like 'de300000-%';
+-- Lote 5: reprogramaciones demo o sobre citas demo (las de otras cuentas sobre citas demo también: la cita se va).
+delete from atencion.reprogramacion where id::text like 'de300000-%' or cita_id::text like 'de300000-%' or cita_nueva_id::text like 'de300000-%';
 -- Cita o número usados por una consulta real se conservan (la consulta real los referencia); igual una cita que asignó una
 -- solicitud por motivo (atencion.solicitud_cita.cita_id).
 delete from atencion.ticket_fila t where t.id::text like 'de300000-%' and not exists (select 1 from atencion.consulta c where c.ticket_id = t.id);
@@ -225,6 +407,9 @@ delete from acceso.vinculacion_paciente where id::text like 'de300000-%' or usua
 delete from publico.aviso_enterado where usuario_id::text like 'de300000-%';
 delete from acceso.asignacion_rol where usuario_id::text like 'de300000-%';
 delete from acceso.usuario where id::text like 'de300000-%';
+-- Lote 5: la cuenta PAC de prueba unida a la paciente demo se separa (la ficha demo se borra abajo).
+update acceso.usuario set paciente_id = null, version = version + 1
+where paciente_id::text like 'de300000-%' and id::text not like 'de300000-%' and pg_temp.es_cuenta_prueba(correo);
 
 -- ---------------------------------------------------------------------------------------------------------
 -- 8. Pacientes: solo los que ningún dato real usa; sus hijos salen con ellos

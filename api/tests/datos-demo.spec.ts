@@ -2,6 +2,8 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { createTestApp, TestApp } from './support/app';
 import { userId } from './support/database';
+import { AuditService } from '../src/platform/audit.service';
+const runner = require('../../tools/demo/demo.cjs') as { simulate: (db: unknown, steps: string[], execute?: boolean) => Promise<{ before: Record<string, number>; after: Record<string, number>; changes: Array<{ tabla: string; diferencia: number }> }>; readOnlyCount: (db: unknown) => Promise<Array<{ tabla: string; demo: number; cuentas_prueba: number }>> };
 
 /**
  * Datos de demostración (tools/demo): la semilla es idempotente y respeta todas las restricciones del esquema;
@@ -11,7 +13,10 @@ jest.setTimeout(240000);
 
 const carpeta = resolve(__dirname, '../../tools/demo');
 const semilla = readFileSync(resolve(carpeta, 'semilla-demo.sql'), 'utf8');
-const limpieza = readFileSync(resolve(carpeta, 'limpiar-demo.sql'), 'utf8');
+const limpiezaSinConfirmar = readFileSync(resolve(carpeta, 'limpiar-demo.sql'), 'utf8');
+// Lote 5 (S17): la limpieza exige la confirmación explícita de la sesión antes de borrar.
+const limpieza = `set demo.confirmar = 'limpiar';
+${limpiezaSinConfirmar}`;
 
 const DEMO = "'de300000-%'";
 /** Tabla -> condición que identifica sus filas demo (id propio, o el padre demo cuando la tabla no tiene id). */
@@ -42,6 +47,10 @@ const TABLAS: Record<string, string> = {
   'atencion.relacion_atencion': `id::text LIKE ${DEMO}`,
   // Fase 2, S6: solicitudes de cita por categoría en todos los estados, para la bandeja de recepción.
   'atencion.solicitud_cita': `id::text LIKE ${DEMO}`,
+  // Lote 5 (S17): reprogramaciones, resultados por revisar del médico e informes externos que no son texto.
+  'atencion.reprogramacion': `id::text LIKE ${DEMO}`,
+  'laboratorio.pendiente_medico': `id::text LIKE ${DEMO}`,
+  'laboratorio.adjunto': `id::text LIKE ${DEMO}`,
   'laboratorio.orden': `id::text LIKE ${DEMO}`,
   'laboratorio.orden_item': `id::text LIKE ${DEMO}`,
   'laboratorio.resultado': `orden_item_id::text LIKE ${DEMO}`,
@@ -67,13 +76,13 @@ const TABLAS: Record<string, string> = {
 };
 /** Tablas de negocio que la semilla no puebla a propósito (ver README.md, sección "Lo que no se siembra"). */
 const SIN_SEMBRAR = ['atencion.contador_fila', 'acceso.acceso_excepcional', 'acceso.dispositivo_push', 'acceso.administrador_principal',
+  // plataforma.auditoria: la semilla agrega lecturas firmadas para «Quién vio mi expediente» (Lote 5), pero la limpieza no
+  // las borra nunca (cadena de solo inserción): por eso no está en TABLAS. La prueba de Lote 5 verifica la cadena.
   'pacientes.busqueda_registro', 'plataforma.auditoria', 'plataforma.outbox', 'plataforma.inbox', 'plataforma.idempotencia',
-  // Fase 0/1 (CITA-02): las solicitudes de reprogramación nacen solo del uso real.
-  'atencion.reprogramacion',
   // Historial de cambios de médico tratante (BL-03): nace de una acción de Jefatura, la demo no lo siembra.
   'hospitalizacion.cambio_tratante',
   // Fase 2, flujo C (S10): pendientes del médico, propuestas de cita y adjuntos externos nacen del uso real.
-  'laboratorio.pendiente_medico', 'laboratorio.propuesta_cita', 'laboratorio.adjunto',
+  'laboratorio.propuesta_cita',
   // Fase 2, flujo F: las plantillas de semana nacen de Jefatura; la demo no las siembra.
   'personal.plantilla_semana',
   // Fase 2, flujo D (S11): el «Enterado» y los recordatorios nacen solo de cada cuenta.
@@ -107,6 +116,7 @@ describe('Datos de demostración (tools/demo)', () => {
     totales: await totales(),
     unidad: (await t.one<{ estado: string }>('SELECT estado FROM ambulancia.unidad')).estado,
     vinculos: (await t.one<{ n: string }>('SELECT count(*) AS n FROM acceso.usuario WHERE persona_personal_id IS NOT NULL')).n,
+    expedientesUnidos: (await t.one<{ n: string }>('SELECT count(*) AS n FROM acceso.usuario WHERE paciente_id IS NOT NULL')).n,
   });
 
   let antes: Awaited<ReturnType<typeof estadoGeneral>>;
@@ -473,13 +483,16 @@ describe('Datos de demostración (tools/demo)', () => {
 
   test('si alguien usó un paciente demo en un flujo real, la limpieza lo conserva y no falla', async () => {
     await t.pg.exec(semilla);
-    const medico = await t.one<{ id: string }>(`SELECT persona_personal_id AS id FROM acceso.usuario WHERE correo = 'med@example.test'`);
+    // A doctor that is neither demo nor a test account (Lote 5: what test accounts create is cleaned too).
+    const medico = await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres, apellidos, tipo, area_id)
+      SELECT 'Médica', 'Real', 'medico', id FROM infra.espacio WHERE codigo = 'P1-CON' RETURNING id`);
     const real = await t.one<{ id: string }>(`INSERT INTO atencion.cita(paciente_id, medico_id, horario, estado, origen)
       VALUES ('de300000-0001-4000-8000-000000000001', $1, tstzrange(now() + interval '40 days', now() + interval '40 days 20 minutes', '[)'), 'confirmada', 'recepcion') RETURNING id`, [medico.id]);
     await t.pg.exec(limpieza);
     expect(await contar('pacientes.paciente', `id = 'de300000-0001-4000-8000-000000000001'`)).toBe(1);
     expect(await contar('pacientes.paciente', `id::text LIKE ${DEMO} AND id <> 'de300000-0001-4000-8000-000000000001'`)).toBe(0);
     await t.pg.query('DELETE FROM atencion.cita WHERE id = $1', [real.id]);
+    await t.pg.query('DELETE FROM personal.persona WHERE id = $1', [medico.id]);
     await t.pg.exec(limpieza);
     expect(await estadoGeneral()).toEqual(antes);
   });
@@ -499,6 +512,132 @@ describe('Datos de demostración (tools/demo)', () => {
     await t.pg.query('DELETE FROM atencion.solicitud_cita WHERE id = ANY($1::uuid[])', [[prefiere.id, delDemo.id]]);
     await t.pg.query('DELETE FROM pacientes.paciente WHERE id = $1', [realPaciente]);
     await t.pg.exec(limpieza);
+    expect(await estadoGeneral()).toEqual(antes);
+  });
+  // ------------------------------------------------------------------------------------------------------------
+  // Lote 5 (S17): reinicio repetible (simulación, confirmación explícita, datos de cuentas de prueba) y conexiones nuevas.
+  // ------------------------------------------------------------------------------------------------------------
+  const HOY_L = `(now() AT TIME ZONE 'America/El_Salvador')::date`;
+  const runnerDb = () => ({ exec: (sql: string) => t.pg.exec(sql), rows: async (sql: string) => (await t.pg.query(sql)).rows });
+
+  test('Lote 5: sin «set demo.confirmar» la limpieza se detiene sin borrar nada', async () => {
+    await t.pg.exec(semilla);
+    const conDemo = await demo();
+    await t.pg.exec('RESET demo.confirmar');
+    await expect(t.pg.exec(limpiezaSinConfirmar)).rejects.toThrow(/demo\.confirmar/);
+    await t.pg.exec('ROLLBACK');
+    expect(await demo()).toEqual(conDemo);
+  });
+
+  test('Lote 5: las cuentas de prueba tienen turno de 06:00 a 22:00 los 7 días pasados y los 14 siguientes', async () => {
+    const personas = (await t.pg.query<{ id: string }>(`SELECT u.persona_personal_id AS id FROM acceso.usuario u
+      JOIN acceso.asignacion_rol a ON a.usuario_id = u.id AND a.rol_codigo IN ('REC','AST','ENF','MED','LAB','PAR')
+      WHERE u.correo LIKE '%@example.test' AND u.id::text NOT LIKE ${DEMO} AND u.persona_personal_id IS NOT NULL`)).rows.map(r => r.id);
+    expect(personas).toHaveLength(6);
+    for (const persona of personas) {
+      const dias = Number((await t.one<{ n: string }>(`SELECT count(DISTINCT (lower(periodo) AT TIME ZONE 'America/El_Salvador')::date) AS n FROM personal.turno
+        WHERE persona_id = $1 AND id::text LIKE ${DEMO} AND estado <> 'cancelado'
+          AND (lower(periodo) AT TIME ZONE 'America/El_Salvador')::time = '06:00' AND (upper(periodo) AT TIME ZONE 'America/El_Salvador')::time = '22:00'
+          AND (lower(periodo) AT TIME ZONE 'America/El_Salvador')::date BETWEEN ${HOY_L} - 7 AND ${HOY_L} + 13`, [persona])).n);
+      expect({ persona, dias }).toEqual({ persona, dias: 21 });
+    }
+  });
+
+  test('Lote 5: emergencia tiene médico todas las noches salvo el hueco a propósito del día +3', async () => {
+    const hoy = (await t.one<{ d: string }>(`SELECT to_char(${HOY_L}, 'YYYY-MM-DD') AS d`)).d;
+    const fin = (await t.one<{ d: string }>(`SELECT to_char(${HOY_L} + 13, 'YYYY-MM-DD') AS d`)).d;
+    const cobertura = await t.call('JOP', 'GET', `/turnos/cobertura?from=${hoy}&to=${fin}`);
+    expect(cobertura.status).toBe(200);
+    const huecos = (cobertura.body.gaps as Array<{ area: string; role: string; start: string; end: string }>).filter(g => g.role === 'MED' && /emergencia/i.test(g.area));
+    expect(huecos).toHaveLength(1);
+    const inicio = await t.one<{ d: string }>(`SELECT to_char(($1::timestamptz AT TIME ZONE 'America/El_Salvador')::date - ${HOY_L}, 'FM99') AS d`, [huecos[0].start]);
+    expect(inicio.d).toBe('3');
+  });
+
+  test('Lote 5: conexiones nuevas: cuenta PAC unida, fila con citas, reprogramaciones, resultados por revisar, adjuntos y avisos', async () => {
+    const pac = await t.one<{ paciente_id: string; correo: string; ficha: string }>(`SELECT u.paciente_id, u.correo, p.correo AS ficha FROM acceso.usuario u
+      JOIN pacientes.paciente p ON p.id = u.paciente_id WHERE u.id = $1`, [userId('PAC')]);
+    expect(pac.paciente_id).toBe('de300000-0001-4000-8000-000000000004');
+    expect(pac.ficha).toBe(pac.correo.toLowerCase());
+    expect(await contar('atencion.ticket_fila', `id::text LIKE ${DEMO} AND fecha = ${HOY_L} AND cita_id IS NOT NULL`)).toBeGreaterThanOrEqual(3);
+    expect(await contar('atencion.ticket_fila', `id::text LIKE ${DEMO} AND fecha = ${HOY_L} AND cita_id IS NULL`)).toBeGreaterThanOrEqual(30);
+    // A linked ticket always belongs to the patient of its appointment.
+    expect(await contar('atencion.ticket_fila t JOIN atencion.cita c ON c.id = t.cita_id', `t.id::text LIKE ${DEMO} AND c.paciente_id <> t.paciente_id`)).toBe(0);
+    const reprogramaciones = (await t.pg.query<{ estado: string }>(`SELECT DISTINCT estado FROM atencion.reprogramacion WHERE id::text LIKE ${DEMO}`)).rows.map(r => r.estado).sort();
+    expect(reprogramaciones).toEqual(['pendiente', 'rechazada', 'vencida']);
+    // The requested slot is inside a published shift of the same doctor (accepting it is possible).
+    expect(await contar('atencion.reprogramacion r', `r.id::text LIKE ${DEMO} AND NOT EXISTS (SELECT 1 FROM personal.turno u WHERE u.persona_id = r.medico_id
+      AND u.estado = 'publicado' AND u.periodo @> r.horario)`)).toBe(0);
+    expect(await contar('atencion.solicitud_cita', `id::text LIKE ${DEMO} AND estado = 'pendiente' AND paciente_id = 'de300000-0001-4000-8000-000000000004'`)).toBe(1);
+    // The PAC patient has a confirmed upcoming appointment with a pending reschedule, and one to be confirmed.
+    expect(await contar('atencion.reprogramacion r JOIN atencion.cita c ON c.id = r.cita_id', `r.id::text LIKE ${DEMO} AND r.estado = 'pendiente'
+      AND c.paciente_id = 'de300000-0001-4000-8000-000000000004' AND c.estado = 'confirmada' AND lower(c.horario) > now()`)).toBe(1);
+    expect(await contar('atencion.cita', `id::text LIKE ${DEMO} AND paciente_id = 'de300000-0001-4000-8000-000000000004' AND estado = 'solicitada' AND lower(horario) > now()`)).toBe(1);
+    expect(await contar('atencion.solicitud_cita s', `s.id::text LIKE ${DEMO} AND s.estado = 'pendiente' AND s.medico_preferido_id IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM personal.turno u WHERE u.persona_id = s.medico_preferido_id)`)).toBe(1);
+    const pendientes = (await t.pg.query<{ v: string }>(`SELECT DISTINCT motivo || ':' || estado AS v FROM laboratorio.pendiente_medico WHERE id::text LIKE ${DEMO}`)).rows.map(r => r.v).sort();
+    expect(pendientes).toEqual(['critico:pendiente', 'critico:revisado', 'observacion:pendiente']);
+    const mimes = (await t.pg.query<{ v: string }>(`SELECT DISTINCT tipo_mime AS v FROM laboratorio.adjunto WHERE id::text LIKE ${DEMO}`)).rows.map(r => r.v).sort();
+    expect(mimes).toEqual(['application/pdf', 'image/jpeg']);
+    const niveles = (await t.pg.query<{ v: string }>(`SELECT DISTINCT nivel AS v FROM publico.aviso WHERE id::text LIKE ${DEMO}`)).rows.map(r => r.v).sort();
+    expect(niveles).toEqual(['critico', 'importante', 'informativo']);
+    expect(await contar('publico.aviso', `id::text LIKE ${DEMO} AND cardinality(areas) > 0`)).toBe(1);
+    expect(await contar('ambulancia.cambio_estado', `motivo LIKE '[DEMO] Mantenimiento%'`)).toBe(2);
+  });
+
+  test('Lote 5: «Quién vio mi expediente» muestra las lecturas sembradas y la cadena de auditoría sigue válida', async () => {
+    const accesos = await t.call('PAC', 'GET', '/me/accesos');
+    expect(accesos.status).toBe(200);
+    expect((accesos.body as unknown[]).length).toBeGreaterThanOrEqual(7);
+    expect(await t.app.get(AuditService).verifyChain()).toEqual(expect.objectContaining({ ok: true }));
+    // Seeding again adds no audit rows (fixed event ids).
+    const filas = await contar('plataforma.auditoria', `evento_id::text LIKE ${DEMO}`);
+    await t.pg.exec(semilla);
+    expect(await contar('plataforma.auditoria', `evento_id::text LIKE ${DEMO}`)).toBe(filas);
+    expect(await t.app.get(AuditService).verifyChain()).toEqual(expect.objectContaining({ ok: true }));
+  });
+
+  test('Lote 5: la limpieza borra lo que crearon las cuentas de prueba y conserva lo de otras cuentas', async () => {
+    const medico = await t.staffOf('MED');
+    const deCuenta = await t.patient({ name: 'Creada por prueba' });
+    await t.pg.query('UPDATE pacientes.paciente SET creado_por = $2 WHERE id = $1', [deCuenta, userId('REC')]);
+    const ajena = await t.patient({ name: 'Creada por otra cuenta' });
+    await t.pg.query(`UPDATE pacientes.paciente SET creado_por = '11111111-1111-4111-8111-111111111111' WHERE id = $1`, [ajena]);
+    const cita = await t.one<{ id: string }>(`INSERT INTO atencion.cita(paciente_id, medico_id, horario, estado, origen, creado_por)
+      VALUES ($1, $2, tstzrange(now() + interval '45 days', now() + interval '45 days 20 minutes', '[)'), 'confirmada', 'recepcion', $3) RETURNING id`, [deCuenta, medico, userId('REC')]);
+    const turno = await t.one<{ id: string }>(`INSERT INTO personal.turno(persona_id, area_id, periodo, tipo, estado)
+      SELECT $1, id, tstzrange(now() + interval '60 days', now() + interval '60 days 8 hours', '[)'), 'diurno', 'publicado' FROM infra.espacio WHERE codigo = 'P1-CON' RETURNING id`, [medico]);
+    const aviso = await t.one<{ id: string }>(`INSERT INTO publico.aviso(titulo, cuerpo, vigencia, publicado_por)
+      VALUES ('Aviso de prueba', 'Creado por la cuenta ADM de prueba', tstzrange(now(), now() + interval '1 day', '[)'), $1) RETURNING id`, [userId('ADM')]);
+    // The read-only count sees them as test-account rows.
+    const conteo = Object.fromEntries((await runner.readOnlyCount(runnerDb())).map(r => [r.tabla, r]));
+    expect(conteo['atencion.cita'].cuentas_prueba).toBeGreaterThanOrEqual(1);
+    expect(conteo['personal.turno'].cuentas_prueba).toBeGreaterThanOrEqual(1);
+    expect(conteo['publico.aviso'].cuentas_prueba).toBe(1);
+    expect(conteo['pacientes.paciente'].cuentas_prueba).toBe(1);
+    await t.pg.exec(limpieza);
+    for (const [tabla, id] of [['atencion.cita', cita.id], ['personal.turno', turno.id], ['publico.aviso', aviso.id], ['pacientes.paciente', deCuenta]])
+      expect({ tabla, n: await contar(tabla, `id = '${id}'`) }).toEqual({ tabla, n: 0 });
+    expect(await contar('pacientes.paciente', `id = '${ajena}'`)).toBe(1);
+    expect(await contar('acceso.usuario', `paciente_id IS NOT NULL`)).toBe(0);
+    await t.pg.query('DELETE FROM pacientes.paciente WHERE id = $1', [ajena]);
+    expect(await estadoGeneral()).toEqual(antes);
+  });
+
+  test('Lote 5: demo.cjs simula limpiar y cargar, informa los cambios por tabla y no deja nada escrito', async () => {
+    const vacia = await totales();
+    const carga = await runner.simulate(runnerDb(), ['cargar']);
+    expect(carga.changes.find(c => c.tabla === 'pacientes.paciente')?.diferencia).toBeGreaterThanOrEqual(300);
+    expect(carga.changes.find(c => c.tabla === 'personal.turno')?.diferencia).toBeGreaterThanOrEqual(1000);
+    expect(await totales()).toEqual(vacia);
+    await runner.simulate(runnerDb(), ['cargar'], true);
+    const reinicio = await runner.simulate(runnerDb(), ['limpiar', 'cargar']);
+    // Clean + load leaves the same volume; only the realtime outbox grows (the database announces the seeded rows).
+    expect(reinicio.changes.map(c => c.tabla)).toEqual(['plataforma.outbox']);
+    const limpia = await runner.simulate(runnerDb(), ['limpiar']);
+    expect(limpia.changes.find(c => c.tabla === 'pacientes.paciente')?.diferencia).toBeLessThanOrEqual(-300);
+    expect(await contar('pacientes.paciente', `id::text LIKE ${DEMO}`)).toBeGreaterThanOrEqual(300);
+    await runner.simulate(runnerDb(), ['limpiar'], true);
     expect(await estadoGeneral()).toEqual(antes);
   });
 });
