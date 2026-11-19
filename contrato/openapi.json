@@ -18427,6 +18427,74 @@
         "x-permiso": "ambulancia.ver_estado"
       }
     },
+    "/api/v1/ambulancia/cobertura": {
+      "get": {
+        "operationId": "AmbulanceController_coverage",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CrewCoverageResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lote 5 S8: horas de los próximos 7 días sin paramédico y motorista de turno (no bloquea publicar turnos)",
+        "tags": [
+          "ambulancia"
+        ],
+        "x-permiso": "ambulancia.ver_estado"
+      }
+    },
     "/api/v1/ambulancia/mantenimiento": {
       "post": {
         "operationId": "AmbulanceController_maintenance",
@@ -18521,11 +18589,11 @@
             "bearer": []
           }
         ],
-        "summary": "Entrar o salir de mantenimiento; salir exige paramédico con turno en curso",
+        "summary": "Entrar o salir de mantenimiento (Jefatura o la tripulación); salir exige paramédico y motorista con turno en curso",
         "tags": [
           "ambulancia"
         ],
-        "x-permiso": "ambulancia.mantenimiento"
+        "x-permiso": "ambulancia.mantenimiento OR ambulancia.operar"
       }
     },
     "/api/v1/ambulancia/solicitudes": {
@@ -33668,6 +33736,10 @@
               }
             ]
           },
+          "canSetMaintenance": {
+            "type": "boolean",
+            "description": "Lote 5 S8: quien consulta puede poner o quitar mantenimiento (Jefatura o la tripulación)"
+          },
           "paramedicOnDuty": {
             "type": "boolean"
           },
@@ -33707,10 +33779,80 @@
         "required": [
           "unit",
           "activeService",
+          "canSetMaintenance",
           "paramedicOnDuty",
           "driverOnDuty",
           "paramedicWithAccountOnDuty",
           "dispatchBlock"
+        ]
+      },
+      "FaltaTripulacion": {
+        "type": "string",
+        "enum": [
+          "paramedico",
+          "motorista",
+          "tripulacion"
+        ],
+        "description": "Quién falta: paramédico, motorista o los dos"
+      },
+      "CrewGapResponse": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "missing": {
+            "description": "Quién falta: paramédico, motorista o los dos",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FaltaTripulacion"
+              }
+            ]
+          }
+        },
+        "required": [
+          "start",
+          "end",
+          "missing"
+        ]
+      },
+      "CrewCoverageResponse": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "to": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "hoursWithoutCrew": {
+            "type": "integer",
+            "description": "Horas sin paramédico y motorista de turno"
+          },
+          "covered": {
+            "type": "boolean",
+            "description": "Cada hora tiene paramédico y motorista de turno"
+          },
+          "gaps": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrewGapResponse"
+            }
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "hoursWithoutCrew",
+          "covered",
+          "gaps"
         ]
       },
       "MaintenanceDto": {

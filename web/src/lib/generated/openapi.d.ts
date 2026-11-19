@@ -2850,6 +2850,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/ambulancia/cobertura": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lote 5 S8: horas de los próximos 7 días sin paramédico y motorista de turno (no bloquea publicar turnos) */
+        get: operations["AmbulanceController_coverage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/ambulancia/mantenimiento": {
         parameters: {
             query?: never;
@@ -2859,7 +2876,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Entrar o salir de mantenimiento; salir exige paramédico con turno en curso */
+        /** Entrar o salir de mantenimiento (Jefatura o la tripulación); salir exige paramédico y motorista con turno en curso */
         post: operations["AmbulanceController_maintenance"];
         delete?: never;
         options?: never;
@@ -7097,6 +7114,8 @@ export interface components {
         AmbulanceStatusResponse: {
             unit: components["schemas"]["AmbulanceUnitResponse"];
             activeService: components["schemas"]["ActiveServiceResponse"] | null;
+            /** @description Lote 5 S8: quien consulta puede poner o quitar mantenimiento (Jefatura o la tripulación) */
+            canSetMaintenance: boolean;
             paramedicOnDuty: boolean;
             /** @description Hay motorista con turno en curso (RN-30 exige paramédico y motorista) */
             driverOnDuty: boolean;
@@ -7108,6 +7127,30 @@ export interface components {
             pendingRequests?: components["schemas"]["PendingAmbulanceRequestResponse"][];
             /** @description Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02) */
             availableCrew?: components["schemas"]["CrewMemberResponse"][];
+        };
+        /**
+         * @description Quién falta: paramédico, motorista o los dos
+         * @enum {string}
+         */
+        FaltaTripulacion: "paramedico" | "motorista" | "tripulacion";
+        CrewGapResponse: {
+            /** Format: date-time */
+            start: string;
+            /** Format: date-time */
+            end: string;
+            /** @description Quién falta: paramédico, motorista o los dos */
+            missing: components["schemas"]["FaltaTripulacion"];
+        };
+        CrewCoverageResponse: {
+            /** Format: date-time */
+            from: string;
+            /** Format: date-time */
+            to: string;
+            /** @description Horas sin paramédico y motorista de turno */
+            hoursWithoutCrew: number;
+            /** @description Cada hora tiene paramédico y motorista de turno */
+            covered: boolean;
+            gaps: components["schemas"]["CrewGapResponse"][];
         };
         MaintenanceDto: {
             version: number;
@@ -20309,6 +20352,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AmbulanceStatusResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AmbulanceController_coverage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CrewCoverageResponse"];
                 };
             };
             /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */

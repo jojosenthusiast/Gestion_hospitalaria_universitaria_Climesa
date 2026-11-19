@@ -124,7 +124,7 @@ describe('Ambulancia · estado de la unidad y paramédico de turno (HU-109)',()=
   const stale=await maintenance('JOP',true,now.version-1);
   expect(stale.status).toBe(409);expect(stale.body.codigo).toBe('version_conflicto');
   expect((await maintenance('REC',true,now.version)).status).toBe(403);
-  expect((await maintenance('PAR',true,now.version)).status).toBe(403);
+  expect((await maintenance('MED',true,now.version)).status).toBe(403);
   expect((await maintenance('JOP',false,now.version)).status).toBe(409);// ya está Disponible
   const entered=await maintenance('JOP',true,now.version,'Cambio de llantas programado');
   expect(entered.status).toBe(201);expect(entered.body.state).toBe('en_mantenimiento');

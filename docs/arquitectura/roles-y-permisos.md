@@ -335,7 +335,8 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/ambulancia/llegada` | `ambulancia.recibir_prehospital` | Servicios por recibir: primero los llegados sin entrega (24 h) y después el activo; sin datos clínicos; MA-AMB-04 | R | 6 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/recepcion` | `ambulancia.recibir_prehospital` | Personal clínico (expediente.ver); después de en_hospital; una sola vez; MA-AMB-04 | E | 6 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/ubicacion` | `ambulancia.operar` | Solo con servicio activo | E | 5 | · | · | · | · | · | · | · | ✔ | · | · |
-| POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` | Solo sin servicio activo | R | 4 | · | ✔ | · | · | · | · | · | · | · | · |
+| GET | `/api/v1/ambulancia/cobertura` | `ambulancia.ver_estado` | Lote 5 S8: próximos 7 días; paramédico y motorista por hora; informativo (no bloquea publicar) | R | 6 | · | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · |
+| POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` o `ambulancia.operar` | Solo sin servicio activo; Jefatura o la tripulación (Lote 5 S8) | R | 4 | · | ✔ | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Datos del paciente ocultos sin relación | R | 4 | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
 
 ### Spec 111

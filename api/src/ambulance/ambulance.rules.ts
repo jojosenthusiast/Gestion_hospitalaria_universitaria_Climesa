@@ -138,3 +138,28 @@ export function undoMilestoneError(last: { tipo: string; registrado_en: Date } |
   if (now.getTime() - new Date(last.registrado_en).getTime() > UNDO_MILESTONE_MS) return 'Pasaron más de 15 minutos desde que se registró; ya no se puede deshacer.';
   return null;
 }
+
+/** Lote 5, S8: how far ahead the crew coverage looks (the week the dashboards warn about). */
+export const CREW_COVERAGE_DAYS = 7;
+export const HOUR_MS = 3600_000;
+export type CrewShift = { role: string; start: number; end: number };
+export type CrewGap = { start: string; end: string; missing: 'paramedico' | 'motorista' | 'tripulacion' };
+/**
+ * Hours in [from, to) without a paramedic or a driver whose shift covers the whole hour, merged into consecutive gaps
+ * with the same missing role. `hoursWithoutCrew` counts the hours.
+ */
+export function crewCoverageGaps(shifts: CrewShift[], from: number, to: number) {
+  const gaps: CrewGap[] = [];
+  let hours = 0;
+  for (let h = from; h < to; h += HOUR_MS) {
+    const covered = (role: string) => shifts.some(s => s.role === role && s.start <= h && s.end >= h + HOUR_MS);
+    const paramedic = covered('paramedico'), driver = covered('motorista');
+    if (paramedic && driver) continue;
+    hours++;
+    const missing = !paramedic && !driver ? 'tripulacion' : !paramedic ? 'paramedico' : 'motorista';
+    const last = gaps.at(-1);
+    if (last && last.missing === missing && new Date(last.end).valueOf() === h) last.end = new Date(h + HOUR_MS).toISOString();
+    else gaps.push({ start: new Date(h).toISOString(), end: new Date(h + HOUR_MS).toISOString(), missing });
+  }
+  return { from: new Date(from).toISOString(), to: new Date(to).toISOString(), hoursWithoutCrew: hours, covered: hours === 0, gaps };
+}
