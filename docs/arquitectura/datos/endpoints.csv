@@ -3,10 +3,10 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 101,GET,/api/v1/inicio,sesion.perfil,,R,2,Resumen de inicio según rol y permisos
 110,POST,/api/v1/exportaciones,sesion.perfil,Solo registra la exportación; el archivo se arma en la web,R,2,Auditar una exportación de lista con datos personales (MA-SEG-05)
 101,GET,/api/v1/eventos,sesion.perfil,Solo eventos de canales permitidos al usuario,R,2,Consulta de recuperación de eventos desde un cursor (?after=) tras reconectar
-101,POST,/api/v1/cuentas/vinculacion,cuenta.vincular,Solo su cuenta,R,2,Paciente pide vincular su cuenta con DUI y fecha de nacimiento
-101,GET,/api/v1/cuentas/vinculaciones,cuentas.verificar,,R,3,Vinculaciones pendientes
-101,POST,/api/v1/cuentas/vinculaciones/{id}/aprobar,cuentas.verificar,,R,3,Aprobar vinculación tras verificar identidad
-101,POST,/api/v1/cuentas/vinculaciones/{id}/rechazar,cuentas.verificar,Motivo obligatorio,R,3,Rechazar vinculación
+101,POST,/api/v1/cuentas/vinculacion,cuenta.vincular,Solo su cuenta,R,2,Retirado: responde 410 vinculacion_automatica; la cuenta se une sola al expediente que tiene su correo verificado
+101,GET,/api/v1/cuentas/vinculaciones,cuentas.verificar,,R,3,Retirado: responde una lista vacía; la vinculación es automática por correo verificado
+101,POST,/api/v1/cuentas/vinculaciones/{id}/aprobar,cuentas.verificar,,R,3,Retirado: responde 410 vinculacion_automatica
+101,POST,/api/v1/cuentas/vinculaciones/{id}/rechazar,cuentas.verificar,Motivo obligatorio,R,3,Cerrar una solicitud antigua (DUI) que quedó pendiente
 101,GET,/api/v1/usuarios,usuarios.ver,,R,2,Listado de usuarios con roles y estado
 101,POST,/api/v1/usuarios/invitaciones,usuarios.invitar,,R,2,Crear cuenta de personal e invitarla
 101,POST,/api/v1/usuarios/{id}/invitacion/reenvio,usuarios.invitar,Solo invitación pendiente,R,2,Reenviar invitación (MA-CTA-01)
@@ -196,4 +196,4 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/citas/solicitudes-categoria/{id}/rechazar,citas.agendar,Motivo,R,5,Recepción rechaza una solicitud por categoría
 105,POST,/api/v1/citas/solicitudes-categoria/{id}/cancelar,citas.cancelar,PAC solo propias y pendientes,R,5,Paciente retira su solicitud por categoría
 105,GET,/api/v1/citas/solicitudes-categoria/{id}/sugerencia,citas.agendar,Hasta 14 días; médico preferido o de las especialidades sugeridas,R,5,Primer día con hueco en la franja pedida
-101,GET,/api/v1/me/vinculacion,cuenta.vincular,Solo su cuenta,R,5,Estado de la vinculación de la cuenta y su última solicitud
+101,GET,/api/v1/me/vinculacion,cuenta.vincular,Solo su cuenta,R,5,"Estado de la vinculación por correo: linked, email, emailVerified"

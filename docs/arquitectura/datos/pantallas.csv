@@ -2,7 +2,7 @@ id,plataforma,roles,nombre,proposito,muestra,acciones,tiempo_real,privacidad,niv
 W01,Web,Todos los roles web,Ingreso,Entrar con correo y contraseña,"Logo, campos, enlace a recuperar",Ingresar; recuperar contraseña,,Mensaje de error genérico (no revela si el correo existe),R,101
 W02,Web,Personal invitado,Activar cuenta,Definir contraseña desde la invitación,"Nombre, rol asignado",Crear contraseña,,,R,101
 W03,Web,ADM; JOP,Tablero inicial,Vista del día al entrar (dashboard del avance),"Ocupación por planta (barras 2.ª y 3.ª), camas en limpieza, estado de la ambulancia, números en fila, órdenes de laboratorio por estado, huecos de cobertura de turnos",Ir al detalle de cada tarjeta,Todas las tarjetas se actualizan solas,"Solo agregados, sin nombres",R,113
-W04,Web,REC; LAB; DPD,Inicio de trabajo,Bandeja de lo que toca hacer,"REC: vinculaciones, solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar. Todos: aviso crítico dirigido a su rol o área hasta su «Enterado» (S11)",Abrir cada pendiente; Enterado,Contadores en vivo,,R,113
+W04,Web,REC; LAB; DPD,Inicio de trabajo,Bandeja de lo que toca hacer,"REC: solicitudes de cita y ambulancia, admisiones sin cama. LAB: cola. DPD: cadena de auditoría por verificar. Todos: aviso crítico dirigido a su rol o área hasta su «Enterado» (S11)",Abrir cada pendiente; Enterado,Contadores en vivo,,R,113
 W05,Web,ADM,Usuarios,Gestionar cuentas,"Tabla: nombre, correo, roles, estado, último ingreso; filtros","Invitar, editar roles, desactivar",,No puede editar sus propios roles,R,101
 W06,Web,ADM,Invitar y editar roles,Alta de cuenta de personal,"Formulario: persona del personal, correo, roles (casillas)",Guardar; enviar invitación,,,R,101
 W07,Web,ADM; JOP,Personal de salud,CRUD de personal (avance),"Tabla: nombre, tipo (médico, enfermero, alergista...), especialidad, área, inscripción y vigencia, tiene cuenta","Crear, editar, inactivar",,Teléfono y DUI del personal solo ADM,R,103
@@ -25,7 +25,7 @@ W23,Web,JOP; LAB,Movimiento de inventario,"Entrada, salida, ajuste o traslado","
 W24,Web,JOP,Equipo médico,Equipo por espacio,"Equipo, espacio, estado operativo o mantenimiento",Cambiar estado,,,E,104
 W25,Web,ADM; JOP; REC; LAB; DPD,Avisos,"Área de avisos (Fase 2, S11): mis avisos con «Enterado» y, para quien publica, redactar con vista previa y elegir a quién llegan","Para mí: avisos vigentes de mi rol o área con los críticos primero, filtros Todos, Sin leer y Críticos, y detalle. Publicados (avisos.publicar): formulario con nivel, audiencia (público, roles y/o áreas) y vigencia; lista con estado y conteo de «Enterado»","Enterado; Recordarme después; Publicar",Evento aviso y recarga única en proximoCambio,Nunca datos personales: la pantalla advierte; el conteo de «Enterado» no muestra nombres,R,112
 W26,Web,REC,Pacientes,Buscar y registrar,"Buscador (nombre, DUI, expediente) con motivo de coincidencia; ficha",Registrar solo tras buscar; editar con motivo,,Búsqueda auditada,R,102
-W27,Web,REC,Vinculaciones por verificar,Validar cuentas de pacientes,"Cuenta, datos que dio, candidato de expediente",Aprobar; rechazar con motivo,Nuevas entran solas,,R,101
+W27,Web,REC,Vinculaciones por verificar (retirada),Retirada: la cuenta se une sola por correo verificado,"Recepción anota el correo del paciente en su expediente (W de expediente); conflictos de correo se muestran en ese campo",Ninguna,,Ya no existe en el menú,R,101
 W28,Web,REC,Citas y solicitudes,Agenda y bandeja,Agenda por médico y día; solicitudes de pacientes,"Agendar, confirmar, rechazar, cancelar",En vivo,,R,105
 W29,Web,REC,Fila del día,Emitir y seguir números,"Por servicio: números, estado, consultorio",Emitir número; marcar no se presentó,En vivo,Solo número e iniciales,R,105
 W32,Web,DPD,Auditoría,Buscar y verificar,"Búsqueda por persona; filtros plegables con chips (expediente, rol, acción, entidad, resultado, fechas); vistas rápidas; tabla ordenable y paginada; detalle con hashes; resultado de verificación de cadena","Verificar integridad, abrir detalle, exportar CSV/Excel/PDF",,,R,110
@@ -35,7 +35,7 @@ W35,Web,Todos,Perfil,Datos propios y sesión,"Nombre, roles, cambiar contraseña
 W36,Web,Todos,Estados comunes,"Sin permiso, sin conexión, error, vacío",Mensajes claros en español,Reintentar,Banda de reconexión,,R,120
 A01,Android,Todos los roles móviles,Ingreso,Entrar,"Correo, contraseña; enlace Crear cuenta de paciente",Ingresar; crear cuenta,,,R,101
 A02,Android,PAC,Crear cuenta de paciente,Registro (avance),"Correo, contraseña, nombre",Crear,,,R,101
-A03,Android,PAC,Vincular expediente,Unir cuenta y expediente,"DUI, fecha de nacimiento; estado: en verificación, aprobada, rechazada",Enviar,Cambia sola al aprobarse,Sin aprobar no se ve nada privado,R,101
+A03,Android,PAC,Vincular expediente,Unir cuenta y expediente por correo,"Correo de la cuenta; si no está confirmado, pide confirmarlo; si no está unida, pide que Recepción lo anote en el expediente",Ninguna,Cambia sola al unirse,Sin unir no se ve nada privado,R,101
 A04,Android,PAC,Inicio del paciente,Resumen,"Mi número de fila (si hay), próxima cita, exámenes, avisos",Ir a cada sección,En vivo,,R,120
 A05,Android,PAC,Mi turno en fila,Seguir mi número,"Número grande, cuántos faltan, consultorio al ser llamado",Ninguna,Vibra y avisa al ser llamado,,R,105
 A06,Android,PAC,Mis citas,"Ver, pedir y cancelar","Próximas y pasadas; pedir: médico o especialidad, fecha, horarios libres",Pedir; cancelar,Confirmación llega en vivo,,R,105
@@ -54,7 +54,7 @@ A25,Android,MED,Llegada de ambulancia,Reporte prehospital,"Hora estimada, motivo
 A26,Android,MED; todos los de personal,Mis turnos,Horario propio,Calendario de mis turnos publicados,Ninguna,Cambios en vivo,,R,103
 I01,iOS,Todos los roles móviles,Ingreso,Entrar,"Correo, contraseña; enlace Crear cuenta de paciente",Ingresar; crear cuenta,,,R,101
 I02,iOS,PAC,Crear cuenta de paciente,Registro (avance),"Correo, contraseña, nombre",Crear,,,R,101
-I03,iOS,PAC,Vincular expediente,Unir cuenta y expediente,"DUI, fecha de nacimiento; estado: en verificación, aprobada, rechazada",Enviar,Cambia sola al aprobarse,Sin aprobar no se ve nada privado,R,101
+I03,iOS,PAC,Vincular expediente,Unir cuenta y expediente por correo,"Correo de la cuenta; si no está confirmado, pide confirmarlo; si no está unida, pide que Recepción lo anote en el expediente",Ninguna,Cambia sola al unirse,Sin unir no se ve nada privado,R,101
 I04,iOS,PAC,Inicio del paciente,Resumen,"Mi número de fila (si hay), próxima cita, exámenes, avisos",Ir a cada sección,En vivo,,R,120
 I05,iOS,PAC,Mi turno en fila,Seguir mi número,"Número grande, cuántos faltan, consultorio al ser llamado",Ninguna,Vibra y avisa al ser llamado,,R,105
 I06,iOS,PAC,Mis citas,"Ver, pedir y cancelar","Próximas y pasadas; pedir: médico o especialidad, fecha, horarios libres",Pedir; cancelar,Confirmación llega en vivo,,R,105
@@ -74,7 +74,7 @@ I26,iOS,MED; todos los de personal,Mis turnos,Horario propio,Calendario de mis t
 A30,Android,REC,Buscar o registrar paciente,Buscar antes de crear,Buscador con motivo de coincidencia; formulario de registro,Registrar; abrir ficha,,Búsqueda auditada,R,102
 A31,Android,REC,Emitir número de fila,Turno del día,"Servicio, paciente (opcional), número emitido grande",Emitir; reimprimir,,,R,105
 A32,Android,REC,Citas,Agenda y solicitudes,Agenda del día por médico; solicitudes,"Agendar, confirmar, rechazar",En vivo,,R,105
-A33,Android,REC,Verificar vinculaciones,Aprobar cuentas,Datos de la cuenta y candidato,Aprobar; rechazar,En vivo,,R,101
+A33,Android,REC,Verificar vinculaciones (retirada),Retirada: la cuenta se une sola por correo verificado,"Recepción anota el correo del paciente en su expediente",Ninguna,,Ya no existe en el menú,R,101
 A34,Android,REC,Admisión y cama,Admitir y asignar,Mismo flujo de W14 en móvil,Confirmar cama,En vivo,,R,108
 A35,Android,REC,Tablero de camas,Ver camas,"Por planta, colores y texto",Abrir cama,En vivo,Ocupante enmascarado salvo permiso,R,104
 A36,Android,REC,Despacho de ambulancia,Despachar desde el mostrador,"Estado, solicitudes, servicio activo",Confirmar y despachar,En vivo,,R,109
