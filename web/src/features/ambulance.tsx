@@ -25,6 +25,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  useEffect(()=>{if(previous.current!==null&&pendingCount>previous.current)beep();if(data.data)previous.current=pendingCount;},[pendingCount,data.data]);
  // R7 G4: every dialog closes only on success and leaves a sentence in place saying what happened.
  const [done,setDone]=useState('');
+ const callDone=dispatcher?'Llamada registrada: la solicitud está abajo, lista para despachar.':'Llamada registrada: queda por confirmar en despacho.';
  const saved=(message='')=>{setDispatching(null);setDiscarding(null);setCalling(false);setDone(message);data.refresh();};
  // S13: the home quick action «Solicitar ambulancia» (#/ambulancia?accion=solicitud) opens the call form directly.
  const [quick,consumeQuick]=useQuickAction();
@@ -42,7 +43,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
   {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} crewPool={s.availableCrew??[]} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={()=>saved(dispatching==='direct'?'Ambulancia despachada para el traslado.':`Ambulancia despachada a ${dispatching.address}.`)}/>}
   {discarding&&<DiscardForm api={api} request={discarding} onClose={()=>setDiscarding(null)} onSaved={()=>saved('Solicitud descartada.')}/>}
  </section>}</RemoteState>
- {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onSaved={()=>saved(dispatcher?'Llamada registrada: la solicitud está abajo, lista para despachar.':'Llamada registrada: queda por confirmar en despacho.')}/>}
+ {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onRegistered={data.refresh} doneMessage={callDone} onSaved={()=>saved(callDone)}/>}
  {report&&<PrehospitalDialog api={api} serviceId={report} version={version} onClose={()=>setReport(null)}/>}
  </>;
 }
