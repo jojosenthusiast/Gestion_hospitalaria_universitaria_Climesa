@@ -14,7 +14,7 @@ export class AmbulanceController {
   status(@Req() r:ActorRequest){return this.ambulance.status(r.actor);}
   @Get('cobertura') @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Lote 5 S8: horas de los próximos 7 días sin paramédico y motorista de turno (no bloquea publicar turnos)'}) @ApiOkResponse({ type: CrewCoverageResponse })
   coverage(){return this.ambulance.crewCoverage();}
-  @Post('mantenimiento') @RequirePermission('ambulancia.mantenimiento','ambulancia.operar') @ApiOperation({summary:'Entrar o salir de mantenimiento (Jefatura o la tripulación); salir exige paramédico y motorista con turno en curso'}) @ApiCreatedResponse({ type: AmbulanceUnitStateResponse })
+  @Post('mantenimiento') @RequirePermission('ambulancia.mantenimiento') @ApiOperation({summary:'Entrar o salir de mantenimiento (Jefatura o la tripulación); salir exige paramédico y motorista con turno en curso'}) @ApiCreatedResponse({ type: AmbulanceUnitStateResponse })
   maintenance(@Req() r:ActorRequest,@Body() d:MaintenanceDto,@Headers('idempotency-key') k?:string){return this.ambulance.setMaintenance(r.actor,d,k);}
   @Post('solicitudes') @RequirePermission('ambulancia.solicitar') @ApiOperation({summary:'Solicitar ambulancia; queda por confirmar (paciente verificado o recepción por teléfono)'}) @ApiCreatedResponse({ type: AmbulanceRequestCreatedResponse })
   request(@Req() r:ActorRequest,@Body() d:AmbulanceRequestDto,@Headers('idempotency-key') k?:string){return this.ambulance.request(r.actor,d,k);}

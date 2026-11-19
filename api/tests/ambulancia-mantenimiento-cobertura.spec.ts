@@ -15,7 +15,7 @@ describe('Lote 5 S8 · mantenimiento por la tripulación y cobertura de ambulanc
   });
   afterAll(async () => { await t?.close(); });
 
-  test('PAR pone y quita mantenimiento con motivo; la auditoría guarda ambulancia.operar; REC y MED no pueden', async () => {
+  test('PAR pone y quita mantenimiento con motivo (ambulancia.mantenimiento); REC y MED no pueden', async () => {
     const before = await unit();
     expect((await t.call('REC', 'POST', '/ambulancia/mantenimiento', { version: before.version, inMaintenance: before.estado !== 'en_mantenimiento', reason: 'Recepción no decide esto' })).status).toBe(403);
     expect((await t.call('MED', 'POST', '/ambulancia/mantenimiento', { version: before.version, inMaintenance: before.estado !== 'en_mantenimiento', reason: 'Medicina no decide esto' })).status).toBe(403);
@@ -32,11 +32,16 @@ describe('Lote 5 S8 · mantenimiento por la tripulación y cobertura de ambulanc
     expect(entered.body).toMatchObject({ state: 'en_mantenimiento' });
     expect(await unit()).toMatchObject({ estado: 'en_mantenimiento' });
     const audit = (await t.pg.query<{ permiso: string; motivo: string }>("SELECT permiso,motivo FROM plataforma.auditoria WHERE accion='ambulancia.mantenimiento' ORDER BY seq DESC LIMIT 1")).rows[0];
-    expect(audit).toEqual({ permiso: 'ambulancia.operar', motivo: 'Falla en la sirena' });
+    expect(audit).toEqual({ permiso: 'ambulancia.mantenimiento', motivo: 'Falla en la sirena' });
     const left = await t.call('PAR', 'POST', '/ambulancia/mantenimiento', { version: entered.body.version, inMaintenance: false, reason: 'Sirena reparada' });
     expect([left.status, left.body.state]).toEqual([201, 'disponible']);
     // JOP still can.
     expect((await t.call('JOP', 'POST', '/ambulancia/mantenimiento', { version: left.body.version, inMaintenance: true, reason: 'Revisión programada' })).status).toBe(201);
+  });
+
+  test('PAR no cierra administrativamente un servicio: sigue siendo de Jefatura', async () => {
+    const r = await t.call('PAR', 'POST', '/ambulancia/servicios/00000000-0000-4000-8000-000000000999/cerrar', { version: 1, reason: 'Cierre que no le corresponde' });
+    expect(r.status).toBe(403);
   });
 
   test('GET /ambulancia dice quién puede poner mantenimiento', async () => {

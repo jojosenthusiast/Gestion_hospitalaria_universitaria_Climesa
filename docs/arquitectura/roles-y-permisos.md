@@ -104,7 +104,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `ambulancia.operar` | Hitos del servicio y ubicación | · | · | · | · | · | · | · | ✔ | · | · |
 | `ambulancia.reportar_prehospital` | Enviar datos del paciente antes de llegar | · | · | · | · | · | · | · | ✔ | · | · |
 | `ambulancia.recibir_prehospital` | Ver el reporte prehospital | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
-| `ambulancia.mantenimiento` | Poner y quitar mantenimiento | · | ✔ | · | · | · | · | · | · | · | · |
+| `ambulancia.mantenimiento` | Poner y quitar mantenimiento | · | ✔ | · | · | · | · | · | ✔ | · | · |
 | `ambulancia.ver_bitacora` | Ver bitácora filtrable | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
 | `auditoria.ver` | Consultar y verificar auditoría | · | · | · | · | · | · | · | · | ✔ | · |
 | `auditoria.mis_accesos` | Ver quién consultó mi expediente | · | · | · | · | · | · | · | · | · | propio |
@@ -329,14 +329,14 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/ambulancia/servicios` | `ambulancia.despachar` | Solo si Disponible; bloqueo de fila | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/hitos` | `ambulancia.operar` | Orden de hitos | R | 4 | · | · | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/hitos/deshacer` | `ambulancia.operar` | Solo la tripulación; último hito; 15 minutos; nunca finalizado ni llegada recibida | R | 6 | · | · | · | · | · | · | · | ✔ | · | · |
-| POST | `/api/v1/ambulancia/servicios/{id}/cerrar` | `ambulancia.mantenimiento` | Solo servicio activo; motivo; estado final cancelado; unidad a Disponible | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
+| POST | `/api/v1/ambulancia/servicios/{id}/cerrar` | `ambulancia.mantenimiento` | Además ambulancia.despachar (solo Jefatura; Lote 5 S8); solo servicio activo; motivo; estado final cancelado; unidad a Disponible | R | 6 | · | ✔ | · | · | · | · | · | ✔ | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.reportar_prehospital` | Funciona sin conexión con reintento | E | 4 | · | · | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/servicios/{id}/prehospital` | `ambulancia.recibir_prehospital` |  | E | 4 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | GET | `/api/v1/ambulancia/llegada` | `ambulancia.recibir_prehospital` | Servicios por recibir: primero los llegados sin entrega (24 h) y después el activo; sin datos clínicos; MA-AMB-04 | R | 6 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/servicios/{id}/recepcion` | `ambulancia.recibir_prehospital` | Personal clínico (expediente.ver); después de en_hospital; una sola vez; MA-AMB-04 | E | 6 | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | POST | `/api/v1/ambulancia/ubicacion` | `ambulancia.operar` | Solo con servicio activo | E | 5 | · | · | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/cobertura` | `ambulancia.ver_estado` | Lote 5 S8: próximos 7 días; paramédico y motorista por hora; informativo (no bloquea publicar) | R | 6 | · | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · |
-| POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` o `ambulancia.operar` | Solo sin servicio activo; Jefatura o la tripulación (Lote 5 S8) | R | 4 | · | ✔ | · | · | · | · | · | ✔ | · | · |
+| POST | `/api/v1/ambulancia/mantenimiento` | `ambulancia.mantenimiento` | Solo sin servicio activo; Jefatura o la tripulación (Lote 5 S8) | R | 4 | · | ✔ | · | · | · | · | · | ✔ | · | · |
 | GET | `/api/v1/ambulancia/bitacora` | `ambulancia.ver_bitacora` | Datos del paciente ocultos sin relación | R | 4 | · | ✔ | ✔ | · | · | ✔ | · | propio | ✔ | · |
 
 ### Spec 111

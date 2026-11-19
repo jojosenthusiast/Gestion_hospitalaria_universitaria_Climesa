@@ -59,6 +59,10 @@ ADICIONES_ROL_FASE2 = [("REC", "fila.llamar")]
 # Lo inserta la migración de SALIDA_AVISOS_ADM.
 ADICIONES_ROL_AVISOS_ADM = [("ADM", "avisos.publicar")]
 
+# Lote 5 S8 (observación del propietario en la app del paramédico): la tripulación también pone y quita mantenimiento.
+# Lo inserta la migración 20261129003000_mantenimiento_paramedico.sql (escrita a mano).
+ADICIONES_ROL_LOTE5 = [("PAR", "ambulancia.mantenimiento")]
+
 # Permisos que se retiraron del catálogo (observación 12: módulo de acceso excepcional) después de aplicada la semilla. Ya no están en
 # permisos.csv ni en los documentos RBAC, pero la semilla (aplicada, regla 10 de AGENTS.md) los sigue emitiendo tal como estaban, en su
 # posición original (`despues_de`), y la migración 20261117002000 los borra. Ningún endpoint los declara y `--verificar` no los trata
@@ -350,7 +354,7 @@ def generar_sql(roles, permisos):
     filas = []
     for p in permisos:
         for c in codigos:
-            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL + ADICIONES_ROL_FASE01 + ADICIONES_ROL_RECURSOS + ADICIONES_ROL_FASE2 + ADICIONES_ROL_AVISOS_ADM:
+            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL + ADICIONES_ROL_FASE01 + ADICIONES_ROL_RECURSOS + ADICIONES_ROL_FASE2 + ADICIONES_ROL_AVISOS_ADM + ADICIONES_ROL_LOTE5:
                 filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(historico.get((c, p['permiso']), p[c]))})")
     l.append(",\n".join(filas) + ";")
     return "\n".join(l) + "\n"
@@ -589,6 +593,9 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     for r, perm in ADICIONES_ROL_AVISOS_ADM:
         if not por_permiso.get(perm, {}).get(r):
             errores.append(f"ADICIONES_ROL_AVISOS_ADM dice {r} {perm} y permisos.csv no se lo asigna")
+    for r, perm in ADICIONES_ROL_LOTE5:
+        if not por_permiso.get(perm, {}).get(r):
+            errores.append(f"ADICIONES_ROL_LOTE5 dice {r} {perm} y permisos.csv no se lo asigna")
     usados = {parte for e in endpoints for parte in partes_permiso(e["permiso"])}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:

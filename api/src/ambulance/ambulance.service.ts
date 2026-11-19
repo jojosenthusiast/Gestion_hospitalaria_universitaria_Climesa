@@ -12,6 +12,8 @@ import { CREW_COVERAGE_DAYS, HOUR_MS, crewCoverageGaps, CREW_ON_DUTY_SQL, CREW_R
 type Unit = { id: string; estado: UnitState; version: number };
 type Service = { id: string; unidad_id: string; solicitud_id: string | null; paciente_id: string | null; despachado_en: Date; finalizado_en: Date | null; version: number };
 export type LogFilters = { from?: string; to?: string; type?: string; finalState?: string; priority?: string; crewId?: string; municipality?: string; minResponseMinutes?: string; q?: string };
+/** Administrative close (BL-05): maintenance and dispatch together, which only Jefatura holds. */
+const canCloseService = (actor: Actor) => hasPermission(actor, 'ambulancia.mantenimiento') && hasPermission(actor, 'ambulancia.despachar');
 /**
  * Permiso base del contenido clínico del prehospital (privacidad.md); además hace falta el contexto de quien recibe: turno en curso
  * en el área de Emergencia o relación de atención con el paciente vinculado (`receivingContext`).
@@ -59,7 +61,7 @@ export class AmbulanceService {
         const milestones = (await c.query('SELECT tipo AS type,ocurrido_en AS "occurredAt" FROM ambulancia.hito WHERE servicio_id=$1 ORDER BY ocurrido_en,registrado_en', [service.id])).rows;
         const location = (await c.query('SELECT latitud::float AS latitude,longitud::float AS longitude,capturada_en AS "capturedAt" FROM ambulancia.ubicacion WHERE servicio_id=$1 ORDER BY capturada_en DESC LIMIT 1', [service.id])).rows[0] ?? null;
         // BL-05: Jefatura cierra administrativamente un servicio que la tripulación no puede finalizar.
-        const allowedActions = hasPermission(actor, 'ambulancia.mantenimiento') ? ['cerrar'] : [];
+        const allowedActions = canCloseService(actor) ? ['cerrar'] : [];
         const done = milestones.map((m: { type: string }) => m.type);
         // S5 (preconditions): only the assigned crew operates the service (`crewService`), so only it is offered the actions.
         if (actor.staffId && crew.some((member: { staffId: string }) => member.staffId === actor.staffId)) {
@@ -91,7 +93,7 @@ export class AmbulanceService {
       const duty = await this.onDuty(c, this.clock.now());
       const change = (await c.query<{ motivo: string | null; en: Date }>('SELECT motivo,en FROM ambulancia.cambio_estado WHERE unidad_id=$1 AND hacia=$2 ORDER BY id DESC LIMIT 1', [unit.id, unit.state])).rows[0];
       Object.assign(unit, { stateReason: change?.motivo ?? null, stateSince: change?.en ?? null });
-      const result: Record<string, unknown> = { unit, activeService, canSetMaintenance: hasPermission(actor, 'ambulancia.mantenimiento') || hasPermission(actor, 'ambulancia.operar'), paramedicOnDuty: duty.paramedic, driverOnDuty: duty.driver, paramedicWithAccountOnDuty: duty.paramedicWithAccount, dispatchBlock: dispatchBlock(unit.state, duty.paramedic, duty.driver, duty.paramedicWithAccount) };
+      const result: Record<string, unknown> = { unit, activeService, canSetMaintenance: hasPermission(actor, 'ambulancia.mantenimiento'), paramedicOnDuty: duty.paramedic, driverOnDuty: duty.driver, paramedicWithAccountOnDuty: duty.paramedicWithAccount, dispatchBlock: dispatchBlock(unit.state, duty.paramedic, duty.driver, duty.paramedicWithAccount) };
       if (hasPermission(actor, 'ambulancia.despachar')) {
         const pending = (await c.query(`SELECT s.id,s.canal AS channel,s.direccion AS address,s.municipio AS municipality,s.latitud::float AS latitude,s.longitud::float AS longitude,s.motivo AS reason,s.telefono_contacto AS "contactPhone",s.creada_en AS "createdAt",s.version,s.paciente_id AS patient,
             s.solicitante_nombre AS "callerName",p.expediente AS "patientRecord",
@@ -111,9 +113,8 @@ export class AmbulanceService {
 
   /** Entrar o salir de mantenimiento; salir deja la unidad Disponible y exige paramédico de turno (FR-109-06, FR-109-09). */
   async setMaintenance(actor: Actor, dto: MaintenanceDto, key?: string) {
-    // Lote 5, S8: the crew (ambulancia.operar) also puts its unit in maintenance, not only Jefatura.
-    const permission = hasPermission(actor, 'ambulancia.mantenimiento') ? 'ambulancia.mantenimiento' : 'ambulancia.operar';
-    const work = async (c: PoolClient) => {
+    // Lote 5, S8: Jefatura and the crew (PAR has ambulancia.mantenimiento since 20261129003000).
+    return this.commands.run(actor, 'ambulancia.mantenimiento:unidad', key, dto, async c => {
       const unit = await this.lockUnit(c);
       if (unit.version !== dto.version) throw new VersionConflictException(unit.version, 'La unidad cambió; vuelve a consultar su estado.');
       let target: UnitState;
@@ -128,13 +129,10 @@ export class AmbulanceService {
         target = 'disponible';
       }
       const version = await this.setUnit(c, actor, unit, target, dto.reason.trim());
-      await this.commands.audit(c, actor, { action: 'ambulancia.mantenimiento', entity: 'unidad', entityId: unit.id, permission, reason: dto.reason, detail: { from: unit.estado, to: target } });
+      await this.commands.audit(c, actor, { action: 'ambulancia.mantenimiento', entity: 'unidad', entityId: unit.id, permission: 'ambulancia.mantenimiento', reason: dto.reason, detail: { from: unit.estado, to: target } });
       await this.commands.event(c, 'ambulancia.estado_cambiado', 'unidad', unit.id, version, ['ambulancia']);
-      return { id: unit.id, state: target as UnitState, version };
-    };
-    return permission === 'ambulancia.mantenimiento'
-      ? this.commands.run(actor, 'ambulancia.mantenimiento:unidad', key, dto, work)
-      : this.commands.run(actor, 'ambulancia.operar:unidad', key, dto, work);
+      return { id: unit.id, state: target, version };
+    });
   }
 
   /**
@@ -346,6 +344,8 @@ export class AmbulanceService {
    * única unidad a Disponible en la misma transacción, como el hito `finalizado` de la tripulación.
    */
   async close(actor: Actor, id: string, dto: CloseServiceDto, key?: string) {
+    // Lote 5 S8: PAR got ambulancia.mantenimiento for the unit; closing a service stays with Jefatura (it also dispatches).
+    if (!canCloseService(actor)) throw new ForbiddenException('Solo Jefatura cierra administrativamente un servicio.');
     return this.commands.run(actor, `ambulancia.mantenimiento:servicio:${id}:cerrar`, key, dto, async c => {
       const now = this.clock.now();
       const unit = await this.lockUnit(c);
