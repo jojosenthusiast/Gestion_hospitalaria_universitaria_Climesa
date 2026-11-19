@@ -1,44 +1,5 @@
 import Foundation
 
-/// I03: vincular la cuenta con el expediente (spec 101, FR-101-08 a FR-101-10). El cliente solo revisa el formato;
-/// la API valida el DUI contra el expediente. Igual que `LinkRules` de Android.
-public enum LinkRules {
-    public static func digits(_ text: String) -> String { text.filter(\.isNumber) }
-
-    /// DUI de 9 dígitos con dígito verificador válido (8 dígitos ponderados de 9 a 2, módulo 10).
-    public static func validDui(_ text: String) -> Bool {
-        let numbers = digits(text).compactMap { $0.wholeNumberValue }
-        guard numbers.count == 9, numbers.prefix(8).contains(where: { $0 != 0 }) else { return false }
-        let sum = numbers.prefix(8).enumerated().reduce(0) { $0 + $1.element * (9 - $1.offset) }
-        return (10 - sum % 10) % 10 == numbers[8]
-    }
-
-    public static func formatDui(_ text: String) -> String {
-        let value = digits(text)
-        return value.count == 9 ? "\(value.prefix(8))-\(value.suffix(1))" : text.trimmingCharacters(in: .whitespaces)
-    }
-
-    /// Errores por campo (`dui`, `birth`); vacío cuando se puede enviar.
-    public static func errors(dui: String, birth: String, today: Date) -> [String: String] {
-        var errors: [String: String] = [:]
-        let trimmed = dui.trimmingCharacters(in: .whitespaces)
-        if trimmed.range(of: #"^[0-9]{8}-?[0-9]$"#, options: .regularExpression) == nil || !validDui(trimmed) {
-            errors["dui"] = "Usa 9 dígitos con un verificador válido."
-        }
-        let day = birth.trimmingCharacters(in: .whitespaces)
-        if day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) == nil || ClimesaDates.parse(day + "T12:00:00Z") == nil {
-            errors["birth"] = "Escribe la fecha como aaaa-mm-dd."
-        } else if day > ClimesaDates.localDay(today) {
-            errors["birth"] = "La fecha de nacimiento no puede ser futura."
-        }
-        return errors
-    }
-
-    public static func body(dui: String, birth: String) -> LinkRequestBody {
-        LinkRequestBody(dui: formatDui(dui), birth: birth.trimmingCharacters(in: .whitespaces))
-    }
-}
-
 /// I05: seguimiento del número propio en la fila.
 public enum QueueRules {
     /// Número vigente de la persona (el más reciente que no terminó).

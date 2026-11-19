@@ -384,30 +384,29 @@ public struct ClinicalHistory: Decodable, Sendable, Equatable {
     public let allowedActions: [String]?
 }
 
-/// `LinkRequestResponse` de `POST /cuentas/vinculacion`.
-public struct LinkRequestResult: Decodable, Sendable, Equatable {
-    public let id: String
-    public let state: LinkState
-    public let createdAt: String
-    public let resolvedAt: String?
-    public let rejectionReason: String?
-    public let version: Int
-}
-
-/// `MyLinkResponse` of `GET /me/vinculacion` (G2): the account's last link request, so the screen opens in its real state.
+/// `MyLinkResponse` of `GET /me/vinculacion` (U12): linking is automatic by verified email. The account joins the one
+/// active record whose email matches the email Supabase Auth confirmed, so the app shows either the linked record or the
+/// email Recepción must write on the record. The retired DUI request (`request`) always comes back null and is not read.
 public struct MyLink: Decodable, Sendable, Equatable {
-    /// `LinkDeclaredResponse`: what the account declared, to ask again with the form filled in.
-    public struct Declared: Decodable, Sendable, Equatable {
-        public let dui: String
-        /// Local day `yyyy-MM-dd`.
-        public let birth: String?
-        public init(dui: String, birth: String?) { self.dui = dui; self.birth = birth }
-    }
     public let linked: Bool
-    /// nil when the account never asked.
-    public let request: LinkRequestResult?
-    /// Absent when the account never asked, and on a server before R7.
-    public let declared: Declared?
+    /// The account's email; nil when the server has none.
+    public let email: String?
+    /// Supabase Auth confirmed the email. Only a confirmed email joins the account with the record.
+    public let emailVerified: Bool
+
+    public init(linked: Bool, email: String?, emailVerified: Bool) {
+        self.linked = linked; self.email = email; self.emailVerified = emailVerified
+    }
+
+    enum CodingKeys: String, CodingKey { case linked, email, emailVerified }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        linked = try container.decode(Bool.self, forKey: .linked)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        // A server before U12 does not send it: treat the email as not confirmed yet.
+        emailVerified = try container.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
+    }
 }
 
 /// `MyAccessResponse` de `GET /me/accesos`: quién vio mi expediente, sin nombres de personas.

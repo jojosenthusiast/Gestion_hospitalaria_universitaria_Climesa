@@ -100,7 +100,7 @@ struct PatientHomeView: View {
         }
     }
 
-    /// S13: while the account is not linked, linking is the one thing to do: open the form in one tap.
+    /// S13: while the account is not linked, linking is the one thing to do: open its status (U12: by email) in one tap.
     @ViewBuilder private var linkCard: some View {
         SectionCard {
             Text("home.unlinked.title").font(Typo.subheading).foregroundStyle(Theme.ink)
@@ -1102,32 +1102,24 @@ struct PatientSectionView: View {
     }
 }
 
-/// I03 · Vincular expediente (G2). Opens in the real state of the request (`GET /me/vinculacion`): the form when there is
-/// none, «En revisión desde …», approved, or rejected with the reason and «Volver a pedir» filled with what was declared.
-/// A failed read is shown with «Reintentar» and is never taken as "no request", so nobody asks twice. It rereads on
-/// `vinculacion.*` (tiempo real).
+/// I03 · Vincular expediente (U12). Linking is automatic by verified email (`GET /me/vinculacion`): the linked state, a
+/// request to confirm the email first, or «Pide en Recepción que anoten este correo: {email}». There is no form: the
+/// account joins its record on its next session or when Recepción saves that email on the record. A failed read is shown
+/// with «Reintentar». It rereads on `vinculacion.*` (tiempo real); a refreshed profile with a record shows it linked.
 struct LinkRecordView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<MyLink>()
-    @State private var submission = Submission()
-    @State private var dui = ""
-    @State private var birth = Calendar.current.date(byAdding: .year, value: -30, to: Date()) ?? Date()
-    @State private var errors: [String: String] = [:]
-    /// The request this screen just created, until a read returns it.
-    @State private var sent: LinkRequestResult?
-    /// «Volver a pedir» after a rejection: the form, filled with what was declared.
-    @State private var retrying = false
 
     private var profileLinked: Bool { account.profile?.patientId != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if profileLinked {
-                PatientNotice(text: L.text("link.approved"))
+                content(.linked)
             } else {
                 LoadState(loader: loader, retry: load) { link in
-                    content(LinkStatusRules.screen(link, profileLinked: false, sent: sent))
+                    content(LinkStatusRules.screen(link, profileLinked: false))
                 }
             }
         }
@@ -1136,76 +1128,30 @@ struct LinkRecordView: View {
 
     @ViewBuilder private func content(_ screen: LinkStatusRules.Screen) -> some View {
         switch screen {
-        case .form:
-            form
-        case let .pending(since):
-            SectionCard(eyebrow: L.text("link.status")) {
-                PatientTag(LinkState.pendiente.rawValue, label: LinkStatusRules.pendingText(since))
-                EmptyNote("link.pending.body")
-            }
-        case .approved:
+        case .linked:
             PatientNotice(text: L.text("link.approved"))
-        case let .rejected(reason, prefill):
-            PatientNotice(text: LinkStatusRules.rejectedText(reason), failure: true)
-            if retrying {
-                form
-            } else {
-                ClimesaButton(title: L.text("link.retry")) {
-                    if let prefill {
-                        dui = prefill.dui
-                        if let day = LinkStatusRules.birthDate(prefill.birth) { birth = day }
-                    }
-                    retrying = true
-                }
-            }
+        case let .emailNotVerified(email):
+            // Confirm the email first: only a confirmed email joins the account with the record.
+            PatientNotice(text: LinkStatusRules.confirmEmailText, failure: true)
+            receptionCard(email)
+        case let .askReception(email):
+            receptionCard(email)
         }
     }
 
-    @ViewBuilder private var form: some View {
-        Text("link.intro").font(Typo.body).foregroundStyle(Theme.muted)
-        SectionCard {
-            FormField(label: L.text("link.dui"), text: $dui, error: errors["dui"] ?? submission.fieldErrors["dui"])
-                .keyboardType(.numbersAndPunctuation)
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                DatePicker("link.birth", selection: $birth, in: ...Date(), displayedComponents: .date).font(Typo.label).foregroundStyle(Theme.ink)
-                FieldError(text: errors["birth"] ?? submission.fieldErrors["birth"])
-            }
+    /// «Pide en Recepción que anoten este correo: {email}», with what happens next.
+    private func receptionCard(_ email: String?) -> some View {
+        SectionCard(eyebrow: L.text("link.status")) {
+            Text(verbatim: LinkStatusRules.receptionText(email)).font(Typo.body).foregroundStyle(Theme.ink)
+            EmptyNote("link.reception.body")
         }
-        PatientSubmissionNotice(submission: submission)
-        ClimesaButton(title: L.text("link.submit"), loading: submission.busy) { Task { await send() } }
     }
 
     private func load() async {
         await loader.load { try await account.client().get("/me/vinculacion", as: MyLink.self) }
         guard let link = loader.value else { return }
-        if link.request?.id == sent?.id { sent = nil }
-        // Approved on the server before the profile knows it: refresh the profile so the tabs follow.
-        if LinkStatusRules.screen(link, profileLinked: false) == .approved { await account.refreshProfile() }
-    }
-
-    private func send() async {
-        let day = Self.dayText(birth)
-        errors = LinkRules.errors(dui: dui, birth: day, today: Date())
-        guard errors.isEmpty else { return }
-        let body = LinkRules.body(dui: dui, birth: day)
-        var created: LinkRequestResult?
-        let ok = await submission.run(body: body) { key in
-            created = try await account.client().send("POST", "/cuentas/vinculacion", body: body, key: key, as: LinkRequestResult.self)
-        }
-        guard ok, let created else { return }
-        sent = created
-        retrying = false
-        await load()
-    }
-
-    /// La fecha elegida en el calendario del dispositivo, como `yyyy-MM-dd`.
-    static func dayText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        // Linked on the server before the profile knows it: refresh the profile so the tabs follow.
+        if LinkStatusRules.screen(link, profileLinked: false) == .linked { await account.refreshProfile() }
     }
 }
 
