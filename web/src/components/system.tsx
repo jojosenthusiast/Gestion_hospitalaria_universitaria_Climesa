@@ -42,15 +42,20 @@ export type SectionSource<T> = { data: T | null; loading: boolean; error: { stat
 export function SectionState<T>({ state, children, rows = 4, compact = false, empty }: { state: SectionSource<T>; children: (data: T) => ReactNode; rows?: number; compact?: boolean; empty?: (data: T) => string | null }) {
   if (state.loading && !state.data) return <Skeleton rows={compact ? 2 : rows} />;
   if (state.error) {
-    // WEB-04: "no permission" and "load failed" are distinct; both can retry (access can be granted meanwhile).
-    const denied = state.error.status === 403;
-    const title = denied ? 'No tienes acceso a esta información' : 'No pudimos cargar esta información';
-    // A 403 with its own reason (e.g. «needs a care relationship») says why; a bare «Forbidden» keeps the generic text.
-    const specific = denied && state.error.message && !/^(forbidden|prohibido|no autorizado|sin permiso)\.?$/i.test(state.error.message.trim());
-    const message = denied ? (specific ? state.error.message : 'Tu cuenta no tiene permiso para consultar esta sección.') : state.error.message;
+    // WEB-04, S8: "no permission" is not a failure. Retrying a 403 can never succeed, so it is a calm info state with
+    // the server's reason and no retry; only a failed load (network, 5xx, other) offers «Volver a intentar».
+    if (state.error.status === 403) {
+      // A 403 with its own reason (e.g. «needs a care relationship») says why; a bare «Forbidden» keeps the generic text.
+      const specific = state.error.message && !/^(forbidden|prohibido|no autorizado|sin permiso)\.?$/i.test(state.error.message.trim());
+      const message = specific ? state.error.message : 'Tu cuenta no tiene permiso para consultar esta sección.';
+      return <div className={`section-state-info${compact ? ' is-compact' : ''}`} role="status">
+        <Icon name="lock" size={compact ? 16 : 20} />
+        <div><strong>No tienes acceso a esta información</strong><span>{message}</span>{!compact && <span>Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta.</span>}</div>
+      </div>;
+    }
     return <div className={`section-state-error${compact ? ' is-compact' : ''}`} role="alert">
       <Icon name="alert" size={compact ? 16 : 20} />
-      <div><strong>{title}</strong><span>{message}</span>{denied && !compact && <span>Si la necesitas para tu trabajo, pide a un administrador que revise los permisos de tu cuenta y vuelve a intentar.</span>}</div>
+      <div><strong>No pudimos cargar esta información</strong><span>{state.error.message}</span></div>
       <button type="button" className={compact ? 'row-action' : 'secondary-button'} onClick={state.refresh}><Icon name="retry" size={compact ? 16 : 18} />Volver a intentar</button>
     </div>;
   }

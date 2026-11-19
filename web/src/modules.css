@@ -610,6 +610,15 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .section-state-error.is-compact strong { margin-right: var(--space-2); font-size: var(--text-md); }
 .section-state-error.is-compact > button { grid-column: auto; }
 /* R1: sección vacía: una sola línea tranquila, sin segundo título ni caja. */
+/* S8: a 403 is information, not a failure: the quiet tone of the info notices, no danger colour and no retry. */
+.section-state-info { padding: var(--space-4); display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--space-2) var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--soft); color: var(--primary-text); }
+.section-state-info > svg { margin-top: 2px; }
+.section-state-info > div { min-width: 0; display: grid; gap: var(--space-1); }
+.section-state-info strong { font-size: var(--text-base); }
+.section-state-info span { color: var(--ink); font-size: var(--text-md); line-height: 1.5; overflow-wrap: anywhere; }
+.section-state-info.is-compact { padding: var(--space-2) 0; align-items: center; border: 0; background: transparent; }
+.section-state-info.is-compact > div { display: block; }
+.section-state-info.is-compact strong { margin-right: var(--space-2); font-size: var(--text-md); }
 .section-empty { margin: 0; padding: var(--space-2) 0; color: var(--muted); font-size: var(--text-md); line-height: 1.45; }
 .section-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-3); flex-wrap: wrap; }
 .section-count { color: var(--muted); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }

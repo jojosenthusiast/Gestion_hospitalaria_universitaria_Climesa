@@ -1,4 +1,5 @@
 import { cleanup, render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { SectionState } from '../components/system';
 import { ApiError, type AccessProfile, type Api } from '../lib/api';
@@ -25,6 +26,26 @@ describe('estado único de sección (R1, WC-40)', () => {
     expect(screen.getAllByText('No pudimos cargar esta información')).toHaveLength(2);
     expect(screen.getAllByText('El servicio no está disponible.')).toHaveLength(2);
     expect(screen.getAllByRole('button', { name: 'Volver a intentar' })).toHaveLength(2);
+  });
+
+  // S8: a refusal must never feel broken; a 403 never offers retry.
+  it('un 403 muestra el motivo del servidor como información, sin «Volver a intentar»', () => {
+    const error = new ApiError('Necesitas una relación de atención con este paciente.', 403, 'sin_relacion');
+    render(<><SectionState state={state({ error })}>{() => null}</SectionState><SectionState compact state={state({ error })}>{() => null}</SectionState></>);
+    expect(screen.getAllByText('Necesitas una relación de atención con este paciente.')).toHaveLength(2);
+    expect(screen.getAllByText('No tienes acceso a esta información')).toHaveLength(2);
+    expect(screen.queryByRole('button', { name: 'Volver a intentar' })).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('un 500 o un fallo de red siguen ofreciendo «Volver a intentar»', async () => {
+    const refresh = vi.fn();
+    const { rerender } = render(<SectionState state={state({ error: new ApiError('Error interno.', 500), refresh })}>{() => null}</SectionState>);
+    await userEvent.click(screen.getByRole('button', { name: 'Volver a intentar' }));
+    expect(refresh).toHaveBeenCalledTimes(1);
+    rerender(<SectionState state={state({ error: new ApiError('No hay conexión con el servidor.', 0), refresh })}>{() => null}</SectionState>);
+    expect(screen.getByText('No pudimos cargar esta información')).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();
   });
 
   it('una sección vacía es una sola línea, sin título', () => {

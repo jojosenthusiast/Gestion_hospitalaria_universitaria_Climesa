@@ -1,6 +1,6 @@
 import { useCallback,useEffect,useMemo,useRef,useState,type FormEvent } from 'react';
 import type { Session } from '@supabase/supabase-js';
-import type { AccessProfile } from './lib/api';
+import { ApiError,type AccessProfile } from './lib/api';
 import { IntentApi } from './features/intent';
 import { LiveContext } from './features/live-scope';
 import { SessionExpiryWarning,useIdleSession } from './features/session';
@@ -58,11 +58,13 @@ function Portal({session,onExpired}:{session:Session;onExpired:(reason?:'idle'|'
  // rejects the renewed token too, the session ends with the expired-session notice.
  const expire=useRef(onExpired);expire.current=onExpired;
  const api=useMemo(()=>new IntentApi(async()=>{const {data}=await supabase!.auth.getSession();return data.session?.access_token??token.current;},renewOnce(()=>supabase!.auth.refreshSession().then(({data,error})=>!error&&!!data.session,()=>false),()=>expire.current('expired'))),[]);
- const [profile,setProfile]=useState<AccessProfile|null>(null),[error,setError]=useState<string|null>(null),[loading,setLoading]=useState(true),[slow,setSlow]=useState(false);
+ const [profile,setProfile]=useState<AccessProfile|null>(null),[error,setError]=useState<string|null>(null),[denied,setDenied]=useState(false),[loading,setLoading]=useState(true),[slow,setSlow]=useState(false);
  // MA-OPS-01: /auth/me is usually the request that wakes the API; it is retried and, after 5 s, the screen says why it waits.
- const load=useCallback(()=>{setLoading(true);setError(null);setSlow(false);void retryColdStart(()=>api.request<AccessProfile>('/auth/me'),()=>setSlow(true)).then(setProfile).catch(e=>setError(e instanceof Error?e.message:'No se pudo verificar el acceso.')).finally(()=>{setLoading(false);setSlow(false);});},[api]);
+ const load=useCallback(()=>{setLoading(true);setError(null);setDenied(false);setSlow(false);void retryColdStart(()=>api.request<AccessProfile>('/auth/me'),()=>setSlow(true)).then(setProfile).catch(e=>{setDenied(e instanceof ApiError&&e.status===403);setError(e instanceof Error?e.message:'No se pudo verificar el acceso.');}).finally(()=>{setLoading(false);setSlow(false);});},[api]);
  useEffect(load,[load]);
  if(loading&&!profile)return <StartupView slow={slow}/>;
+ // S8: a 403 is the server's answer, not a failure: its reason, no retry (it can never succeed); «Cerrar sesión» stays.
+ if(denied)return <div><StatusView settled title="Tu cuenta no tiene acceso" detail={error??'Tu cuenta no tiene permiso para usar esta aplicación.'}/><button className="access-logout" onClick={()=>void supabase?.auth.signOut({scope:'local'})}>Cerrar sesión</button></div>;
  if(error||!profile)return <div><StatusView title="No pudimos validar el acceso" detail={error??'Intenta nuevamente.'} action="Volver a intentar" onAction={load}/><button className="access-logout" onClick={()=>void supabase?.auth.signOut({scope:'local'})}>Cerrar sesión</button></div>;
  if(!profile.platforms.includes('web'))return <PlatformGuidanceScreen profile={profile} title="Tu rol no usa esta aplicación" action={{label:'Cerrar sesión',onClick:()=>void supabase?.auth.signOut({scope:'local'})}}/>;
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;
