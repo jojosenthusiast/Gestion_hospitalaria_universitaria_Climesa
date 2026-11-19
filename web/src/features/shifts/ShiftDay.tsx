@@ -33,8 +33,8 @@ export function ShiftDay({ day, label, now, shifts, gaps, typeOf, onOpen, planni
   const dragged = useRef(false);
   const segments = daySegments(shifts, range, day).sort((a, b) => a.from - b.from || a.item.person.localeCompare(b.item.person, 'es'));
   const groups: Group[] = [
-    { id: 'ayer', name: 'Vienen de ayer', rows: segments.filter(s => s.startsBefore) },
-    ...BANDS.map(b => ({ id: b.id, name: b.name, rows: segments.filter(s => !s.startsBefore && bandOf(s.item) === b.id) })),
+    { id: 'ayer' as const, name: 'Vienen de ayer', rows: segments.filter(s => s.startsBefore) },
+    ...BANDS.map((b): Group => ({ id: b.id, name: b.name, rows: segments.filter(s => !s.startsBefore && bandOf(s.item) === b.id) })),
   ].filter(g => g.rows.length > 0);
   const hours = hourlyLoad(shifts, gaps, day);
   const nowAt = now >= day.start && now < day.end ? (now - day.start) / DAY : null;
