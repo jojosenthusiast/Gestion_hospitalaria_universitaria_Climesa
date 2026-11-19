@@ -1,0 +1,35 @@
+/* S19: printable prescription. On screen it is a preview inside the dialog; on paper only the body copy prints. */
+.rx-preview { padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-card, 12px); background: var(--soft); }
+.rx-sheet { max-width: 720px; margin: 0 auto; padding: 32px 36px; background: var(--surface); color: var(--ink); border-radius: 4px; box-shadow: 0 1px 2px oklch(0 0 0 / 0.06), 0 4px 16px oklch(0 0 0 / 0.06); display: grid; gap: 24px; }
+.rx-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; padding-bottom: 16px; border-bottom: 2px solid var(--primary, #0043b2); }
+.rx-head div { display: grid; gap: 2px; }
+.rx-brand { font-size: 1.375rem; letter-spacing: 0.04em; color: var(--primary, #0043b2); }
+.rx-head span { color: var(--muted); font-size: 0.875rem; }
+.rx-head h2 { margin: 0; font-size: 1.125rem; font-weight: 700; }
+.rx-meta { margin: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 24px; }
+.rx-meta dt { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.rx-meta dd { margin: 2px 0 0; font-size: 0.9375rem; overflow-wrap: anywhere; }
+.rx-meta .rx-wide { grid-column: 1 / -1; }
+.rx-items { margin: 0; padding: 0 0 0 20px; display: grid; gap: 14px; }
+.rx-items li { display: grid; gap: 2px; padding-left: 4px; }
+.rx-items strong { font-size: 1rem; }
+.rx-items span { font-size: 0.9375rem; }
+.rx-note { color: var(--muted); font-style: italic; }
+.rx-sign { margin-top: 32px; justify-self: end; width: min(280px, 100%); display: grid; gap: 4px; text-align: center; }
+.rx-line { display: block; height: 0; border-top: 1px solid var(--ink); margin-bottom: 4px; }
+.rx-sign small { color: var(--muted); }
+.rx-print-root { display: none; }
+@media (max-width: 560px) { .rx-sheet { padding: 20px; } .rx-meta { grid-template-columns: 1fr; } }
+@media print {
+  body:has(> .rx-print-root) > :not(.rx-print-root) { display: none !important; }
+  .rx-print-root { display: block !important; }
+  .rx-print-root .rx-sheet { box-shadow: none; max-width: none; padding: 0; background: none; color: #111; }
+  .rx-print-root .rx-head { border-bottom-color: #111; }
+  .rx-print-root .rx-brand { color: #111; }
+  @page { margin: 18mm; }
+}
+/* The doctor's issued prescription inside the consultation, with its print action on the same line as the title. */
+.rx-issued-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px 16px; }
+.rx-issued-head h3 { margin: 0; }
+.rx-issued ul { margin: 8px 0 0; padding-left: 18px; display: grid; gap: 4px; }
+.sign-pending-exams { margin: 8px 0 0; }

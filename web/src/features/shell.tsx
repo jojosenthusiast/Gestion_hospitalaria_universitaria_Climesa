@@ -13,13 +13,13 @@ import { Dashboard } from './dashboards';
  */
 const loaders={
  patients:()=>import('./patients'),personnel:()=>import('./personnel'),spaces:()=>import('./spaces'),ambulance:()=>import('./ambulance'),
- ambulanceLog:()=>import('./ambulance-log'),appointments:()=>import('./appointments'),consultations:()=>import('./consultations'),
+ ambulanceLog:()=>import('./ambulance-log'),appointments:()=>import('./appointments'),consultations:()=>import('./consultations'),history:()=>import('./clinical-history'),
  queue:()=>import('./queue'),laboratory:()=>import('./laboratory'),labCatalog:()=>import('./lab-catalog'),inventory:()=>import('./inventory'),
  hospitalization:()=>import('./hospitalization'),privacy:()=>import('./privacy'),
  notices:()=>import('./notices'),metrics:()=>import('./metrics'),
 };
 type LoaderId=keyof typeof loaders;
-const moduleCode:Record<string,LoaderId>={pacientes:'patients',personal:'personnel',turnos:'personnel',camas:'spaces',espacios:'spaces',ambulancia:'ambulance','bitacora-ambulancia':'ambulanceLog',auditoria:'privacy',laboratorio:'laboratory','catalogo-laboratorio':'labCatalog',inventario:'inventory',hospitalizacion:'hospitalization',fila:'queue',citas:'appointments',consultas:'consultations',avisos:'notices',metricas:'metrics'};
+const moduleCode:Record<string,LoaderId>={pacientes:'patients',personal:'personnel',turnos:'personnel',camas:'spaces',espacios:'spaces',ambulancia:'ambulance','bitacora-ambulancia':'ambulanceLog',auditoria:'privacy',laboratorio:'laboratory','catalogo-laboratorio':'labCatalog',inventario:'inventory',hospitalizacion:'hospitalization',fila:'queue',citas:'appointments',consultas:'consultations',historial:'history',avisos:'notices',metricas:'metrics'};
 type Loaded={[I in LoaderId]:Awaited<ReturnType<(typeof loaders)[I]>>};
 const warmers:Partial<Record<LoaderId,(()=>Promise<void>)[]>>={};
 /**
@@ -45,6 +45,7 @@ const AmbulancePage=page('ambulance',m=>m.AmbulancePage);
 const AmbulanceLogPage=page('ambulanceLog',m=>m.AmbulanceLogPage);
 const AppointmentsPage=page('appointments',m=>m.AppointmentsPage);
 const ConsultationsPage=page('consultations',m=>m.ConsultationsPage);
+const MyHistoryPage=page('history',m=>m.MyHistoryPage);
 const QueuePage=page('queue',m=>m.QueuePage);
 const LaboratoryPage=page('laboratory',m=>m.LaboratoryPage);
 const LabCatalogPage=page('labCatalog',m=>m.LabCatalogPage);
@@ -73,7 +74,8 @@ class ModuleBoundary extends Component<{label:string;children:ReactNode},{failed
 function ModuleFallback({label}:{label:string}){return <><CompactHeader title={label}/><Skeleton rows={6} label={`Cargando ${label.toLowerCase()}…`}/></>;}
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
 /** `replacedBy`: the module hides when the account also sees that one (obs. 17: Edificio replaces Camas); its deep links go there. */
-export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean;replacedBy?:string};
+/** `context`: the module needs that context of the permission (S19: «Mi historial» is `expediente.ver` in `propio_revisado`, the patient's own record). */
+export type Module={id:string;label:string;permission?:string;context?:string;alsoPermissions?:string[];future?:boolean;replacedBy?:string};
 export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
@@ -91,14 +93,15 @@ export const modules:Module[]=[
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
  {id:'consultas',label:'Mi consultorio',permission:'consulta.iniciar'},
+ {id:'historial',label:'Mi historial',permission:'expediente.ver',context:'propio_revisado'},
  // S11: Avisos es de toda cuenta con sesión (bandeja «Para mí»); publicar, editar y retirar siguen con avisos.publicar.
  {id:'avisos',label:'Avisos'},
  {id:'metricas',label:'Métricas',permission:'metricas.ver'},
  {id:'perfil',label:'Perfil'},
 ];
-export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
+export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',historial:'clipboard',perfil:'user',avisos:'info',metricas:'grid'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
-const allowed=(profile:AccessProfile,m:Module)=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p));
+const allowed=(profile:AccessProfile,m:Module)=>!m.permission||(m.context?profile.permissions.some(p=>p.code===m.permission&&p.context===m.context):[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>{if(!allowed(profile,m))return false;const replacement=m.replacedBy&&modules.find(x=>x.id===m.replacedBy);return !(replacement&&allowed(profile,replacement));});
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
 export const hasWebModule=(profile:AccessProfile)=>visibleModules(profile).some(m=>m.permission);
@@ -158,6 +161,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  else if(route==='bitacora-ambulancia')content=<AmbulanceLogPage api={api} version={version}/>;
  else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;
+ else if(route==='historial')content=<MyHistoryPage api={api} profile={profile} version={version}/>;
  else if(route==='fila')content=<QueuePage api={api} profile={profile} version={version}/>;
  else if(route==='laboratorio')content=<LaboratoryPage api={api} profile={profile} version={version}/>;
  else if(route==='catalogo-laboratorio')content=<LabCatalogPage api={api} profile={profile} version={version}/>;

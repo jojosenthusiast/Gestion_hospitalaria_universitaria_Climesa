@@ -180,7 +180,7 @@ const menuCatalogo: Record<string, string[]> = {
   ENF: ['Pacientes', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
   MED: ['Pacientes', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos'],
-  PAC: ['Hospitalización', 'Fila del día', 'Citas'],
+  PAC: ['Hospitalización', 'Fila del día', 'Citas', 'Mi historial'],
 };
 
 describe('el menú depende solo del permiso (regla 8)', () => {
