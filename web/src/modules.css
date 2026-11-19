@@ -130,6 +130,9 @@
 /* Tablas adaptativas */
 .record-table { width: 100%; border-collapse: collapse; color: var(--ink); font-size: 14px; text-align: left; }
 .record-table th { position: sticky; top: 76px; z-index: 2; padding: 15px 20px; border-bottom: 1px solid var(--line); background: var(--bg); color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.04em; line-height: 1.4; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+/* Owner batch 1 (S21): inside `.data-workbench` (overflow-x: auto) the card is the sticky header's scroll container, so the
+   app-bar offset pushed the header over the first row and left an empty band. There the header sits at the card's top. */
+.data-workbench .record-table th { top: 0; }
 .record-table td { max-width: 340px; padding: 18px 20px; border-bottom: 1px solid var(--line); line-height: 1.55; overflow-wrap: break-word; word-break: normal; hyphens: manual; vertical-align: middle; }
 /* `break-word` (not `anywhere`) keeps whole words in the column's minimum width, so a narrow column never reads
    «Semipriva da»; a person's name gets room for two words per line and the actions column stays compact. */

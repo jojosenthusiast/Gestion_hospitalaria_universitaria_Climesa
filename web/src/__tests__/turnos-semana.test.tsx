@@ -99,33 +99,54 @@ function montar(ancho: boolean, lista: ShiftRow[] = turnos, semana: (path: strin
 }
 
 describe('turnos · vista semanal', () => {
-  it('en pantalla ancha abre la semana actual con un bloque por turno, la guardia de 24 h en dos días y la leyenda', async () => {
+  it('en pantalla ancha abre la semana como resumen por día: franjas, roles, lo que viene de ayer y los huecos', async () => {
     const api = montar(true);
     const semana = await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre$/ });
     expect(screen.getByRole('button', { name: 'Semana' }).getAttribute('aria-pressed')).toBe('true');
     const hoy = within(semana).getByRole('group', { name: /Hoy, martes, 10 de noviembre/ });
-    // Cada día tiene además su botón "Asignar turno el …" (S12); los bloques son los turnos.
-    const bloques = within(hoy).getAllByRole('button').filter(b => b.classList.contains('shift-block')).map(b => b.getAttribute('aria-label'));
-    expect(bloques).toEqual([
-      'Ana Ficticia Prueba, Emergencia, 07:00 a 07:00 del día siguiente, Guardia / 24 h, En curso',
-      'Rosa Enfermera Prueba, Emergencia, 08:00 a 14:00, Diurno, En curso',
-    ]);
+    expect(within(hoy).getByText('2 turnos')).toBeTruthy();
+    const franjas = within(within(hoy).getByRole('list', { name: 'Turnos por franja' })).getAllByRole('listitem').map(li => li.textContent);
+    expect(franjas).toEqual(['Mañana1Enfermería 1', 'Guardia1Médico 1']);
     const manana = within(semana).getByRole('group', { name: /Mañana, miércoles, 11 de noviembre/ });
-    expect(within(manana).getByRole('button', { name: /Ana Ficticia Prueba.*Guardia/ }).textContent).toMatch(/viene de ayer/);
+    expect(within(manana).getByText('1 viene de ayer')).toBeTruthy();
     // El hueco de cobertura se ve en su día y hora.
     expect(within(manana).getByRole('img', { name: /Hueco de cobertura de 07:00 a 19:00: Emergencia · Medicina \(0 de 1\)/ })).toBeTruthy();
     expect(api.request).toHaveBeenCalledWith('/turnos/cobertura?from=2026-11-09&to=2026-11-15', expect.anything());
+    // Sin nombres de una letra: la semana no dibuja bloques por persona.
+    expect(semana.querySelector('.shift-bar, .shift-block')).toBeNull();
+    // El turno de la semana siguiente no aparece hasta avanzar; desde su día se abre la vista Día con el nombre completo.
+    await userEvent.click(screen.getByRole('button', { name: 'Semana siguiente' }));
+    const siguiente = await screen.findByRole('region', { name: /Semana del 16 al 22 de noviembre/ });
+    await userEvent.click(within(siguiente).getByRole('button', { name: 'Ver el día miércoles, 18 de noviembre' }));
+    expect(screen.getByRole('button', { name: 'Día' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getAllByRole('button', { name: /Ana Ficticia Prueba, Emergencia, 07:00 a 15:00/ })).toHaveLength(1);
     const leyenda = screen.getByRole('list', { name: 'Estados del turno' });
     expect(within(leyenda).getAllByRole('listitem').map(i => i.textContent)).toEqual(['Borrador', 'Publicado', 'En curso', 'Completado', 'Ausente', 'Cancelado']);
-    // El turno de la semana siguiente no aparece hasta avanzar.
-    expect(screen.queryByRole('button', { name: /18:00|2026-11-18/ })).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Semana siguiente' }));
-    expect(await screen.findByRole('region', { name: /Semana del 16 al 22 de noviembre/ })).toBeTruthy();
-    expect(screen.getAllByRole('button', { name: /Ana Ficticia Prueba, Emergencia, 07:00 a 15:00/ })).toHaveLength(1);
   });
 
-  it('un bloque abre el turno con solo las acciones que permite la API', async () => {
+  it('la vista Día muestra nombres completos, la guardia que sigue mañana y la que viene de ayer', async () => {
     montar(true);
+    await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre$/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Día' }));
+    const hoy = screen.getByRole('group', { name: 'Hoy · martes 10 de noviembre' });
+    expect(within(hoy).getAllByRole('button').filter(b => b.classList.contains('shift-bar')).map(b => b.getAttribute('aria-label'))).toEqual([
+      'Rosa Enfermera Prueba, Emergencia, 08:00 a 14:00, Diurno, En curso',
+      'Ana Ficticia Prueba, Emergencia, 07:00 a 07:00 del día siguiente, Guardia / 24 h, En curso',
+    ]);
+    expect(within(hoy).getByText('Ana Ficticia Prueba')).toBeTruthy();
+    expect(within(hoy).getByRole('button', { name: /Ana Ficticia Prueba.*Guardia/ }).textContent).toMatch(/07:00 · sigue mañana/);
+    // El día elegido se lee completo en su botón, no cortado.
+    await userEvent.click(screen.getByRole('button', { name: 'mié 11' }));
+    expect(screen.getByRole('button', { name: 'Mañana · miércoles 11 de noviembre' }).getAttribute('aria-pressed')).toBe('true');
+    const manana = screen.getByRole('group', { name: 'Mañana · miércoles 11 de noviembre' });
+    expect(within(manana).getByRole('button', { name: /Ana Ficticia Prueba.*Guardia/ }).textContent).toMatch(/viene de ayer/);
+    expect(within(manana).getByRole('region', { name: 'Vienen de ayer: 1 turno' })).toBeTruthy();
+  });
+
+  it('un turno de la vista Día abre su detalle con solo las acciones que permite la API', async () => {
+    montar(true);
+    await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre$/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Día' }));
     await userEvent.click(await screen.findByRole('button', { name: /Rosa Enfermera Prueba, Emergencia, 08:00 a 14:00/ }));
     const detalle = await screen.findByRole('dialog', { name: 'Rosa Enfermera Prueba' });
     expect(within(detalle).getByText(/Entrada confirmada automáticamente/)).toBeTruthy();
@@ -136,7 +157,7 @@ describe('turnos · vista semanal', () => {
 
   it('la lista agrupa por día con encabezados y ordena por hora de inicio', async () => {
     montar(false);
-    expect(screen.getByRole('button', { name: 'Lista por día' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('button', { name: 'Lista' }).getAttribute('aria-pressed')).toBe('true');
     const dias = await screen.findAllByRole('heading', { level: 3 });
     // Todos los días tienen su ancla; la guardia del martes también aparece el miércoles, al que llega. Hoy va primero y
     // los días pasados quedan plegados al final (S12).
@@ -177,15 +198,15 @@ describe('turnos · guardia de 24 h en un clic', () => {
 describe('turnos · días, reloj y semanas lejanas', () => {
   const guardia = (n: number) => turno(`g-${n}`, n % 2 ? 'Ana Ficticia Prueba' : 'Rosa Enfermera Prueba', iso('2026-11-10', '07:00'), iso('2026-11-11', '07:00'), { type: 'guardia', state: 'en_curso', attendance: 'presente', allowedActions: ['marcar_presente', 'marcar_ausente'] });
 
-  it('cinco guardias martes 07:00 a miércoles 07:00: "N turnos más" del miércoles lleva a una lista con las cinco', async () => {
+  it('cinco guardias martes 07:00 a miércoles 07:00: el miércoles dice que vienen de ayer y su día las lista con nombre', async () => {
     montar(true, [1, 2, 3, 4, 5].map(guardia));
     const semana = await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre/ });
     const miercoles = within(semana).getByRole('group', { name: /Mañana, miércoles, 11 de noviembre/ });
-    await userEvent.click(within(miercoles).getByRole('button', { name: /turnos? más/ }));
-    const dia = await screen.findByRole('region', { name: /Mañana · miércoles, 11 de noviembre/ });
-    expect(within(dia).getAllByText('Viene del día anterior')).toHaveLength(5);
-    expect(within(dia).getByRole('heading', { level: 3 }).textContent).toMatch(/5 turnos/);
-    expect(document.getElementById('dia-2026-11-11')).toBe(dia);
+    expect(within(miercoles).getByText('5 vienen de ayer')).toBeTruthy();
+    await userEvent.click(within(miercoles).getByRole('button', { name: /Ver el día/ }));
+    const dia = screen.getByRole('group', { name: 'Mañana · miércoles 11 de noviembre' });
+    expect(within(dia).getAllByText('viene de ayer a 07:00')).toHaveLength(5);
+    expect(within(dia).getByRole('region', { name: 'Vienen de ayer: 5 turnos' })).toBeTruthy();
   });
 
   it('el lunes muestra la guardia que empezó el domingo anterior', async () => {
@@ -214,7 +235,8 @@ describe('turnos · días, reloj y semanas lejanas', () => {
     const api = montar(true, turnos, path => path === '/turnos?from=2027-02-07&to=2027-02-14' ? [lejano] : []);
     await screen.findByRole('region', { name: /Semana del 9 al 15 de noviembre/ });
     for (let i = 0; i < 13; i++) fireEvent.click(screen.getByRole('button', { name: 'Semana siguiente' }));
-    expect(await screen.findByRole('button', { name: /Ana Ficticia Prueba, Emergencia, 07:00 a 15:00/ })).toBeTruthy();
+    const martes = await screen.findByRole('group', { name: /martes, 9 de febrero/ });
+    expect(await within(martes).findByText('1 turno')).toBeTruthy();
     expect(api.request).toHaveBeenCalledWith('/turnos?from=2027-02-07&to=2027-02-14', expect.anything());
   });
 });

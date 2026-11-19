@@ -77,7 +77,9 @@ describe('turnos · jornada automática', () => {
   it('JOP ve la jornada abierta y asigna horarios sin un paso de publicación manual', async () => {
     const api = montar(jefatura, [turno('t-1', 'publicado')]);
     await screen.findByRole('table');
-    expect(screen.getByText('Jornada laboral abierta')).toBeTruthy();
+    // Owner obs 8: a compact status line in the header, not a banner.
+    expect(screen.getByText(/Jornada abierta ·/)).toBeTruthy();
+    expect(screen.queryByText('Jornada laboral abierta')).toBeNull();
     expect(screen.getByRole('button', { name: /Asignar turno/ })).toBeTruthy();
     expect(screen.queryByRole('button', { name: /Publicar planificación/ })).toBeNull();
     expect(api.write).not.toHaveBeenCalled();
@@ -252,10 +254,12 @@ describe('turnos · filtros con todas las opciones reales (obs. 2)', () => {
     const api = montarLectura();
     await screen.findByRole('table');
     await userEvent.click(screen.getByRole('button', { name: /Filtros/ }));
+    // Each option carries how many shifts of the week it has (counts next to filters).
     const roles = within(screen.getByRole('group', { name: 'Rol del personal' })).getAllByRole('button').map(b => b.textContent);
-    expect(roles).toEqual(['Médico', 'Enfermería', 'Laboratorio']);
-    const areas = within(screen.getByRole('group', { name: 'Área de trabajo' })).getAllByRole('button').map(b => b.textContent);
-    expect(areas).toEqual(['Emergencia', 'Laboratorio clínico', 'Consulta externa']);
+    expect(roles).toEqual(['Médico1', 'Enfermería1', 'Laboratorio0']);
+    const areas = within(screen.getByRole('group', { name: 'Área de trabajo' })).getAllByRole('button').map(b => b.textContent?.replace(/\d+$/, ''));
+    expect(areas).toEqual(expect.arrayContaining(['Emergencia', 'Laboratorio clínico', 'Consulta externa']));
+    expect(areas).toHaveLength(3);
     expect(api.request).toHaveBeenCalledWith('/turnos/catalogo', expect.anything());
     expect(api.request).not.toHaveBeenCalledWith('/personal', expect.anything());
   });
@@ -264,9 +268,9 @@ describe('turnos · filtros con todas las opciones reales (obs. 2)', () => {
     montarLectura();
     await screen.findByRole('table');
     await userEvent.click(screen.getByRole('button', { name: /Filtros/ }));
-    await userEvent.click(within(screen.getByRole('group', { name: 'Área de trabajo' })).getByRole('button', { name: 'Emergencia' }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Área de trabajo' })).getByRole('button', { name: /^Emergencia/ }));
     expect(personas()).toHaveLength(2);
-    await userEvent.click(within(screen.getByRole('group', { name: 'Rol del personal' })).getByRole('button', { name: 'Enfermería' }));
+    await userEvent.click(within(screen.getByRole('group', { name: 'Rol del personal' })).getByRole('button', { name: /^Enfermería/ }));
     expect(personas()).toHaveLength(1);
     expect(personas()[0]).toContain('Rosa Enfermera');
     await userEvent.click(screen.getByRole('button', { name: 'Quitar filtros' }));

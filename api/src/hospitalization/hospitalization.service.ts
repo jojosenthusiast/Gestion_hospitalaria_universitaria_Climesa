@@ -96,7 +96,7 @@ export class HospitalizationService {
   }
 
   private async bedChanged(c: PoolClient, bedId: string, version: number) {
-    await this.commands.event(c, 'cama.estado_cambiado', 'cama', bedId, version, await channelsFor(c, ['camas.ver_tablero']));
+    await this.commands.event(c, 'cama.estado_cambiado', 'cama', bedId, version, await channelsFor(c, ['camas.ver_tablero', 'espacios.ver']));
   }
 
   /** DAT-02: isolation blocks the other beds of the room with the catalogued origin `aislamiento`. */

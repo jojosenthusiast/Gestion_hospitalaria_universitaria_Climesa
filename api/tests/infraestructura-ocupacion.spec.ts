@@ -107,4 +107,21 @@ describe('HU-104 · disponibilidad recursiva, tablero por permiso y capacidad ba
   const pac=await call('PAC','GET','/inicio');
   expect(pac.body.beds).toBeUndefined();expect(pac.body.patients).toBeUndefined();expect(pac.body.shifts).toBeUndefined();
  });
+ test('obs. 7: ADM ve el estado de cada cama en /espacios sin datos del paciente y sigue sin acceso a /camas',async()=>{
+  const bed=(await bedsOf('HAB-205'))[0];
+  const admission=await occupy(bed);
+  const occupantId=(await fixture.pg.query<{paciente_id:string}>('SELECT paciente_id FROM hospitalizacion.admision WHERE id=$1',[admission])).rows[0].paciente_id;
+  const occupant=(await call('REC','GET','/camas')).body.find((b:any)=>b.id===bed.id).occupant;
+  expect(occupant).toEqual(expect.any(String));
+  expect((await call('ADM','GET','/camas')).status).toBe(403);
+  const response=await call('ADM','GET','/espacios');
+  expect(response.status).toBe(200);
+  const tree=response.body as any[];
+  expect(tree.find(n=>n.id===bed.id)).toMatchObject({type:'cama',bedState:'ocupada'});
+  expect(tree.filter(n=>n.type==='cama').every(n=>['libre','ocupada','reservada','limpieza','bloqueada'].includes(n.bedState))).toBe(true);
+  expect(tree.filter(n=>n.type!=='cama').every(n=>n.bedState===null)).toBe(true);
+  const raw=JSON.stringify(tree);
+  for(const leak of ['Ana Lucía','occupant','patientId',occupantId,admission,...(occupant.length>2?[occupant]:[])])expect(raw).not.toContain(leak);
+  for(const node of tree)expect(Object.keys(node).sort()).toEqual(['active','bedState','capacity','category','code','freeBeds','id','level','name','parentId','path','totalBeds','type','version']);
+ });
 });
