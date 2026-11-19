@@ -12,6 +12,9 @@
 .audit-chain-actions { display: flex; gap: 10px; flex-wrap: wrap; }
 
 .audit-presets { margin: 18px 24px 0; }
+.audit-view-hint { margin: 10px 24px 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.audit-mine { min-height: 48px; display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; cursor: pointer; }
+.audit-mine input { width: 18px; height: 18px; flex-shrink: 0; accent-color: var(--primary); }
 .audit-active-filters { padding: 12px 24px 0; }
 .audit-active-filters:empty { display: none; }
 .audit-toolbar { align-items: flex-end; }
@@ -24,7 +27,7 @@
 
 
 .audit-table th { white-space: nowrap; }
-.audit-sort { padding: 0; display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; cursor: pointer; }
+.audit-sort { padding: 0; display: inline-flex; align-items: center; gap: 6px; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 700; letter-spacing: inherit; text-transform: inherit; cursor: pointer; }
 .audit-sort:hover { color: var(--primary-text); }
 .audit-table small.mono, .audit-drawer .mono { font-family: "Atkinson Hyperlegible Mono", ui-monospace, monospace; font-size: 12px; }
 .audit-table td small { display: block; margin-top: 2px; color: var(--muted); }
@@ -53,6 +56,7 @@
 
 @media (max-width: 640px) {
   .audit-presets, .audit-active-filters, .audit-pager { padding-inline: 16px; margin-inline: 0; }
+  .audit-view-hint { margin-inline: 16px; }
   .audit-facts > div, .audit-meta > div { grid-template-columns: 1fr; gap: 4px; }
   .audit-diff-grid { grid-template-columns: 1fr; }
 }

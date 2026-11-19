@@ -15713,6 +15713,15 @@
             }
           },
           {
+            "name": "incluirConsultasAuditoria",
+            "required": false,
+            "in": "query",
+            "description": "Solo /auditoria/registros: true incluye las consultas a la auditoría de la propia cuenta (auditoria.consultar), que por defecto se ocultan; siguen registradas",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
             "name": "exportar",
             "required": false,
             "in": "query",
@@ -15916,6 +15925,15 @@
                 "asc",
                 "desc"
               ]
+            }
+          },
+          {
+            "name": "incluirConsultasAuditoria",
+            "required": false,
+            "in": "query",
+            "description": "Solo /auditoria/registros: true incluye las consultas a la auditoría de la propia cuenta (auditoria.consultar), que por defecto se ocultan; siguen registradas",
+            "schema": {
+              "type": "string"
             }
           },
           {
@@ -31150,6 +31168,11 @@
           "reason": {
             "type": "string",
             "nullable": true
+          },
+          "subject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre de lo que se tocó: cuenta, persona del personal o código de cama/espacio. Los pacientes van por expediente"
           }
         },
         "required": [
@@ -31165,7 +31188,8 @@
           "patientId",
           "patientRecord",
           "result",
-          "reason"
+          "reason",
+          "subject"
         ]
       },
       "AuditPageResponse": {
@@ -31282,6 +31306,11 @@
             "type": "string",
             "nullable": true
           },
+          "subject": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre de lo que se tocó: cuenta, persona del personal o código de cama/espacio. Los pacientes van por expediente"
+          },
           "correlation": {
             "type": "string",
             "nullable": true,
@@ -31325,6 +31354,7 @@
           "patientRecord",
           "result",
           "reason",
+          "subject",
           "correlation",
           "detail",
           "hash",
