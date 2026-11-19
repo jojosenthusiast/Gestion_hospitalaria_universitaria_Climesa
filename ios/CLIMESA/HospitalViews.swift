@@ -251,9 +251,10 @@ struct MyDataView: View {
                 DataLine(label: L.text("mydata.address"), value: patient.address)
             }
             if account.can("pacientes.editar_propios") {
-                ClimesaButton(title: L.text("mydata.edit"), kind: .secondary) { editing = true }
+                CrudButton(kind: .edit, label: L.text("mydata.edit")) { editing = true }
             } else {
-                PatientNotice(text: L.text("mydata.readonly"))
+                // S0: the data is read-only for this account; the lock pill says whom to ask.
+                ReadOnlyBadge(who: "Recepción", what: "tus datos")
             }
         }
         .task(id: live.snapshot.version(.patient)) { await load() }

@@ -299,8 +299,8 @@ struct DoctorDayView: View {
                             if account.can("expediente.ver") {
                                 NavigationLink {
                                     PatientRecordScreen(patientId: entry.patientId)
-                                } label: { Text("day.record") }
-                                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                                } label: { CrudLabel(kind: .view, label: L.text("day.record")) }
+                                    .buttonStyle(ClimesaButtonStyle(kind: .view))
                             }
                         }
                         .padding(.bottom, Spacing.s)
@@ -568,7 +568,7 @@ struct DoctorPatientsView: View {
                     ListCard(items: RecordAccess.ordered(rows)) { patient in
                         if let reason = RecordAccess.gate(patient).blockedReason {
                             VStack(alignment: .leading, spacing: Spacing.xs) {
-                                ListRow(title: patient.fullName, meta: patient.record) {
+                                ListRow(title: patient.fullName, meta: RecordAccess.rowMeta(patient)) {
                                     if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
                                 }
                                 .opacity(0.6)
@@ -579,7 +579,7 @@ struct DoctorPatientsView: View {
                             NavigationLink {
                                 PatientRecordScreen(patientId: patient.id)
                             } label: {
-                                ListRow(title: patient.fullName, meta: patient.record) {
+                                ListRow(title: patient.fullName, meta: RecordAccess.rowMeta(patient)) {
                                     HStack(spacing: Spacing.s) {
                                         if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
                                         Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
@@ -700,8 +700,8 @@ private struct LabFollowUpInbox: View {
                     if let record = item.patientRecord { Text(verbatim: String(format: L.text("results.followUp.record"), record)).font(Typo.small).foregroundStyle(Theme.muted) }
                     Text(verbatim: item.detail).font(Typo.small).foregroundStyle(Theme.ink)
                     if let order = orders.first(where: { $0.id == item.orderId }) {
-                        NavigationLink { ReviewDetailView(order: order, reload: reload) } label: { Text("results.followUp.open") }
-                            .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                        NavigationLink { ReviewDetailView(order: order, reload: reload) } label: { CrudLabel(kind: .view, label: L.text("results.followUp.open")) }
+                            .buttonStyle(ClimesaButtonStyle(kind: .view))
                     }
                     ClimesaButton(title: L.text("results.followUp.review"), kind: .secondary, loading: submission.busyId == item.id) { Task { await review(item) } }
                         .disabled(submission.busy)
@@ -770,14 +770,14 @@ private struct ReviewDetailView: View {
                     ClimesaButton(title: L.text("results.externalLoad.open"), kind: .secondary) { loadingExternal = true }
                 }
                 if order.allows(.cancelar) {
-                    ClimesaButton(title: L.text("results.cancel"), kind: .secondary) { cancelling = true }
+                    CrudButton(kind: .deactivate, label: L.text("results.cancel")) { cancelling = true }
                 }
             }
             if account.can("expediente.ver") {
                 NavigationLink {
                     PatientRecordScreen(patientId: order.patientId)
-                } label: { Text("day.record") }
-                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+                } label: { CrudLabel(kind: .view, label: L.text("day.record")) }
+                    .buttonStyle(ClimesaButtonStyle(kind: .view))
             }
         }
         .sheet(isPresented: $cancelling, onDismiss: { if cancelled { dismiss() } }) {

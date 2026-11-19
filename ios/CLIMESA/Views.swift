@@ -70,14 +70,21 @@ private struct TextLinkButton:View {
     }
 }
 
-/// Armazón mientras se valida la sesión guardada: misma barra que las pestañas y esqueletos, sin spinner (S3).
+/// Armazón mientras se valida la sesión guardada: misma barra que las pestañas y esqueletos (S3).
+/// Owner obs. 1: the static skeletons alone looked frozen, so a moving `ProgressView` says the check is running. The
+/// system indicator keeps turning with Reduce Motion on, which is what a waiting person needs to see.
 struct LaunchShellView:View {
     var body:some View {
         VStack(spacing:0) {
             Theme.navy.frame(height:44).frame(maxWidth:.infinity).background(Theme.navy.ignoresSafeArea(edges:.top))
             ScrollView {
                 VStack(alignment:.leading,spacing:Spacing.space6) {
-                    Skeleton(rows:2,label:L.text("root.verifying"))
+                    HStack(spacing:Spacing.space3) {
+                        ProgressView().tint(Theme.primaryText)
+                        Text("root.verifying").font(Typo.small).foregroundStyle(Theme.muted)
+                    }
+                    .accessibilityElement(children:.combine)
+                    Skeleton(rows:2)
                     Skeleton(rows:4)
                 }.padding(Spacing.space6).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
             }
