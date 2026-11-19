@@ -59,6 +59,10 @@
     <string name="rec_campo_nacimiento">Nacimiento · opcional</string>
     <string name="rec_campo_sexo">Sexo registrado</string>
     <string name="rec_campo_telefono">Teléfono · opcional</string>
+    <string name="rec_campo_correo">Correo del paciente · opcional</string>
+    <string name="rec_campo_correo_ayuda">Con este correo, su cuenta de la app se une sola a este expediente.</string>
+    <string name="rec_correo">Correo</string>
+    <string name="rec_cuenta_app">Cuenta de la app</string>
     <string name="rec_campo_motivo">Motivo de modificación *</string>
     <string name="rec_campo_motivo_ayuda">Mínimo 10 caracteres. Quedará en el historial.</string>
     <string name="rec_guardar_paciente">Guardar paciente</string>

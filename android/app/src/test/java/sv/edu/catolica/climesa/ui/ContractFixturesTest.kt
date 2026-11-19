@@ -223,7 +223,7 @@ class ContractFixturesTest {
         api.responses["/me/paciente"] = JSONObject().put("id", PATIENT).put("fullName", "Ana Ejemplo").put("record", "0000001")
             .put("phone", "70001111").put("email", "ana@example.test").put("address", "Calle 1").put("version", 3)
         val vm = MyDataViewModel(api); vm.load(); runCurrent()
-        vm.save("7000-2222", "nuevo@example.test", "Calle 2"); runCurrent()
+        vm.save("7000-2222", "Calle 2"); runCurrent()
         val patch = api.calls.single { it.second == "PATCH" }
         assertContract("me-paciente", patch.second, patch.first, patch.third)
     }

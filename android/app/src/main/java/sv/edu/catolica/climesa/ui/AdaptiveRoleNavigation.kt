@@ -80,7 +80,7 @@ private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.APPOINTMENTS -> "Citas"
     AndroidSection.MY_APPOINTMENTS -> "Mis citas"
     AndroidSection.PATIENT_QUEUE -> "Mi turno"
-    AndroidSection.LINKING, AndroidSection.LINK_RECORD -> "Vincular"
+    AndroidSection.LINK_RECORD -> "Vincular"
     AndroidSection.ADMISSION -> "Admisión"
     AndroidSection.BEDS -> "Camas"
     AndroidSection.ASSISTANT_STATION -> "Consultorio"
@@ -131,7 +131,6 @@ internal fun iconFor(section: AndroidSection): ImageVector = when (section) {
     AndroidSection.LOG -> Icons.AutoMirrored.Outlined.ListAlt
     AndroidSection.MY_ACCESS -> ClimesaIcons.Privacy
     AndroidSection.LINK_RECORD -> Icons.Outlined.Link
-    AndroidSection.LINKING -> Icons.Outlined.HowToReg
     AndroidSection.SUPPLIES -> ClimesaIcons.Inventory
     AndroidSection.MEDICAL_DAY -> Icons.Outlined.Today
     AndroidSection.CONSULTATIONS -> ClimesaIcons.Steth

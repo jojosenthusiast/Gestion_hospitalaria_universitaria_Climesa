@@ -19,8 +19,9 @@ data class MyData(val fullName: String = "", val record: String = "", val phone:
 data class MyDataState(val data: MyData? = null, val loading: Boolean = false, val saving: Boolean = false, val saved: Boolean = false, val error: String? = null)
 
 /**
- * "Mis datos": the patient sees the personal data of the own record and edits only phone, e-mail and address
- * (`PATCH /me/paciente`, permission `pacientes.editar_propios`). Name, DUI, birth date and sex stay with reception.
+ * "Mis datos": the patient sees the personal data of the own record and edits only phone and address
+ * (`PATCH /me/paciente`, permission `pacientes.editar_propios`). Name, DUI, birth date, sex and, since U12, the e-mail
+ * (it links the app account) stay with reception: the e-mail is shown read-only and never sent.
  */
 @HiltViewModel
 class MyDataViewModel @Inject constructor(private val api: ApiGateway) : ViewModel() {
@@ -39,15 +40,18 @@ class MyDataViewModel @Inject constructor(private val api: ApiGateway) : ViewMod
         }
     }
 
-    /** Only the contact fields travel; an empty value clears the field. A stale version asks the patient to reload. */
-    fun save(phone: String, email: String, address: String) {
+    /**
+     * Only phone and address travel; an empty value clears the field. A stale version asks the patient to reload. A 403
+     * `correo_lo_gestiona_recepcion` (never expected, the e-mail is not sent) says Recepción changes it.
+     */
+    fun save(phone: String, address: String) {
         val current = mutable.value.data ?: return
-        val error = validate(phone, email)
+        val error = validate(phone)
         if (error != null) { mutable.value = mutable.value.copy(error = error, saved = false); return }
         mutable.value = mutable.value.copy(saving = true, error = null, saved = false)
         viewModelScope.launch {
             try {
-                val body = JSONObject().put("version", current.version).put("phone", phone.trim()).put("email", email.trim()).put("address", address.trim())
+                val body = JSONObject().put("version", current.version).put("phone", phone.trim()).put("address", address.trim())
                 intent.send { api.request("/me/paciente", "PATCH", body) }
                 val json = api.request("/me/paciente") as? JSONObject
                 mutable.value = MyDataState(data = json?.let(::parse), saved = true)
@@ -67,11 +71,8 @@ class MyDataViewModel @Inject constructor(private val api: ApiGateway) : ViewMod
             version = json.optInt("version"),
         )
 
-        /** Same rules as the API: eight-digit phone starting 2, 6 or 7, and a plausible e-mail. Null when valid. */
-        fun validate(phone: String, email: String): String? = when {
-            phone.isNotBlank() && !Regex("^[267]\\d{3}-?\\d{4}$").matches(phone.trim()) -> "El teléfono debe tener ocho dígitos."
-            email.isNotBlank() && !Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$").matches(email.trim()) -> "Revisa el correo electrónico."
-            else -> null
-        }
+        /** Same rule as the API: eight-digit phone starting 2, 6 or 7. Null when valid. */
+        fun validate(phone: String): String? =
+            if (phone.isNotBlank() && !Regex("^[267]\\d{3}-?\\d{4}$").matches(phone.trim())) "El teléfono debe tener ocho dígitos." else null
     }
 }

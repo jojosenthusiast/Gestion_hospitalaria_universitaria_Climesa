@@ -51,16 +51,6 @@ import java.time.format.DateTimeFormatter
         inbox.consume(AndroidSection.PATIENTS)
     }
     LaunchedEffect(state.message) { state.message?.let { snack.showSnackbar(it);model.clearMessage() } }
-    // G2 (web `declaredPatient`): "Buscar antes de crear" in Vinculaciones searches the declared DUI and, if the person then
-    // registers, the form starts with the declared DUI, birth date and the account's name.
-    var linkPrefill by rememberSaveable { mutableStateOf<List<String>?>(null) }
-    LaunchedEffect(state.formOpen,state.editingId) {
-        val prefill=linkPrefill?:return@LaunchedEffect
-        if(!state.formOpen||state.editingId!=null)return@LaunchedEffect
-        val names=PatientRules.prefill(prefill[2])
-        model.draft(state.draft.copy(dui=prefill[0].ifBlank{state.draft.dui},birth=prefill[1].ifBlank{state.draft.birth},givenNames=state.draft.givenNames.ifBlank{names.givenNames},surnames=state.draft.surnames.ifBlank{names.surnames}))
-        linkPrefill=null
-    }
     /** R7 U1 (G2, hub): an action of the patient record opens its section with this patient already chosen. */
     fun openWith(section:AndroidSection,action:QuickAction,p:Patient){model.select(null);selectedName=section.name;inbox.post(QuickActionRequest(section,action,QuickSubject(p.id,p.fullName,p.record)))}
     fun back() { if(state.saving)return;if(state.formOpen) discard=true else model.select(null) }
@@ -91,11 +81,6 @@ import java.time.format.DateTimeFormatter
             page==AndroidSection.HOME -> RoleDashboardScreen(account,"REC",{request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}},onOpenNotices={if(AndroidSection.NOTICES in sections)selectedName=AndroidSection.NOTICES.name})
             page==AndroidSection.NOTICES -> NoticesScreen(account)
             page==AndroidSection.APPOINTMENTS -> ReceptionAppointmentsScreen(account.profile.channels,"citas.agendar" in account.profile.permissions,userId=account.session.userId,quickAction=inbox.actionFor(AndroidSection.APPOINTMENTS),onQuickActionHandled={inbox.consume(AndroidSection.APPOINTMENTS)},permissions=account.profile.permissions,subject=inbox.subjectFor(AndroidSection.APPOINTMENTS))
-            page==AndroidSection.LINKING -> ReceptionLinkingScreen(account.profile.channels,"cuentas.verificar" in account.profile.permissions,{row->
-                linkPrefill=listOf(row.declaredDui,row.declaredBirth,row.accountName)
-                model.select(null);model.query(row.declaredDui);selectedName=AndroidSection.PATIENTS.name
-                if(row.declaredDui.isNotBlank()&&PatientAction.SEARCH in state.actions)model.search()
-            })
             page==AndroidSection.BEDS -> BedsScreen(account.profile)
             page==AndroidSection.QUEUE -> QueueScreen(account.profile,userId=account.session.userId,quickAction=inbox.actionFor(page),onQuickActionHandled={inbox.consume(page)},subject=inbox.subjectFor(page))
             page==AndroidSection.HOSPITAL_INFO -> HospitalInfoScreen()
@@ -154,6 +139,8 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
         item {SegmentedControl(listOf(R.string.pac_ficha_datos,R.string.pac_ficha_cambios).map{Segment(stringResource(it))},tab,{tab=it})}
         if(tab==0) item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
             val none=stringResource(R.string.rec_no_registrado);Value(stringResource(R.string.rec_dui),p.dui ?: stringResource(R.string.rec_sin_documento));Value(stringResource(R.string.rec_nacimiento),p.birth?.let { b -> BirthDates.format(b) + (sv.edu.catolica.climesa.domain.PatientSummary.ageText(b)?.let { " · $it" } ?: "") } ?: none);Value(stringResource(R.string.rec_sexo),p.sex.label);Value(stringResource(R.string.rec_telefono),p.phone.ifBlank {none})
+            p.email?.let { Value(stringResource(R.string.rec_correo),it.ifBlank {none}) }
+            sv.edu.catolica.climesa.domain.PatientEmail.appAccount(p.appAccount)?.let { Value(stringResource(R.string.rec_cuenta_app),it) }
         }}}
         // One primary per screen: with the hub, its first action ("Emitir número o registrar llegada") is the primary one.
         if(tab==0&&p.active&&hub.isNotEmpty()) item {ClimesaActionGroup {hub.forEachIndexed {i,(section,action)->
@@ -199,6 +186,8 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
         Text(stringResource(R.string.rec_campo_sexo),style=MaterialTheme.typography.labelLarge)
         Sex.entries.forEach {sex -> Row(verticalAlignment=Alignment.CenterVertically) {RadioButton(selected=d.sex==sex,onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving);TextButton(shape = ButtonShape, onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving) {Text(sex.label)}}}
         PatientField(stringResource(R.string.rec_campo_telefono),d.phone,state.fields["phone"],"7000-0000",KeyboardType.Phone,!state.saving) {model.draft(d.copy(phone=it.take(9)))}
+        // U12: the record email joins the patient's app account on its own; a role without contact data never sees it.
+        d.email?.let { email -> PatientField(stringResource(R.string.rec_campo_correo),email,state.fields["email"],stringResource(R.string.rec_campo_correo_ayuda),KeyboardType.Email,!state.saving) {model.draft(d.copy(email=it.trim().take(254)))} }
         if(state.editingId!=null) ClimesaTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text(stringResource(R.string.rec_campo_motivo))},supportingText={Text(stringResource(R.string.rec_campo_motivo_ayuda))})
         PrimaryButton(stringResource(R.string.rec_guardar_paciente),{model.save()},loading=state.saving)
         Spacer(Modifier.height(24.dp))

@@ -70,7 +70,6 @@ enum class DashboardSource(val path: String, val anyOf: List<String>) {
     APPOINTMENTS("/citas", listOf("citas.ver")),
     /** S8: requests by category (no doctor yet) also wait on Recepción; same source and permission as the web Inicio. */
     CATEGORY_REQUESTS("/citas/solicitudes-categoria", listOf("citas.agendar")),
-    LINKS("/cuentas/vinculaciones", listOf("cuentas.verificar")),
     STOCK("/inventario/existencias", listOf("inventario.ver")),
     SHIFTS("/turnos/mios", listOf("turnos.ver")),
 }
@@ -79,7 +78,7 @@ object RoleDashboard {
     private val zone: ZoneId = ZoneId.of("America/El_Salvador")
 
     private val sourcesByRole: Map<String, List<DashboardSource>> = mapOf(
-        "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.LINKS, DashboardSource.APPOINTMENTS, DashboardSource.CATEGORY_REQUESTS, DashboardSource.SHIFTS),
+        "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.APPOINTMENTS, DashboardSource.CATEGORY_REQUESTS, DashboardSource.SHIFTS),
         "AST" to listOf(DashboardSource.QUEUE, DashboardSource.MY_POST, DashboardSource.SHIFTS),
         "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.ARRIVALS, DashboardSource.SHIFTS),
         "MED" to listOf(DashboardSource.AGENDA, DashboardSource.LAB, DashboardSource.ADMISSIONS, DashboardSource.SHIFTS),
@@ -270,8 +269,6 @@ object RoleDashboard {
                 val requested = appointments?.let { appointmentRequestCount(it, data[DashboardSource.CATEGORY_REQUESTS]?.let { r -> rows(r) }.orEmpty()) } ?: 0
                 val requestsAction = QuickAction.REVIEW_REQUESTS.takeIf { QuickActions.allowed(it, permissions) }
                 appointments?.let { kpis += DashboardKpi("Citas por confirmar", requested.toString(), if (requested > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.APPOINTMENTS), action = requestsAction) }
-                val links = data[DashboardSource.LINKS]?.let { rows(it).size }
-                links?.let { kpis += DashboardKpi("Vinculaciones por verificar", it.toString(), if (it > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.LINKING)) }
                 if (admissions != null) kpis += DashboardKpi("Admisiones sin cama", pendingBed.toString(), if (pendingBed > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.ADMISSION))
                 bedKpis(withCleaning = false)
                 shiftKpi()
@@ -279,7 +276,6 @@ object RoleDashboard {
                     attention += DashboardAttention(counted(waiting, "número esperando", "números esperando"), "Revisa la fila del día.", DashboardTone.WARNING, "Abrir fila", QuickActionRequest(AndroidSection.QUEUE), covers = "En espera")
                 }
                 if (requested > 0 && AndroidSection.APPOINTMENTS in sections) attention += DashboardAttention(counted(requested, "solicitud de cita", "solicitudes de cita"), "Confirma, rechaza o reprograma las solicitudes de los pacientes.", DashboardTone.WARNING, "Abrir citas", QuickActionRequest(AndroidSection.APPOINTMENTS, requestsAction), covers = "Citas por confirmar")
-                if ((links ?: 0) > 0 && AndroidSection.LINKING in sections) attention += DashboardAttention(counted(links ?: 0, "vinculación por verificar", "vinculaciones por verificar"), "Verifica la identidad antes de enlazar la cuenta con el expediente.", DashboardTone.WARNING, "Verificar", QuickActionRequest(AndroidSection.LINKING), covers = "Vinculaciones por verificar")
                 assignBedAttention()
                 ambulance?.pendingRequests?.size?.takeIf { it > 0 && QuickActions.allowed(QuickAction.DISPATCH, permissions) && AndroidSection.DISPATCH in sections }?.let {
                     attention += DashboardAttention(counted(it, "solicitud de ambulancia", "solicitudes de ambulancia"), "Confirma y despacha la unidad si está disponible.", DashboardTone.WARNING, "Despachar", QuickActionRequest(AndroidSection.DISPATCH, QuickAction.DISPATCH))

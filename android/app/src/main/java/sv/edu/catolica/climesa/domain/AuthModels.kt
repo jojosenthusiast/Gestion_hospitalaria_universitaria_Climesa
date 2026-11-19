@@ -81,7 +81,6 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
     PATIENTS("A30", "Pacientes", "pacientes.buscar", true),
     QUEUE("A31", "Fila del día", "fila.emitir", true),
     APPOINTMENTS("A32", "Citas", "citas.ver", true),
-    LINKING("A33", "Vinculaciones", "cuentas.verificar", true),
     ADMISSION("A34", "Admisión y cama", "admision.crear", true),
     BEDS("A35", "Tablero de camas", "camas.ver_tablero", true),
     DISPATCH("A36", "Despacho", "ambulancia.despachar", true),
@@ -111,7 +110,7 @@ object AndroidSections {
 
     /** Jefe de Operaciones and Laboratorio use the web only (D-090): they have no Android catalog and see "Tu rol no usa esta aplicación". */
     private val roleCatalog = mapOf(
-        "REC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "REC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "AST" to careStation,
         "ENF" to careStation,
         "MED" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),

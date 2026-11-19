@@ -83,20 +83,17 @@
     <string name="mis_accesos_actualizar">Actualizar</string>
     <string name="vinculo_eyebrow">Cuenta / Expediente</string>
     <string name="vinculo_titulo">Vincular expediente</string>
-    <string name="vinculo_detalle">Une tu cuenta con tu expediente. Recepción verifica tu identidad antes de mostrarte datos personales o clínicos.</string>
-    <string name="vinculo_dui">DUI</string>
-    <string name="vinculo_nacimiento">Fecha de nacimiento</string>
-    <string name="vinculo_nacimiento_formato">aaaa-mm-dd</string>
-    <string name="vinculo_privacidad">Solo usamos estos datos para buscar tu expediente. Hasta que Recepción apruebe, no verás nada privado.</string>
-    <string name="vinculo_enviar">Enviar solicitud</string>
-    <string name="vinculo_enviando">Enviando…</string>
-    <string name="vinculo_en_verificacion">En verificación</string>
-    <string name="vinculo_en_verificacion_detalle">Recepción revisará tu solicitud. Esta pantalla cambia sola cuando la resuelvan.</string>
+    <string name="vinculo_cargando">Consultando tu cuenta</string>
+    <string name="vinculo_sin_estado">No pudimos consultar tu cuenta</string>
+    <string name="vinculo_sin_vincular">Tu cuenta todavía no está vinculada</string>
+    <string name="vinculo_pide_recepcion">Pide en Recepción que anoten este correo: %1$s</string>
+    <string name="vinculo_pide_recepcion_sin_correo">Pide en Recepción que anoten en tu expediente el correo de tu cuenta.</string>
+    <string name="vinculo_sin_vincular_detalle">Cuando Recepción lo guarde en tu expediente, tu cuenta se une sola. Esta pantalla cambia sola.</string>
+    <string name="vinculo_confirma_correo">Confirma tu correo primero</string>
+    <string name="vinculo_confirma_correo_detalle">Abre el enlace que te enviamos a %1$s (revisa también la carpeta de spam). Solo un correo confirmado une tu cuenta con tu expediente.</string>
+    <string name="vinculo_confirma_correo_sin_correo">Abre el enlace que te enviamos a tu correo (revisa también la carpeta de spam). Solo un correo confirmado une tu cuenta con tu expediente.</string>
     <string name="vinculo_aprobada">Cuenta vinculada</string>
     <string name="vinculo_aprobada_detalle">Ya puedes ver tu fila, citas, exámenes e historial.</string>
-    <string name="vinculo_rechazada">Solicitud rechazada</string>
-    <string name="vinculo_rechazada_detalle">Recepción no pudo verificar tus datos. Revisa el DUI y la fecha, o acude a Recepción con tu documento.</string>
-    <string name="vinculo_volver_a_pedir">Corregir y volver a pedir</string>
     <string name="historial_eyebrow">Atención / Historial clínico</string>
     <string name="historial_titulo_propio">Mi historial</string>
     <string name="historial_titulo_expediente">Expediente</string>
@@ -340,9 +337,6 @@
     <!-- U5: vinculaciones, expediente parecido (G2) -->
     <string name="u5_vinc_parecido">Parecido: %1$s · %2$s · DUI %3$s · nac. %4$s</string>
     <!-- U9: vinculación desde GET /me/vinculacion (G2) -->
-    <string name="u9_vinculo_cargando">Consultando tu solicitud</string>
-    <string name="u9_vinculo_sin_estado">No pudimos consultar tu solicitud</string>
-    <string name="u9_vinculo_motivo">Recepción rechazó tu solicitud. Motivo: %1$s</string>
     <!-- U9: búsqueda CIE-10 en el paso de diagnóstico -->
     <string name="u9_cie10_buscar">Diagnóstico CIE-10</string>
     <string name="u9_cie10_ayuda">Código o palabras, al menos 2 caracteres</string>

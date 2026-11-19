@@ -28,18 +28,19 @@ internal fun MyDataCard(modifier: Modifier = Modifier, model: MyDataViewModel = 
             return@SectionCard
         }
         var phone by remember(data.version) { mutableStateOf(data.phone) }
-        var email by remember(data.version) { mutableStateOf(data.email) }
         var address by remember(data.version) { mutableStateOf(data.address) }
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             LabeledValue("Nombre", data.fullName.ifBlank { "—" })
             LabeledValue("Expediente", data.record.ifBlank { "—" })
-            Text("Tu nombre, DUI, fecha de nacimiento y sexo los corrige Recepción.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            // U12: the e-mail links the app account, so only Recepción changes it; shown, never editable.
+            LabeledValue("Correo electrónico", data.email.ifBlank { "Sin registrar" })
+            ReadOnlyBadge("Recepción", "tu correo")
+            Text("Tu nombre, DUI, fecha de nacimiento, sexo y correo los corrige Recepción.", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             state.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
             if (state.saved) Text("Datos guardados.", style = MaterialTheme.typography.bodyMedium)
             FormField("Teléfono", phone, { phone = it.take(9) })
-            FormField("Correo electrónico", email, { email = it.take(254) })
             FormField("Dirección", address, { address = it.take(500) })
-            PrimaryButton(if (state.saving) "Guardando…" else "Guardar cambios", { model.save(phone, email, address) }, enabled = !state.saving, loading = state.saving)
+            PrimaryButton(if (state.saving) "Guardando…" else "Guardar cambios", { model.save(phone, address) }, enabled = !state.saving, loading = state.saving)
         }
     }
 }

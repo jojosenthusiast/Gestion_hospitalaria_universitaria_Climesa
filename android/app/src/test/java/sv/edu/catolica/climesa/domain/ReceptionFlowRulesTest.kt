@@ -39,35 +39,6 @@ class ReceptionFlowRulesTest {
         assertNull(QueueRules.vitalsSubject(ticket.copy(state = "en_espera")))
     }
 
-    // Per-field match (G-2): name, DUI and birth compared one by one; a null account name never prints "null".
-    @Test fun linkingComparesEachFieldAndNeverShowsNull() {
-        val parsed = ReceptionLinking.parse(JSONArray().put(row(
-            "id" to "v1", "version" to 2, "createdAt" to "2030-11-20T14:00:00Z",
-            "account" to row("email" to "ana@example.test", "name" to null),
-            "declared" to row("dui" to "06612345-2", "birth" to "1999-05-30"),
-            "candidate" to row("id" to "pac-1", "record" to "000412-7", "fullName" to "Ána  Ficticia", "birth" to "1999-05-30", "dui" to "06612345-2"),
-            "candidates" to 1,
-        ))).single()
-        assertEquals("", parsed.accountName)
-        assertEquals("06612345-2", parsed.candidateDui)
-        val fields = parsed.fields.associateBy { it.label }
-        assertEquals("Sin nombre en la cuenta", fields.getValue("Nombre").declared)
-        assertFalse(fields.getValue("Nombre").matches)
-        assertTrue(fields.getValue("DUI").matches)
-        assertTrue(fields.getValue("Nacimiento").matches)
-        assertEquals("30 may 1999", fields.getValue("Nacimiento").declared)
-        assertEquals(listOf("nombre"), parsed.mismatched)
-        val named = parsed.copy(accountName = "Ana Ficticia")
-        assertTrue(named.fields.first { it.label == "Nombre" }.matches)
-    }
-
-    @Test fun duplicateRecordsSayWhatReceptionCanDo() {
-        val row = LinkRequestRow("v", 1, "", "a@example.test", "Ana", "06612345-2", "1999-05-30", null, null, null, 2)
-        assertTrue(row.guidance.contains("Recepción no fusiona expedientes"))
-        assertTrue(row.guidance.contains("06612345-2"))
-        assertFalse(row.canApprove)
-    }
-
     // Label map: the web field names and readable values in "Cambios".
     @Test fun historyUsesTheWebFieldNamesAndReadableValues() {
         assertEquals("Segundo apellido", PatientHistory.label("segundo_apellido"))
