@@ -12,8 +12,8 @@ export class AmbulanceController {
   constructor(private readonly ambulance:AmbulanceService) {}
   @Get() @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Estado de la unidad, servicio activo con hitos y, para despacho, solicitudes por confirmar'}) @ApiOkResponse({ type: AmbulanceStatusResponse })
   status(@Req() r:ActorRequest){return this.ambulance.status(r.actor);}
-  @Get('cobertura') @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Lote 5 S8: horas de los próximos 7 días sin paramédico y motorista de turno (no bloquea publicar turnos)'}) @ApiOkResponse({ type: CrewCoverageResponse })
-  coverage(){return this.ambulance.crewCoverage();}
+  @Get('cobertura') @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Lote 5 S8: horas de los próximos días (7 por omisión) sin paramédico y motorista de turno, por día (no bloquea publicar turnos)'}) @ApiQuery({name:'dias',type:Number,required:false,description:'Días desde la hora en curso, 1 a 14; 7 por omisión'}) @ApiOkResponse({ type: CrewCoverageResponse })
+  coverage(@Query('dias') dias?:string){return this.ambulance.crewCoverage(dias===undefined||dias===''?undefined:Number(dias));}
   @Post('mantenimiento') @RequirePermission('ambulancia.mantenimiento') @ApiOperation({summary:'Entrar o salir de mantenimiento (Jefatura o la tripulación); salir exige paramédico y motorista con turno en curso'}) @ApiCreatedResponse({ type: AmbulanceUnitStateResponse })
   maintenance(@Req() r:ActorRequest,@Body() d:MaintenanceDto,@Headers('idempotency-key') k?:string){return this.ambulance.setMaintenance(r.actor,d,k);}
   @Post('solicitudes') @RequirePermission('ambulancia.solicitar') @ApiOperation({summary:'Solicitar ambulancia; queda por confirmar (paciente verificado o recepción por teléfono)'}) @ApiCreatedResponse({ type: AmbulanceRequestCreatedResponse })

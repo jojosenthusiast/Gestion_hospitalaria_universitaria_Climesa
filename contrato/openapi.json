@@ -18430,7 +18430,17 @@
     "/api/v1/ambulancia/cobertura": {
       "get": {
         "operationId": "AmbulanceController_coverage",
-        "parameters": [],
+        "parameters": [
+          {
+            "name": "dias",
+            "required": false,
+            "in": "query",
+            "description": "Días desde la hora en curso, 1 a 14; 7 por omisión",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "",
@@ -18488,7 +18498,7 @@
             "bearer": []
           }
         ],
-        "summary": "Lote 5 S8: horas de los próximos 7 días sin paramédico y motorista de turno (no bloquea publicar turnos)",
+        "summary": "Lote 5 S8: horas de los próximos días (7 por omisión) sin paramédico y motorista de turno, por día (no bloquea publicar turnos)",
         "tags": [
           "ambulancia"
         ],
@@ -33786,6 +33796,23 @@
           "dispatchBlock"
         ]
       },
+      "CrewDayResponse": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local, yyyy-MM-dd"
+          },
+          "hoursWithoutCrew": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "hoursWithoutCrew"
+        ]
+      },
       "FaltaTripulacion": {
         "type": "string",
         "enum": [
@@ -33798,6 +33825,14 @@
       "CrewGapResponse": {
         "type": "object",
         "properties": {
+          "date": {
+            "type": "string",
+            "format": "date",
+            "description": "Día local al que pertenece el hueco (los huecos se cortan a medianoche local)"
+          },
+          "hours": {
+            "type": "integer"
+          },
           "start": {
             "type": "string",
             "format": "date-time"
@@ -33816,6 +33851,8 @@
           }
         },
         "required": [
+          "date",
+          "hours",
           "start",
           "end",
           "missing"
@@ -33840,6 +33877,13 @@
             "type": "boolean",
             "description": "Cada hora tiene paramédico y motorista de turno"
           },
+          "days": {
+            "description": "Cada día local del rango con sus horas sin tripulación (0 si está cubierto)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CrewDayResponse"
+            }
+          },
           "gaps": {
             "type": "array",
             "items": {
@@ -33852,6 +33896,7 @@
           "to",
           "hoursWithoutCrew",
           "covered",
+          "days",
           "gaps"
         ]
       },

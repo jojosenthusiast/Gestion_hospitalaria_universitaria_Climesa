@@ -7,7 +7,7 @@ import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { ProblemException, VersionConflictException } from '../platform/problem';
 import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto, UndoMilestoneDto } from './ambulance.dto';
-import { CREW_COVERAGE_DAYS, HOUR_MS, crewCoverageGaps, CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, PREHOSPITAL_GRACE_MS, RECEIVING_AREA, crewOrder, defaultCrew, milestoneTimeError, UnitState, allowedFinalStates, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, milestoneTypes, nextMilestones, undoMilestoneError, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
+import { CREW_COVERAGE_DAYS, CREW_COVERAGE_MAX_DAYS, HOUR_MS, crewCoverageGaps, CREW_ON_DUTY_SQL, CREW_ROLES_ON_DUTY_SQL, PREHOSPITAL_GRACE_MS, RECEIVING_AREA, crewOrder, defaultCrew, milestoneTimeError, UnitState, allowedFinalStates, canReportAfter, dispatchBlock, missingCrew, missingCrewDetail, finalStateError, finalStates, fold, maskRecord, milestoneTypes, nextMilestones, undoMilestoneError, priorities, responseMinutes, serviceTypes } from './ambulance.rules';
 
 type Unit = { id: string; estado: UnitState; version: number };
 type Service = { id: string; unidad_id: string; solicitud_id: string | null; paciente_id: string | null; despachado_en: Date; finalizado_en: Date | null; version: number };
@@ -141,6 +141,7 @@ export class AmbulanceService {
    * publishing shifts is never blocked on it.
    */
   async crewCoverage(days = CREW_COVERAGE_DAYS) {
+    if (!Number.isInteger(days) || days < 1 || days > CREW_COVERAGE_MAX_DAYS) throw new BadRequestException(`Indica de 1 a ${CREW_COVERAGE_MAX_DAYS} días.`);
     const now = this.clock.now(), start = new Date(Math.floor(now.valueOf() / HOUR_MS) * HOUR_MS), end = new Date(start.valueOf() + days * 24 * HOUR_MS);
     const shifts = await this.db.query<{ tipo: string; start: Date; end: Date }>(`SELECT p.tipo,lower(t.periodo) AS start,upper(t.periodo) AS "end" FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id
       WHERE p.tipo IN ('paramedico','motorista') AND p.activo AND t.estado IN ('publicado','en_curso') AND t.periodo && tstzrange($1::timestamptz,$2::timestamptz,'[)')`, [start, end]);

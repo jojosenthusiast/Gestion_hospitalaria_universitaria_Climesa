@@ -2857,7 +2857,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** Lote 5 S8: horas de los próximos 7 días sin paramédico y motorista de turno (no bloquea publicar turnos) */
+        /** Lote 5 S8: horas de los próximos días (7 por omisión) sin paramédico y motorista de turno, por día (no bloquea publicar turnos) */
         get: operations["AmbulanceController_coverage"];
         put?: never;
         post?: never;
@@ -7128,12 +7128,26 @@ export interface components {
             /** @description Solo con ambulancia.despachar: paramédicos y motoristas de turno entre los que se elige la tripulación (MA-AMB-02) */
             availableCrew?: components["schemas"]["CrewMemberResponse"][];
         };
+        CrewDayResponse: {
+            /**
+             * Format: date
+             * @description Día local, yyyy-MM-dd
+             */
+            date: string;
+            hoursWithoutCrew: number;
+        };
         /**
          * @description Quién falta: paramédico, motorista o los dos
          * @enum {string}
          */
         FaltaTripulacion: "paramedico" | "motorista" | "tripulacion";
         CrewGapResponse: {
+            /**
+             * Format: date
+             * @description Día local al que pertenece el hueco (los huecos se cortan a medianoche local)
+             */
+            date: string;
+            hours: number;
             /** Format: date-time */
             start: string;
             /** Format: date-time */
@@ -7150,6 +7164,8 @@ export interface components {
             hoursWithoutCrew: number;
             /** @description Cada hora tiene paramédico y motorista de turno */
             covered: boolean;
+            /** @description Cada día local del rango con sus horas sin tripulación (0 si está cubierto) */
+            days: components["schemas"]["CrewDayResponse"][];
             gaps: components["schemas"]["CrewGapResponse"][];
         };
         MaintenanceDto: {
@@ -20394,7 +20410,10 @@ export interface operations {
     };
     AmbulanceController_coverage: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Días desde la hora en curso, 1 a 14; 7 por omisión */
+                dias?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;

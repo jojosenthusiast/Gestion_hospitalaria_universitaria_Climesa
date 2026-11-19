@@ -1,4 +1,4 @@
-import { BoolProp, ClassArrayProp, ClassProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, JsonProp, NumProp, StrProp, UuidProp } from '../platform/responses';
+import { BoolProp, ClassArrayProp, ClassProp, DateProp, DateTimeProp, EnumArrayProp, EnumProp, IntProp, JsonProp, NumProp, StrProp, UuidProp } from '../platform/responses';
 import { ESTADO_AMBULANCIA, ESTADO_FINAL_SERVICIO, ESTADO_SOLICITUD_AMBULANCIA, HITO_SERVICIO, PRIORIDAD_AMBULANCIA } from '../platform/states';
 import { serviceTypes } from './ambulance.rules';
 
@@ -264,8 +264,15 @@ export class ServiceLogEntryResponse {
   @StrProp({ nullable: true, description: 'Expediente enmascarado del paciente; nunca el nombre' }) patientRef!: string | null;
 }
 
+/** Lote 5, S8: one local day of the crew coverage. */
+export class CrewDayResponse {
+  @DateProp() date!: string;
+  @IntProp() hoursWithoutCrew!: number;
+}
 /** Lote 5, S8: an interval without a full crew on shift. */
 export class CrewGapResponse {
+  @DateProp({ description: 'Día local al que pertenece el hueco (los huecos se cortan a medianoche local)' }) date!: string;
+  @IntProp() hours!: number;
   @DateTimeProp() start!: string;
   @DateTimeProp() end!: string;
   @EnumProp(['paramedico', 'motorista', 'tripulacion'] as const, 'FaltaTripulacion', { description: 'Quién falta: paramédico, motorista o los dos' }) missing!: string;
@@ -276,5 +283,6 @@ export class CrewCoverageResponse {
   @DateTimeProp() to!: string;
   @IntProp({ description: 'Horas sin paramédico y motorista de turno' }) hoursWithoutCrew!: number;
   @BoolProp({ description: 'Cada hora tiene paramédico y motorista de turno' }) covered!: boolean;
+  @ClassArrayProp(CrewDayResponse, { description: 'Cada día local del rango con sus horas sin tripulación (0 si está cubierto)' }) days!: CrewDayResponse[];
   @ClassArrayProp(CrewGapResponse) gaps!: CrewGapResponse[];
 }
