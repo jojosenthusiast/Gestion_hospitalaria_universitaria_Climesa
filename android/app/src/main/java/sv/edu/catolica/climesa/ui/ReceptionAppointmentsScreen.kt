@@ -4,7 +4,10 @@ package sv.edu.catolica.climesa.ui
 import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -86,7 +89,12 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
     }
     BackHandler(enabled = state.scheduling) { model.leaveScheduling() }
     if (state.scheduling) { SchedulingForm(state, model, modifier); return }
-    PageList(modifier) {
+    // Lote 5 S6: «Agendar cita» stays docked at the bottom, right above the navigation bar (thumb reach), while the list
+    // scrolls; from 600dp the cards use two columns instead of stretching one line across the screen.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxSize()) {
+    val columns = if (maxWidth >= 600.dp) 2 else 1
+    Column(Modifier.fillMaxSize()) {
+    PageList(Modifier.weight(1f)) {
         state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = ClimesaIcons.Retry) } } }
         (actionState.done ?: state.notice)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         actionState.error?.takeIf { actionState.target == null }?.let { error -> item {
@@ -98,14 +106,14 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 }
             }
         } }
-        if (canSchedule) item { CompactHeader("", actions = { PrimaryButton(stringResource(R.string.rec_citas_agendar), { model.clearMessages(); model.openScheduling() }, icon = ClimesaIcons.Plus, fill = false) }) }
         if (canSchedule) {
-            requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+            // S6: an assign or reject error shows on its card; here only when that card is gone (or it was not a card's).
+            requestState.error?.takeIf { requestState.errorRequestId == null || requestState.inbox.none { it.id == requestState.errorRequestId } }?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
             requestState.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
             // Empty inboxes collapse into one line so the appointment list starts on the first screen.
             val inboxEmpty = requestState.inbox.isEmpty() && !requestState.loading
             val followUpsEmpty = followUpState.proposals.isEmpty() && !followUpState.loading && followUpState.error == null && followUpState.notice == null
-            if (!inboxEmpty) item { CategoryRequestInbox(requestState, requests) }
+            if (!inboxEmpty) item { CategoryRequestInbox(requestState, requests, columns) }
             if (!followUpsEmpty) item { LabProposalInbox(followUpState, followUps) }
             if (inboxEmpty && followUpsEmpty) item { Text(stringResource(R.string.citas_bandejas_al_dia), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
         }
@@ -130,15 +138,34 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 if (foldPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, pastDays), { showPast = true }) }
                 groups.filter { !foldPast || it.first >= today }.forEach { (day, rows) ->
                     item(key = "d-$day") { Text(sv.edu.catolica.climesa.domain.AppointmentAgenda.dayLabel(day), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                    items(rows, key = { it.id }) { row ->
-                        // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
-                        val pending = actionState.pendingNoShows.firstOrNull { it.key == row.id }
-                        if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow(row.id) }
-                        else AppointmentRow(row, arrival = if (canArrive) ArrivalControl(today, queueState, { queue.clearMessages(); queue.registerArrivalFor(row.id, row.patientId, row.patientName.ifBlank { "Paciente" }) }) else null) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
+                    items(rows.chunked(columns), key = { chunk -> chunk.joinToString("|") { it.id } }) { chunk ->
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.block)) {
+                            chunk.forEach { row ->
+                                Box(Modifier.weight(1f)) {
+                                    // D-3: "No asistió" is one tap; the row offers "Deshacer" for 8 s before anything is sent.
+                                    val pending = actionState.pendingNoShows.firstOrNull { it.key == row.id }
+                                    if (pending != null) PendingUndoRow(pending.label) { actions.undoNoShow(row.id) }
+                                    else AppointmentRow(row, arrival = if (canArrive) ArrivalControl(today, queueState, { queue.clearMessages(); queue.registerArrivalFor(row.id, row.patientId, row.patientName.ifBlank { "Paciente" }) }) else null) { action -> if (action == AppointmentAction.NO_SHOW) { actions.markNoShow(row) } else actions.open(row, action) }
+                                }
+                            }
+                            repeat(columns - chunk.size) { Spacer(Modifier.weight(1f)) }
+                        }
                     }
                 }
             }
         }
+    }
+    if (canSchedule) ScheduleDock { model.clearMessages(); model.openScheduling() }
+    }
+    }
+}
+
+/** Lote 5 S6: the bottom bar of Citas with «Agendar cita» full width, the one primary action of the screen. */
+@Composable
+private fun ScheduleDock(onSchedule: () -> Unit) {
+    Column(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
+        HorizontalDivider(color = MaterialTheme.climesa.line)
+        PrimaryButton(stringResource(R.string.rec_citas_agendar), onSchedule, Modifier.padding(horizontal = Spacing.page, vertical = Spacing.sm), icon = ClimesaIcons.Plus)
     }
 }
 
@@ -148,22 +175,37 @@ private val APPOINTMENT_STATES = listOf("solicitada", "confirmada", "vencida", "
 /** D-1 from the row: today's key, the queue counter state and the command that registers the arrival. */
 private class ArrivalControl(val today: String, val queue: QueueState, val register: () -> Unit)
 
-/** One appointment: its state, a pending reschedule request, and one button per action the API accepts now (CITA-04). */
+/**
+ * One appointment as a card with its own actions (Lote 5 S2): patient, time and doctor on top with the state tag, notes under
+ * them, then a divider and every action the API accepts now on one line inside the same card (CITA-04): "Registrar llegada"
+ * solid primary, "Reprogramar" outlined primary, "Cancelar cita" outlined red at the right end.
+ */
 @Composable private fun AppointmentRow(a: ReceptionAppointment, arrival: ArrivalControl? = null, onAction: (AppointmentAction) -> Unit) {
-    Column {
-        DataRow(a.patientName.ifBlank { "Paciente" }, subtitle = "${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(a.start, a.end)} · ${a.doctorName}",
-            status = { AppointmentStateTag(a.state) }, titleTrailing = if (a.categories.isEmpty()) null else ({ CategoryMarks(a.categories) }))
+    val actions = buildList {
+        // D-1, like the web: "Registrar llegada" on today's confirmed one, the main next step of the card.
+        if (arrival != null && a.canRegisterArrival(arrival.today)) {
+            val key = "${QueueViewModel.ARRIVAL}:${a.id}"
+            add(CardAction(stringResource(R.string.u5_registrar_llegada), ActionRole.Primary, arrival.register, enabled = !arrival.queue.busy, loading = arrival.queue.busyKey == key))
+        }
+        addAll(appointmentCardActions(AppointmentActions.available(a), onAction))
+    }
+    ActionCard(actions) {
+        androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.Top, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            androidx.compose.foundation.layout.Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                androidx.compose.foundation.layout.Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(a.patientName.ifBlank { "Paciente" }, Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    if (a.categories.isNotEmpty()) CategoryMarks(a.categories)
+                }
+                Text("${sv.edu.catolica.climesa.domain.AppointmentAgenda.timeRange(a.start, a.end)} · ${a.doctorName}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            AppointmentStateTag(a.state)
+        }
         a.pendingReschedule?.let { Text(stringResource(R.string.cita_pide_cambiar, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
         if (a.state == AppointmentActions.EXPIRED) Text(stringResource(R.string.cita_vencida_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (a.state == AppointmentActions.RESCHEDULED) Text(stringResource(R.string.cita_reprogramada_a), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        // D-1, like the web: "Llegó · CON N" once the arrival issued its number; else "Registrar llegada" on today's confirmed one.
+        // D-1, like the web: "Llegó · CON N" once the arrival issued its number.
         a.arrival?.let { Text(stringResource(R.string.cita_llego, it.code), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.success) }
-        if (arrival != null && a.canRegisterArrival(arrival.today)) {
-            val key = "${QueueViewModel.ARRIVAL}:${a.id}"
-            RowAction(stringResource(R.string.u5_registrar_llegada), arrival.register, enabled = !arrival.queue.busy, loading = arrival.queue.busyKey == key)
-        }
         arrival?.queue?.arrival?.takeIf { it.appointmentId == a.id }?.let { NoticeBanner(NoticeKind.SUCCESS, it.text) }
-        AppointmentActionButtons(AppointmentActions.available(a), AppointmentActions.blocked(a), onAction)
     }
 }
 
@@ -178,18 +220,29 @@ private class ArrivalControl(val today: String, val queue: QueueState, val regis
 /** Every appointment state, `vencida` (closed) and `reprogramada` (called) included, uses the shared table like the web. */
 @Composable internal fun AppointmentStateTag(state: String) = StatusTag(state, label = sv.edu.catolica.climesa.domain.ReceptionAppointmentLabels.state(state) { StatusCatalog.label(it) })
 
-/** Allowed actions as buttons, two per line; blocked ones disabled with the server's reason under them. */
 /**
- * Row actions of an appointment (R3 A-15, A-31, A-38): only what the server allows, as compact text actions in one line,
- * never a full-width filled button per row nor a red one. A blocked action is hidden instead of printing the server reason;
- * destructive ones confirm in their dialog, where the red belongs.
+ * Role of each appointment command in a card (Lote 5 S2, web `crud.css`): confirming, starting the consultation and accepting
+ * the new time are the main next step; rescheduling edits; cancelling and rejecting are destructive; "No asistió" is neutral
+ * (it is undoable for 8 s in its row).
  */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+internal fun appointmentActionRole(action: AppointmentAction): ActionRole = when (action) {
+    AppointmentAction.CONFIRM, AppointmentAction.START_CONSULTATION, AppointmentAction.ACCEPT_RESCHEDULE -> ActionRole.Primary
+    AppointmentAction.RESCHEDULE -> ActionRole.Edit
+    AppointmentAction.REJECT, AppointmentAction.CANCEL, AppointmentAction.REJECT_RESCHEDULE -> ActionRole.Danger
+    AppointmentAction.NO_SHOW -> ActionRole.Neutral
+}
+
+/** The allowed commands as [CardAction]s with their role colours. */
+internal fun appointmentCardActions(allowed: List<AppointmentAction>, onAction: (AppointmentAction) -> Unit): List<CardAction> =
+    allowed.map { action -> CardAction(action.label, appointmentActionRole(action), { onAction(action) }) }
+
+/**
+ * Row actions of an appointment (R3 A-15, A-31, A-38): only what the server allows, in one [CardActionRow] with each
+ * command's role colour (Lote 5 S2). A blocked action is hidden instead of printing the server reason; destructive ones
+ * still confirm in their dialog.
+ */
 @Composable internal fun AppointmentActionButtons(allowed: List<AppointmentAction>, @Suppress("UNUSED_PARAMETER") blocked: List<Pair<AppointmentAction, String>>, onAction: (AppointmentAction) -> Unit) {
-    if (allowed.isEmpty()) return
-    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        allowed.forEach { action -> RowAction(action.label, { onAction(action) }) }
-    }
+    CardActionRow(appointmentCardActions(allowed, onAction))
 }
 
 /** Dialog of one appointment command: reason with live counter, or the slot grid of the same doctor for a reschedule. */

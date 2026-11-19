@@ -26,7 +26,11 @@ data class CategoryRequest(
     val id: String, val patientName: String, val record: String?, val categories: List<CategoryRef>, val specialties: List<String>,
     val franja: RequestFranja, val note: String?, val preferredDoctorId: String?, val preferredDoctorName: String?, val state: String,
     val rejectionReason: String?, val appointment: AssignedAppointment?, val createdAt: String, val version: Int, val allowedActions: List<String>,
+    /** Lote 5: `patientAge` and `patientSex` read fields; null on older APIs or without permission. */
+    val patientAge: Int? = null, val patientSex: String? = null,
 ) {
+    /** «34 años · Femenino» after the patient name; null when the API sends neither. */
+    val patientSummary: String? get() = PatientSummary.fromAge(patientAge, patientSex)
     val pending get() = state == CategoryRequestRules.PENDING
     fun allows(action: String) = action in allowedActions
     val categoryNames get() = categories.joinToString(", ") { it.name }
@@ -102,6 +106,8 @@ object CategoryRequestRules {
             row.text("preferredDoctorId"), row.text("preferredDoctorName"), row.optString("state"), row.text("rejectionReason"),
             row.optJSONObject("appointment")?.let { AssignedAppointment(it.optString("id"), it.optString("doctorName"), it.optString("start"), it.optString("end")) },
             row.optString("createdAt"), row.optInt("version", 1), row.optJSONArray("allowedActions").strings(),
+            patientAge = if (row.has("patientAge") && !row.isNull("patientAge")) row.optInt("patientAge") else null,
+            patientSex = row.text("patientSex"),
         )
     }
 

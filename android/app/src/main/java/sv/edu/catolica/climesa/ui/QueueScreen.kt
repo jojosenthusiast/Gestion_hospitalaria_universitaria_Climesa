@@ -4,6 +4,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.MoreVert
 import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
@@ -78,6 +79,8 @@ fun QueueScreen(
     subject: sv.edu.catolica.climesa.domain.QuickSubject? = null,
     /** G5: "Tomar signos" on a called card opens Signos vitales on that patient; null when the role cannot record signs. */
     onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null,
+    /** Lote 5 S11: «Ver expediente» on a row opens this patient's record; null hides it (the host has no record section). */
+    onOpenRecord: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null,
     model: QueueViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -90,6 +93,8 @@ fun QueueScreen(
     val canCall = "fila.llamar" in profile.permissions
     val canManage = "fila.gestionar" in profile.permissions
     val readOnly = !canIssue && !canCall && !canManage
+    // S11: whoever starts consultations reads the rows as a doctor (reason, appointment, wait) and can open the record.
+    val forDoctor = "consulta.iniciar" in profile.permissions
     var service by rememberSaveable { mutableStateOf<String?>(null) }
     var query by rememberSaveable { mutableStateOf("") }
     var showClosed by rememberSaveable { mutableStateOf(false) }
@@ -145,7 +150,8 @@ fun QueueScreen(
     // within thumb reach, like the reception counter of the web.
     Column(modifier.fillMaxSize()) {
     PageList(Modifier.weight(1f)) {
-        state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        // S5: the "Llamar siguiente" answer lives in its confirmation card in the dock, not again as a banner here.
+        sv.edu.catolica.climesa.domain.QueueReception.noticeShown(state.notice, state.lastCall)?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         if (canCall) state.myPostError?.let { item { NoticeBanner(NoticeKind.WARNING, it) } }
         // Sweep: the call's undo lives only on its card ("Deshacer"), not again at the top.
         if (service != null && !state.loading) item {
@@ -173,6 +179,7 @@ fun QueueScreen(
                 val visible = QueueBoard.visible(state.tickets, service, query)
                 val summary = QueueBoard.summary(visible, now)
                 if (state.loading) item { RefreshHint() }
+                item { QueueSummaryStrip(visible) }
                 item { LiveSearchField(query, { query = it }, stringResource(R.string.fila_buscar)) }
                 item { ChipRow(listOf(Triple<String?, String, Int?>(null, stringResource(R.string.fila_todos), state.tickets.size)) + QueueLabels.services.map { (value, label) -> Triple<String?, String, Int?>(value, label, state.tickets.count { it.service == value }) }, service) { service = it } }
                 // R3 A-27: the column headings carry the counts; the wait times live in the bottom dock.
@@ -190,7 +197,7 @@ fun QueueScreen(
                                 if (query.isBlank()) RowAction(stringResource(if (showClosed) R.string.fila_ocultar_terminados else R.string.fila_ver_terminados), { showClosed = !showClosed })
                             } else Text("${column.label} (${inColumn.size})", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
                         }
-                        items(shown, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state, model, now, canIssue, onOpenVitals) }
+                        items(shown, key = { it.id }) { ticket -> QueueTicketCard(ticket, canCall, canManage, state, model, now, canIssue, onOpenVitals, forDoctor, onOpenRecord) }
                         if (shown.size < inColumn.size && !closed) item(key = "m-${column.name}") { RowAction(stringResource(R.string.fila_ver_n_mas, inColumn.size - shown.size), { showAllWaiting = true }) }
                     }
                 }
@@ -201,6 +208,7 @@ fun QueueScreen(
         state, service, query,
         onCallNext = if (canCall && service == null) ({ model.clearMessages(); callNextOpen = true }) else null,
         onIssue = if (canIssue) ({ model.clearMessages(); issueOpen = true }) else null,
+        onDismissCall = model::dismissLastCall,
     )
     }
 }
@@ -210,7 +218,7 @@ fun QueueScreen(
  * numbers, and "Llamar siguiente" / "Emitir número" splitting the full width. It stays put while the board scrolls.
  */
 @Composable
-private fun QueueDock(state: QueueState, service: String?, query: String, onCallNext: (() -> Unit)?, onIssue: (() -> Unit)?) {
+private fun QueueDock(state: QueueState, service: String?, query: String, onCallNext: (() -> Unit)?, onIssue: (() -> Unit)?, onDismissCall: () -> Unit = {}) {
     val now = System.currentTimeMillis()
     val visible = QueueBoard.visible(state.tickets, service, query)
     val summary = QueueBoard.summary(visible, now)
@@ -226,6 +234,7 @@ private fun QueueDock(state: QueueState, service: String?, query: String, onCall
             .padding(horizontal = Spacing.page, vertical = Spacing.md),
         verticalArrangement = Arrangement.spacedBy(Spacing.md),
     ) {
+        state.lastCall?.let { CallConfirmationCard(it, onDismissCall) }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
             DockStat(stringResource(R.string.fila_dock_atendiendo), serving?.number?.toString() ?: stringResource(R.string.fila_dock_nadie), serving?.area, Modifier.weight(1f))
             DockStat(stringResource(R.string.fila_dock_sigue), nextCode ?: stringResource(R.string.fila_dock_nadie), nextArea, Modifier.weight(1f),
@@ -270,7 +279,7 @@ private fun NextCard(state: QueueState, service: String, canCall: Boolean, prima
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AreaTag(proposal.area)
                 Text(proposal.number.toString(), style = MaterialTheme.typography.displaySmall, modifier = Modifier.semantics { contentDescription = proposal.code })
-                if (proposal.priority != "rutina") PriorityBadge(Priority.of(proposal.priority))
+                PriorityBadge(Priority.of(proposal.priority))
             }
             Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -308,49 +317,126 @@ private fun UndoRow(label: String, busy: Boolean, onUndo: () -> Unit) {
     }
 }
 
+/**
+ * One number as a card with its own actions (Lote 5 S2/S5): area code and number large with the service written out, the
+ * state tag, the patient, then the priority as a full-width strip with the wait (never small grey text), and every action
+ * the API allows now in one [CardActionRow] coloured by what it does. For a doctor (S11) the card also says why the patient
+ * came and offers «Ver expediente».
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, state: QueueState, model: QueueViewModel, now: Long, canIssue: Boolean = false, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null) {
+private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, state: QueueState, model: QueueViewModel, now: Long, canIssue: Boolean = false, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null, forDoctor: Boolean = false, onOpenRecord: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null) {
     val busy = state.busy
     // B3: only the card being sent shows "Un momento…"; the rest only stop taking taps.
     val sending = state.busyKey == ticket.id
-    Column(Modifier.fillMaxWidth().areaSurface(ticket.area).padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+    // D-3: "No se presentó" waits on its own card with "Deshacer" before it is sent.
+    val absence = state.pendingAbsences.firstOrNull { it.key == ticket.id }
+    val undoShown = ticket.id in state.calledByMe && ticket.state == "llamado" && "deshacer_llamado" in ticket.undoActions
+    val subject = QueueRules.vitalsSubject(ticket)
+    val actions = if (absence != null) emptyList() else buildList {
+        // Buttons come from the API (`allowedActions`); a blocked action is hidden instead of printing the server's reason.
+        if (ticket.allows(QueueAction.ATTEND)) add(CardAction("Iniciar atención", ActionRole.Primary, { model.attend(ticket) }, enabled = !busy, loading = sending))
+        if (ticket.allows(QueueAction.COMPLETE)) add(CardAction("Completar", ActionRole.Primary, { model.complete(ticket) }, enabled = !busy, loading = sending && !ticket.allows(QueueAction.ATTEND)))
+        if (ticket.allows(QueueAction.CALL)) {
+            val again = ticket.state == "llamado"
+            // Calling is the next step of a waiting number; once called, starting the attention is, and calling again is secondary.
+            val role = if (ticket.allows(QueueAction.ATTEND) || ticket.allows(QueueAction.COMPLETE)) ActionRole.Edit else ActionRole.Primary
+            add(CardAction(if (again) "Llamar de nuevo" else "Llamar", role, { model.call(ticket) }, enabled = !busy, loading = sending && role == ActionRole.Primary))
+        }
+        // B3: every number this person called keeps its own undo while it is still called.
+        if (undoShown) add(CardAction(stringResource(R.string.fila_deshacer), ActionRole.Neutral, { model.undoCall(ticket) }, enabled = !busy))
+        // S11: the doctor opens the patient's record from the row (observations and past visits before calling).
+        if (forDoctor && onOpenRecord != null && subject != null) add(CardAction(stringResource(R.string.fila_l5_ver_expediente), ActionRole.Neutral, { onOpenRecord(subject) }, icon = ClimesaIcons.Clipboard))
+        // G5: a called or attended number opens Signos vitales on its patient, like the ward card.
+        if (onOpenVitals != null && subject != null) add(CardAction(stringResource(R.string.rec7_hosp_signos), ActionRole.Neutral, { onOpenVitals(subject) }, enabled = !busy))
+        if (ticket.allows(QueueAction.ABSENT)) add(CardAction("No se presentó", ActionRole.Danger, { model.absent(ticket) }, enabled = !busy))
+        // B-3: the issuer may void a number issued by mistake while the server window is open (like the web card menu).
+        if (canIssue && QueueRules.voidable(ticket.voidableUntilMillis, ticket.state, now)) add(CardAction(stringResource(R.string.fila_anular), ActionRole.Danger, { model.voidTicket(ticket) }, enabled = !busy))
+    }
+    val priority = Priority.of(ticket.priority)
+    val wait = QueueBoard.waitMinutes(ticket, now)?.takeIf { ticket.state == "en_espera" || QueueBoard.waitLevel(ticket, now) != SlaLevel.NONE }
+    ActionCard(
+        actions,
+        status = { CardStatusStrip(QueueLabels.priority(ticket.priority), priorityStrip(priority), icon = priority.icon.vector(), detail = wait?.let { stringResource(R.string.fila_espera, elapsedText(it)) }) },
+        footer = if (absence != null) ({ UndoRow(absence.label, busy = false) { model.undoAbsence(ticket.id) } }) else null,
+    ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             AreaTag(ticket.area)
             // The number is large next to the area code, as the patient hears it called ("CON 7").
-            Text(ticket.number.toString(), style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold), modifier = Modifier.weight(1f).semantics { contentDescription = QueueLabels.code(ticket) })
+            Text(ticket.number.toString(), Modifier.weight(1f).semantics { contentDescription = QueueLabels.code(ticket) }, style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold))
             OperacionStatusTag(ticket.state, label = QueueLabels.state(ticket.state))
+            if (absence == null) CardMenu(ticket, canCall, canManage, busy, model, undoShown = undoShown)
         }
-        Text(ticket.patientName, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            if (ticket.priority != "rutina") PriorityBadge(Priority.of(ticket.priority))
-            Text(QueueLabels.arrival(ticket), style = MaterialTheme.typography.labelLarge, color = if (ticket.appointmentAt != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
+        // S5: the service is written out on every ticket, not only coded by the area colour.
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Icon(ClimesaIcons.Queue, null, Modifier.size(16.dp), tint = MaterialTheme.climesa.primaryText)
+            Text(QueueLabels.service(ticket.service), style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold), color = MaterialTheme.climesa.primaryText)
         }
-        Text("${QueueLabels.service(ticket.service)} · ${QueueLabels.progress(ticket, canCall)}${ticket.officeCode?.let { " · $it" } ?: ""}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        QueueBoard.waitMinutes(ticket, now)?.takeIf { QueueBoard.waitLevel(ticket, now) != SlaLevel.NONE }?.let { minutes ->
-            Text(stringResource(R.string.fila_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(QueueBoard.waitLevel(ticket, now)))
+        Text(ticket.patientName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        // Lote 5: «34 años · Femenino» right after the name, on reception and MED rows; absent when the API does not send it.
+        ticket.patientSummary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (forDoctor) {
+            if (ticket.categories.isNotEmpty()) CategoryMarks(ticket.categories, showNames = true)
+            Text(sv.edu.catolica.climesa.domain.QueueReception.doctorSummary(ticket, now), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        } else {
+            Text(QueueLabels.arrival(ticket), style = MaterialTheme.typography.bodyMedium, color = if (ticket.appointmentAt != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant)
         }
-        // G5: a called or attended number opens Signos vitales on its patient, like the ward card.
-        if (onOpenVitals != null) QueueRules.vitalsSubject(ticket)?.let { subject -> RowAction(stringResource(R.string.rec7_hosp_signos), { onOpenVitals(subject) }, enabled = !busy) }
-        // D-3: "No se presentó" waits on its own card with "Deshacer" before it is sent.
-        val absence = state.pendingAbsences.firstOrNull { it.key == ticket.id }
-        if (absence != null) {
-            UndoRow(absence.label, busy = false) { model.undoAbsence(ticket.id) }
-            return@Column
+        Text(listOfNotNull(QueueLabels.progress(ticket, canCall), ticket.officeCode?.let { stringResource(R.string.fila_l5_consultorio, it) }).joinToString(" · "), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+/** Strip tone of a priority: emergency danger, urgent warning, routine neutral (the same weight on every card). */
+private fun priorityStrip(priority: Priority): StripTone = when (priority) {
+    Priority.EMERGENCIA -> StripTone.Danger
+    Priority.URGENTE -> StripTone.Warning
+    Priority.RUTINA -> StripTone.Neutral
+}
+
+/**
+ * Lote 5 S5: the day at a glance on top of the board: how many wait (walk-ins and appointments apart), are called, are in
+ * attention and are done, one cell each with the number large.
+ */
+@Composable
+private fun QueueSummaryStrip(tickets: List<QueueTicket>) {
+    val items = sv.edu.catolica.climesa.domain.QueueReception.summary(tickets)
+    val split = sv.edu.catolica.climesa.domain.QueueReception.waitingSplit(tickets)
+    ClimesaCard {
+        Column(Modifier.fillMaxWidth().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                items.forEach { item ->
+                    Column(Modifier.weight(1f).semantics(mergeDescendants = true) {}, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(item.label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item.count.toString(), style = MaterialTheme.typography.headlineSmall.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum"))
+                    }
+                }
+            }
+            // S4: the waiting count split into walk-ins of the day and appointments, the same words as Inicio.
+            Text(stringResource(R.string.fila_l5_en_espera_detalle, split.text), style = MaterialTheme.typography.bodyMedium)
         }
-        // Buttons come from the API (`allowedActions`). R3 A-14/A-31: only allowed actions, as compact row actions in one line
-        // (never four full-width buttons); a blocked action is hidden instead of printing the server's reason.
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-            // B3: every number this person called keeps its own undo while it is still called.
-            if (ticket.id in state.calledByMe && ticket.state == "llamado" && "deshacer_llamado" in ticket.undoActions) RowAction(stringResource(R.string.fila_deshacer), { model.undoCall(ticket) }, enabled = !busy, loading = sending)
-            QueueActionButton(ticket, QueueAction.CALL, if (ticket.state == "llamado") "Llamar de nuevo" else "Llamar", busy, sending) { model.call(ticket) }
-            QueueActionButton(ticket, QueueAction.ATTEND, "Iniciar atención", busy, sending) { model.attend(ticket) }
-            QueueActionButton(ticket, QueueAction.COMPLETE, "Completar", busy, sending) { model.complete(ticket) }
-            QueueActionButton(ticket, QueueAction.ABSENT, "No se presentó", busy, false) { model.absent(ticket) }
-            // B-3: the issuer may void a number issued by mistake while the server window is open (like the web card menu).
-            if (canIssue && QueueRules.voidable(ticket.voidableUntilMillis, ticket.state, now)) RowAction(stringResource(R.string.fila_anular), { model.voidTicket(ticket) }, enabled = !busy, loading = sending)
-            CardMenu(ticket, canCall, canManage, busy, model, undoShown = ticket.id in state.calledByMe && ticket.state == "llamado" && "deshacer_llamado" in ticket.undoActions)
+    }
+}
+
+/**
+ * Lote 5 S5: what "Llamar siguiente" just did, in one card where the person is looking (the dock): «Llamaste CON 12 ·
+ * Juan Pérez → C-101 · Consultorio 1 · Consulta general», with the number large and a close control.
+ */
+@Composable
+private fun CallConfirmationCard(call: sv.edu.catolica.climesa.domain.CallNextConfirmation, onDismiss: () -> Unit) {
+    val c = MaterialTheme.climesa
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp)
+    Row(
+        Modifier.fillMaxWidth().background(c.successSoft, shape).border(1.dp, c.success, shape).padding(start = Spacing.md, top = Spacing.sm, bottom = Spacing.sm, end = Spacing.xs)
+            .semantics(mergeDescendants = true) { contentDescription = call.text },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+    ) {
+        Icon(ClimesaIcons.Check, null, Modifier.size(22.dp), tint = c.success)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(stringResource(R.string.fila_l5_llamaste, call.code), style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = c.success)
+            call.patientName?.let { Text(it, style = MaterialTheme.typography.bodyLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+            Text("${call.office?.let { "→ $it" } ?: stringResource(R.string.fila_l5_sin_consultorio)} · ${call.service}", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2)
         }
+        androidx.compose.material3.IconButton(onClick = onDismiss) { Icon(ClimesaIcons.Close, stringResource(R.string.fila_l5_cerrar_confirmacion)) }
     }
 }
 
@@ -381,11 +467,6 @@ private fun CardMenu(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, 
     }
 }
 
-@Composable
-private fun QueueActionButton(ticket: QueueTicket, action: QueueAction, label: String, busy: Boolean, sending: Boolean, onClick: () -> Unit) {
-    if (!ticket.allows(action)) return
-    RowAction(label, onClick, enabled = !busy, loading = sending)
-}
 
 /** R3 A-6: the patient's "Mi turno": their number large, the area, the state and the room once called. Nothing of the board. */
 @Composable

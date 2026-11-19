@@ -17,8 +17,7 @@
     <string name="dash_vacio">Todavía no hay nada que resumir</string>
     <string name="dash_vacio_detalle">Cuando haya actividad en tus secciones aparecerá aquí.</string>
     <string name="dash_ayuda_rec">Lo que llega a recepción: fila, citas por confirmar y admisiones sin cama. Cada pendiente trae el botón para resolverlo.</string>
-    <string name="dash_ayuda_ast">Tu fila del día. Llama al siguiente número desde aquí o abre Mi consultorio para atender.</string>
-    <string name="dash_ayuda_enf">Tu planta: camas, hospitalizados e insumos. Las alertas te dicen qué atender primero.</string>
+    <string name="dash_ayuda_enf">Pacientes por piso, llegadas en ambulancia, tu fila y los insumos. Las alertas te dicen qué atender primero.</string>
     <string name="dash_ayuda_med">Tu agenda y los resultados por revisar. El paciente solo ve un resultado después de que tú lo revisas.</string>
     <string name="dash_ayuda_par">Estado de tu unidad y del servicio en curso. Registra cada hito para que el hospital sepa cuándo llegas.</string>
     <string name="dash_ayuda_pac">Tu próxima cita, tu turno en la fila y tus exámenes. Si ya tienes expediente vinculado verás todo aquí.</string>

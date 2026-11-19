@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lote 5 S4 and S7: free beds by room type and isolation filters of the bed board. -->
+    <string name="camas_l5_libres_por_tipo">Camas libres por tipo de habitación</string>
+    <string name="camas_l5_de_total">de %1$d</string>
+    <string name="camas_l5_sin_libres">Sin camas libres</string>
+    <string name="camas_l5_tipo_sin_libres">%1$s: sin camas libres</string>
+    <string name="camas_l5_tipo_libres">%3$s: %1$d de %2$d camas libres</string>
+    <string name="camas_l5_sin_filtro_aislamiento">Todas las camas</string>
+    <string name="camas_l5_aislamiento">Paciente en aislamiento</string>
+    <string name="camas_l5_habitacion_aislamiento">Habitación con aislamiento</string>
+</resources>

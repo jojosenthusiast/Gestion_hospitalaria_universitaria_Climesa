@@ -14,8 +14,9 @@ internal val ClimesaShapes = Shapes(
     extraLarge = RoundedCornerShape(Radius.panel),
 )
 
+/** App theme: colours for [dark], the web type scale and shapes, and the "Tamaño de letra" step ([textScale]) on top of the system size. */
 @Composable
-fun ClimesaTheme(dark: Boolean, content: @Composable () -> Unit) {
+fun ClimesaTheme(dark: Boolean, textScale: TextScale = TextScale.NORMAL, content: @Composable () -> Unit) {
     CompositionLocalProvider(
         LocalClimesaColors provides if (dark) DarkClimesaColors else LightClimesaColors,
         LocalSystemColors provides if (dark) DarkSystemColors else LightSystemColors,
@@ -24,7 +25,6 @@ fun ClimesaTheme(dark: Boolean, content: @Composable () -> Unit) {
             colorScheme = if (dark) DarkScheme else LightScheme,
             typography = ClimesaTypography,
             shapes = ClimesaShapes,
-            content = content,
-        )
+        ) { ProvideTextScale(textScale, content) }
     }
 }

@@ -4,9 +4,9 @@ import org.junit.Test
 class RoleAccessTest {
     private val allSections = AndroidSection.entries.map(AndroidSection::permission)
     private fun profile(roles:List<String>,verified:Boolean=true,platforms:List<String> = listOf("android"),permissions:List<String> = allSections)=AccessProfile(roles=roles,permissions=permissions,verifiedByBackend=verified,platforms=platforms)
-    @Test fun exposesExactlySixAndroidRoles(){
-        assertEquals(listOf("REC","AST","ENF","MED","PAR","PAC"),AndroidSections.roles)
-        assertEquals(6,RoleAccess.allowed(profile(AndroidSections.roles+"ADM"),"android").size)
+    @Test fun exposesExactlyFiveAndroidRoles(){
+        assertEquals(listOf("REC","ENF","MED","PAR","PAC"),AndroidSections.roles)
+        assertEquals(5,RoleAccess.allowed(profile(AndroidSections.roles+"ADM"),"android").size)
     }
     @Test fun operationsChiefAndLaboratoryDoNotUseAndroid(){
         assertTrue(RoleAccess.allowed(profile(listOf("JOP"),permissions=listOf("sesion.perfil","turnos.ver")),"android").isEmpty())

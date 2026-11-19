@@ -77,6 +77,8 @@ data class QueueState(
     val voided: String? = null,
     /** D-1: the last arrival registered from an appointment row. */
     val arrival: RegisteredArrival? = null,
+    /** Lote 5 S5: the last "Llamar siguiente" of this person: number, patient, room and service, until dismissed. */
+    val lastCall: sv.edu.catolica.climesa.domain.CallNextConfirmation? = null,
 )
 
 @HiltViewModel
@@ -341,7 +343,11 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
      * The API picks who goes next in [service] by RN-FILA-SIGUIENTE (priority, appointments in their window, then arrival)
      * with `POST /fila/llamar-siguiente`, optionally to [officeId]; 409 `fila_sin_espera` when nobody waits.
      */
-    fun callNext(service: String, officeId: String? = null, onDone: () -> Unit = {}) = mutate("/fila/llamar-siguiente", QueueRules.callNextBody(service, officeId?.takeIf { it.isNotBlank() }), "Número llamado.", key = NEXT, onDone = { onDone() }, describe = { result ->
+    fun callNext(service: String, officeId: String? = null, onDone: () -> Unit = {}) = mutate("/fila/llamar-siguiente", QueueRules.callNextBody(service, officeId?.takeIf { it.isNotBlank() }), "Número llamado.", key = NEXT, onDone = { result ->
+        val office = officeId?.takeIf { it.isNotBlank() }?.let { id -> mutable.value.offices.firstOrNull { it.id == id }?.label }
+        sv.edu.catolica.climesa.domain.QueueReception.callNextConfirmation(result, service, office)?.let { call -> mutable.value = mutable.value.copy(lastCall = call) }
+        onDone()
+    }, describe = { result ->
         (result as? JSONObject)?.optInt("numero", 0)?.takeIf { it > 0 }?.let { "Se llamó al N.º $it de ${QueueLabels.service(service)}." }
     }, undoOf = { result -> (result as? JSONObject)?.let { undoable(it, it.optString("id"), "${QueueLabels.areaOf(service)} ${it.optInt("numero")}") } })
 
@@ -374,6 +380,9 @@ class QueueViewModel @Inject constructor(private val api: ApiGateway, realtime: 
             if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.statusCode == 409) load(silent = true)
         }
     }
+
+    /** Lote 5 S5: closes the confirmation card of the last call. */
+    fun dismissLastCall() { mutable.value = mutable.value.copy(lastCall = null) }
 
     fun clearMessages() { mutable.value = mutable.value.copy(error = null, notice = null) }
 

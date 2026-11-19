@@ -10,7 +10,6 @@ import androidx.compose.material.icons.outlined.Hearing
 import androidx.compose.material.icons.outlined.Memory
 import androidx.compose.material.icons.outlined.PregnantWoman
 import androidx.compose.material.icons.outlined.Psychology
-import androidx.compose.material.icons.outlined.Restaurant
 import androidx.compose.material.icons.outlined.Send
 import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
@@ -34,6 +33,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -42,9 +43,11 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AppointmentAgenda
+import sv.edu.catolica.climesa.domain.AppointmentRequestCards
 import sv.edu.catolica.climesa.domain.AppointmentDoctor
 import sv.edu.catolica.climesa.domain.CategoryRequest
 import sv.edu.catolica.climesa.domain.CategoryRef
@@ -65,7 +68,8 @@ internal fun categoryIcon(key: String): ImageVector = when (key) {
     "oido" -> Icons.Outlined.Hearing
     "mente" -> Icons.Outlined.Psychology
     "neuro" -> Icons.Outlined.Memory
-    "digestivo" -> Icons.Outlined.Restaurant
+    // Lote 5 S6: the fork and knife read as "comida"; the stomach says "Estómago e intestinos".
+    "digestivo" -> StomachIcon
     "rinon" -> ClimesaIcons.Drop
     "alergia" -> Icons.Outlined.Air
     "cirugia" -> Icons.Outlined.Healing
@@ -132,16 +136,20 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
                 LiveSearchField(state.query, model::search, stringResource(R.string.cat_buscar))
                 val visible = state.visibleCategories
                 if (visible.isEmpty()) Text(stringResource(R.string.cat_sin_coincidencias), style = MaterialTheme.typography.bodySmall)
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    visible.forEach { category ->
-                        val selected = category.code in state.picked
-                        val full = !selected && state.picked.size >= CategoryRequestRules.MAX_CATEGORIES
-                        ClimesaFilterChip(
-                            selected = selected, onClick = { model.toggle(category.code) }, enabled = !full,
-                            label = { Text(category.name) },
-                            leadingIcon = { Icon(categoryIcon(category.icon), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
-                            modifier = Modifier.semantics { contentDescription = "${category.name}: ${category.description}" },
-                        )
+                // Lote 5 S16: the reasons grouped by body, internal, mind, senses and general, each section with its title.
+                sv.edu.catolica.climesa.domain.CategoryGroups.sections(visible).forEach { section ->
+                    Text(section.group.title, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.primaryText, modifier = Modifier.padding(top = Spacing.xs).semantics { heading() })
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        section.categories.forEach { category ->
+                            val selected = category.code in state.picked
+                            val full = !selected && state.picked.size >= CategoryRequestRules.MAX_CATEGORIES
+                            ClimesaFilterChip(
+                                selected = selected, onClick = { model.toggle(category.code) }, enabled = !full,
+                                label = { Text(category.name) },
+                                leadingIcon = { Icon(categoryIcon(category.icon), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
+                                modifier = Modifier.semantics { contentDescription = "${category.name}: ${category.description}" },
+                            )
+                        }
                     }
                 }
             }
@@ -207,26 +215,30 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
     }
 }
 
-/** W28 on Android: pending-assignment inbox for reception, with an inline assign panel prefilled by the view model. */
+/**
+ * W28 on Android, owner batch 5 (S6): the pending-assignment inbox as a vertical list of request cards. Each card reads in
+ * order of importance: the patient's name, the reasons (icon and name), the note, «Para» (the time of day asked for) and
+ * «Pedida» (how long ago), and the record number last. The state is a full-width strip right above the buttons, with
+ * «Asignar» (solid primary) at the bottom left and «Rechazar» (red outline) at the bottom right. Two columns from 600dp.
+ */
 @Composable
-internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryRequestsViewModel) {
+internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryRequestsViewModel, columns: Int = 1) {
     var rejecting by rememberSaveable { mutableStateOf<String?>(null) }
-    SectionCard(stringResource(R.string.cat_bandeja_titulo), eyebrow = state.inbox.size.toString()) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Text(stringResource(R.string.cat_bandeja_titulo), Modifier.weight(1f, fill = false), style = MaterialTheme.typography.titleMedium)
+            StatusTag("en_espera", label = state.inbox.size.toString())
+        }
         Text(stringResource(R.string.cat_bandeja_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         if (state.inbox.isEmpty()) Text(stringResource(R.string.cat_bandeja_vacia), style = MaterialTheme.typography.bodyMedium)
         // A4: how long each request has waited, read when the inbox is drawn (every realtime reload redraws it; no timers).
         val now = System.currentTimeMillis()
-        state.inbox.forEach { r ->
-            Column {
-                DataRow(r.patientName, subtitle = listOfNotNull(r.record, r.categoryNames, r.franja.label, CategoryRequestRules.waitingFor(r.createdAt, now)).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
-                r.note?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                r.preferredDoctorName?.let { Text(stringResource(R.string.cat_prefiere, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                if (state.assigning?.id == r.id) AssignPanel(state, model)
-                else ClimesaActionGroup {
-                    // R3 A-15: row actions are compact; the screen keeps its one primary action.
-                    if (r.allows(CategoryRequestRules.ASSIGN)) RowAction(stringResource(R.string.cat_asignar), { model.clearMessages(); model.openAssign(r) }, enabled = !state.saving)
-                    if (r.allows(CategoryRequestRules.REJECT)) RowAction(stringResource(R.string.cat_rechazar), { model.clearMessages(); rejecting = r.id }, enabled = !state.saving)
-                }
+        // The open assign panel takes the whole width; the other cards keep the grid.
+        state.inbox.chunked(columns.coerceAtLeast(1)).forEach { row ->
+            if (row.any { state.assigning?.id == it.id } && row.size > 1) row.forEach { r -> RequestCard(r, state, model, now, { rejecting = it }) }
+            else Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                row.forEach { r -> RequestCard(r, state, model, now, { rejecting = it }, Modifier.weight(1f)) }
+                repeat(columns - row.size) { Spacer(Modifier.weight(1f)) }
             }
         }
     }
@@ -245,6 +257,39 @@ internal fun CategoryRequestInbox(state: CategoryRequestsState, model: CategoryR
                 }, enabled = !state.saving, other = sv.edu.catolica.climesa.domain.AppointmentReasons.OTHER)
                 if (other) FormField(stringResource(R.string.cat_rechazar_motivo), reason, { reason = it.take(500) }, singleLine = false)
             })
+    }
+}
+
+/** One request of the inbox (S6), see [CategoryRequestInbox]. While it is being assigned, the panel replaces its buttons. */
+@Composable
+private fun RequestCard(r: CategoryRequest, state: CategoryRequestsState, model: CategoryRequestsViewModel, now: Long, onReject: (String) -> Unit, modifier: Modifier = Modifier) {
+    val assigning = state.assigning?.id == r.id
+    val noStaff = r.id in state.noStaff
+    val actions = if (assigning) emptyList() else buildList {
+        // S6 / "never offer what the server refuses": without staff for this reason only "Rechazar" is offered.
+        if (r.allows(CategoryRequestRules.ASSIGN) && !noStaff) add(CardAction(stringResource(R.string.cat_asignar), ActionRole.Primary, { model.clearMessages(); model.openAssign(r) }, enabled = !state.saving))
+        if (r.allows(CategoryRequestRules.REJECT)) add(CardAction(stringResource(R.string.cat_rechazar), ActionRole.Danger, { model.clearMessages(); onReject(r.id) }, enabled = !state.saving))
+    }
+    ActionCard(
+        actions, modifier,
+        status = if (assigning) null else ({ CardStatusStrip(AppointmentRequestCards.stateLabel(r.state), StripTone.Warning, icon = ClimesaIcons.Clock) }),
+        footer = if (assigning) ({ AssignPanel(state, model) }) else null,
+    ) {
+        Text(r.patientName, style = MaterialTheme.typography.titleMedium.copy(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold), maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        // Lote 5: «34 años · Femenino» right after the name; absent when the API does not send it.
+        r.patientSummary?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        // The reason is the icon and its name together, so the picture never has to be guessed.
+        CategoryMarks(r.categories, showNames = true)
+        r.note?.let { Text("«$it»", style = MaterialTheme.typography.bodyMedium) }
+        r.preferredDoctorName?.let { Text(stringResource(R.string.cat_prefiere, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Icon(ClimesaIcons.Calendar, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+            Text(AppointmentRequestCards.requestedFor(r.franja), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        }
+        AppointmentRequestCards.askedAt(r.createdAt, now)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        AppointmentRequestCards.record(r.record)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (noStaff) NoticeBanner(NoticeKind.WARNING, NO_STAFF_TEXT)
+        state.error?.takeIf { state.errorRequestId == r.id }?.let { NoticeBanner(NoticeKind.ERROR, it) }
     }
 }
 
@@ -284,4 +329,28 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
         PrimaryButton(stringResource(R.string.cat_confirmar_cita), model::assign, icon = ClimesaIcons.Check, enabled = state.canAssign, loading = state.saving)
         SecondaryButton(stringResource(R.string.ui_cancelar), model::closeAssign, icon = ClimesaIcons.Close, enabled = !state.saving)
     }
+}
+
+/**
+ * Stomach outline for the digestive category (Lote 5 S6), drawn like the other outlined icons (24dp grid, 1.8 stroke):
+ * the gullet from the top, the J-shaped body and the exit to the intestine at the bottom left.
+ */
+internal val StomachIcon: ImageVector by lazy {
+    ImageVector.Builder("Stomach", 24.dp, 24.dp, 24f, 24f).apply {
+        path(
+            stroke = androidx.compose.ui.graphics.SolidColor(Color.Black), strokeLineWidth = 1.8f,
+            strokeLineCap = androidx.compose.ui.graphics.StrokeCap.Round, strokeLineJoin = androidx.compose.ui.graphics.StrokeJoin.Round,
+        ) {
+            moveTo(10f, 2f); lineTo(10f, 6f)
+            curveTo(10f, 7.6f, 8.6f, 8.4f, 7.4f, 9.4f)
+            curveTo(5.4f, 11.1f, 4.9f, 14.2f, 6.4f, 16.5f)
+            curveTo(8.1f, 19.1f, 11.6f, 19.9f, 14.6f, 18.9f)
+            curveTo(18.4f, 17.6f, 20.4f, 13.8f, 19.6f, 10.2f)
+            curveTo(19f, 7.4f, 16.6f, 5.6f, 14.2f, 6f)
+            curveTo(12.8f, 6.2f, 12.1f, 7.4f, 12.6f, 8.6f)
+            curveTo(13.1f, 9.8f, 14.6f, 10.2f, 15.2f, 11.4f)
+            moveTo(6.4f, 16.5f)
+            curveTo(5.4f, 17.6f, 4.6f, 19f, 4.2f, 21f)
+        }
+    }.build()
 }

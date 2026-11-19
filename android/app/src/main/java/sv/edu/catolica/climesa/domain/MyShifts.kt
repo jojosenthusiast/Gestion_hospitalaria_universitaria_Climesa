@@ -36,7 +36,10 @@ data class MyShift(
  * One day of "Mis turnos": the assigned day (the day the shift starts) with its shifts in start order. `past` days
  * (before today, with every shift already over) go below the current and upcoming ones.
  */
-data class MyShiftDay(val title: String, val shifts: List<MyShift>, val past: Boolean = false)
+/** See [MyShifts.overview]. */
+data class MyShiftsOverview(val today: MyShiftDay?, val upcoming: List<MyShiftDay>, val past: List<MyShiftDay>)
+
+data class MyShiftDay(val title: String, val shifts: List<MyShift>, val past: Boolean = false, val today: Boolean = false)
 
 /**
  * Parses `GET /turnos/mios` outside composition. A missing or malformed `start`/`end` never throws:
@@ -137,7 +140,7 @@ object MyShifts {
         val grouped = shifts.filter { it.start != null }.sortedBy { it.start }
             .groupBy { it.start!!.atZone(zone).toLocalDate() }
         val isPast = { day: LocalDate, items: List<MyShift> -> day < today && items.none { it.end == null || it.end > now } }
-        val current = grouped.filter { (day, items) -> !isPast(day, items) }.map { (day, items) -> MyShiftDay(dayTitle(day, today), items) }
+        val current = grouped.filter { (day, items) -> !isPast(day, items) }.map { (day, items) -> MyShiftDay(dayTitle(day, today), items, today = day == today) }
         val past = grouped.filter { (day, items) -> isPast(day, items) }.toSortedMap(reverseOrder())
             .map { (day, items) -> MyShiftDay(dayTitle(day, today), items, past = true) }
         val undated = shifts.filter { it.start == null }
@@ -145,6 +148,12 @@ object MyShifts {
     }
 
     private fun text(row: JSONObject, key: String): String? = if (row.isNull(key)) null else row.optString(key)
+
+    /**
+     * Lote 5 S9, read-only «Mis turnos»: today on its own (highlighted, null when there is no shift today), then the upcoming
+     * days (a night shift still running from yesterday included), then past days. Jefatura publishes and changes shifts.
+     */
+    fun overview(days: List<MyShiftDay>) = MyShiftsOverview(days.firstOrNull { it.today }, days.filter { !it.today && !it.past }, days.filter { it.past })
 
     /** Attendance text for the person (never the raw code). */
     fun attendanceLabel(shift: MyShift): String? = when (shift.attendance) {

@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lote 5 S16: the patient's own access log, reachable from Perfil. -->
+    <string name="pac_accesos_enlace">Quién vio mi expediente</string>
+    <string name="pac_accesos_enlace_detalle">Fecha, rol y motivo de cada consulta a tu expediente.</string>
+</resources>

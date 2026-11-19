@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -85,7 +86,7 @@ internal fun ClimesaFilterChip(
 internal data class Segment(val label: String, val count: Int? = null)
 
 /**
- * The one segmented control (web `.segmented`): a bordered group 44dp tall with 6dp corners; options are split by a line,
+ * The one segmented control (web `.segmented`): a bordered group at least 44dp tall with 6dp corners; options are split by a line,
  * and the selected one takes the soft fill and primary text, its count pill turns primary. Scrolls sideways when the
  * options do not fit. Replaces the Material `TabRow`.
  */
@@ -95,7 +96,9 @@ internal fun SegmentedControl(segments: List<Segment>, selectedIndex: Int, onSel
     val shape = RoundedCornerShape(Radius.control)
     Row(
         modifier
-            .height(44.dp)
+            // Lote 5 S1: grows with "Tamaño de letra" (min 44dp) instead of clipping the labels at a fixed height.
+            .heightIn(min = 44.dp)
+            .height(IntrinsicSize.Min)
             .border(1.dp, colors.controlLine, shape)
             .background(MaterialTheme.colorScheme.surface, shape)
             .padding(1.dp)

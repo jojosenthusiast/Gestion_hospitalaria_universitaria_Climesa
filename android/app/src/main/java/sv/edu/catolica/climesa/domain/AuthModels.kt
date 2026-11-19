@@ -47,9 +47,18 @@ object RoleAccess {
      */
     fun allowed(profile: AccessProfile, platform: String): List<String> {
         if (!profile.verifiedByBackend || platform.lowercase() != "android" || "android" !in profile.platforms || "sesion.perfil" !in profile.permissions) return emptyList()
-        return AndroidSections.roles.filter { it in profile.roles && AndroidSections.hasAppScreens(it, profile.permissions) }
+        val roles = profile.roles.map(::canonical).toSet()
+        return AndroidSections.roles.filter { it in roles && AndroidSections.hasAppScreens(it, profile.permissions) }
     }
-    fun label(role: String) = mapOf("JOP" to "Jefe de Operaciones", "REC" to "Recepción", "AST" to "Asistencia", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[role] ?: role
+
+    /**
+     * Lote 5 S10 (owner, 2026-11-19: "Unir en Enfermería"): Asistencia was retired into Enfermería. An account that still has
+     * the old AST role (before the API migration runs) gets the Enfermería experience; its permissions still decide what it sees.
+     */
+    fun canonical(role: String) = if (role == RETIRED_ASSISTANT) "ENF" else role
+    private const val RETIRED_ASSISTANT = "AST"
+
+    fun label(role: String) = mapOf("JOP" to "Jefe de Operaciones", "REC" to "Recepción", "ENF" to "Enfermería", "MED" to "Medicina", "LAB" to "Laboratorio", "PAR" to "Paramédico", "PAC" to "Paciente")[canonical(role)] ?: role
 }
 
 /**
@@ -100,8 +109,8 @@ enum class AndroidSection(val screenId: String, val label: String, val permissio
 
 object AndroidSections {
     /**
-     * Asistente and Enfermería are the same person at the same station per the course PDF: one shared catalog, filtered by the
-     * permissions of each account. "Paciente hospitalizado" opens the same screen as "Mi planta", so it is not a second entry.
+     * Enfermería's station. Lote 5 S10: it absorbed the retired Asistencia (queue, office, vitals), so a nurse has everything
+     * the assistant had, filtered by the permissions of each account. "Paciente hospitalizado" opens the same screen as "Mi planta", so it is not a second entry.
      */
     private val careStation = listOf(
         AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.CLEANING,
@@ -111,7 +120,6 @@ object AndroidSections {
     /** Jefe de Operaciones and Laboratorio use the web only (D-090): they have no Android catalog and see "Tu rol no usa esta aplicación". */
     private val roleCatalog = mapOf(
         "REC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-        "AST" to careStation,
         "ENF" to careStation,
         "MED" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "PAR" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
@@ -121,7 +129,6 @@ object AndroidSections {
     /** The role's core tasks, in bar order (they are what its dashboard leads to). The bar takes the first visible ones after "Inicio". */
     private val coreTasks = mapOf(
         "REC" to listOf(AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS),
-        "AST" to listOf(AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.SUPPLIES),
         "ENF" to listOf(AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.SUPPLIES),
         "MED" to listOf(AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED),
         "PAR" to listOf(AndroidSection.SERVICE, AndroidSection.LOG),

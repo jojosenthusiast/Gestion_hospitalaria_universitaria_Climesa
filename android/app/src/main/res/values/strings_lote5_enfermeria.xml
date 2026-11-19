@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lote 5 S10: Enfermería works every floor; its floor is only the default filter of the ward. -->
+    <string name="enf_todos_los_pisos">Todos los pisos</string>
+    <string name="enf_recepcion_flujo">Así funciona: Despacho envía la unidad, el paramédico manda el reporte en camino y, cuando llega, aquí recibes al paciente y marcas la entrega.</string>
+</resources>

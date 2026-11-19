@@ -20,7 +20,7 @@ val climesaWebUrl = providers.gradleProperty("CLIMESA_WEB_URL").getOrElse("https
 val climesaDemoLogin = providers.gradleProperty("CLIMESA_DEMO_LOGIN").map { it.toBoolean() }.getOrElse(false)
 val climesaDemoCredentialsFile = rootProject.layout.projectDirectory.file("../demo-credenciales.json")
 // Only roles that use Android reach the APK: the same list as AndroidSections.roles (DemoLoginTest checks they match).
-val climesaDemoRoles = listOf("REC", "AST", "ENF", "MED", "PAR", "PAC")
+val climesaDemoRoles = listOf("REC", "ENF", "MED", "PAR", "PAC")
 fun androidDemoCredentials(text: String): String {
     if (text.isBlank()) return ""
     val entries = runCatching { groovy.json.JsonSlurper().parseText(text) as? List<*> }.getOrNull() ?: return ""

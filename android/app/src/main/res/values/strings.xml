@@ -221,6 +221,8 @@
     <string name="ui_cuenta_autenticada">Cuenta autenticada</string>
     <string name="ui_modo_oscuro">Modo oscuro</string>
     <string name="ui_modo_oscuro_detalle">Se conserva en este dispositivo</string>
+    <string name="ui_tamano_letra">Tamaño de letra</string>
+    <string name="ui_tamano_letra_detalle">Agranda el texto de toda la aplicación, sobre el tamaño del teléfono. Se conserva en este dispositivo</string>
     <string name="ui_cerrar_sesion_ayuda">Tu cuenta es personal. Cierra sesión cuando termines en un equipo compartido.</string>
     <string name="ui_camas_libres">camas libres</string>
     <string name="avisos_titulo">Avisos</string>

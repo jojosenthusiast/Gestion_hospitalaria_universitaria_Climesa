@@ -18,12 +18,15 @@ import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.realtime.LiveSubscription
 import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.DashboardEvents
+import sv.edu.catolica.climesa.domain.DashboardExtras
+import sv.edu.catolica.climesa.domain.DashboardSplits
 import sv.edu.catolica.climesa.domain.DashboardModel
 import sv.edu.catolica.climesa.domain.DashboardSource
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 import sv.edu.catolica.climesa.domain.RoleDashboard
 
-data class DashboardUiState(val loading: Boolean = true, val model: DashboardModel? = null, val error: String? = null)
+/** [extras]: Lote 5 S4 splits drawn under «En espera» and «Camas libres» (walk-ins vs appointments, free beds by room type). */
+data class DashboardUiState(val loading: Boolean = true, val model: DashboardModel? = null, val error: String? = null, val extras: DashboardExtras = DashboardExtras())
 
 /**
  * Reads the endpoints the role's dashboard needs (only those its permissions allow), in parallel, and builds the tiles,
@@ -65,11 +68,14 @@ class DashboardViewModel @Inject constructor(private val api: ApiGateway, realti
     fun refreshSeen() {
         val current = args ?: return
         val (data, failed) = last ?: return
-        mutable.value = mutable.value.copy(model = build(current, data, failed))
+        mutable.value = mutable.value.copy(model = build(current, data, failed), extras = DashboardSplits.extras(data))
     }
 
     private fun build(current: Args, data: Map<sv.edu.catolica.climesa.domain.DashboardSource, Any>, failed: Set<sv.edu.catolica.climesa.domain.DashboardSource>) =
-        RoleDashboard.build(current.role, current.permissions, data, failed, linked = current.linked, resultsSeenAt = userId?.let { sv.edu.catolica.climesa.data.ResultsSeen.load(drafts, it) })
+        DashboardSplits.withWaitingTile(
+            RoleDashboard.build(current.role, current.permissions, data, failed, linked = current.linked, resultsSeenAt = userId?.let { sv.edu.catolica.climesa.data.ResultsSeen.load(drafts, it) }),
+            DashboardSplits.extras(data),
+        )
 
     private fun reloadSoon() {
         job?.cancel()
@@ -95,7 +101,7 @@ class DashboardViewModel @Inject constructor(private val api: ApiGateway, realti
             return
         }
         last = data to failed
-        mutable.value = DashboardUiState(loading = false, model = build(current, data, failed))
+        mutable.value = DashboardUiState(loading = false, model = build(current, data, failed), extras = DashboardSplits.extras(data))
     }
 
     private suspend fun read(path: String): Result<Any> =

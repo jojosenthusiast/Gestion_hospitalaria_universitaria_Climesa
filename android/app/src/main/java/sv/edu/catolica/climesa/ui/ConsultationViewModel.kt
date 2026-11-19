@@ -15,6 +15,7 @@ import sv.edu.catolica.climesa.data.ApiGateway
 import sv.edu.catolica.climesa.data.DraftStore
 import sv.edu.catolica.climesa.data.NoDraftStore
 import sv.edu.catolica.climesa.domain.ConsultationResume
+import sv.edu.catolica.climesa.domain.ConsultationAutosave
 import sv.edu.catolica.climesa.domain.ConsultationRecord
 import sv.edu.catolica.climesa.domain.ConsultationRecordRules
 import sv.edu.catolica.climesa.domain.RecordedLabOrder
@@ -64,6 +65,14 @@ data class ConsultationState(
     val stepNotice: Pair<RecordSection, String>? = null,
     /** Row 1: the queue number whose call, undo, absence or priority is being sent; only its buttons show progress. */
     val queueBusy: String? = null,
+    /** Lote 5 S12: "Guardado" under the form after a draft save (manual or automatic); cleared by the screen after a moment. */
+    val saved: String? = null,
+    /** Lote 5 S12: an automatic draft save is on its way (debounced typing, leaving the screen or the app). */
+    val autosaving: Boolean = false,
+    /** Lote 5 S12: the last automatic save failed; what was typed stays on this device and the next change retries. */
+    val autosaveFailed: Boolean = false,
+    /** Lote 5 S12: the queue number the open consultation was started from, to show what the patient came for. */
+    val contextTicket: QueueConsultation? = null,
 )
 
 /** Steps of the consultation whose success shows in place. */
@@ -141,6 +150,7 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
      * `consultaId` of a 409 `consulta_ya_iniciada`. Another doctor's consultation answers 409 without the id: shown as error.
      */
     fun attend(ticket: QueueConsultation) {
+        mutable.value = mutable.value.copy(contextTicket = ticket)
         ticket.consultationId?.let { open(it, ticket.number); return }
         mutable.value = mutable.value.copy(opening = ticket.ticketId, error = null, notice = null)
         viewModelScope.launch {
@@ -173,7 +183,40 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
     /** "Reanudar" an unsigned consultation: opens it by id like the queue does. */
     fun resume(consultation: UnsignedConsultation) { open(consultation.id, null) }
 
-    fun closeResumed() { mutable.value = mutable.value.copy(resumed = null, record = null, stepNotice = null) }
+    fun closeResumed() { mutable.value = mutable.value.copy(resumed = null, record = null, stepNotice = null, saved = null, autosaveFailed = false, contextTicket = null) }
+
+    private var autosaveJob: Job? = null
+
+    /** The newest copy of [item] in the state (its version moves with every saved draft). */
+    private fun latest(item: MedicalAppointment): MedicalAppointment {
+        val id = item.consultationId ?: return item
+        val s = mutable.value
+        return s.resumed?.takeIf { it.consultationId == id } ?: s.appointments.firstOrNull { it.consultationId == id } ?: item
+    }
+
+    fun clearSaved() { mutable.value = mutable.value.copy(saved = null) }
+
+    /**
+     * Lote 5 S12: saves the draft on the server without blocking the form (debounced typing, leaving the screen, the app going
+     * to the background). Skipped while another write runs or when nothing changed; a failure keeps the local draft and says so.
+     */
+    fun autosave(item: MedicalAppointment, reason: String, physicalExam: String, plan: String) {
+        val id = item.consultationId ?: return
+        if (item.consultationState == "firmada") return
+        val current = mutable.value
+        if (current.saving || current.autosaving) return
+        val latest = latest(item)
+        if (!ConsultationAutosave.changed(latest, reason, physicalExam, plan)) return
+        mutable.value = current.copy(autosaving = true)
+        autosaveJob = viewModelScope.launch {
+            try {
+                val result = api.request("/consultas/$id", "PATCH", ConsultationAutosave.body(latest.version, reason, physicalExam, plan)) as JSONObject
+                keepDraft(latest, reason, physicalExam, plan, result.optInt("version", latest.version + 1))
+                mutable.value = mutable.value.copy(autosaving = false, autosaveFailed = false, saved = ConsultationAutosave.savedText(java.time.Instant.now()))
+            } catch (e: CancellationException) { throw e
+            } catch (_: Exception) { mutable.value = mutable.value.copy(autosaving = false, autosaveFailed = true) }
+        }
+    }
 
     private var withLabOrders = false
     /**
@@ -211,9 +254,13 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try {
+                // An automatic save in flight finishes first, so this write goes at the version it returned (no 409).
+                autosaveJob?.join()
+                @Suppress("NAME_SHADOWING") val item = latest(item)
                 val result = api.request("/consultas/${item.consultationId}", "PATCH", JSONObject().put("version", item.version).put("reason", reason.trim()).put("physicalExam", physicalExam.trim()).put("plan", plan.trim())) as JSONObject
                 val version = result.optInt("version", item.version + 1)
                 replace(item, reason, physicalExam, plan, version, "Borrador guardado.")
+                mutable.value = mutable.value.copy(saved = "Borrador guardado", autosaveFailed = false)
                 onDone()
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
@@ -227,6 +274,8 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
         mutable.value = mutable.value.copy(saving = true, error = null, notice = null)
         viewModelScope.launch {
             try {
+                autosaveJob?.join()
+                @Suppress("NAME_SHADOWING") val item = latest(item)
                 val draft = api.request("/consultas/${item.consultationId}", "PATCH", JSONObject().put("version", item.version).put("reason", reason.trim()).put("physicalExam", physicalExam.trim()).put("plan", plan.trim())) as JSONObject
                 val nextVersion = draft.optInt("version", item.version + 1)
                 // The draft is already saved: keep its new version so a failed signature can be retried without a 409.

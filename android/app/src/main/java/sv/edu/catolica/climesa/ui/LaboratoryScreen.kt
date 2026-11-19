@@ -69,6 +69,7 @@ import sv.edu.catolica.climesa.domain.LabGroup
 import sv.edu.catolica.climesa.domain.LabGroups
 import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
+import sv.edu.catolica.climesa.domain.LabResultView
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -100,6 +101,11 @@ fun LaboratoryScreen(
     model: LaboratoryViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
+    // S15: the patient's record opens over the review list and back returns to it.
+    var recordPatient by rememberSaveable { mutableStateOf<String?>(null) }
+    val canRecord = !ownResults && "expediente.ver" in profile.permissions
+    recordPatient?.let { id -> androidx.activity.compose.BackHandler { recordPatient = null }; PatientRecordPage(profile, id, modifier) { recordPatient = null }; return }
+    val onRecord: ((String) -> Unit)? = if (canRecord) ({ recordPatient = it }) else null
     LaunchedEffect(ownResults, userId) { if (ownResults && userId != null) model.markResultsSeen(userId) }
     var filterName by rememberSaveable(section) { mutableStateOf(LabFlow.defaultFilter(section).name) }
     val filter = LabFilter.entries.firstOrNull { it.name == filterName } ?: LabFilter.ALL
@@ -155,10 +161,10 @@ fun LaboratoryScreen(
                     if (toReview.isEmpty() && state.followUps.isEmpty() && inProgress.isEmpty()) item { EmptyState(stringResource(R.string.lab_pendientes_vacio), icon = ClimesaIcons.Check) }
                     // One primary per screen: the inbox keeps it when it has a release; otherwise the first card here.
                     val inboxHasPrimary = LabInbox.rows(state.followUps).any { it.canRelease }
-                    items(toReview, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now, primary = !inboxHasPrimary && order.id == toReview.first().id) }
+                    items(toReview, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now, primary = !inboxHasPrimary && order.id == toReview.first().id, onRecord = onRecord) }
                     if (inProgress.isNotEmpty()) {
                         item(key = "g-en-proceso") { LabGroupHeader(stringResource(R.string.lab_grupo_en_proceso), inProgress.size, null) {} }
-                        items(inProgress, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now, primary = false) }
+                        items(inProgress, key = { it.id }) { order -> LaboratoryOrderCard(order, false, order.id in state.busyIds, model, now, primary = false, onRecord = onRecord) }
                     }
                 }
                 else {
@@ -173,7 +179,7 @@ fun LaboratoryScreen(
                                 openGroups = if (group.name in openGroups) openGroups - group.name else openGroups + group.name
                             }
                         }
-                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, ownResults, order.id in state.busyIds, model, now) }
+                        if (open) items(orders, key = { it.id }) { order -> LaboratoryOrderCard(order, ownResults, order.id in state.busyIds, model, now, onRecord = onRecord) }
                     }
                 }
             }
@@ -377,8 +383,77 @@ private fun CancelOrderDialog(state: LaboratoryState, order: LaboratoryOrder?, m
     )
 }
 
+/**
+ * Lote 5 S13: an order as the reviewing doctor reads it. Exams first, then the patient and where the order came from; the stage
+ * and the result summary ("2 fuera de rango · 1 crítico") as a full-width strip; each component with value, unit, reference and
+ * its flag; every action on one line by weight (release solid, external outlined, cancel red).
+ */
 @Composable
-private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long, primary: Boolean = true) {
+private fun StaffOrderCard(order: LaboratoryOrder, busy: Boolean, model: LaboratoryViewModel, now: Long, primary: Boolean, onRecord: ((String) -> Unit)?) {
+    val canReview = order.allows(LabOrderAction.REVIEW)
+    val canCancel = order.allows(LabOrderAction.CANCEL)
+    val inReview = order.state == "completado" && !order.reviewed
+    val canSendExternal = order.allowsExternal(LabExternalAction.SEND)
+    val canLoadExternal = order.allowsExternal(LabExternalAction.LOAD_RESULT)
+    var expanded by rememberSaveable(order.id) { mutableStateOf(canReview || canLoadExternal || canSendExternal) }
+    val stage = LabWorklist.stage(order)
+    val critical = LabWorklist.isCritical(order)
+    val summary = LabResultView.summary(order.items)
+    val withResults = order.items.any { it.result != null }
+    val tone = when {
+        critical -> StripTone.Danger
+        summary != null -> StripTone.Warning
+        stage == LabStage.RELEASED -> StripTone.Success
+        stage == LabStage.CANCELLED -> StripTone.Neutral
+        stage == LabStage.IN_PROCESS -> StripTone.Info
+        else -> StripTone.Warning
+    }
+    val actions = buildList {
+        if (canLoadExternal) add(CardAction(stringResource(R.string.lab_cargar_externo), if (primary) ActionRole.Primary else ActionRole.Edit, { model.openExternalLoad(order.id) }, icon = Icons.Outlined.UploadFile, enabled = !busy))
+        if (canReview) add(CardAction(stringResource(R.string.u5_lab_revisar_liberar), if (primary && !canLoadExternal) ActionRole.Primary else ActionRole.Edit, { model.openReview(order.id) }, icon = ClimesaIcons.Check, enabled = !busy, loading = busy))
+        if (canSendExternal) add(CardAction(stringResource(R.string.lab_externo_titulo), ActionRole.Edit, { model.openExternal(order.id) }, enabled = !busy))
+        if (!expanded) add(CardAction(stringResource(R.string.lab_ver_detalle, order.items.size), ActionRole.Neutral, { expanded = true }, icon = ClimesaIcons.Eye))
+        else if (!(canReview || canLoadExternal || canSendExternal)) add(CardAction(stringResource(R.string.lab_ocultar_detalle), ActionRole.Neutral, { expanded = false }))
+        order.patientId?.let { id -> onRecord?.let { open -> add(CardAction(stringResource(R.string.lab5_ver_expediente), ActionRole.Neutral, { open(id) }, icon = ClimesaIcons.Clipboard)) } }
+        if (canCancel) add(CardAction(stringResource(R.string.lab_cancelar_orden), ActionRole.Danger, { model.openCancel(order.id) }, enabled = !busy))
+    }
+    ActionCard(actions, status = {
+        CardStatusStrip(stage.label, tone, icon = if (critical || summary != null) ClimesaIcons.Alert else ClimesaIcons.Flask,
+            detail = summary ?: stringResource(R.string.lab5_en_rango).takeIf { withResults && order.items.all { it.result != null } })
+    }) {
+        Text(order.items.joinToString(", ") { it.name.ifBlank { it.code } }, style = MaterialTheme.typography.titleMedium, maxLines = 3, overflow = TextOverflow.Ellipsis)
+        Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.lab5_paciente, order.patientName), Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (LabWorklist.isUrgent(order)) PriorityBadge(Priority.URGENTE)
+            if (critical) CriticalPill(stringResource(R.string.lab_critico))
+        }
+        LabWorklist.identityLine(order).takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        val origin = stringResource(if (order.consultationId != null) R.string.lab5_origen_consulta else R.string.lab5_origen_sin_consulta)
+        LabPatientList.shortDate(order.createdAtMillis).takeIf(String::isNotEmpty)?.let { Text(stringResource(R.string.lab5_origen, it, origin), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        order.doctorName?.let { Text(stringResource(R.string.lab_pidio, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        LabWorklist.elapsedMinutes(order, now)?.takeIf { order.state != "completado" && order.state != "cancelado" }?.let { minutes ->
+            Text(stringResource(R.string.lab_espera, elapsedText(minutes)), style = MaterialTheme.typography.labelLarge, color = slaColor(LabWorklist.sla(order, now)))
+        }
+        if (order.state == "cancelado") order.cancellationReason?.let { Text(stringResource(R.string.lab_motivo_cancelacion, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        if (order.external) ExternalNote(order)
+        if (expanded) {
+            LabStepper(order, false)
+            HorizontalDivider(color = MaterialTheme.climesa.line)
+            Text(stringResource(R.string.lab5_resultados, order.items.size), Modifier.semantics { heading() }, style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            order.items.forEachIndexed { index, item ->
+                if (index > 0) HorizontalDivider(color = MaterialTheme.climesa.line)
+                // C-3: the doctor reviews against the range valid for this patient (never sent to the patient).
+                LabResultRow(item, pendingText = stringResource(if (inReview) R.string.lab_valor_en_revision else R.string.clin_lab_pendiente))
+            }
+            // T07c: the report file (photo or PDF) of a completed external order opens from here.
+            if (order.external && order.state == "completado") ExternalReport(order, model)
+        }
+    }
+}
+
+@Composable
+private fun LaboratoryOrderCard(order: LaboratoryOrder, ownView: Boolean, busy: Boolean, model: LaboratoryViewModel, now: Long, primary: Boolean = true, onRecord: ((String) -> Unit)? = null) {
+    if (!ownView) { StaffOrderCard(order, busy, model, now, primary, onRecord); return }
     // Buttons follow `allowedActions` from the API for this reader, never the role or the state.
     val canReview = !ownView && order.allows(LabOrderAction.REVIEW)
     val canCancel = !ownView && order.allows(LabOrderAction.CANCEL)
@@ -478,7 +553,7 @@ private fun ExternalReport(order: LaboratoryOrder, model: LaboratoryViewModel) {
                 file.note?.let { Text(it, style = MaterialTheme.typography.bodySmall) }
                 if (file.stored) {
                     val description = stringResource(R.string.lab_adjunto_abrir_desc, file.fileName)
-                    SecondaryButton(stringResource(R.string.lab_adjunto_abrir), { model.openAttachment(order.id, file.id) }, Modifier.semantics { contentDescription = description }, icon = Icons.AutoMirrored.Outlined.OpenInNew, enabled = state.attachmentBusy == null, loading = busy)
+                    SecondaryButton(stringResource(if (file.mimeType == "application/pdf") R.string.lab5_ver_pdf else R.string.lab5_ver_imagen), { model.openAttachment(order.id, file.id) }, Modifier.semantics { contentDescription = description }, icon = Icons.AutoMirrored.Outlined.OpenInNew, enabled = state.attachmentBusy == null, loading = busy)
                 } else {
                     Text(stringResource(R.string.lab_adjunto_solo_referencia), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     if (canAttach) SecondaryButton(stringResource(R.string.lab_adjunto_subir), { target = file.id; picker.launch(LabExternalRules.ATTACHMENT_TYPES.toTypedArray()) }, icon = Icons.Outlined.UploadFile, enabled = state.attachmentBusy == null, loading = busy)

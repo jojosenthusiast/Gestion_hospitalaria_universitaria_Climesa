@@ -13,7 +13,6 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
-import sv.edu.catolica.climesa.domain.NoticeInboxRules
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -105,6 +104,8 @@ internal fun PortalScaffold(
     snackbarHost: @Composable () -> Unit = {},
     badges: Map<AndroidSection, Int> = emptyMap(),
     noticeCritical: Boolean = false,
+    /** Lote 5 S9: a compact app-wide notice right under the top bar (the shift state); draws nothing when empty. */
+    topNotice: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     AdaptiveRoleScaffold(
@@ -133,7 +134,12 @@ internal fun PortalScaffold(
                 },
             )
         },
-        content = content,
+        content = if (topNotice == null) content else { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                topNotice()
+                Box(Modifier.weight(1f).fillMaxWidth()) { content(PaddingValues()) }
+            }
+        },
     )
 }
 
@@ -147,27 +153,42 @@ internal val TopBarMuted = Color(0xFFD3DBE6)
 internal fun bellCountColors(critical: Boolean, surface: Color, primaryText: Color, criticalRed: Color): Pair<Color, Color> =
     if (critical) criticalRed to Color.White else surface to primaryText
 
-/** Header bell: notices one tap away, with the unread count ("9+" cap, like the web and iOS). */
+/**
+ * Text of the bell count (Lote 5 S1): "1" to "99", "99+" from a hundred, null for none (no badge). Up to three characters,
+ * and the pill is sized for them, so the count is never cut off.
+ */
+internal fun bellBadgeText(count: Int): String? = when {
+    count <= 0 -> null
+    count > 99 -> "99+"
+    else -> count.toString()
+}
+
+/**
+ * Header bell: notices one tap away, with the unread count. The count pill is drawn next to the icon button, not inside it:
+ * the Material icon button clips its content to a circle, which used to cut the count off (Lote 5 S1).
+ */
 @Composable
 private fun NoticesBell(unread: Int, critical: Boolean, onClick: () -> Unit) {
     val (container, content) = bellCountColors(critical, MaterialTheme.colorScheme.surface, MaterialTheme.climesa.primaryText, MaterialTheme.system.critical)
-    IconButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = if (unread > 0) "Avisos, $unread sin leer" else "Avisos" }) {
-        Box {
+    Box {
+        IconButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = if (unread > 0) "Avisos, $unread sin leer" else "Avisos" }) {
             Icon(ClimesaIcons.Bell, null)
-            NoticeInboxRules.badgeText(unread)?.let { text ->
-                Text(
-                    text,
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = 9.dp, y = (-7).dp)
-                        .heightIn(min = 18.dp)
-                        .widthIn(min = 18.dp)
-                        .background(container, RoundedCornerShape(percent = 50))
-                        .padding(horizontal = 5.dp, vertical = 1.dp),
-                    color = content,
-                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, letterSpacing = 0.sp, textAlign = TextAlign.Center),
-                )
-            }
+        }
+        bellBadgeText(unread)?.let { text ->
+            Text(
+                text,
+                Modifier
+                    .align(Alignment.TopEnd)
+                    .offset(x = (-2).dp, y = 4.dp)
+                    .heightIn(min = 18.dp)
+                    .widthIn(min = 18.dp)
+                    .background(container, RoundedCornerShape(percent = 50))
+                    .padding(horizontal = 5.dp, vertical = 1.dp),
+                color = content,
+                maxLines = 1,
+                softWrap = false,
+                style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.sp, textAlign = TextAlign.Center),
+            )
         }
     }
 }

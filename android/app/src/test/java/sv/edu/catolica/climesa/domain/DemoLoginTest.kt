@@ -28,7 +28,7 @@ class DemoLoginTest {
     @Test fun androidRolesAreKeptInFileOrder() {
         val file = listOf("ADM", "PAC", "JOP", "REC", "AST", "LAB", "ENF", "MED", "DPD", "PAR")
             .joinToString(",", "[", "]") { """{"rol":"$it","correo":"${it.lowercase()}@example.test","contrasena":"x"}""" }
-        assertEquals(listOf("PAC", "REC", "AST", "ENF", "MED", "PAR"), DemoLogin.accounts(true, file).map { it.role })
+        assertEquals(listOf("PAC", "REC", "ENF", "MED", "PAR"), DemoLogin.accounts(true, file).map { it.role })
     }
 
     @Test fun buildFiltersTheSameRolesAsTheApp() {

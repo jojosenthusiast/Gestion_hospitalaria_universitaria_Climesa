@@ -34,16 +34,34 @@ internal fun ProfileSummaryCard(account: AuthenticatedAccount, modifier: Modifie
     }
 }
 
-/** Light/dark switch row; the choice is kept on the device by the caller. */
+/**
+ * Appearance: the light/dark switch and "Tamaño de letra" (Normal 100 %, Grande 115 %, Muy grande 130 %). Both choices are
+ * kept on the device; the text size comes from [LocalTextScaleControl], provided by the activity, and applies app-wide at once.
+ */
 @Composable
 internal fun AppearanceCard(dark: Boolean, setDark: (Boolean) -> Unit, modifier: Modifier = Modifier) {
+    val textScale = LocalTextScaleControl.current
     ClimesaCard(modifier) {
-        Row(Modifier.fillMaxWidth().padding(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(stringResource(R.string.ui_modo_oscuro), style = MaterialTheme.typography.titleMedium)
-                Text(stringResource(R.string.ui_modo_oscuro_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Column {
+            Row(Modifier.fillMaxWidth().padding(Spacing.md), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Text(stringResource(R.string.ui_modo_oscuro), style = MaterialTheme.typography.titleMedium)
+                    Text(stringResource(R.string.ui_modo_oscuro_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+                Switch(dark, setDark)
             }
-            Switch(dark, setDark)
+            HorizontalDivider(color = MaterialTheme.climesa.line)
+            Column(Modifier.fillMaxWidth().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Text(stringResource(R.string.ui_tamano_letra), style = MaterialTheme.typography.titleMedium)
+                Text(stringResource(R.string.ui_tamano_letra_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                val steps = TextScale.entries
+                SegmentedControl(
+                    segments = steps.map { Segment(it.label) },
+                    selectedIndex = steps.indexOf(textScale.value),
+                    onSelect = { textScale.set(steps[it]) },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
         }
     }
 }

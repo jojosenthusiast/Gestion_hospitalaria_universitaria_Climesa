@@ -161,9 +161,15 @@ object PatientSummary {
     fun fromApi(birth: String?, ageRange: String?, sex: String?, today: LocalDate = LocalDate.now()): String? {
         val date = birth?.takeIf { it.isNotBlank() && it != "null" }?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         val age = ageText(date, today) ?: ageRange?.takeIf { it.isNotBlank() && it != "null" }?.let { "$it años" }
-        val sexLabel = when (sex) { "femenino" -> Sex.FEMALE.label; "masculino" -> Sex.MALE.label; "indeterminado" -> Sex.INDETERMINATE.label; else -> null }
-        return listOfNotNull(age, sexLabel).joinToString(" · ").ifBlank { null }
+        return listOfNotNull(age, sexLabel(sex)).joinToString(" · ").ifBlank { null }
     }
+
+    /** Spanish label of the API sex code (`femenino`, `masculino`, `indeterminado`); `no_registrado`, null or unknown give none. */
+    fun sexLabel(sex: String?): String? = when (sex) { "femenino" -> Sex.FEMALE.label; "masculino" -> Sex.MALE.label; "indeterminado" -> Sex.INDETERMINATE.label; else -> null }
+
+    /** Lote 5: the same line from the `patientAge` / `patientSex` read fields of `/fila` and category requests. */
+    fun fromAge(age: Int?, sex: String?): String? =
+        listOfNotNull(age?.takeIf { it >= 0 }?.let { if (it == 1) "1 año" else "$it años" }, sexLabel(sex)).joinToString(" · ").ifBlank { null }
 
     fun line(p: Patient, today: LocalDate = LocalDate.now()): String? =
         listOfNotNull(ageText(p.birth, today), p.sex.takeIf { it != Sex.UNKNOWN }?.label).joinToString(" · ").ifBlank { null }

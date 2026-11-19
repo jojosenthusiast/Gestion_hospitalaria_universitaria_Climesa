@@ -39,7 +39,6 @@ import sv.edu.catolica.climesa.domain.*
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZoneId
-import sv.edu.catolica.climesa.domain.UnitStatusBadge
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -107,8 +106,7 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
         }
     }}
 }
-private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";AndroidSection.MY_ROOM->"/admisiones";else->null}
-private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En servicio","en_mantenimiento" to "En mantenimiento")
+private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.MY_ROOM->"/admisiones";else->null}
 private val ClockTime=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,fontWeight=FontWeight.ExtraBold,fontSize=18.sp,lineHeight=22.sp,letterSpacing=.36.sp,fontFeatureSettings=TabularNumbers)
 private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,fontWeight=FontWeight.Normal,fontSize=13.sp,lineHeight=17.sp,fontFeatureSettings=TabularNumbers)
 /** Obs 2: live clock with seconds, ticking on each whole second, and the full weekday on a second line that ellipsizes on phones. */
@@ -144,6 +142,11 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
     // Opens Signos on a patient from the current section; gated by the section (permission), never by role (rule 8).
     val openVitals:((QuickSubject)->Unit)?=if(AndroidSection.VITAL_SIGNS in sections){subject->vitalsOrigin=page.name;selectedName=AndroidSection.VITAL_SIGNS.name;inbox.post(QuickActionRequest(AndroidSection.VITAL_SIGNS,subject=subject))}else null
     val handled={inbox.consume(page)}
+    // Lote 5 S11/S15: «Ver expediente» on a queue row opens that patient's record over the queue; back returns to it.
+    var recordFor by rememberSaveable{mutableStateOf<String?>(null)}
+    LaunchedEffect(page){recordFor=null}
+    BackHandler(enabled=recordFor!=null){recordFor=null}
+    val openRecord:((QuickSubject)->Unit)?=if("expediente.ver" in account.profile.permissions){subject->recordFor=subject.id}else null
     val onDashboardAction:(QuickActionRequest)->Unit={request->if(request.section in sections){selectedName=request.section.name;inbox.post(request)}}
     LaunchedEffect(role,page){model.load(path)}
     LaunchedEffect(account.profile.channels,account.profile.permissions){model.start(account.profile.channels,account.profile.permissions)}
@@ -153,23 +156,25 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
     PortalScaffold(
         role=role,sections=sections,selected=page,onSelected={vitalsOrigin=null;selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
         badges=noticeBadges(account,sections),noticeCritical=noticeBellCritical(account,sections),
+        topNotice={ShiftStatusBanner(account.profile.channels)},
     ) {outer->
       Column(Modifier.padding(outer).fillMaxSize()){
         if(criticalLab&&AndroidSection.RESULT_REVIEW in sections)CriticalLabNotice(onReview={model.dismissCriticalLab();selectedName=AndroidSection.RESULT_REVIEW.name},onDismiss=model::dismissCriticalLab)
         val padding=PaddingValues(0.dp)
         Box(Modifier.weight(1f).fillMaxWidth()){when{
+        recordFor!=null->PatientRecordPage(account.profile,recordFor!!,Modifier.padding(padding)){recordFor=null}
         page==AndroidSection.HOME->RoleDashboardScreen(account,role,onDashboardAction,Modifier.padding(padding),onOpenNotices={if(AndroidSection.NOTICES in sections)selectedName=AndroidSection.NOTICES.name})
         page==AndroidSection.NOTICES->NoticesScreen(account,Modifier.padding(padding))
         page==AndroidSection.BEDS||page==AndroidSection.CLEANING->BedsScreen(account.profile,Modifier.padding(padding))
         page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,linked=account.profile.patientId!=null)
         page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled,
-            onOpenVitals=openVitals)
+            onOpenVitals=openVitals,floorFilter=page==AndroidSection.WARD)
         page==AndroidSection.SUPPLIES->InventoryScreen(Modifier.padding(padding),account.profile)
         page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
-        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId,onOpenVitals=openVitals)
+        page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId,onOpenVitals=openVitals,onOpenRecord=openRecord)
         page==AndroidSection.RESULTS||page==AndroidSection.RESULT_REVIEW->LaboratoryScreen(account.profile,Modifier.padding(padding),ownResults=page==AndroidSection.RESULTS,section=page,userId=account.session.userId)
         page==AndroidSection.LINK_RECORD->LinkRecordScreen(account.profile,Modifier.padding(padding))
-        page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding))
+        page==AndroidSection.HISTORY||page==AndroidSection.RECORD->ClinicalHistoryScreen(account.profile,own=page==AndroidSection.HISTORY,modifier=Modifier.padding(padding),startPatientId=inbox.subjectFor(page)?.id,onStartHandled=handled)
         page==AndroidSection.MEDICAL_DAY->ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HOSPITAL_INFO->HospitalInfoScreen(Modifier.padding(padding))
         page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=!sv.edu.catolica.climesa.domain.VitalsAccess.canRecord(account.profile.permissions),userId=account.session.userId,subject=inbox.subjectFor(page),onSubjectHandled=handled,
@@ -177,7 +182,10 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
         page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)->AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding))
         else->PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){
-                profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if("pacientes.editar_propios" in account.profile.permissions){{MyDataCard()}}else null)
+                // Lote 5 S16 ("no se mira quien vio mi expediente"): the access log is one tap from Mis datos too, not only in Más.
+                val accessLink:(@Composable ()->Unit)?=if(AndroidSection.MY_ACCESS in sections){{DataRow(stringResource(R.string.pac_accesos_enlace),subtitle=stringResource(R.string.pac_accesos_enlace_detalle),leadingIcon=ClimesaIcons.Eye,onClick={selectedName=AndroidSection.MY_ACCESS.name})}}else null
+                val ownData="pacientes.editar_propios" in account.profile.permissions
+                profileItems(account,dark,setDark,{if(!signingOut)logout()},myData=if(ownData||accessLink!=null){{Column(verticalArrangement=Arrangement.spacedBy(Spacing.block)){if(ownData)MyDataCard();accessLink?.invoke()}}}else null)
             }
             else if(data.loading&&data.data==null)item{LoadingState()}
             else if(data.error!=null&&data.data==null)item{ErrorState(data.error,{model.load(path)})}
@@ -186,19 +194,6 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
                 val rows=PortalParsers.patients(data.data)
                 if(rows.isEmpty())item{EmptyState("No hay coincidencias. Ajusta la búsqueda.")}
                 else items(rows){p->DataRow(p.fullName,subtitle=p.summary,meta="EXP. ${p.record}")}
-            }else if(page==AndroidSection.UNIT){
-                val unit=PortalParsers.unit(data.data)
-                // Obs 19: one status tag («No se puede despachar» when blocked) with its reason under it, and the service line in the header.
-                val blocked=unit?.dispatchBlock!=null
-                val state=unit?.state.orEmpty()
-                item{SectionCard(unit?.plate.orEmpty(),eyebrow=stringResource(R.string.op_amb_unidad),action={OperacionStatusTag(UnitStatusBadge.code(state,blocked),label=UnitStatusBadge.label(state,blocked,unitStates[state]?:OperacionStatus.label(state)))}){
-                    unit?.dispatchBlock?.let{Text(it,style=MaterialTheme.typography.bodyMedium)}
-                    if(unit?.hasService!=true)Text(stringResource(R.string.unidad_sin_servicio),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.climesa.primaryText)
-                    else Column{Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Text("${unit.serviceOrigin.orEmpty()} → ${unit.serviceDestination.orEmpty()}",style=MaterialTheme.typography.titleSmall)}
-                    LabeledValue(stringResource(R.string.unidad_paramedico_turno),stringResource(if(unit?.paramedicOnDuty==true)R.string.unidad_si else R.string.unidad_no))
-                    LabeledValue(stringResource(R.string.unidad_motorista_turno),stringResource(if(unit?.driverOnDuty!=false)R.string.unidad_si else R.string.unidad_no))
-                }}
-                if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.state))item{MaintenanceControl(model,unit.state,unit.version,unit.paramedicOnDuty,unit.driverOnDuty)}
             }else if(page==AndroidSection.MY_ROOM){
                 val admissions=AdmissionParser.admissions(data.data)
                 val room=MyRoomRules.current(admissions,account.profile.patientId)
@@ -260,16 +255,38 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
  * días de hoy en adelante van primero y los anteriores debajo, bajo "Turnos anteriores".
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:List<MyShift>,pastOpen:Boolean,togglePast:()->Unit){
-    val days=MyShifts.byDay(shifts)
+    val overview=MyShifts.overview(MyShifts.byDay(shifts))
+    // Lote 5 S9 ("mi turno ... seria solo lectura"): Jefatura publishes and changes shifts, so the screen says it and offers no action.
+    item(key="turnos-lectura"){Text(stringResource(R.string.turnos_solo_lectura),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+    item(key="turnos-hoy"){TodayShiftCard(overview.today)}
+    if(overview.upcoming.isNotEmpty())item(key="turnos-proximos"){Text(stringResource(R.string.turnos_proximos),style=MaterialTheme.typography.titleMedium,modifier=Modifier.padding(top=Spacing.sm))}
+    for(day in overview.upcoming){
+        item(key="dia-${day.title}"){Text(day.title,style=MaterialTheme.typography.titleSmall,modifier=Modifier.padding(top=Spacing.xs))}
+        items(day.shifts,key={it.id.ifBlank{it.period}}){shift->MyShiftCard(shift)}
+    }
     // R3 A-8: past days fold under one closed heading with their count, like the web list (#122).
-    val pastCount=days.filter{it.past}.sumOf{it.shifts.size}
-    for((index,day) in days.withIndex()){
-        if(day.past&&days.getOrNull(index-1)?.past!=true)item(key="turnos-anteriores"){
-            TextButton(shape = ButtonShape, onClick=togglePast,modifier=Modifier.padding(top=Spacing.sm).heightIn(min=Spacing.touch)){Text(stringResource(if(pastOpen)R.string.turnos_ocultar_anteriores else R.string.turnos_ver_anteriores,pastCount))}
-        }
-        if(day.past&&!pastOpen)continue
+    if(overview.past.isNotEmpty())item(key="turnos-anteriores"){
+        TextButton(shape = ButtonShape, onClick=togglePast,modifier=Modifier.padding(top=Spacing.sm).heightIn(min=Spacing.touch)){Text(stringResource(if(pastOpen)R.string.turnos_ocultar_anteriores else R.string.turnos_ver_anteriores,overview.past.sumOf{it.shifts.size}))}
+    }
+    if(pastOpen)for(day in overview.past){
         item(key="dia-${day.title}"){Text(day.title,style=MaterialTheme.typography.titleSmall,modifier=Modifier.padding(top=Spacing.sm))}
         items(day.shifts,key={it.id.ifBlank{it.period}}){shift->MyShiftCard(shift)}
+    }
+}
+/** Today's shifts on a tinted surface so the day reads first; without a shift today it says so (never an empty gap). */
+@OptIn(ExperimentalLayoutApi::class) @Composable private fun TodayShiftCard(today:MyShiftDay?){
+    Surface(Modifier.fillMaxWidth(),color=MaterialTheme.climesa.soft,shape=MaterialTheme.shapes.medium){
+        Column(Modifier.padding(Spacing.md),verticalArrangement=Arrangement.spacedBy(Spacing.sm)){
+            Text(today?.title?:stringResource(R.string.turnos_hoy),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.climesa.primaryText)
+            if(today==null)Text(stringResource(R.string.turnos_hoy_sin_turno),style=MaterialTheme.typography.bodyMedium)
+            else today.shifts.forEach{shift->
+                Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(Spacing.sm),verticalArrangement=Arrangement.spacedBy(Spacing.xs)) {AreaChip(shift.area);StatusTag(shift.state,label=StaffLabels.shiftState(shift.state))}
+                    Text(shift.hours,style=MaterialTheme.typography.titleLarge)
+                    MyShifts.attendanceLabel(shift)?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                }
+            }
+        }
     }
 }
 /** La entrada se confirma sola al iniciar el turno (ASIS-01): la tarjeta solo muestra el estado y la asistencia. */
@@ -277,34 +294,5 @@ private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:Li
     Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
         AreaChip(shift.area)
         DataRow(shift.hours,meta=MyShifts.attendanceLabel(shift),status={StatusTag(shift.state,label=StaffLabels.shiftState(shift.state))})
-    }
-}
-/** Entrar o salir de mantenimiento; el motivo y el diálogo sobreviven al giro de pantalla. */
-@Composable private fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean,driverOnDuty:Boolean){
-    val leaving=unitState=="en_mantenimiento";val blocked=MaintenanceRules.leavingBlocked(unitState,paramedicOnDuty,driverOnDuty)
-    val state by model.maintenance.collectAsStateWithLifecycle()
-    var open by rememberSaveable{mutableStateOf(false)};var reason by rememberSaveable{mutableStateOf("")}
-    val title=stringResource(if(leaving)R.string.mantenimiento_sacar else R.string.mantenimiento_poner)
-    LaunchedEffect(state.saved){if(state.saved){open=false;reason="";model.resetMaintenance()}}
-    Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
-        Text(stringResource(R.string.mantenimiento_titulo),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
-        if(blocked)Text(stringResource(when(MaintenanceRules.missingCrew(paramedicOnDuty,driverOnDuty)){"sin_motorista_de_turno"->R.string.mantenimiento_requiere_motorista;"sin_tripulacion_de_turno"->R.string.mantenimiento_requiere_tripulacion;else->R.string.mantenimiento_requiere_paramedico}),style=MaterialTheme.typography.bodySmall)
-        SecondaryButton(title,{model.resetMaintenance();open=true},enabled=!blocked)
-    }
-    if(open){
-        val close={open=false;model.resetMaintenance()}
-        ConfirmDialog(
-            title=title,
-            message=stringResource(if(leaving)R.string.mantenimiento_efecto_sacar else R.string.mantenimiento_efecto_poner),
-            confirmLabel=if(state.conflict)stringResource(R.string.mantenimiento_cerrar) else title,
-            onConfirm=if(state.conflict){close}else{{model.setMaintenance(version,!leaving,reason)}},
-            onDismiss=close,
-            dismissLabel=stringResource(R.string.mantenimiento_cancelar),
-            busy=state.busy,
-            body={
-                state.error?.let{NoticeBanner(NoticeKind.ERROR,it)}
-                if(!state.conflict)FormField(stringResource(R.string.mantenimiento_motivo),reason,{reason=it.take(MaintenanceRules.MAX_REASON)})
-            },
-        )
     }
 }
