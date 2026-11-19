@@ -133,7 +133,8 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
     if (await direct.run(path, body)) data.refresh();
   }
   // #9: Inicio links «Asignar» as #/citas?asignar=<id>; the list opens on «Solicitudes» with that request open.
-  const [query, setQuery] = useState(''), [state, setState] = useState<StateFilter>(() => canSchedule && readHashParams().get('asignar') ? 'solicitudes' : 'proximas'), [range, setRange] = useState<Range>(() => defaultRange(canSchedule)), [day, setDay] = useState(todayKey()), [doctor, setDoctor] = useState<PickerItem | null>(null);
+  // «Confirmar» and the requests panel link #/citas?vista=solicitudes to open on that segment.
+  const [query, setQuery] = useState(''), [state, setState] = useState<StateFilter>(() => canSchedule && (readHashParams().get('asignar') || readHashParams().get('vista') === 'solicitudes') ? 'solicitudes' : 'proximas'), [range, setRange] = useState<Range>(() => defaultRange(canSchedule)), [day, setDay] = useState(todayKey()), [doctor, setDoctor] = useState<PickerItem | null>(null);
   const reload = () => { setCreate(false); setPrefilled(null); setSelected(null); data.refresh(); };
   const all = data.data ?? [];
   const now = Date.now();

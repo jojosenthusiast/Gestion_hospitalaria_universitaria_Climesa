@@ -25,14 +25,14 @@ export function LabCatalogPage({ api, profile, version }: { api: Api; profile: A
       const rows = all.filter(exam => matches(query, exam.code, exam.name));
       const selected = rows.find(exam => exam.id === selectedId) ?? rows[0] ?? null;
       return <>
-        <ListToolbar><LiveSearch label="Buscar exámenes" placeholder="Código o nombre" value={query} onChange={setQuery} /></ListToolbar>
-        {rows.length ? <div className="cl-master-detail">
+        <div className="lab-controls"><ListToolbar><LiveSearch label="Buscar exámenes" placeholder="Código o nombre" value={query} onChange={setQuery} /></ListToolbar></div>
+        <div className="lab-body">{rows.length ? <div className="cl-master-detail">
           <ul className="cl-master" aria-label="Exámenes">{rows.map(exam => <li key={exam.id}><button type="button" className="lw-row" aria-current={exam.id === selected?.id} onClick={() => setSelectedId(exam.id)}>
             <span className="lw-patient"><strong>{exam.name}</strong><small>{exam.code} · {kindLabel(exam)}{exam.unit ? ` · ${exam.unit}` : ''}</small></span>
             <span className="lw-end">{exam.active ? <Tag value="activo" label="Activo" /> : <Tag value="inactivo" label="Inactivo" />}</span>
           </button></li>)}</ul>
           {selected && <ExamEditor key={`${selected.id}-${selected.version}`} api={api} exam={selected} onSaved={data.refresh} />}
-        </div> : all.length ? <Empty title="Ningún examen coincide" description="Cambia lo que buscas." /> : <Empty title="El catálogo está vacío" description="No hay exámenes registrados." />}
+        </div> : all.length ? <Empty title="Ningún examen coincide" description="Cambia lo que buscas." /> : <Empty title="El catálogo está vacío" description="No hay exámenes registrados." />}</div>
       </>;
     }}</RemoteState></section>
   </>;

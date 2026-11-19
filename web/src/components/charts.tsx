@@ -1,4 +1,4 @@
-import { useId, type ReactNode } from 'react';
+import { useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 
 /**
  * Gráficos SVG ligeros (sin librería): barras, barra apilada, dona, línea/mini-línea e indicador semicircular.
@@ -26,17 +26,17 @@ const niceMax = (max: number) => {
 };
 
 /** Tabla equivalente del gráfico (WCAG 1.1.1): mismas etiquetas y valores que el dibujo. */
-export function ChartTable({ caption, rows, unit, visible = false }: { caption: string; rows: { label: string; value: number | null }[]; unit?: string; visible?: boolean }) {
+export function ChartTable({ caption, rows, unit, visible = false, format }: { caption: string; rows: { label: string; value: number | null }[]; unit?: string; visible?: boolean; format?: (value: number) => string }) {
   return <table className={visible ? 'chart-table' : 'sr-only'}><caption>{caption}</caption><thead><tr><th scope="col">Categoría</th><th scope="col">Valor</th></tr></thead>
-    <tbody>{rows.map((row, index) => <tr key={`${row.label}-${index}`}><th scope="row">{row.label}</th><td>{fmt(row.value, unit)}</td></tr>)}</tbody></table>;
+    <tbody>{rows.map((row, index) => <tr key={`${row.label}-${index}`}><th scope="row">{row.label}</th><td>{format && row.value != null ? format(row.value) : fmt(row.value, unit)}</td></tr>)}</tbody></table>;
 }
 
-function Figure({ title, description, rows, unit, table, children, className = '' }: { title: string; description?: string; rows: { label: string; value: number | null }[]; unit?: string; table: TableMode; children: ReactNode; className?: string }) {
+function Figure({ title, description, rows, unit, table, children, className = '', format }: { title: string; description?: string; rows: { label: string; value: number | null }[]; unit?: string; table: TableMode; children: ReactNode; className?: string; format?: (value: number) => string }) {
   return <figure className={`chart ${className}`.trim()} aria-label={title}>
     {children}
     {table === 'details'
-      ? <details className="chart-data"><summary>Ver datos</summary><ChartTable caption={title} rows={rows} unit={unit} visible /></details>
-      : <ChartTable caption={description ? `${title}. ${description}` : title} rows={rows} unit={unit} />}
+      ? <details className="chart-data"><summary>Ver datos</summary><ChartTable caption={title} rows={rows} unit={unit} visible format={format} /></details>
+      : <ChartTable caption={description ? `${title}. ${description}` : title} rows={rows} unit={unit} format={format} />}
   </figure>;
 }
 
@@ -44,27 +44,55 @@ export function Legend({ items }: { items: { label: string; value?: number | str
   return <ul className="chart-legend">{items.map(item => <li key={item.label}><span className="chart-swatch" style={{ background: toneColor[item.tone] }} aria-hidden="true" /><span>{item.label}</span>{item.value !== undefined && <strong>{item.value}</strong>}</li>)}</ul>;
 }
 
-/** Barras verticales. `threshold` dibuja una línea de referencia (por ejemplo la meta). */
-export function BarChart({ title, data, unit = '', height = 160, threshold, description, table = 'sr', empty = 'Sin datos para mostrar.' }: { title: string; data: Datum[]; unit?: string; height?: number; threshold?: { value: number; label: string }; description?: string; table?: TableMode; empty?: string }) {
-  const titleId = useId();
+/** Width in CSS pixels of the element, so an SVG can draw at 1:1 and its text never scales with the card. */
+function useWidth<T extends Element>(): [(node: T | null) => void, number] {
+  const [width, setWidth] = useState(0), observer = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((node: T | null) => {
+    observer.current?.disconnect();
+    if (!node) return;
+    setWidth(node.getBoundingClientRect().width);
+    if (typeof ResizeObserver === 'undefined') return;
+    observer.current = new ResizeObserver(entries => setWidth(entries[0]?.contentRect.width ?? 0));
+    observer.current.observe(node);
+  }, []);
+  useEffect(() => () => observer.current?.disconnect(), []);
+  return [ref, width];
+}
+
+/**
+ * Barras verticales. `threshold` dibuja una línea de referencia (por ejemplo la meta), nombrada en la leyenda bajo
+ * el gráfico para que nunca choque con el número de una barra. The SVG draws at the card's real width, so labels keep
+ * their CSS size. With a threshold, a value far above it (more than 4×) no longer flattens the rest: the scale stops
+ * near the others and that bar is cut with a break mark, its real value still written on top. `format` writes values.
+ */
+export function BarChart({ title, data, unit = '', height = 180, threshold, description, table = 'sr', empty = 'Sin datos para mostrar.', format }: { title: string; data: Datum[]; unit?: string; height?: number; threshold?: { value: number; label: string }; description?: string; table?: TableMode; empty?: string; format?: (value: number) => string }) {
+  const titleId = useId(), [ref, measured] = useWidth<HTMLDivElement>();
   if (data.length === 0 || data.every(d => d.value == null)) return <p className="chart-empty" role="status">{empty}</p>;
-  const w = Math.max(320, data.length * 44), pad = { l: 8, r: 8, t: 22, b: 28 }, innerH = height - pad.t - pad.b;
-  const max = niceMax(Math.max(threshold?.value ?? 0, ...data.map(d => d.value ?? 0))), slot = (w - pad.l - pad.r) / data.length, bar = Math.min(32, slot * 0.64);
-  const every = Math.ceil(data.length / 12);
-  return <Figure title={title} description={description} rows={data} unit={unit} table={table}>
-    <svg className="chart-svg" viewBox={`0 0 ${w} ${height}`} role="img" aria-labelledby={titleId} preserveAspectRatio="xMidYMid meet">
-      <title id={titleId}>{title}</title>
-      {[0, 0.5, 1].map(f => <line key={f} className="chart-grid" x1={pad.l} x2={w - pad.r} y1={pad.t + innerH * (1 - f)} y2={pad.t + innerH * (1 - f)} />)}
-      {data.map((d, i) => {
-        const x = pad.l + slot * i + (slot - bar) / 2, h = d.value == null ? 0 : Math.max(2, (d.value / max) * innerH), y = pad.t + innerH - h;
-        return <g key={`${d.label}-${i}`}>
-          {d.value != null && <rect x={x} y={y} width={bar} height={h} rx={3} fill={toneColor[d.tone ?? 'primary']}><title>{`${d.label}: ${fmt(d.value, unit)}`}</title></rect>}
-          {d.value != null && <text className="chart-value" x={x + bar / 2} y={y - 5} textAnchor="middle">{new Intl.NumberFormat('es-SV', { maximumFractionDigits: 1 }).format(d.value)}</text>}
-          {(i % every === 0 || i === data.length - 1) && <text className="chart-axis" x={x + bar / 2} y={height - 9} textAnchor="middle">{d.label}</text>}
-        </g>;
-      })}
-      {threshold && <g><line className="chart-threshold" x1={pad.l} x2={w - pad.r} y1={pad.t + innerH * (1 - threshold.value / max)} y2={pad.t + innerH * (1 - threshold.value / max)} /><text className="chart-axis" x={w - pad.r} y={pad.t + innerH * (1 - threshold.value / max) - 4} textAnchor="end">{threshold.label}</text></g>}
-    </svg>
+  const text = (value: number) => format ? format(value) : new Intl.NumberFormat('es-SV', { maximumFractionDigits: 1 }).format(value);
+  const w = Math.max(measured || 0, data.length * 44, 280), pad = { l: 8, r: 8, t: 24, b: 28 }, innerH = height - pad.t - pad.b;
+  const values = data.map(d => d.value ?? 0), limit = threshold ? threshold.value * 4 : Infinity;
+  const max = niceMax(Math.max(threshold?.value ?? 0, ...values.filter(v => v <= limit))), slot = (w - pad.l - pad.r) / data.length, bar = Math.min(40, slot * 0.6);
+  const every = Math.ceil(data.length / Math.max(4, Math.floor(w / 64)));
+  const yOf = (value: number) => pad.t + innerH * (1 - Math.min(value, max) / max);
+  return <Figure title={title} description={description} rows={data.map(d => ({ label: d.label, value: d.value }))} unit={format ? undefined : unit} table={table} format={format}>
+    <div ref={ref} className="chart-frame">
+      <svg className="chart-svg" width={w} height={height} viewBox={`0 0 ${w} ${height}`} role="img" aria-labelledby={titleId}>
+        <title id={titleId}>{title}</title>
+        {[0, 0.5, 1].map(f => <line key={f} className="chart-grid" x1={pad.l} x2={w - pad.r} y1={pad.t + innerH * (1 - f)} y2={pad.t + innerH * (1 - f)} />)}
+        {threshold && <line className="chart-threshold" x1={pad.l} x2={w - pad.r} y1={yOf(threshold.value)} y2={yOf(threshold.value)} />}
+        {data.map((d, i) => {
+          const x = pad.l + slot * i + (slot - bar) / 2, cut = d.value != null && d.value > max;
+          const h = d.value == null ? 0 : Math.max(2, (Math.min(d.value, max) / max) * innerH), y = pad.t + innerH - h;
+          return <g key={`${d.label}-${i}`}>
+            {d.value != null && <rect x={x} y={y} width={bar} height={h} rx={3} fill={toneColor[d.tone ?? 'primary']}><title>{`${d.label}: ${format ? format(d.value) : fmt(d.value, unit)}`}</title></rect>}
+            {cut && <path className="chart-break" d={`M${x - 2} ${y + 14} l${bar / 2 + 2} -6 l${bar / 2 + 2} 6 M${x - 2} ${y + 20} l${bar / 2 + 2} -6 l${bar / 2 + 2} 6`} />}
+            {d.value != null && <text className="chart-value" x={x + bar / 2} y={y - 6} textAnchor="middle">{text(d.value)}</text>}
+            {(i % every === 0 || i === data.length - 1) && <text className="chart-axis" x={x + bar / 2} y={height - 9} textAnchor="middle">{d.label}</text>}
+          </g>;
+        })}
+      </svg>
+    </div>
+    {threshold && <ul className="chart-legend chart-legend-threshold"><li><span className="chart-swatch-line" aria-hidden="true" /><span>{threshold.label}</span></li>{data.some(d => d.value != null && d.value > max) && <li><span>Barra cortada: su valor real está escrito encima.</span></li>}</ul>}
   </Figure>;
 }
 
