@@ -1,7 +1,7 @@
 import { useEffect,useRef,useState } from 'react';
-import { Notice } from '../components/ui';
+import { Icon,Notice } from '../components/ui';
 import { Dialog,CompactHeader,RemoteState,WriteError,formatDateTime,useAction,useData } from './common';
-import { PriorityBadge,StatusBadge } from '../components/system';
+import { CrudButton,PriorityBadge,StatusBadge } from '../components/system';
 import { formatRelative,formatTime } from '../lib/format';
 import { can,type AccessProfile,type Api } from '../lib/api';
 import { DiscardForm,DispatchForm,PhoneRequestForm } from './ambulance/dialogs';
@@ -25,25 +25,31 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  useEffect(()=>{if(previous.current!==null&&pendingCount>previous.current)beep();if(data.data)previous.current=pendingCount;},[pendingCount,data.data]);
  // R7 G4: every dialog closes only on success and leaves a sentence in place saying what happened.
  const [done,setDone]=useState('');
+ const callDone=dispatcher?'Llamada registrada: la solicitud está abajo, lista para despachar.':'Llamada registrada: queda por confirmar en despacho.';
  const saved=(message='')=>{setDispatching(null);setDiscarding(null);setCalling(false);setDone(message);data.refresh();};
  // S13: the home quick action «Solicitar ambulancia» (#/ambulancia?accion=solicitud) opens the call form directly.
  const [quick,consumeQuick]=useQuickAction();
  useEffect(()=>{if(quick==='solicitud'&&phoneDesk)setCalling(true);if(quick)consumeQuick();},[quick,phoneDesk,consumeQuick]);
- return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Centro de despacho" actions={phoneDesk?<button type="button" className="secondary-button" onClick={()=>setCalling(true)}>Registrar llamada</button>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
-  {/* R4a: one readable line for the unit (normal type, code on one line, state as a badge), not a strip of giant numbers. */}
-  <div className="amb-unit"><div className="amb-unit-id"><span className="sr-only">Unidad</span><strong className="nowrap-code">{s.unit.plate}</strong><StatusBadge value={s.unit.state} label={stateNames[s.unit.state]}/></div><div className="amb-unit-crew"><CrewCoverage status={s}/></div></div>
-  {dispatcher&&s.dispatchBlock&&<section aria-label="Despacho bloqueado"><Notice kind="info"><strong>No se puede despachar ahora.</strong> {s.dispatchBlock.message} {blockAction(s)}</Notice>{closeInNotice(s)&&<p className="amb-crew-next"><AdminCloseAction api={api} service={s.activeService!} onSaved={()=>saved(ADMIN_CLOSED)}/></p>}{missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}
+ return <><CompactHeader breadcrumb="Operaciones / Ambulancia" title="Centro de despacho" actions={phoneDesk?<CrudButton kind="create" label="Registrar llamada" onClick={()=>setCalling(true)}/>:undefined}/><RemoteState state={data}>{s=><section className="data-workbench" aria-label="Estado de la unidad">
+  {/* Owner obs. 19: one status strip with everything base: unit and its real state, crew by name, the active service,
+      and, when the unit cannot be dispatched, why and what to do. «Disponible» never sits next to a dispatch block. */}
+  <div className="amb-unit"><div className="amb-unit-id"><span className="sr-only">Unidad</span><strong className="nowrap-code">{s.unit.plate}</strong><UnitBadge status={s}/></div><div className="amb-unit-crew"><CrewCoverage status={s}/><div className={s.activeService?'':'is-missing'}><span>Servicio</span><strong>{s.activeService?`En curso · ${typeNames[s.activeService.type]??s.activeService.type}`:'Sin servicio activo'}</strong></div></div>
+   {s.dispatchBlock&&<section className="amb-unit-block" aria-label="Despacho bloqueado"><p><Icon name="alert" size={18}/><span><strong>No se puede despachar.</strong> {s.dispatchBlock.message}{dispatcher&&blockAction(s)?<> {blockAction(s)}</>:null}</span></p>{dispatcher&&closeInNotice(s)&&<p className="amb-crew-next"><AdminCloseAction api={api} service={s.activeService!} onSaved={()=>saved(ADMIN_CLOSED)}/></p>}{dispatcher&&missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</section>}</div>
   {done&&<Notice kind="success">{done}</Notice>}
-  {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} closeAbove={dispatcher&&closeInNotice(s)} onSaved={saved} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:<p className="muted">Sin servicio activo</p>}
+  {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} closeAbove={dispatcher&&closeInNotice(s)} onSaved={saved} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:null}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
   {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
   {dispatching&&<DispatchForm api={api} unitVersion={s.unit.version} crewPool={s.availableCrew??[]} request={dispatching==='direct'?null:dispatching} onClose={()=>setDispatching(null)} onSaved={()=>saved(dispatching==='direct'?'Ambulancia despachada para el traslado.':`Ambulancia despachada a ${dispatching.address}.`)}/>}
   {discarding&&<DiscardForm api={api} request={discarding} onClose={()=>setDiscarding(null)} onSaved={()=>saved('Solicitud descartada.')}/>}
  </section>}</RemoteState>
- {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onSaved={()=>saved(dispatcher?'Llamada registrada: la solicitud está abajo, lista para despachar.':'Llamada registrada: queda por confirmar en despacho.')}/>}
+ {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onRegistered={data.refresh} doneMessage={callDone} onSaved={()=>saved(callDone)}/>}
  {report&&<PrehospitalDialog api={api} serviceId={report} version={version} onClose={()=>setReport(null)}/>}
  </>;
+}
+/** The unit's state badge: an available unit that cannot be dispatched (no crew, RN-30) does not read «Disponible». */
+export function UnitBadge({status:s}:{status:AmbulanceStatus}){
+ return s.unit.state==='disponible'&&s.dispatchBlock?<StatusBadge value="bloqueada" label="No se puede despachar"/>:<StatusBadge value={s.unit.state} label={stateNames[s.unit.state]}/>;
 }
 const ADMIN_CLOSED='Servicio cerrado por Jefatura; la unidad quedó disponible.';
 const CREW_ACTIONS=['hito','deshacer_hito','reportar'];

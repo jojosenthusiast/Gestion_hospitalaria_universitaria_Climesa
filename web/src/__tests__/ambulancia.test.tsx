@@ -39,13 +39,15 @@ describe('estado de la ambulancia (W18 mínima)', () => {
     expect(await screen.findByText('P-000-001')).toBeTruthy();
     expect(screen.getByText('Disponible')).toBeTruthy();
     expect(screen.getByText('Sin servicio activo')).toBeTruthy();
-    expect(screen.getByText('Paramédico de turno')).toBeTruthy();
+    // Without the dispatch list of people on shift the slot says the role is covered, not the role twice.
+    expect(screen.getByText('Paramédico')).toBeTruthy();
+    expect(screen.getAllByText('De turno')).toHaveLength(2);
   });
 
   it('avisa cuando no hay paramédico de turno', async () => {
     render(<AmbulancePage api={apiWith({ ...free, unit: { ...free.unit, state: 'en_mantenimiento' }, paramedicOnDuty: false })} profile={profile(['ambulancia.ver_estado'])} version={0} />);
     expect(await screen.findByText('En mantenimiento')).toBeTruthy();
-    expect(screen.getByText('Sin paramédico con turno en curso')).toBeTruthy();
+    expect(screen.getByText('Sin paramédico de turno')).toBeTruthy();
   });
 
   it('muestra el servicio activo con su tripulación y sin datos del paciente', async () => {

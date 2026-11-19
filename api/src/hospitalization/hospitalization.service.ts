@@ -125,6 +125,10 @@ export class HospitalizationService {
       // BL-03: MED (`relacion`) sees the admissions where it is the attending doctor or has a current care relationship,
       // the same two cases in which it may sign the discharge.
       const rows = (await c.query(`SELECT a.id,a.paciente_id AS "patientId",coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",a.origen AS origin,a.categoria_pedida AS "requestedCategory",a.estado AS state,a.aislamiento AS isolation,a.fecha_programada AS "scheduledAt",a.medico_tratante_id AS "attendingDoctorId",a.version,coalesce(o.codigo,'') AS bed,oc.id AS "occupationId",a.origen_id AS "originId",a.motivo AS motive,a.tipo_aislamiento AS "isolationType",a.inestable AS unstable,a.postquirurgico AS "postSurgical",a.visitas_permitidas AS "visitorsAllowed",a.visitantes_max AS "visitorsMax",
+          a.creado_en AS "createdAt",
+          -- S27: when the source record happened (the consultation that indicated it, the emergency ticket, the ambulance service, the appointment).
+          CASE a.origen WHEN 'consulta' THEN (SELECT k.iniciada_en FROM atencion.consulta k WHERE k.id=a.origen_id) WHEN 'emergencia' THEN (SELECT tf.emitido_en FROM atencion.ticket_fila tf WHERE tf.id=a.origen_id)
+            WHEN 'ambulancia' THEN (SELECT sv.despachado_en FROM ambulancia.servicio sv WHERE sv.id=a.origen_id) WHEN 'cita' THEN (SELECT lower(ci.horario) FROM atencion.cita ci WHERE ci.id=a.origen_id) END AS "originAt",
           nullif(concat_ws(' ',d.nombres,d.apellidos),'') AS "attendingDoctorName",EXISTS(SELECT 1 FROM acceso.usuario du WHERE du.persona_personal_id=a.medico_tratante_id AND du.estado='activo') AS "attendingDoctorHasAccount",
           oc.categoria AS "bedCategory",(a.autorizado_por IS NOT NULL) AS authorized,a.alta_solicitada_en AS "dischargeRequestedAt",
           al.tipo AS "dischargeType",al.firmada_en AS "dischargeSignedAt",al.firmada_por AS "dischargeSignedBy",al.pendientes AS "dischargePending",al.resumen AS "dischargeSummary",
@@ -194,8 +198,10 @@ export class HospitalizationService {
       await this.checkIntake(c, dto);
       const patient = (await c.query(`SELECT id,coalesce(sexo,'no_registrado') AS sex FROM pacientes.paciente WHERE id=$1`, [dto.patientId])).rows[0] as Row | undefined;
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
-      const doctor = (await c.query(`SELECT id FROM personal.persona WHERE id=$1 AND tipo='medico' AND activo`, [dto.attendingDoctorId])).rows[0];
+      const doctor = (await c.query(`SELECT p.id,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS "hasAccount" FROM personal.persona p WHERE p.id=$1 AND p.tipo='medico' AND p.activo`, [dto.attendingDoctorId])).rows[0] as Row | undefined;
       if (!doctor) throw new BadRequestException('El médico tratante no está activo.');
+      // Owner obs. 21: the attending doctor signs the discharge from the app (D-02); without an account nobody could sign it.
+      if (!doctor.hasAccount) throw new ProblemException('validacion', 400, 'El médico tratante no tiene cuenta en la app; no podría firmar el alta. Elige un médico con cuenta.', 'attendingDoctorId');
       if (dto.bedId) {
         if (!hasPermission(actor, 'camas.asignar')) throw new ForbiddenException('No tienes permiso para asignar cama.');
         if (!dto.bedVersion) throw new BadRequestException('Indica la versión de la cama elegida.');
