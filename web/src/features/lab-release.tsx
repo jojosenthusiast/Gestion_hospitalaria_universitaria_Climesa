@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Icon } from '../components/ui';
 import type { Api } from '../lib/api';
-import { releaseLines, type ReleaseValue } from '../lib/lab-sheet';
+import { labFlagSummary, releaseLines, type ReleaseValue } from '../lib/lab-sheet';
+import { LabFlagChip } from './lab-flag';
 import { Dialog, WriteError, useAction } from './common';
 import { spanishProblem } from './problems';
 
@@ -15,7 +16,7 @@ export type ReleaseOutcome = { followUpProposalId?: string | null; followUpsClos
  */
 export function ReleaseDialog({ api, target, onClose, onReleased }: { api: Api; target: ReleaseTarget; onClose: () => void; onReleased: (outcome: ReleaseOutcome & { followUp: boolean }) => void }) {
   const action = useAction(api), [followUp, setFollowUp] = useState(true), [note, setNote] = useState('');
-  const lines = releaseLines(target.values), critical = lines.filter(line => line.critical).length;
+  const lines = releaseLines(target.values), critical = lines.filter(line => line.critical).length, summary = labFlagSummary(target.values);
   async function release() {
     const patientNote = note.trim();
     const done = await action.run<ReleaseOutcome>(`/laboratorio/ordenes/${target.orderId}/revisar`, { version: target.version, followUp, ...(patientNote ? { patientNote } : {}) });
@@ -24,7 +25,8 @@ export function ReleaseDialog({ api, target, onClose, onReleased }: { api: Api; 
   return <Dialog title="Revisar y liberar al paciente" onClose={onClose} busy={action.busy}>
     <form className="module-form lab-release" onSubmit={event => { event.preventDefault(); void release(); }}>
       <p className="form-intro"><strong>{target.patientName}</strong> verá estos resultados en su app{critical ? `, ${critical === 1 ? 'incluido 1 valor crítico' : `incluidos ${critical} valores críticos`}` : ''}:</p>
-      <ul className="lab-release-list">{lines.map(line => <li key={line.text} className={line.critical ? 'is-critical' : undefined}>{line.critical && <Icon name="alert" size={16} />}{line.text}</li>)}</ul>
+      {summary && <p className="lab-flag-summary" role="status"><Icon name="alert" size={16} />{summary}</p>}
+      <ul className="lab-release-list">{lines.map(line => <li key={line.text} className={line.critical ? 'is-critical' : undefined}>{line.critical && <Icon name="alert" size={16} />}<span>{line.label}</span>{line.flag && <LabFlagChip flag={line.flag} />}</li>)}</ul>
       <label className="lab-relevant"><input type="checkbox" checked={followUp} onChange={event => setFollowUp(event.target.checked)} />Pedir a Recepción una cita de seguimiento{target.doctorName ? ` con ${target.doctorName}` : ''}</label>
       <label className="field"><span>Nota para el paciente (opcional)</span><textarea value={note} maxLength={500} rows={2} placeholder="Por ejemplo: repetir en ayunas el lunes." onChange={event => setNote(event.target.value)} /></label>
       <WriteError error={spanishProblem(action.error)} onReload={onClose} reloadLabel="Cerrar y recargar" />

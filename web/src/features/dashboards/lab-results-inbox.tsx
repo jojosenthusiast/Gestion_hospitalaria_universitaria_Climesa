@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { Notice } from '../../components/ui';
 import { SectionState, StatusBadge } from '../../components/system';
 import { can, type AccessProfile, type Api } from '../../lib/api';
-import { releaseLines, type ReleaseValue } from '../../lib/lab-sheet';
+import { labFlagSummary, releaseLines, type ReleaseValue } from '../../lib/lab-sheet';
+import { LabFlagChip } from '../lab-flag';
 import { WriteError, useAction, useData, type Remote } from '../common';
 import { ReleaseDialog, releasedMessage } from '../lab-release';
 import { spanishProblem } from '../problems';
@@ -51,7 +52,7 @@ export function LabResultsInbox({ api, profile, version, state, inTray = false }
 function FollowUpRow({ api, item, onDone, onReleased }: { api: Api; item: LabFollowUp; onDone: () => void; onReleased: (message: string) => void }) {
   const action = useAction(api), [releasing, setReleasing] = useState(false);
   const releasable = (item.orderActions ?? []).includes('revisar') && typeof item.orderVersion === 'number';
-  const lines = item.values?.length ? releaseLines(item.values) : null, shown = lines?.slice(0, 3) ?? [], more = (lines?.length ?? 0) - shown.length;
+  const lines = item.values?.length ? releaseLines(item.values) : null, shown = lines?.slice(0, 3) ?? [], more = (lines?.length ?? 0) - shown.length, summary = item.values?.length ? labFlagSummary(item.values) : null;
   const name = item.patientName ?? 'Paciente';
   async function review() {
     await action.run(`/laboratorio/pendientes/${item.id}/revisar`, { version: item.version });
@@ -61,7 +62,8 @@ function FollowUpRow({ api, item, onDone, onReleased }: { api: Api; item: LabFol
     <a className="lab-follow-up-who" href={`#/laboratorio?orden=${item.orderId}`} aria-label={`Abrir la orden de ${name}`}>
       <strong>{name}</strong>
       {item.patientRecord && <small className="muted">Exp. {item.patientRecord}</small>}
-      {lines ? <span className="lab-follow-up-values">{shown.map(line => <span key={line.text} className={line.critical ? 'is-critical' : undefined}>{line.text}</span>)}{more > 0 && <span className="muted">+{more}</span>}</span> : <span>{item.detail}</span>}
+      {summary && <small className="lab-flag-summary">{summary}</small>}
+      {lines ? <span className="lab-follow-up-values">{shown.map(line => <span key={line.text} className={line.critical ? 'is-critical' : undefined}>{line.label}{line.flag && <LabFlagChip flag={line.flag} />}</span>)}{more > 0 && <span className="muted">+{more}</span>}</span> : <span>{item.detail}</span>}
     </a>
     <StatusBadge value={isCritical(item) ? 'critico_alto' : 'en_proceso'} label={isCritical(item) ? 'Crítico' : 'Observación'} />
     <div className="lw-actions">

@@ -96,13 +96,14 @@ describe('R7 C1 · MED revisa y libera desde la bandeja', () => {
     const write = vi.fn(async () => { rows = []; return { id: 'o-1', version: 7, reviewedAt: '2026-12-02T15:00:00Z', followUpsClosed: 1, followUpProposalId: null }; });
     render(<LabResultsInbox api={{ request, write } as unknown as Api} profile={perfil(['laboratorio.revisar'])} version={0} />);
     const row = (await screen.findByText('Ana Pérez Ficticia')).closest('li')!;
-    expect(within(row).getByText('Hemoglobina 7.1 g/dL (crítico bajo)')).toBeTruthy();
+    expect(within(row).getByText('Hemoglobina 7.1 g/dL')).toBeTruthy();
+    expect(within(row).getByText('Crítico bajo').className).toBe('lab-flag is-critical');
     expect(within(row).getByRole('link', { name: 'Abrir la orden de Ana Pérez Ficticia' }).getAttribute('href')).toBe('#/laboratorio?orden=o-1');
     expect(within(row).queryByRole('button', { name: 'Marcar como revisado' })).toBeNull();
     await userEvent.click(within(row).getByRole('button', { name: 'Revisar y liberar' }));
     const dialog = await screen.findByRole('dialog', { name: 'Revisar y liberar al paciente' });
     expect(within(dialog).getByText(/incluido 1 valor crítico/)).toBeTruthy();
-    expect(within(dialog).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Hemoglobina 7.1 g/dL (crítico bajo)', 'Glucosa 88 mg/dL']);
+    expect(within(dialog).getAllByRole('listitem').map(li => li.textContent)).toEqual(['Hemoglobina 7.1 g/dLCrítico bajo', 'Glucosa 88 mg/dLEn rango']);
     await userEvent.click(within(dialog).getByRole('checkbox', { name: /cita de seguimiento/ }));
     await userEvent.click(within(dialog).getByRole('button', { name: 'Liberar resultados' }));
     expect(write).toHaveBeenCalledWith('/laboratorio/ordenes/o-1/revisar', { version: 6, followUp: false }, 'POST');
