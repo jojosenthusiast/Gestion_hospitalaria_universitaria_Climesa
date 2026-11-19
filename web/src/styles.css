@@ -290,6 +290,7 @@ table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priorit
 .notice.success { color: var(--success); background: var(--success-soft); }
 .notice.error { color: var(--danger); background: var(--danger-soft); }
 .notice.info { color: var(--primary-text); background: var(--soft); }
+.notice.warning { color: var(--warning); background: var(--warning-soft); }
 
 .spinner, .status-spinner { display: inline-block; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; }
 .spinner { width: 18px; height: 18px; }

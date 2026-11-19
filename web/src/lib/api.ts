@@ -49,7 +49,7 @@ export class HttpApi implements Api {
   recordServerAnswer(response.status);
   if(response.status===401&&this.unauthorized&&await this.unauthorized(renewed)===true&&!renewed)return this.request<T>(path,init,true);
   const body=await response.json().catch(()=>({}));
-  if(!response.ok){const code=typeof body.codigo==='string'?body.codigo:undefined;throw new ApiError(body.detail??body.error?.message??body.message??(code==='sin_turno_activo'?NO_ACTIVE_SHIFT_TEXT:'No se pudo completar la operación.'),response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
+  if(!response.ok){const code=typeof body.codigo==='string'?body.codigo:undefined;throw new ApiError(body.detail??body.error?.message??body.message??(code==='sin_turno_activo'?NO_ACTIVE_SHIFT_TEXT:code==='sin_personal_disponible'?'No hay médicos de turno para ese día y servicio.':'No se pudo completar la operación.'),response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
   return body as T;
  }
  async write<T>(path:string,body:unknown,method='POST'):Promise<T>{

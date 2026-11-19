@@ -62,8 +62,8 @@ export function Brand({ light = false }: { light?: boolean }) {
   );
 }
 
-export function Notice({ kind, children }: { kind: 'success' | 'error' | 'info'; children: ReactNode }) {
-  return <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'} aria-live={kind === 'error' ? 'assertive' : 'polite'} aria-atomic="true"><span className="notice-icon"><Icon name={kind === 'success' ? 'check' : 'info'} /></span><span>{children}</span></div>;
+export function Notice({ kind, children }: { kind: 'success' | 'error' | 'info' | 'warning'; children: ReactNode }) {
+  return <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'} aria-live={kind === 'error' ? 'assertive' : 'polite'} aria-atomic="true"><span className="notice-icon"><Icon name={kind === 'success' ? 'check' : kind === 'warning' ? 'alert' : 'info'} /></span><span>{children}</span></div>;
 }
 
 /** dd/mm/aaaa (or an ISO date) to ISO; '' clears; null while the text is not a whole, real date. */
