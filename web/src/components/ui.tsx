@@ -230,9 +230,10 @@ export function ActivationView({ ready, email, password, confirmation, setPasswo
   );
 }
 
-export function StatusView({ title, detail, action, onAction }: { title: string; detail: string; action?: string; onAction?: () => void }) {
+/** `settled`: a final answer with no action (e.g. a 403), so it shows the info symbol instead of the waiting spinner. */
+export function StatusView({ title, detail, action, onAction, settled = false }: { title: string; detail: string; action?: string; onAction?: () => void; settled?: boolean }) {
   return (
-    <main className="status-screen"><header><Brand light /><span className="mono-label">Portal institucional</span></header><section className="status-content"><span className="status-symbol">{action ? <Icon name="info" size={38} /> : <span className="status-spinner" />}</span><span className="eyebrow">Acceso a CLIMESA</span><h1>{title}</h1><p>{detail}</p>{action && <button className="primary-button" onClick={onAction}><span>{action}</span><Icon name="arrow" size={18} /></button>}</section><footer>Hospital universitario CLIMESA</footer></main>
+    <main className="status-screen"><header><Brand light /><span className="mono-label">Portal institucional</span></header><section className="status-content"><span className="status-symbol">{action || settled ? <Icon name="info" size={38} /> : <span className="status-spinner" />}</span><span className="eyebrow">Acceso a CLIMESA</span><h1>{title}</h1><p>{detail}</p>{action && <button className="primary-button" onClick={onAction}><span>{action}</span><Icon name="arrow" size={18} /></button>}</section><footer>Hospital universitario CLIMESA</footer></main>
   );
 }
 

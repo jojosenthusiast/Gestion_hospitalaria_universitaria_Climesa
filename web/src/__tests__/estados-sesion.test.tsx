@@ -87,6 +87,7 @@ describe('en vivo, conflicto y carga', () => {
     const { rerender } = render(<RemoteState state={estado(new ApiError('Prohibido', 403))}>{() => null}</RemoteState>);
     expect(screen.getByText('No tienes acceso a esta información')).toBeTruthy();
     expect(screen.getByText(/pide a un administrador que revise los permisos/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Volver a intentar' })).toBeNull();
     rerender(<RemoteState state={estado(new ApiError('El servicio no está disponible.', 500))}>{() => null}</RemoteState>);
     expect(screen.getByText('No pudimos cargar esta información')).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();

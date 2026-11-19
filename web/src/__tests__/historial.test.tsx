@@ -89,11 +89,11 @@ describe('historial clínico (REQ-03, FR-106-09)', () => {
     expect(within(dialog).getByText('Sin órdenes de laboratorio')).toBeTruthy();
   });
 
-  it('si la API niega el acceso muestra el error y permite reintentar', async () => {
+  it('si la API niega el acceso muestra su motivo, sin reintentar (S8)', async () => {
     mount(['consulta.iniciar', 'expediente.ver'], { '/pacientes/pac-1/historial': new ApiError('El historial requiere una relación de atención.', 403) });
     const dialog = await openHistory();
     expect(await within(dialog).findByText('El historial requiere una relación de atención.')).toBeTruthy();
-    expect(within(dialog).getByRole('button', { name: 'Volver a intentar' })).toBeTruthy();
+    expect(within(dialog).queryByRole('button', { name: 'Volver a intentar' })).toBeNull();
   });
 
   it('sin expediente.ver no ofrece el historial', async () => {
