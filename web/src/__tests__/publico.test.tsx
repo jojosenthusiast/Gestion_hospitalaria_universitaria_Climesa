@@ -96,10 +96,10 @@ describe('W25 · avisos generales', () => {
     const preview = screen.getByLabelText('Vista previa');
     expect(within(preview).getByText('Corte de agua')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Crítico' }));
-    expect(within(preview).getByText(/^Para: Pantalla pública y apps sin sesión/)).toBeTruthy();
+    expect(within(preview).getByText('Pantalla pública y apps sin sesión')).toBeTruthy();
     await userEvent.click(screen.getByLabelText(/^Público/));
     await userEvent.click(screen.getByLabelText('Enfermería'));
-    expect(within(preview).getByText(/Para: Enfermería/)).toBeTruthy();
+    expect(within(preview).getByText('Roles: Enfermería')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Publicar aviso' }));
     // R7 D1: a critical notice confirms with a summary first.
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Publicar aviso' })).getByRole('button', { name: 'Publicar aviso' }));

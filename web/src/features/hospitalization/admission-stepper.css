@@ -42,3 +42,6 @@
 @media (max-width: 640px) { .stepper-track small { display: none; } .summary-list > div { grid-template-columns: 1fr; gap: 2px; } }
 .stepper-subtitle { margin: var(--space-4) 0 0; font-size: var(--text-base, 15px); font-weight: 700; }
 .stepper-subtitle + .muted { margin: 0; }
+/* S27: date (dd/mm/aaaa) and 24 h time side by side. */
+.admission-when { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 12rem); gap: var(--space-3); align-items: start; }
+@media (max-width: 520px) { .admission-when { grid-template-columns: 1fr; } }

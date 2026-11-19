@@ -62,5 +62,5 @@ export function staffEmptyState(filters: StaffFilters, context: { accountsOnly: 
   if (filters.cuenta === 'sin') return { title: 'Todos tienen cuenta', description: 'Cada persona de esta vista ya tiene su cuenta de acceso.' };
   if (filters.rol) return { title: 'Nadie con este rol', description: `Ninguna cuenta de esta vista tiene el rol ${roleNames[filters.rol] ?? filters.rol}. ${widen}` };
   if (filters.area) return { title: 'Nadie en esta área', description: `No hay personas asignadas a esta área con estos filtros. ${widen}` };
-  return { title: context.accountsOnly ? 'No hay cuentas en esta vista' : 'No hay personas en esta vista', description: `Cambia la búsqueda o los filtros para consultar el directorio.${context.canCreate ? ' Con «Registrar personal» sumas a alguien nuevo.' : ''}` };
+  return { title: context.accountsOnly ? 'No hay cuentas en esta vista' : 'No hay personas en esta vista', description: `Cambia la búsqueda o los filtros para consultar el directorio.${context.canCreate ? ' Con «Agregar personal» sumas a alguien nuevo.' : ''}` };
 }

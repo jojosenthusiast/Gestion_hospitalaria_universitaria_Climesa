@@ -60,7 +60,7 @@ describe('Pacientes · lista y ficha (R4a)', () => {
 
   it('«1 año», nunca «1 años»', async () => {
     montar();
-    expect((await screen.findAllByText(/· 1 año ·/)).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/^1 año$/)).length).toBeGreaterThan(0);
     expect(screen.queryByText(/\b1 años/)).toBeNull();
   });
 
@@ -69,8 +69,9 @@ describe('Pacientes · lista y ficha (R4a)', () => {
     await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
     const editar = await screen.findByRole('button', { name: 'Editar datos' });
     const inactivar = screen.getByRole('button', { name: 'Inactivar paciente' });
-    expect(editar.className).toContain('secondary-button');
-    expect(inactivar.className).not.toContain('secondary-button');
-    expect(inactivar.className).toContain('danger-link');
+    // S0: one color and symbol per CRUD verb: edit is the blue pencil, inactivate the red trash.
+    expect(editar.className).toContain('crud-edit');
+    expect(inactivar.className).toContain('crud-deactivate');
+    expect(inactivar.className).not.toContain('crud-edit');
   });
 });
