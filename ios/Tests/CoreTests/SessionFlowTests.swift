@@ -34,4 +34,29 @@ final class SessionFlowTests: XCTestCase {
         XCTAssertTrue(SessionFailure.offersRetry(after: APIFailure.transport, signedIn: true))
         XCTAssertFalse(SessionFailure.offersRetry(after: APIFailure.sessionExpired, signedIn: true))
     }
+
+    // A rejected refresh token ends the session as expired; network errors (no status) and Auth 5xx never end it.
+    func testRejectedRefreshEndsSessionAsExpired() {
+        XCTAssertEqual(SessionEndRules.afterRefreshFailure(status: 400), .expired)
+        XCTAssertEqual(SessionEndRules.afterRefreshFailure(status: 401), .expired)
+        XCTAssertNil(SessionEndRules.afterRefreshFailure(status: nil))
+        XCTAssertNil(SessionEndRules.afterRefreshFailure(status: 500))
+        XCTAssertEqual(SessionEnd.expired.message, "Tu sesión expiró. Vuelve a ingresar.")
+    }
+
+    // A 401 with a just-renewed token means the API no longer accepts the account; a 403 is one refused action.
+    func testUnauthorizedAfterRenewalEndsSessionAsRevoked() {
+        XCTAssertEqual(SessionEndRules.afterRenewedCall(status: 401), .revoked)
+        XCTAssertNil(SessionEndRules.afterRenewedCall(status: 403))
+        XCTAssertNil(SessionEndRules.afterRenewedCall(status: nil))
+        XCTAssertEqual(SessionEnd.revoked.message, "Tu acceso fue retirado. Si crees que es un error, contacta a administración.")
+    }
+
+    // A refused own profile (/auth/me 401 or 403) withdraws access; other failures keep the session.
+    func testRefusedProfileEndsSessionAsRevoked() {
+        XCTAssertEqual(SessionEndRules.afterProfile(status: 401), .revoked)
+        XCTAssertEqual(SessionEndRules.afterProfile(status: 403), .revoked)
+        XCTAssertNil(SessionEndRules.afterProfile(status: 500))
+        XCTAssertNil(SessionEndRules.afterProfile(status: nil))
+    }
 }
