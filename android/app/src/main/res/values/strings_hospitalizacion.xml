@@ -108,4 +108,5 @@
     <string name="hosp_pendiente_linea">%1$s · responsable: %2$s</string>
     <string name="hosp_contador_motivo">%1$s · de 10 a 500 caracteres</string>
     <string name="hosp_contador_nota">%1$s · opcional</string>
+    <string name="hosp_habitacion_n">%1$s · %2$d disponibles</string>
 </resources>

@@ -122,7 +122,7 @@ fun ReceptionAppointmentsScreen(channels: List<String>, canSchedule: Boolean, mo
                 val visible = state.appointments.filter { (chosen == null || it.state == chosen) && sv.edu.catolica.climesa.domain.matchesQuery(query, it.patientName, it.doctorName) }
                 item { LiveSearchField(query, { query = it }, stringResource(R.string.rec_citas_buscar)) }
                 val present = APPOINTMENT_STATES.filter { st -> st == chosen || state.appointments.any { it.state == st } }
-                item { ChipRow(listOf(Triple<String?, String, Int?>(null, stringResource(R.string.cita_todas), state.appointments.size)) + present.map { st -> Triple<String?, String, Int?>(st, StatusCatalog.label(st), state.appointments.count { it.state == st }) },
+                item { ChipRow(listOf(Triple<String?, String, Int?>(null, stringResource(R.string.cita_todas), state.appointments.size)) + present.map { st -> Triple<String?, String, Int?>(st, sv.edu.catolica.climesa.domain.ReceptionAppointmentLabels.state(st) { StatusCatalog.label(it) }, state.appointments.count { it.state == st }) },
                     chosen, { it?.let { st -> ChipTone.of(st) } }) { picked -> stateFilter = picked; model.showRequests(picked == "solicitada") } }
                 if (canArrive) queueState.error?.takeIf { queueState.notice == null }?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
                 if (visible.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
@@ -181,7 +181,7 @@ private class ArrivalControl(val today: String, val queue: QueueState, val regis
 }
 
 /** Every appointment state, `vencida` (closed) and `reprogramada` (called) included, uses the shared table like the web. */
-@Composable internal fun AppointmentStateTag(state: String) = StatusTag(state)
+@Composable internal fun AppointmentStateTag(state: String) = StatusTag(state, label = sv.edu.catolica.climesa.domain.ReceptionAppointmentLabels.state(state) { StatusCatalog.label(it) })
 
 /** Allowed actions as buttons, two per line; blocked ones disabled with the server's reason under them. */
 /**

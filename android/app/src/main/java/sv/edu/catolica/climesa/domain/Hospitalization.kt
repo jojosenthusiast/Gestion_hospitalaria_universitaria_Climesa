@@ -81,6 +81,8 @@ data class HospitalAdmission(
     val origin: String? = null,
     val motive: String? = null,
     val unstable: Boolean = false,
+    /** When the admission is planned (`scheduledAt`); null for "as soon as there is a bed". */
+    val scheduledAt: String? = null,
 ) {
     /** G3 "Ingresos indicados": a doctor indicated it from a consultation and it waits for a bed this reader can assign. */
     val indicated get() = state == "pendiente_cama" && origin == "consulta" && AdmissionAction.ASSIGN_BED in allowedActions
@@ -132,6 +134,7 @@ object AdmissionParser {
             origin = row.textOrNull("origin"),
             motive = row.textOrNull("motive"),
             unstable = row.optBoolean("unstable"),
+            scheduledAt = row.textOrNull("scheduledAt"),
         )
     }
 
@@ -164,6 +167,33 @@ object MyRoomRules {
 }
 
 object HospitalizationRules {
+    private val originNames = mapOf("cita" to "una cita", "consulta" to "consulta", "emergencia" to "Emergencia", "ambulancia" to "ambulancia", "programada" to "un ingreso programado")
+    private val dayFormat = java.time.format.DateTimeFormatter.ofPattern("d 'de' MMMM, HH:mm", java.util.Locale("es", "SV")).withZone(java.time.ZoneId.of("America/El_Salvador"))
+
+    /**
+     * Lote 2 "Ingresos indicados": who indicated the admission and where the patient comes from, «Indicado por Dr(a). Ana
+     * Ruiz desde consulta», plus «· para el 18 de noviembre, 14:00» when it is planned. The API sends no indication date,
+     * so none is invented. Null when neither the doctor nor the origin is known.
+     */
+    /** Lote 2 «Asignar cama»: the suggested beds grouped by room, like the intake Cama step; rooms and beds in natural order. */
+    fun byRoom(beds: List<HospitalBedSuggestion>): List<Pair<String, List<HospitalBedSuggestion>>> =
+        beds.groupBy { it.room }.entries
+            .sortedWith { a, b -> BedBoard.compareNatural(a.key, b.key) }
+            .map { (room, list) -> room to list.sortedWith { a, b -> BedBoard.compareNatural(a.code, b.code) } }
+
+    fun indicatedBy(doctor: String?, origin: String?, scheduledAt: String?): String? {
+        val who = doctor?.trim()?.takeIf { it.isNotEmpty() }?.let { if (it.startsWith("Dr", ignoreCase = true)) it else "Dr(a). $it" }
+        val from = origin?.let { originNames[it] ?: it }
+        val head = when {
+            who != null && from != null -> "Indicado por $who desde $from"
+            who != null -> "Indicado por $who"
+            from != null -> "Llega desde $from"
+            else -> return null
+        }
+        val planned = scheduledAt?.let { runCatching { dayFormat.format(java.time.Instant.parse(it)) }.getOrNull() }
+        return if (planned != null) "$head · para el $planned" else head
+    }
+
     /** The API filters the ward of an `area`-only reader of `admision.ver` by the shift in progress; empty then means no shift now. */
     fun wardFollowsShift(admissionContexts: List<String>) = admissionContexts.isNotEmpty() && admissionContexts.all { it == "area" }
 

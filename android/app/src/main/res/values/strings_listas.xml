@@ -15,7 +15,6 @@
     <string name="lab_sin_datos_expediente">Sin datos del expediente</string>
     <!-- Fila del día -->
     <string name="fila_buscar">Número o paciente</string>
-    <string name="fila_solo_lectura">Vista de solo lectura: aquí sigues la fila; llamar y atender corresponde a Recepción, Asistencia y Medicina.</string>
     <string name="fila_todos">Todos</string>
     <string name="fila_paciente_sin_numero">Hoy no tienes número en la fila.</string>
     <string name="fila_paciente_sin_numero_detalle">Recepción te da uno cuando llegas.</string>
@@ -51,4 +50,6 @@
     <string name="portal_critico_aviso">Llegó un resultado con valor crítico. Revísalo cuanto antes.</string>
     <string name="portal_critico_revisar">Revisar</string>
     <string name="portal_critico_cerrar">Cerrar aviso</string>
+    <string name="fila_solo_lectura_quien">Recepción, Asistencia o Medicina</string>
+    <string name="fila_solo_lectura_que">la fila del día</string>
 </resources>

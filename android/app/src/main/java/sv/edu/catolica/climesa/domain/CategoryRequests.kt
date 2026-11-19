@@ -176,3 +176,14 @@ object CategoryRequestRules {
 
 /** A-1: what `GET /citas/solicitudes-categoria/{id}/sugerencia` proposes: the doctor, the day and the slot start. */
 data class RequestSuggestion(val doctorId: String, val date: java.time.LocalDate, val start: String?)
+
+/**
+ * Lote 2 (Citas): reception has two different queues, never the same request twice. A category request has no doctor or
+ * time yet and waits «Por asignar» in the inbox; an appointment the patient booked (`solicitada`) already has its slot and
+ * waits «Por confirmar» in the list. The list names that state the same way the web does.
+ */
+object ReceptionAppointmentLabels {
+    const val TO_CONFIRM = "Por confirmar"
+
+    fun state(code: String, fallback: (String) -> String): String = if (code == "solicitada") TO_CONFIRM else fallback(code)
+}

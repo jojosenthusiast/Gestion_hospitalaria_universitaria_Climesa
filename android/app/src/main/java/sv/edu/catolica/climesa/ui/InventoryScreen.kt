@@ -106,7 +106,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.listItems(state: Inve
                 ArticleCategory.entries.forEach { c -> FilterChip(c in state.filter.categories, { model.toggleCategory(c) }, { Text(c.label) }, leadingIcon = { Icon(categoryIcon(c), null, Modifier.size(18.dp)) }) }
                 if (state.filter.active) FilterChip(false, { model.clearFilters() }, { Text(stringResource(R.string.inv_quitar_filtros)) })
             }
-            if (configure) SecondaryButton(stringResource(R.string.inv_nuevo_articulo), { model.openArticle(null) }, icon = Icons.Default.Add)
+            if (configure) CrudButton(CrudKind.Create, stringResource(R.string.inv_nuevo_articulo), { model.openArticle(null) })
         }
     }
     val shown = state.shown
@@ -155,9 +155,9 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
             }
             if (kinds.isNotEmpty() && article.active) PrimaryButton(stringResource(R.string.inv_registrar_movimiento), { model.openMovement(kinds.first()) }, icon = Icons.Default.Add, enabled = !state.busy)
             if (configure) {
-                SecondaryButton(stringResource(R.string.inv_editar_articulo), { model.openArticle(article) })
-                SecondaryButton(stringResource(R.string.inv_nuevo_lote), { model.openLot(null) })
-                if (detail.lots.isEmpty() && detail.movements.isEmpty()) SecondaryButton(stringResource(R.string.inv_eliminar), { model.askDelete(article.id) }, enabled = !state.busy)
+                CrudButton(CrudKind.Edit, stringResource(R.string.inv_editar_articulo), { model.openArticle(article) })
+                CrudButton(CrudKind.Create, stringResource(R.string.inv_nuevo_lote), { model.openLot(null) })
+                if (detail.lots.isEmpty() && detail.movements.isEmpty()) CrudButton(CrudKind.Deactivate, stringResource(R.string.inv_eliminar), { model.askDelete(article.id) }, enabled = !state.busy)
             }
         }
     }

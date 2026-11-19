@@ -38,6 +38,7 @@ import sv.edu.catolica.climesa.domain.*
 import java.net.URLEncoder
 import java.time.Instant
 import java.time.ZoneId
+import sv.edu.catolica.climesa.domain.UnitStatusBadge
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -107,15 +108,13 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
 }
 private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";AndroidSection.MY_ROOM->"/admisiones";else->null}
 private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En servicio","en_mantenimiento" to "En mantenimiento")
+/** Obs 2: live clock with seconds, ticking on each whole second, and the full weekday on a second line that ellipsizes on phones. */
 @Composable fun HospitalClock(){
     var now by remember { mutableStateOf(Instant.now()) }
-    val zone=remember { ZoneId.of("America/El_Salvador") }
-    val timeFormatter=remember { DateTimeFormatter.ofPattern("HH:mm",Locale("es","SV")).withZone(zone) }
-    val dateFormatter=remember { DateTimeFormatter.ofPattern("EEE d 'de' MMM",Locale("es","SV")).withZone(zone) }
-    LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(60_000L-now.toEpochMilli()%60_000L)}}
-    Column(horizontalAlignment=Alignment.End){
-        Text(timeFormatter.format(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary)
-        Text(dateFormatter.format(now).replaceFirstChar{it.uppercase(Locale("es","SV"))},style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1)
+    LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(sv.edu.catolica.climesa.domain.HospitalClockText.untilNextSecond(System.currentTimeMillis()))}}
+    Column(Modifier.widthIn(max=168.dp).padding(end=8.dp),horizontalAlignment=Alignment.End){
+        Text(sv.edu.catolica.climesa.domain.HospitalClockText.time(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary,maxLines=1)
+        Text(sv.edu.catolica.climesa.domain.HospitalClockText.date(now),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 @Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
@@ -182,16 +181,18 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                 item{ClimesaActionGroup {FormField("Nombre, DUI o expediente",query,{query=it.take(100)});PrimaryButton("Buscar paciente",{model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},icon=Icons.Default.Search,enabled=query.trim().length>=2)}}
                 val rows=PortalParsers.patients(data.data)
                 if(rows.isEmpty())item{EmptyState("No hay coincidencias. Ajusta la búsqueda.")}
-                else items(rows){p->DataRow(p.fullName,meta="EXP. ${p.record}")}
+                else items(rows){p->DataRow(p.fullName,subtitle=p.summary,meta="EXP. ${p.record}")}
             }else if(page==AndroidSection.UNIT){
                 val unit=PortalParsers.unit(data.data)
-                item{SectionCard(unit?.plate.orEmpty()){
-                    Row(verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.spacedBy(10.dp)){Text(stringResource(R.string.unidad_estado),style=MaterialTheme.typography.labelSmall);StatusTag(unit?.state.orEmpty(),label=unitStates[unit?.state])}
+                // Obs 19: one status tag («No se puede despachar» when blocked) with its reason under it, and the service line in the header.
+                val blocked=unit?.dispatchBlock!=null
+                val state=unit?.state.orEmpty()
+                item{SectionCard(unit?.plate.orEmpty(),eyebrow=stringResource(R.string.op_amb_unidad),action={OperacionStatusTag(UnitStatusBadge.code(state,blocked),label=UnitStatusBadge.label(state,blocked,unitStates[state]?:OperacionStatus.label(state)))}){
+                    unit?.dispatchBlock?.let{Text(it,style=MaterialTheme.typography.bodyMedium)}
+                    if(unit?.hasService!=true)Text(stringResource(R.string.unidad_sin_servicio),style=MaterialTheme.typography.titleSmall,color=MaterialTheme.climesa.primaryText)
+                    else Column{Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Text("${unit.serviceOrigin.orEmpty()} → ${unit.serviceDestination.orEmpty()}",style=MaterialTheme.typography.titleSmall)}
                     LabeledValue(stringResource(R.string.unidad_paramedico_turno),stringResource(if(unit?.paramedicOnDuty==true)R.string.unidad_si else R.string.unidad_no))
                     LabeledValue(stringResource(R.string.unidad_motorista_turno),stringResource(if(unit?.driverOnDuty!=false)R.string.unidad_si else R.string.unidad_no))
-                    unit?.dispatchBlock?.let{NoticeBanner(NoticeKind.WARNING,it)}
-                    HorizontalDivider()
-                    if(unit?.hasService!=true)Text(stringResource(R.string.unidad_sin_servicio),style=MaterialTheme.typography.bodyMedium) else {Text(stringResource(R.string.unidad_servicio_activo),style=MaterialTheme.typography.labelSmall);Text("${unit.serviceOrigin.orEmpty()} → ${unit.serviceDestination.orEmpty()}")}
                 }}
                 if(unit!=null&&MaintenanceRules.available(account.profile.permissions,unit.state))item{MaintenanceControl(model,unit.state,unit.version,unit.paramedicOnDuty,unit.driverOnDuty)}
             }else if(page==AndroidSection.MY_ROOM){

@@ -172,7 +172,12 @@ private fun LazyListScope.activeService(
         }
     }
     // S5: a paramedic outside this service's crew follows it read-only; the API would refuse every write.
-    if (service.readOnly) item { NoticeBanner(NoticeKind.INFO, AmbulanceService.NOT_CREW) }
+    if (service.readOnly) item {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            ReadOnlyBadge(who = stringResource(R.string.par_solo_lectura_quien), what = stringResource(R.string.par_solo_lectura_que))
+            BlockedReason(AmbulanceService.NOT_CREW)
+        }
+    }
     if (service.canAdvance || service.canUndo) item { NextStepButton(service, state.busy, model, state.pendingMilestone, state.formError) }
     item {
         SectionCard(stringResource(R.string.par_acciones)) {

@@ -10,7 +10,59 @@ data class Bed(
     val cleaningCompleted: Boolean = false,
     val cleanedByCurrentUser: Boolean = false,
     val occupant: String? = null,
+    /** Floor of the bed (`level`), null when the API does not know it. */
+    val level: Int? = null,
+    val roomId: String = "",
 )
+
+/** One room of the board with its beds, in code order. */
+data class BedRoomGroup(val room: String, val beds: List<Bed>)
+
+/** One floor of the board; [level] null groups beds without a floor. */
+data class BedFloorGroup(val level: Int?, val rooms: List<BedRoomGroup>)
+
+/**
+ * Beds board as a map (obs 7/17): floor, then room, then the beds as tiles, with one filter chip per state and its count.
+ * Same order as the web building map: lower floors first, unknown floor last, rooms and beds by natural code order.
+ */
+object BedBoard {
+    /** States offered as chips, in board order; only the states present (or the chosen one) are shown. */
+    val states = listOf("libre", "ocupada", "reservada", "limpieza", "bloqueada")
+
+    private val natural = Comparator<String> { a, b -> compareNatural(a, b) }
+
+    fun counts(beds: List<Bed>): Map<String, Int> = beds.groupingBy { it.state }.eachCount()
+
+    /** Chips to show: (state or null for "Todas", count). */
+    fun chips(beds: List<Bed>, selected: String?): List<Pair<String?, Int>> {
+        val counts = counts(beds)
+        return listOf<Pair<String?, Int>>(null to beds.size) + states.filter { (counts[it] ?: 0) > 0 || it == selected }.map { it to (counts[it] ?: 0) }
+    }
+
+    fun group(beds: List<Bed>, state: String? = null): List<BedFloorGroup> =
+        beds.filter { state == null || it.state == state }
+            .groupBy { it.level }
+            .entries.sortedWith(compareBy<Map.Entry<Int?, List<Bed>>> { it.key == null }.thenBy { it.key ?: 0 })
+            .map { (level, onFloor) ->
+                val rooms = onFloor.groupBy { it.roomId.ifBlank { it.room } }.values
+                    .map { list -> BedRoomGroup(list.first().room, list.sortedWith(compareBy(natural) { it.code })) }
+                    .sortedWith(compareBy(natural) { it.room })
+                BedFloorGroup(level, rooms)
+            }
+
+    /** "C-2" before "C-10": digits compare as numbers. */
+    internal fun compareNatural(a: String, b: String): Int {
+        val chunk = Regex("""\d+|\D+""")
+        val x = chunk.findAll(a).map { it.value }.toList()
+        val y = chunk.findAll(b).map { it.value }.toList()
+        for (i in 0 until minOf(x.size, y.size)) {
+            val p = x[i]; val q = y[i]
+            val c = if (p[0].isDigit() && q[0].isDigit()) p.toBigInteger().compareTo(q.toBigInteger()) else p.compareTo(q, ignoreCase = true)
+            if (c != 0) return c
+        }
+        return x.size - y.size
+    }
+}
 
 /** Acciones del tablero; `path` es la ruta bajo `/camas/{id}/`. */
 enum class BedAction(val path: String, val minReason: Int, val successMessage: String) {

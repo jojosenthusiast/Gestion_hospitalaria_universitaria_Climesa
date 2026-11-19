@@ -99,9 +99,6 @@
     <string name="ing_campo_origen">el origen</string>
     <string name="ing_campo_medico">el médico tratante</string>
     <string name="ing_campo_categoria">la categoría</string>
-    <string name="ing_salir_titulo">¿Salir del ingreso?</string>
-    <string name="ing_salir">Salir</string>
-    <string name="ing_salir_detalle">Se pierde lo elegido en la guía. El paciente no queda ingresado.</string>
     <string name="ing_medicina_general">Medicina general</string>
     <string name="ing_elegido">Elegido</string>
     <string name="ing_req_aislamiento">Aislamiento</string>
@@ -173,4 +170,7 @@
     <string name="consulta_firmar">Firmar</string>
     <string name="consulta_firmar_titulo">¿Firmar la consulta?</string>
     <string name="consulta_firmar_detalle">Primero se guardan tus notas y después se firma. Una consulta firmada ya no se puede modificar, la cita queda atendida y el número de fila se cierra.</string>
+    <string name="ing_borrador_se_guarda">Lo elegido se guarda: al volver puedes continuar este ingreso o empezar de nuevo.</string>
+    <string name="ing_continuar_de">Continuar ingreso de %1$s</string>
+    <string name="ing_empezar_de_nuevo">Empezar de nuevo</string>
 </resources>

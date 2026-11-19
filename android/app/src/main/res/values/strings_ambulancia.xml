@@ -3,7 +3,6 @@
     <!-- Ambulancia, ronda 2: solicitante, mantenimiento y bitácora. -->
     <string name="amb_expediente">Expediente</string>
     <string name="amb_donde">Dónde está</string>
-    <string name="amb_no_despachable">No se puede despachar ahora</string>
     <string name="amb_estado_desde">En este estado desde %1$s</string>
     <string name="amb_estado_motivo">Motivo registrado: %1$s</string>
     <string name="amb_buscar">Buscar en la bitácora</string>

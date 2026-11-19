@@ -115,3 +115,22 @@ object PatientRules {
         return r.copy(patients=r.patients.map { if(it.id==id) p else it },audit=r.audit+AuditEvent(p.record,if(active) "Reactivación" else "Inactivación",reason.trim(),p.version))
     }
 }
+
+/** Age and sex for the patient list (obs 15): "34 años · Femenino". Unknown parts are left out; DUI never goes in the list. */
+object PatientSummary {
+    fun age(birth: LocalDate?, today: LocalDate = LocalDate.now()): Int? =
+        birth?.takeIf { !it.isAfter(today) }?.let { java.time.Period.between(it, today).years }
+
+    fun ageText(birth: LocalDate?, today: LocalDate = LocalDate.now()): String? = age(birth, today)?.let { if (it == 1) "1 año" else "$it años" }
+
+    /** Same line from a `PatientCandidateResponse`: exact age from `birth`, else the `ageRange` the role may see. */
+    fun fromApi(birth: String?, ageRange: String?, sex: String?, today: LocalDate = LocalDate.now()): String? {
+        val date = birth?.takeIf { it.isNotBlank() && it != "null" }?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
+        val age = ageText(date, today) ?: ageRange?.takeIf { it.isNotBlank() && it != "null" }?.let { "$it años" }
+        val sexLabel = when (sex) { "femenino" -> Sex.FEMALE.label; "masculino" -> Sex.MALE.label; "indeterminado" -> Sex.INDETERMINATE.label; else -> null }
+        return listOfNotNull(age, sexLabel).joinToString(" · ").ifBlank { null }
+    }
+
+    fun line(p: Patient, today: LocalDate = LocalDate.now()): String? =
+        listOfNotNull(ageText(p.birth, today), p.sex.takeIf { it != Sex.UNKNOWN }?.label).joinToString(" · ").ifBlank { null }
+}

@@ -198,7 +198,7 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
                 DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
                 r.appointment?.let { Text(stringResource(R.string.cat_asignada_detalle, it.doctorName, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
                 r.rejectionReason?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.pac_motivo_rechazo, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                if (r.allows(CategoryRequestRules.CANCEL)) TextButton(onClick = { confirm = r.id }, enabled = !busy) { Text(stringResource(R.string.cat_retirar)) }
+                if (r.allows(CategoryRequestRules.CANCEL)) CrudButton(CrudKind.Deactivate, stringResource(R.string.cat_retirar), { confirm = r.id }, enabled = !busy, fill = false)
             }
         }
         pending.forEach { RequestRow(it) }
