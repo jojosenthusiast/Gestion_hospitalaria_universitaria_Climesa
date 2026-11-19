@@ -96,7 +96,7 @@ private fun AuthLoadingScreen() {
         ) {
             Icon(painterResource(R.drawable.ic_climesa), null, Modifier.size(72.dp), tint = androidx.compose.ui.graphics.Color.Unspecified)
             Spacer(Modifier.height(24.dp))
-            CircularProgressIndicator()
+            Spinner()
             Spacer(Modifier.height(12.dp))
             Text(stringResource(R.string.app_comprobando_sesion))
             Spacer(Modifier.height(8.dp))
@@ -198,7 +198,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                     )
                     Button(onClick = submit, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                         if (state.signingIn) {
-                            CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
+                            Spinner(size = 20.dp, strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                             Spacer(Modifier.width(10.dp))
                             Text(stringResource(R.string.login_checking))
                         } else {
