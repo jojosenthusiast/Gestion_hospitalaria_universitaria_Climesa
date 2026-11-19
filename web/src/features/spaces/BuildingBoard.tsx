@@ -4,6 +4,7 @@ import { Field, Icon, Notice, type IconName } from '../../components/ui';
 import { AreaTag, CrudButton, areaOf, type AreaCode } from '../../components/system';
 import { can, type AccessProfile, type Api, type Bed, type BedBlockInput, type BedTransitionInput, type Space } from '../../lib/api';
 import { Empty, SaveButton, Select, Tag, WriteError, useAction, useData } from '../common';
+import { BedTypeBreakdown, bedTypeCounts } from '../../components/bed-types';
 import { BED_STATES, bedStateMap, bedsOf, categoryName, countBeds, floorsOf, plain, spaceTypeNames, stateLabel, type Floor, type SpaceNode, type SpaceWithState } from './building';
 
 type BedActionKind = 'block' | 'unblock' | 'request' | 'complete' | 'verify';
@@ -61,6 +62,9 @@ export function BuildingBoard({ api, profile, version, spaces, beds, onRefresh, 
     return { counts, free, total: list.length };
   };
   const current = floor ? floorStats(floor) : null;
+  /** Owner batch 5 (S4): free beds per room type (the room's category), for the floor shown and the whole building. */
+  const typeCounts = (list: Space[]) => states ? bedTypeCounts(list.map(bed => ({ category: bed.parentId ? byId.get(bed.parentId)?.category : null, free: states.get(bed.id) === 'libre' }))) : [];
+  const floorTypes = floor ? typeCounts(floor.children.flatMap(bedsOf)) : [], buildingTypes = typeCounts(floors.flatMap(f => f.children.flatMap(bedsOf)));
   const select = (id: string) => { setSelectedId(id); setFeedback(''); };
   const sel = selectedId ? byId.get(selectedId) ?? null : null;
 
@@ -107,6 +111,7 @@ export function BuildingBoard({ api, profile, version, spaces, beds, onRefresh, 
       {canConfigure && <label className="check-field"><input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />Mostrar inactivos</label>}
     </div>
     {states && current && <ul className="state-legend" aria-label="Leyenda y conteo de camas de la planta">{BED_STATES.map(s => <li key={s.key}><button type="button" className={`legend-chip bed-state-${s.key}`} aria-pressed={filter === s.key} title={s.hint} onClick={() => setFilter(filter === s.key ? 'todos' : s.key)}><span className="bed-glyph-mark" aria-hidden="true" /><span>{s.label}</span><strong>{current.counts.byState[s.key]}</strong></button></li>)}</ul>}
+    {floorTypes.length > 0 && <div className="building-free-types" aria-label="Camas libres por tipo de habitación"><span><strong>Libres en {floor?.label}</strong><BedTypeBreakdown counts={floorTypes} label={`Camas libres por tipo en ${floor?.label}`} /></span>{floors.length > 1 && <span><strong>Todo el edificio</strong><BedTypeBreakdown counts={buildingTypes} label="Camas libres por tipo en todo el edificio" /></span>}</div>}
     {feedback && <Notice kind="success">{feedback}</Notice>}
     <div className={`building-split${sel ? '' : ' is-collapsed'}`}>
       <div className="floor-plan" aria-label={`Plano de ${floor?.label ?? 'la planta'}`}>

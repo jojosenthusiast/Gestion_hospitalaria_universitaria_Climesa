@@ -59,6 +59,10 @@ ADICIONES_ROL_FASE2 = [("REC", "fila.llamar")]
 # Lo inserta la migración de SALIDA_AVISOS_ADM.
 ADICIONES_ROL_AVISOS_ADM = [("ADM", "avisos.publicar")]
 
+# Lote 5 S8 (observación del propietario en la app del paramédico): la tripulación también pone y quita mantenimiento.
+# Lo inserta la migración 20261129003000_mantenimiento_paramedico.sql (escrita a mano).
+ADICIONES_ROL_LOTE5 = [("PAR", "ambulancia.mantenimiento")]
+
 # Permisos que se retiraron del catálogo (observación 12: módulo de acceso excepcional) después de aplicada la semilla. Ya no están en
 # permisos.csv ni en los documentos RBAC, pero la semilla (aplicada, regla 10 de AGENTS.md) los sigue emitiendo tal como estaban, en su
 # posición original (`despues_de`), y la migración 20261117002000 los borra. Ningún endpoint los declara y `--verificar` no los trata
@@ -79,12 +83,26 @@ PERMISOS_RETIRADOS = [
 # Descripción de rol con que la semilla (aplicada) los insertó, cuando roles.csv ya la cambió. La semilla conserva el histórico.
 # Plataformas que tenía el rol cuando se aplicó la semilla (regla 10: no se edita). Ronda 3: Jefe de Operaciones y Laboratorio dejan Android
 # (PDF del curso y decisión del propietario); lo aplica la migración de SALIDA_PLATAFORMAS.
-PLATAFORMAS_SEMILLA = {"JOP": "Android; Web", "LAB": "Web; Android"}
+# Lote 5 (decisión del propietario 2026-11-19, «Sí, habilitar web»): el Paciente también usa la Web; lo aplica la migración
+# 20261129002000_paciente_web.sql (escrita a mano, como 20261030000200_jop_android.sql).
+PLATAFORMAS_SEMILLA = {"JOP": "Android; Web", "LAB": "Web; Android", "PAC": "Android; iOS"}
 PLATAFORMAS_SIN_ANDROID = {"JOP": ["Web"], "LAB": ["Web"]}
 
 DESCRIPCIONES_ROL_SEMILLA = {
     "DPD": "Aprueba accesos excepcionales a datos clínicos, revisa auditoría y verifica su integridad.",
+    "AST": "Apoya la consulta: prepara al paciente, toma signos vitales, llama y mueve la fila del consultorio.",
+    "ENF": "Cuidado del hospitalizado: signos, notas de enfermería, limpieza de cama, consumo de insumos.",
 }
+
+# Lote 5 S10 (decisión del propietario 2026-11-19, «Unir en Enfermería»): el Asistente se retira y Enfermería absorbe su estación.
+# permisos.csv ya no le da nada a AST; la semilla (aplicada, regla 10) sigue emitiendo lo que AST tenía, con el contexto de entonces,
+# y no emite lo que ENF ganó. Lo aplica la migración 20261129004000_asistente_en_enfermeria.sql (escrita a mano).
+ROL_RETIRADO = "AST"
+PERMISOS_ROL_RETIRADO_SEMILLA = {
+    "sesion.perfil": "x", "pacientes.buscar": "x", "pacientes.ver_ficha": "x", "pacientes.ver_nacimiento": "x", "turnos.ver": "x",
+    "espacios.ver": "x", "fila.ver": "x", "fila.llamar": "x", "fila.gestionar": "x", "citas.ver": "x", "signos.registrar": "x",
+}
+ADICIONES_ROL_AST_ENF = [("ENF", "fila.ver"), ("ENF", "fila.llamar"), ("ENF", "fila.gestionar"), ("ENF", "citas.ver")]
 
 # Contextos que permisos.csv cambió después de aplicada la semilla (regla 10 de AGENTS.md: las migraciones aplicadas no se editan).
 # (rol, permiso, contexto en la semilla, contexto actual en permisos.csv). La semilla conserva el histórico y la migración
@@ -94,6 +112,23 @@ AJUSTES_CONTEXTO = [
     ("ENF", "pacientes.ver_ficha", "x", "area"),
     ("LAB", "pacientes.ver_ficha", "x", "orden"),
 ]
+
+# Lote 5 S10 (decisión del propietario 2026-11-19, «Todo el hospital»): Enfermería trabaja en todos los pisos. Cambios de contexto
+# posteriores a todas las migraciones generadas (regla 10): estas siguen emitiendo el contexto anterior y los aplica la migración
+# escrita a mano 20261129005000_enfermeria_todo_el_hospital.sql. (rol, permiso, contexto anterior, contexto actual en permisos.csv).
+AJUSTES_CONTEXTO_LOTE5 = [
+    ("ENF", "admision.ver", "area", "x"),
+    ("ENF", "pacientes.ver_ficha", "area", "x"),
+    ("ENF", "camas.ver_ocupante", "area", "x"),
+    ("ENF", "enfermeria.registrar", "area", "x"),
+]
+
+
+def permisos_historicos(permisos):
+    """permisos.csv como lo veían las migraciones generadas (ya aplicadas): deshace AJUSTES_CONTEXTO_LOTE5."""
+    ajustes = {(r, p): desde for r, p, desde, _ in AJUSTES_CONTEXTO_LOTE5}
+    return [{**p, **{r: desde for (r, perm), desde in ajustes.items() if perm == p["permiso"]}} for p in permisos]
+
 
 FLUJOS = [
     ("F01 Cuenta del paciente", "A01 Ingreso → A02 Crear cuenta → A03 Vincular expediente → (recepción A33 o W27 aprueba) → A04 Inicio del paciente"),
@@ -348,8 +383,10 @@ def generar_sql(roles, permisos):
     filas = []
     for p in permisos:
         for c in codigos:
-            if p[c] and (c, p["permiso"]) not in ADICIONES_ROL + ADICIONES_ROL_FASE01 + ADICIONES_ROL_RECURSOS + ADICIONES_ROL_FASE2 + ADICIONES_ROL_AVISOS_ADM:
-                filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(historico.get((c, p['permiso']), p[c]))})")
+            # La semilla emitía el valor de entonces: AST (retirado) desde PERMISOS_ROL_RETIRADO_SEMILLA; ya trae el contexto histórico.
+            valor = PERMISOS_ROL_RETIRADO_SEMILLA.get(p["permiso"], "") if c == ROL_RETIRADO else p[c]
+            if valor and (c, p["permiso"]) not in ADICIONES_ROL + ADICIONES_ROL_FASE01 + ADICIONES_ROL_RECURSOS + ADICIONES_ROL_FASE2 + ADICIONES_ROL_AVISOS_ADM + ADICIONES_ROL_LOTE5 + ADICIONES_ROL_AST_ENF:
+                filas.append(f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(valor if c == ROL_RETIRADO else historico.get((c, p['permiso']), p[c]))})")
     l.append(",\n".join(filas) + ";")
     return "\n".join(l) + "\n"
 
@@ -383,7 +420,9 @@ def generar_sql_atributos(roles, permisos):
         "",
         "insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values",
     ]
-    filas = [f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(p[c])})" for p in nuevos for c in codigos if p[c]]
+    # El rol retirado conserva en esta migración aplicada lo que tenía entonces (regla 10).
+    celda_hist = lambda p, c: PERMISOS_ROL_RETIRADO_SEMILLA.get(p["permiso"], "") if c == ROL_RETIRADO else p[c]
+    filas = [f"  ({sql_txt(c)}, {sql_txt(p['permiso'])}, {sql_txt(celda_hist(p, c))})" for p in nuevos for c in codigos if celda_hist(p, c)]
     l.append(",\n".join(filas))
     l.append("on conflict (rol_codigo, permiso_codigo) do nothing;")
     return "\n".join(l) + "\n"
@@ -552,8 +591,17 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
         if e["nivel"] not in ("R", "E", "F"):
             errores.append(f"Endpoint {e['ruta']} con nivel inválido {e['nivel']}")
     por_permiso = {p["permiso"]: p for p in permisos}
+    for r, perm, desde, hasta in AJUSTES_CONTEXTO_LOTE5:
+        actual = por_permiso.get(perm, {}).get(r)
+        if actual != hasta:
+            errores.append(f"AJUSTES_CONTEXTO_LOTE5 dice {r} {perm} = {hasta} y permisos.csv dice {actual!r}")
+    por_permiso = {p["permiso"]: p for p in permisos_historicos(permisos)}
     for r, perm, _, hasta in AJUSTES_CONTEXTO:
         actual = por_permiso.get(perm, {}).get(r)
+        if r == ROL_RETIRADO:
+            if actual:
+                errores.append(f"{ROL_RETIRADO} está retirado y permisos.csv todavía le da {perm}")
+            continue
         if actual != hasta:
             errores.append(f"AJUSTES_CONTEXTO dice {r} {perm} = {hasta} y permisos.csv dice {actual!r}")
     for ret in PERMISOS_RETIRADOS:
@@ -587,6 +635,15 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
     for r, perm in ADICIONES_ROL_AVISOS_ADM:
         if not por_permiso.get(perm, {}).get(r):
             errores.append(f"ADICIONES_ROL_AVISOS_ADM dice {r} {perm} y permisos.csv no se lo asigna")
+    for r, perm in ADICIONES_ROL_AST_ENF:
+        if not por_permiso.get(perm, {}).get(r):
+            errores.append(f"ADICIONES_ROL_AST_ENF dice {r} {perm} y permisos.csv no se lo asigna")
+    for p in permisos:
+        if p.get(ROL_RETIRADO):
+            errores.append(f"{ROL_RETIRADO} está retirado y permisos.csv todavía le da {p['permiso']}")
+    for r, perm in ADICIONES_ROL_LOTE5:
+        if not por_permiso.get(perm, {}).get(r):
+            errores.append(f"ADICIONES_ROL_LOTE5 dice {r} {perm} y permisos.csv no se lo asigna")
     usados = {parte for e in endpoints for parte in partes_permiso(e["permiso"])}
     for p in permisos:
         if p["permiso"] not in usados and p["permiso"] != "camas.ver_ocupante" and p["permiso"] not in PERMISOS_POSTERIORES:
@@ -686,18 +743,19 @@ def main():
     roles, permisos = leer("roles.csv"), leer("permisos.csv")
     endpoints, pantallas = leer("endpoints.csv"), leer("pantallas.csv")
     errores = verificar_consistencia(permisos, endpoints, pantallas, roles) + verificar_politica_campos(permisos, roles)
+    hist = permisos_historicos(permisos)
     salidas = {
         SALIDA_RBAC: generar_rbac(roles, permisos, endpoints),
         SALIDA_PANTALLAS: generar_pantallas(pantallas, roles),
-        SALIDA_SQL: generar_sql(roles, permisos),
+        SALIDA_SQL: generar_sql(roles, hist),
         SALIDA_CONTEXTOS: generar_sql_contextos(),
-        SALIDA_ATRIBUTOS: generar_sql_atributos(roles, permisos),
-        SALIDA_RONDA3: generar_sql_ronda3(roles, permisos),
+        SALIDA_ATRIBUTOS: generar_sql_atributos(roles, hist),
+        SALIDA_RONDA3: generar_sql_ronda3(roles, hist),
         SALIDA_PLATAFORMAS: generar_sql_plataformas(roles),
-        SALIDA_FASE01: generar_sql_fase01(permisos),
-        SALIDA_RECURSOS: generar_sql_recursos(permisos),
-        SALIDA_FASE2: generar_sql_fase2(permisos),
-        SALIDA_AVISOS_ADM: generar_sql_avisos_adm(permisos),
+        SALIDA_FASE01: generar_sql_fase01(hist),
+        SALIDA_RECURSOS: generar_sql_recursos(hist),
+        SALIDA_FASE2: generar_sql_fase2(hist),
+        SALIDA_AVISOS_ADM: generar_sql_avisos_adm(hist),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

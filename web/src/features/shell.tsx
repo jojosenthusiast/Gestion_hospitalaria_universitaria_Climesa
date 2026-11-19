@@ -6,6 +6,7 @@ import { can,roleNames,type AccessProfile,type Api } from '../lib/api';
 import { CompactHeader,Tag } from './common';
 import { ChangePasswordForm } from './password';
 import { Dashboard } from './dashboards';
+import { ShiftStatusBanner } from './shift-status';
 /**
  * Fase 2, S3: división de código por ruta. Inicio (la primera pantalla tras el ingreso) va en el paquete principal;
  * cada otro módulo es un archivo aparte. Para que abrir un módulo no espere su descarga, el armazón descarga en
@@ -13,13 +14,13 @@ import { Dashboard } from './dashboards';
  */
 const loaders={
  patients:()=>import('./patients'),personnel:()=>import('./personnel'),spaces:()=>import('./spaces'),ambulance:()=>import('./ambulance'),
- ambulanceLog:()=>import('./ambulance-log'),appointments:()=>import('./appointments'),consultations:()=>import('./consultations'),
+ ambulanceLog:()=>import('./ambulance-log'),appointments:()=>import('./appointments'),consultations:()=>import('./consultations'),history:()=>import('./clinical-history'),
  queue:()=>import('./queue'),laboratory:()=>import('./laboratory'),labCatalog:()=>import('./lab-catalog'),inventory:()=>import('./inventory'),
  hospitalization:()=>import('./hospitalization'),privacy:()=>import('./privacy'),
- notices:()=>import('./notices'),metrics:()=>import('./metrics'),
+ notices:()=>import('./notices'),metrics:()=>import('./metrics'),myAccess:()=>import('./my-access'),
 };
 type LoaderId=keyof typeof loaders;
-const moduleCode:Record<string,LoaderId>={pacientes:'patients',personal:'personnel',turnos:'personnel',camas:'spaces',espacios:'spaces',ambulancia:'ambulance','bitacora-ambulancia':'ambulanceLog',auditoria:'privacy',laboratorio:'laboratory','catalogo-laboratorio':'labCatalog',inventario:'inventory',hospitalizacion:'hospitalization',fila:'queue',citas:'appointments',consultas:'consultations',avisos:'notices',metricas:'metrics'};
+const moduleCode:Record<string,LoaderId>={pacientes:'patients',personal:'personnel',turnos:'personnel',camas:'spaces',espacios:'spaces',ambulancia:'ambulance','bitacora-ambulancia':'ambulanceLog',auditoria:'privacy',laboratorio:'laboratory','catalogo-laboratorio':'labCatalog',inventario:'inventory',hospitalizacion:'hospitalization',fila:'queue',citas:'appointments',consultas:'consultations',historial:'history',avisos:'notices',metricas:'metrics','mis-accesos':'myAccess'};
 type Loaded={[I in LoaderId]:Awaited<ReturnType<(typeof loaders)[I]>>};
 const warmers:Partial<Record<LoaderId,(()=>Promise<void>)[]>>={};
 /**
@@ -45,6 +46,7 @@ const AmbulancePage=page('ambulance',m=>m.AmbulancePage);
 const AmbulanceLogPage=page('ambulanceLog',m=>m.AmbulanceLogPage);
 const AppointmentsPage=page('appointments',m=>m.AppointmentsPage);
 const ConsultationsPage=page('consultations',m=>m.ConsultationsPage);
+const MyHistoryPage=page('history',m=>m.MyHistoryPage);
 const QueuePage=page('queue',m=>m.QueuePage);
 const LaboratoryPage=page('laboratory',m=>m.LaboratoryPage);
 const LabCatalogPage=page('labCatalog',m=>m.LabCatalogPage);
@@ -53,6 +55,7 @@ const HospitalizationPage=page('hospitalization',m=>m.HospitalizationPage);
 const AuditPage=page('privacy',m=>m.AuditPage);
 const NoticesPage=page('notices',m=>m.NoticesPage);
 const MetricsPage=page('metrics',m=>m.MetricsPage);
+const MyAccessPage=page('myAccess',m=>m.MyAccessPage);
 /** Descarga el código de los módulos visibles cuando el navegador queda libre. Es una sola vez por sesión, no un sondeo. */
 export function preloadModules(ids:string[]){const wanted=[...new Set(ids.map(id=>moduleCode[id]).filter((id):id is LoaderId=>!!id))];for(const id of wanted)for(const warm of warmers[id]??[])void warm().catch(()=>undefined);}
 /**
@@ -73,7 +76,8 @@ class ModuleBoundary extends Component<{label:string;children:ReactNode},{failed
 function ModuleFallback({label}:{label:string}){return <><CompactHeader title={label}/><Skeleton rows={6} label={`Cargando ${label.toLowerCase()}…`}/></>;}
 /** El menú depende solo del permiso (regla 8): sin `permission` el módulo es de toda cuenta con sesión; `alsoPermissions` abre el mismo módulo a otros permisos. */
 /** `replacedBy`: the module hides when the account also sees that one (obs. 17: Edificio replaces Camas); its deep links go there. */
-export type Module={id:string;label:string;permission?:string;alsoPermissions?:string[];future?:boolean;replacedBy?:string};
+/** `context`: the module needs that context of the permission (S19: «Mi historial» is `expediente.ver` in `propio_revisado`, the patient's own record). */
+export type Module={id:string;label:string;permission?:string;context?:string;alsoPermissions?:string[];future?:boolean;replacedBy?:string};
 export const modules:Module[]=[
  {id:'inicio',label:'Inicio'},
  {id:'pacientes',label:'Pacientes',permission:'pacientes.buscar'},
@@ -91,14 +95,17 @@ export const modules:Module[]=[
  {id:'fila',label:'Fila del día',permission:'fila.ver'},
  {id:'citas',label:'Citas',permission:'citas.ver'},
  {id:'consultas',label:'Mi consultorio',permission:'consulta.iniciar'},
+ {id:'historial',label:'Mi historial',permission:'expediente.ver',context:'propio_revisado'},
+ // Lote 5 S16: the patient sees who looked at their record (FR-110-08), as in the apps.
+ {id:'mis-accesos',label:'Quién vio mi expediente',permission:'auditoria.mis_accesos'},
  // S11: Avisos es de toda cuenta con sesión (bandeja «Para mí»); publicar, editar y retirar siguen con avisos.publicar.
  {id:'avisos',label:'Avisos'},
  {id:'metricas',label:'Métricas',permission:'metricas.ver'},
  {id:'perfil',label:'Perfil'},
 ];
-export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',perfil:'user',avisos:'info',metricas:'grid'};
+export const moduleIcons:Record<string,IconName>={inicio:'home',pacientes:'users',personal:'user',camas:'bed',espacios:'building',ambulancia:'ambulance','bitacora-ambulancia':'clipboard',turnos:'calendar',usuarios:'shield',auditoria:'audit',laboratorio:'lab','catalogo-laboratorio':'lab',inventario:'inventory',hospitalizacion:'pulse',fila:'queue',citas:'calendar',consultas:'calendar',historial:'clipboard','mis-accesos':'eye',perfil:'user',avisos:'info',metricas:'grid'};
 /** Módulos que la cuenta ve: Inicio y Perfil siempre, el resto según el permiso del catálogo. */
-const allowed=(profile:AccessProfile,m:Module)=>!m.permission||[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p));
+const allowed=(profile:AccessProfile,m:Module)=>!m.permission||(m.context?profile.permissions.some(p=>p.code===m.permission&&p.context===m.context):[m.permission,...(m.alsoPermissions??[])].some(p=>can(profile,p)));
 export const visibleModules=(profile:AccessProfile)=>modules.filter(m=>{if(!allowed(profile,m))return false;const replacement=m.replacedBy&&modules.find(x=>x.id===m.replacedBy);return !(replacement&&allowed(profile,replacement));});
 /** La web se abre solo si la cuenta tiene algún módulo de trabajo (con permiso) visible. */
 export const hasWebModule=(profile:AccessProfile)=>visibleModules(profile).some(m=>m.permission);
@@ -158,6 +165,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  else if(route==='bitacora-ambulancia')content=<AmbulanceLogPage api={api} version={version}/>;
  else if(route==='citas')content=<AppointmentsPage api={api} profile={profile} version={version}/>;
  else if(route==='consultas')content=<ConsultationsPage api={api} profile={profile} version={version}/>;
+ else if(route==='historial')content=<MyHistoryPage api={api} profile={profile} version={version}/>;
  else if(route==='fila')content=<QueuePage api={api} profile={profile} version={version}/>;
  else if(route==='laboratorio')content=<LaboratoryPage api={api} profile={profile} version={version}/>;
  else if(route==='catalogo-laboratorio')content=<LabCatalogPage api={api} profile={profile} version={version}/>;
@@ -165,6 +173,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
  else if(route==='hospitalizacion')content=<HospitalizationPage api={api} profile={profile} version={version}/>;
  else if(route==='avisos')content=<NoticesPage api={api} profile={profile} version={version}/>;
  else if(route==='metricas')content=<MetricsPage api={api} profile={profile} version={version}/>;
+ else if(route==='mis-accesos')content=<MyAccessPage api={api} version={version}/>;
  else if(route==='auditoria')content=<AuditPage api={api} version={version}/>;
  else if(route==='perfil')content=<ProfilePage profile={profile} onLogout={onLogout} onChangePassword={onChangePassword}/>;
  else content=<><CompactHeader breadcrumb={`CLIMESA / ${active.label}`} title={active.label}/><div className="future-module" role="status"><span className="eyebrow">Sin operaciones disponibles</span><h2>Este módulo no tiene operaciones habilitadas.</h2><p>Tu cuenta tiene acceso a esta sección, pero el sistema todavía no ofrece sus operaciones. Mientras tanto, no hay datos que mostrar.</p><a href="#/inicio" className="row-action">Volver al inicio <Icon name="arrow" size={18}/></a></div></>;
@@ -187,6 +196,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
    {navOpen&&<button className="nav-backdrop" type="button" aria-label="Cerrar panel de navegación" onClick={()=>{setNavOpen(false);toggleRef.current?.focus();}}/>}
    <div className="hospital-workspace">
     {connection!=='live'&&<div role="status" className={`connection-band connection-${connection}`}><Icon name="info" size={16}/>{connection==='offline'?'Sin conexión. No se pueden guardar cambios.':'Recuperando la conexión…'}</div>}
+    <ShiftStatusBanner api={api} version={version}/>
     {/* S3: sin `key` por ruta. Cada módulo es su propio componente y se monta solo; la caché de `useData` muestra al instante lo ya leído. */}
     <main id="main-content" className="hospital-main"><ModuleBoundary key={route} label={active?.label??'Módulo'}>{content}</ModuleBoundary></main>
     <footer className="hospital-footer"><Brand/><span>Hospital universitario CLIMESA</span><span><Icon name="lock" size={13}/>Acceso personal</span></footer>

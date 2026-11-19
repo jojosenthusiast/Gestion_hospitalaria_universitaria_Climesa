@@ -13,6 +13,8 @@ export type AmbulanceStatus={
  pendingRequests?:AmbulanceRequest[];
  /** MA-AMB-02: solo con `ambulancia.despachar`; personal de turno entre el que se elige la tripulación. */
  availableCrew?:CrewCandidate[];
+ /** Lote 5 S8: whoever reads may put or take the unit out of maintenance (Jefatura or the crew); absent in an older API. */
+ canSetMaintenance?:boolean;
 };
 export type CrewCandidate={staffId:string;role:string;name:string;hasAccount:boolean};
 /** Tripulación propuesta: el primer paramédico con cuenta (registra los hitos) y el primer motorista. */

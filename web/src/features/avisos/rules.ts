@@ -10,7 +10,8 @@ export const priorities: { id: Priority; label: string; hint: string }[] = [
 export const priorityLabel = (priority: string) => priorities.find(p => p.id === priority)?.label ?? priority;
 
 /** Roles a los que se puede dirigir un aviso en su tablero de inicio (web y Android). */
-export const audienceRoles = ['ADM', 'JOP', 'REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR', 'DPD'] as const;
+/** Lote 5 S10: AST was retired into Enfermería, so a new notice can no longer aim at it; old ones still show its name. */
+export const audienceRoles = ['ADM', 'JOP', 'REC', 'ENF', 'MED', 'LAB', 'PAR', 'DPD'] as const;
 
 /** Fase 2, S11: criticidad para el personal. Solo «Crítico» se destaca en el inicio de quien lo recibe. */
 export type Level = 'informativo' | 'importante' | 'critico';

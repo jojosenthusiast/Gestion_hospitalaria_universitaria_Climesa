@@ -51,6 +51,10 @@ export class FixtureApi implements Api {
   for(const domain of this.domains){result=domain.request(path);if(result!==undefined)break;}
   if(result!==undefined){/* a domain fixture answered */}
   else if(p==='/auth/me')result=fixtureProfile(this.role);
+  // Lote 5 S9 and S16: the preview account is on shift; the patient's access log has two rows.
+  else if(p==='/me/turno-activo'){const start=new Date(Date.now()-2*3600000).toISOString(),end=new Date(Date.now()+6*3600000).toISOString();result={required:this.role!=='PAC'&&this.role!=='ADM',active:true,graceMinutes:15,shift:{id:'turno-preview',start,end,area:'Consulta externa',state:'publicado'},next:null};}
+  else if(p==='/ambulancia/cobertura'){const start=new Date(Date.now()+2*86400000);start.setUTCHours(4,0,0,0);result={from:'',to:'',hoursWithoutCrew:8,covered:false,days:[{date:start.toISOString().slice(0,10),hoursWithoutCrew:8}],gaps:[{date:start.toISOString().slice(0,10),hours:8,start:start.toISOString(),end:new Date(start.valueOf()+8*3600000).toISOString(),missing:'motorista'}]};}
+  else if(p==='/me/accesos')result=[{fecha:new Date(Date.now()-3600000).toISOString(),rol:'Medicina',tipoDato:'Consulta',motivo:'atención'},{fecha:new Date(Date.now()-3*86400000).toISOString(),rol:'Laboratorio',tipoDato:'Resultados de laboratorio',motivo:'atención'}];
   else if(p==='/pacientes'){const words=fold(q.get('query')??'').split(' ').filter(Boolean),state=q.get('estado');result=this.patients.filter(r=>words.every(w=>fold(`${r.fullName} ${r.record} ${r.dui}`).includes(w))&&(!state||r.state===state)).slice(0,Number(q.get('limit')??50));}
   else if(/^\/pacientes\/[^/]+$/.test(p))result=this.patients.find(r=>r.id===p.split('/')[2]);
   else if(p==='/personal')result=this.people;

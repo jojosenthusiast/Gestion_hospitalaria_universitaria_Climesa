@@ -111,7 +111,7 @@ export function PendingTray({ groups, extras = [], children, othersClear = true 
 }
 
 /** A figure of the day. `value` null means «not applicable now» and hides it; the remote drives loading and error. */
-export type Figure = { id: string; label: string; value: number | string | null; state: Remote<unknown>; href?: string; of?: string };
+export type Figure = { id: string; label: string; value: number | string | null; state: Remote<unknown>; href?: string; of?: string; /** Owner batch 5 (S4): a short split under the label («5 de fila, 3 con cita», free beds per room type). */ detail?: ReactNode };
 const shown = (figure: Figure) => figure.state.error ? '—' : !figure.state.data ? null : typeof figure.value === 'number' ? formatNumber(figure.value) : figure.value;
 /** The day's figures, each shown once. A failed source shows «—» and one line with its retry under the strip. */
 export function DayFigures({ figures }: { figures: Figure[] }) {
@@ -124,6 +124,7 @@ export function DayFigures({ figures }: { figures: Figure[] }) {
       const body = <>
         <span className={`figure-value${value === null ? ' is-loading' : ''}`}>{value ?? ''}</span>
         <span className="figure-label">{figure.label}{figure.of && value !== null && value !== '—' ? <small> {figure.of}</small> : null}</span>
+        {figure.detail && value !== null && value !== '—' ? <span className="figure-detail">{figure.detail}</span> : null}
       </>;
       return <li key={figure.id} data-figure={figure.id} aria-busy={value === null ? true : undefined}>{figure.href ? <a href={figure.href}>{body}</a> : <span>{body}</span>}</li>;
     })}</ul>

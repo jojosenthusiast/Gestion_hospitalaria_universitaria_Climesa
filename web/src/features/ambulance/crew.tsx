@@ -1,5 +1,6 @@
 import { can,type AccessProfile } from '../../lib/api';
 import { type AmbulanceStatus } from './types';
+import { ReadinessItem } from './readiness';
 
 /** Códigos de la API cuando falta tripulación mínima (RN-30: paramédico y motorista con turno en curso). */
 export const crewCodes=['sin_paramedico_de_turno','sin_motorista_de_turno','sin_tripulacion_de_turno'] as const;
@@ -24,7 +25,7 @@ export function crewNames(s:AmbulanceStatus,role:'paramedico'|'motorista'):strin
 }
 /** Crew slot of the status strip: the role as label and the person (or the gap) as value, never the role twice. */
 function CrewSlot({label,names,onDuty,missing}:{label:string;names:string[];onDuty:boolean;missing:string}){
- return <div className={onDuty?'':'is-missing'}><span>{label}</span><strong>{names.length?names.join(' · '):onDuty?'De turno':missing}</strong></div>;
+ return <ReadinessItem state={onDuty?'ok':'missing'} label={label} value={names.length?names.join(' · '):onDuty?'De turno':missing}/>;
 }
 /** Cobertura de la tripulación para la franja de estado: paramédico y motorista por separado, con nombre. */
 export function CrewCoverage({status:s}:{status:AmbulanceStatus}){

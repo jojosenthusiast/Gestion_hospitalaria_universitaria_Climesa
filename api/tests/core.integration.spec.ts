@@ -30,7 +30,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   return call('REC','POST','/pacientes',{...data,searchToken:search.body.token,searchQuery:data.givenNames},key);
  };
  beforeAll(async()=>{
-  fixture=await createDatabase();
+  fixture=await createDatabase({nursingByArea:true});
   inviteProvider=jest.fn(async()=>({data:{user:{id:randomUUID()}},error:null}));
   const auth={authClient:{auth:{getUser:async(token:string)=>{
    const [h,b,s]=token.split('.');
@@ -50,7 +50,8 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   expect(spec.paths['/api/v1/turnos'].post.parameters.some((p:any)=>p.name==='Idempotency-Key'&&p.required)).toBe(true);
  });
  test('cada rol recibe plataformas y permisos; no confía en user_metadata',async()=>{
-  for(const role of roleNames){const r=await call(role,'GET','/auth/me');expect(r.status).toBe(200);expect(r.body.roles).toEqual([role]);expect(r.body.permissions.some((p:any)=>p.code==='sesion.perfil')).toBe(true);}
+  for(const role of roleNames){const r=await call(role,'GET','/auth/me');expect(r.status).toBe(200);expect(r.body.roles).toEqual([role==='AST'?'ENF':role]);// Lote 5 S10: the AST fixture account now holds ENF
+  expect(r.body.permissions.some((p:any)=>p.code==='sesion.perfil')).toBe(true);}
   const rec=(await call('REC','GET','/auth/me')).body;expect(rec.platforms.sort()).toEqual(['android','web']);expect(rec.channels).toContain('ambulancia');
   const med=(await call('MED','GET','/auth/me')).body;expect(med.platforms.sort()).toEqual(['android','ios']);expect(rec.rolePlatforms).toEqual([{role:'REC',platforms:expect.arrayContaining(['android','web'])}]);
  });

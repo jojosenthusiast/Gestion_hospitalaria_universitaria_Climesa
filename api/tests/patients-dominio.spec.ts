@@ -153,7 +153,8 @@ describe('Pacientes · política de campos de la ficha (privacidad.md §2)',()=>
   [['MED'],false,{birth:true,ageRange:false,contact:true}],
   [['PAC'],true,{birth:true,ageRange:false,contact:true}],
   [['LAB'],false,{birth:false,ageRange:true,contact:false}],
-  [['AST'],false,{birth:true,ageRange:false,contact:false}],
+  // Lote 5 S10: AST is retired and holds no permissions.
+  [['AST'],false,{birth:false,ageRange:false,contact:false}],
   [['ENF'],false,{birth:true,ageRange:false,contact:false}],
   [['PAR'],false,{birth:true,ageRange:false,contact:false}],
   [['JOP'],false,{birth:false,ageRange:false,contact:false}],

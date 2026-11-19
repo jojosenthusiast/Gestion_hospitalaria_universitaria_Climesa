@@ -14,9 +14,11 @@ import { unitPlural } from '../inventory/model';
 import { auditActionLabel } from './labels';
 import { coverageTodayGroup } from './coverage-tray';
 import { needsStaffLink } from '../personal/filters';
+import { waitingSplit, waitingSplitText } from '../listas/queue-board';
+import { BedTypeBreakdown, bedTypeCounts } from '../../components/bed-types';
 import { AttentionList, Panel, PanelState, isToday, localDay, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
-export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'AST' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
+export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
 export type Ctx = { d: DashboardData; profile: AccessProfile };
 /**
  * R4a (S2): every role uses the «panel del día» pattern. `tray` feeds the ONE pending tray, `figures` the day's
@@ -29,6 +31,10 @@ const todays = (rows: Appointment[]) => rows.filter(a => isToday(a.start) && ope
 const tickets = (rows: QueueTicket[], state: string) => rows.filter(t => t.state === state);
 const fig = <T,>(id: string, label: string, state: Remote<T>, read: (data: T) => number | string | null, extra: Partial<Figure> = {}): Figure => ({ id, label, state: state as Remote<unknown>, value: state.data ? read(state.data) : null, ...extra });
 const grid = (children: ReactNode) => <div className="dash-grid">{children}</div>;
+/** Owner batch 5 (S4): «En espera» says how many came to the queue today and how many have an appointment. */
+const waitingFigure = (d: DashboardData) => fig('espera', 'En espera', d.queue, r => waitingSplit(r).total, { href: '#/fila', detail: d.queue.data ? waitingSplitText(waitingSplit(d.queue.data)) : undefined });
+/** Owner batch 5 (S4): free beds per room type under the total, read from the bed board when the account has it. */
+const freeByType = (d: DashboardData) => d.beds.data ? <BedTypeBreakdown counts={bedTypeCounts(d.beds.data.map(b => ({ category: b.category, free: b.state === 'libre' })))} /> : undefined;
 const shiftText = (s: Shift) => `${isToday(s.start) ? 'Hoy' : formatDate(s.start, { withYear: false })} · ${timeLabel(s.start)}–${timeLabel(s.end)} · ${s.area}`;
 const nextShift = (rows: Shift[]) => [...rows].filter(s => s.state !== 'cancelado' && new Date(s.end).getTime() > Date.now()).sort((a, b) => a.start.localeCompare(b.start))[0];
 const PRIORITY_ORDER: Record<string, number> = { emergencia: 0, urgente: 1, rutina: 2 };
@@ -187,7 +193,7 @@ const adm: RoleDashboard = {
 // ───────────────────────────── JOP · operación (agregados, sin nombres)
 const jop: RoleDashboard = {
   title: 'Operación del hospital',
-  needs: ['board', 'admissions', 'stock', 'ambulance'],
+  needs: ['board', 'queue', 'beds', 'admissions', 'stock', 'ambulance'],
   actions: [
     { id: 'admision', label: 'Nueva admisión', hint: 'Ingresar a un paciente para hospitalizar', icon: 'bed', href: '#/hospitalizacion?accion=admision', permission: 'admision.crear' },
     { id: 'turno', label: 'Planificar turno', hint: 'Asignar personal a un área', icon: 'calendar', href: '#/turnos?accion=planificar', permission: 'turnos.planificar' },
@@ -199,9 +205,9 @@ const jop: RoleDashboard = {
     indicatedAdmissions(d), noBed(d), unclosedAmbulance(d), pendingAmbulance(d, profile), lowStock(d),
   ],
   figures: ({ d }) => [
-    fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined }),
+    fig('camas-libres', 'Camas libres', d.board, b => b.camas.libres, { href: '#/camas', of: d.board.data ? `de ${d.board.data.camas.total}` : undefined, detail: freeByType(d) }),
     fig('limpieza', 'En limpieza', d.board, b => b.camas.limpieza),
-    fig('espera', 'En espera', d.board, b => b.fila.enEspera, { href: '#/fila' }),
+    waitingFigure(d),
     fig('llamados', 'Llamados', d.board, b => b.fila.llamados),
     fig('lab-pendiente', 'Órdenes por tomar', d.board, b => b.laboratorio.pendiente, { href: '#/laboratorio' }),
     fig('lab-proceso', 'Órdenes en proceso', d.board, b => b.laboratorio.enProceso),
@@ -252,7 +258,7 @@ const requestsState = (d: DashboardData): Remote<unknown> => {
 };
 const rec: RoleDashboard = {
   title: 'Recepción',
-  needs: ['summary', 'queue', 'appts', 'apptRequests', 'admissions', 'ambulance'],
+  needs: ['summary', 'queue', 'beds', 'appts', 'apptRequests', 'admissions', 'ambulance'],
   actions: [
     { id: 'registrar', label: 'Registrar paciente', hint: 'Busca primero y registra si no existe', icon: 'userPlus', href: '#/pacientes?accion=registrar', permission: 'pacientes.registrar' },
     { id: 'agendar', label: 'Agendar cita', hint: 'Paciente, médico y horario disponible', icon: 'calendar', href: '#/citas?accion=agendar', permission: 'citas.agendar' },
@@ -270,57 +276,49 @@ const rec: RoleDashboard = {
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d, profile),
   ],
   figures: ({ d }) => [
-    fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
+    waitingFigure(d),
     fig('llamados', 'Llamados', d.queue, r => tickets(r, 'llamado').length, { href: '#/fila' }),
     fig('citas-hoy', 'Citas de hoy', d.appts, r => todays(r).length, { href: '#/citas' }),
-    fig('camas-libres', 'Camas libres', d.summary, s => s.beds ? s.beds.free : null, { href: '#/camas', of: d.summary.data?.beds ? `de ${d.summary.data.beds.total}` : undefined }),
+    fig('camas-libres', 'Camas libres', d.summary, s => s.beds ? s.beds.free : null, { href: '#/camas', of: d.summary.data?.beds ? `de ${d.summary.data.beds.total}` : undefined, detail: freeByType(d) }),
     fig('pacientes', 'Pacientes activos', d.summary, s => s.patients ? s.patients.active : null, { href: '#/pacientes' }),
   ],
   panels: ({ d }) => grid(<AppointmentsToday appts={d.appts} />),
 };
 
-// ───────────────────────────── AST · asistencia en consultorio
+// ───────────────────────────── Estación de asistencia (Lote 5 S10: Asistencia se unió a Enfermería)
 const priorityOf = (t: QueueTicket) => PRIORITY_ORDER[(t as QueueTicket & { priority?: string }).priority ?? 'rutina'] ?? 2;
-const ast: RoleDashboard = {
-  title: 'Asistencia',
-  needs: ['queue', 'myShifts'],
-  actions: [
-    { id: 'llamar', label: 'Llamar siguiente', hint: 'Llama al próximo número en espera', icon: 'megaphone', href: '#/fila?accion=llamar', permission: 'fila.llamar' },
-    { id: 'buscar', label: 'Buscar paciente', hint: 'Por nombre, DUI o expediente', icon: 'search', href: '#/pacientes', permission: 'pacientes.buscar' },
-  ],
-  tray: () => [],
-  figures: ({ d }) => [
-    fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
-    fig('llamados', 'Llamados', d.queue, r => tickets(r, 'llamado').length),
-    fig('atendidos', 'Atendidos hoy', d.queue, r => tickets(r, 'atendido').length),
-  ],
-  panels: ({ d }) => grid(<>
-    {/* WC-51: same order as the queue rule (emergencies, then urgent, then arrival number), never by issue time alone. */}
-    <Panel title="Quién sigue" icon="megaphone" action={{ label: 'Abrir la fila', href: '#/fila' }}>
-      <PanelState state={d.queue}>{rows => <AttentionList empty="Nadie espera ahora." moreHref="#/fila" items={tickets(rows, 'en_espera').sort((a, b) => priorityOf(a) - priorityOf(b) || a.numero - b.numero).map(t => ({ id: t.id, title: t.patientName ?? `Número ${t.numero}`, detail: `Número ${t.numero} · espera ${formatDuration(minutesSince(t.issuedAt))}`, tone: 'info' as Tone, href: '#/fila?accion=llamar', action: 'Llamar' }))} />}</PanelState>
-    </Panel>
-    <MyShift shifts={d.myShifts} />
-  </>),
-};
+/** The old assistant station, now part of Enfermería. It shows only to an account that reads the queue (`fila.ver`). */
+const stationFigures = (d: DashboardData): Figure[] => [
+  waitingFigure(d),
+  fig('llamados', 'Llamados', d.queue, r => tickets(r, 'llamado').length),
+  fig('atendidos', 'Atendidos hoy', d.queue, r => tickets(r, 'atendido').length),
+];
+/* WC-51: same order as the queue rule (emergencies, then urgent, then arrival number), never by issue time alone. */
+const WhoIsNext = ({ d }: { d: DashboardData }) => <Panel title="Quién sigue" icon="megaphone" action={{ label: 'Abrir la fila', href: '#/fila' }}>
+  <PanelState state={d.queue}>{rows => <AttentionList empty="Nadie espera ahora." moreHref="#/fila" items={tickets(rows, 'en_espera').sort((a, b) => priorityOf(a) - priorityOf(b) || a.numero - b.numero).map(t => ({ id: t.id, title: t.patientName ?? `Número ${t.numero}`, detail: `Número ${t.numero} · espera ${formatDuration(minutesSince(t.issuedAt))}`, tone: 'info' as Tone, href: '#/fila?accion=llamar', action: 'Llamar' }))} />}</PanelState>
+</Panel>;
 
 // ───────────────────────────── ENF · mi planta
 const enf: RoleDashboard = {
   title: 'Mi planta',
-  needs: ['beds', 'admissions', 'stock', 'myShifts'],
+  needs: ['beds', 'admissions', 'stock', 'myShifts', 'queue'],
   actions: [
     { id: 'limpieza', label: 'Registrar limpieza', hint: 'Marca una cama limpia para su verificación', icon: 'bed', href: '#/camas?accion=limpieza', permission: 'camas.registrar_limpieza' },
     { id: 'hospitalizados', label: 'Ver hospitalizados', hint: 'Pacientes con cama asignada', icon: 'users', href: '#/hospitalizacion', permission: 'admision.ver' },
+    { id: 'llamar', label: 'Llamar siguiente', hint: 'Llama al próximo número en espera', icon: 'megaphone', href: '#/fila?accion=llamar', permission: 'fila.llamar' },
+    { id: 'buscar', label: 'Buscar paciente', hint: 'Por nombre, DUI o expediente', icon: 'search', href: '#/pacientes', permission: 'pacientes.buscar' },
   ],
   tray: ({ d }) => [{
     id: 'limpiezas', title: 'Limpiezas por registrar o verificar', href: '#/camas', state: asRemote(d.beds),
     items: (d.beds.data ?? []).filter(b => b.cleaningPending || (b.cleaningCompleted && !b.cleanedByCurrentUser && b.state === 'limpieza')).map(b => ({ id: b.id, title: `Cama ${b.code}`, detail: b.room, tone: 'warn' as Tone, href: '#/camas', action: b.cleaningPending ? 'Registrar' : 'Verificar', tag: b.cleaningPending ? 'Por limpiar' : 'Por verificar', status: 'limpieza' })),
   }, lowStock(d)],
-  figures: ({ d }) => [
+  figures: ({ d, profile }) => [
     fig('ocupadas', 'Camas ocupadas', d.beds, r => r.filter(b => b.state === 'ocupada').length, { href: '#/camas', of: d.beds.data ? `de ${d.beds.data.length}` : undefined }),
     fig('bloqueadas', 'Bloqueadas', d.beds, r => r.filter(b => b.state === 'bloqueada').length || null),
     fig('hospitalizados', 'Hospitalizados', d.admissions, r => r.filter(a => a.state === 'hospitalizado').length, { href: '#/hospitalizacion' }),
+    ...(can(profile, 'fila.ver') ? stationFigures(d) : []),
   ],
-  panels: ({ d }) => grid(<MyShift shifts={d.myShifts} />),
+  panels: ({ d, profile }) => grid(<>{can(profile, 'fila.ver') && <WhoIsNext d={d} />}<MyShift shifts={d.myShifts} /></>),
 };
 
 // ───────────────────────────── MED · mi día
@@ -338,7 +336,7 @@ const med: RoleDashboard = {
   }],
   figures: ({ d }) => [
     fig('citas-hoy', 'Citas de hoy', d.agenda, r => r.filter(a => isToday(a.start)).length, { href: '#/consultas' }),
-    fig('espera', 'En espera', d.queue, r => tickets(r, 'en_espera').length, { href: '#/fila' }),
+    waitingFigure(d),
     fig('hospitalizados', 'Hospitalizados', d.admissions, r => r.filter(a => a.state === 'hospitalizado').length, { href: '#/hospitalizacion' }),
   ],
   panels: ({ d }) => grid(<>
@@ -422,6 +420,8 @@ const pac: RoleDashboard = {
   </Panel>),
 };
 
-export const roleDashboards: Record<RoleId, RoleDashboard> = { ADM: adm, JOP: jop, DPD: dpd, REC: rec, AST: ast, ENF: enf, MED: med, LAB: lab, PAR: par, PAC: pac };
+export const roleDashboards: Record<RoleId, RoleDashboard> = { ADM: adm, JOP: jop, DPD: dpd, REC: rec, ENF: enf, MED: med, LAB: lab, PAR: par, PAC: pac };
 /** Orden de presentación cuando una cuenta tiene varios roles: primero los de gestión, luego los de trabajo directo. */
-export const roleOrder: RoleId[] = ['ADM', 'JOP', 'DPD', 'REC', 'LAB', 'MED', 'ENF', 'AST', 'PAR', 'PAC'];
+export const roleOrder: RoleId[] = ['ADM', 'JOP', 'DPD', 'REC', 'LAB', 'MED', 'ENF', 'PAR', 'PAC'];
+/** Lote 5 S10 (owner, 2026-11-19: «Unir en Enfermería»): an account that still has the retired AST role gets Enfermería. */
+export const canonicalRole = (role: string) => (role === 'AST' ? 'ENF' : role);

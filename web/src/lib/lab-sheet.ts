@@ -48,6 +48,19 @@ export function releaseLines(values: ReleaseValue[]) {
   return [...values].sort((a, b) => rank(a) - rank(b)).map(v => {
     const shown = v.text ?? (typeof v.value === 'number' ? formatLabValue(v.value, v.unit) : 'sin valor');
     const flag = v.mark && v.mark !== 'normal' && v.mark !== 'sin_rango' ? ` (${MARK_WORDS[v.mark] ?? v.mark})` : '';
-    return { text: `${v.name} ${shown}${flag}`, critical: isCriticalMark(v.mark) };
+    return { text: `${v.name} ${shown}${flag}`, label: `${v.name} ${shown}`, flag: v.mark ? LAB_FLAG[v.mark] ?? null : null, critical: isCriticalMark(v.mark) };
   });
+}
+
+/** Lote 5 S13: the flag next to each component, in words and with a tone (same labels as Android `LabFlag`). */
+export type LabFlagTone = 'ok' | 'high' | 'low' | 'critical' | 'none';
+export const LAB_FLAG: Record<string, { label: string; tone: LabFlagTone }> = {
+  normal: { label: 'En rango', tone: 'ok' }, alto: { label: 'Alto', tone: 'high' }, bajo: { label: 'Bajo', tone: 'low' },
+  critico_alto: { label: 'Crítico alto', tone: 'critical' }, critico_bajo: { label: 'Crítico bajo', tone: 'critical' }, sin_rango: { label: 'Sin rango', tone: 'none' },
+};
+/** «2 fuera de rango · 1 crítico» for a summary; null when every result is in range (or has no range). */
+export function labFlagSummary(values: readonly { mark?: string | null }[]) {
+  const out = values.filter(v => isCriticalMark(v.mark) || isAbnormalMark(v.mark)).length, critical = values.filter(v => isCriticalMark(v.mark)).length;
+  if (!out) return null;
+  return [out === 1 ? '1 fuera de rango' : `${out} fuera de rango`, critical ? (critical === 1 ? '1 crítico' : `${critical} críticos`) : null].filter(Boolean).join(' · ');
 }

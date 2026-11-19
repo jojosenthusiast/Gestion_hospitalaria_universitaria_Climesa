@@ -1,0 +1,25 @@
+/* S19 · «Mi historial» (patient, web): reading layout, one consultation per block, results as a two-column table. */
+.my-history { display: grid; gap: 28px; max-width: 920px; }
+.my-history-intro { margin: 0; color: var(--muted); max-width: 70ch; }
+.my-history-section { display: grid; gap: 12px; }
+.my-history-section > h2 { margin: 0; display: flex; align-items: baseline; gap: 8px; font-size: var(--text-lg, 1.125rem); }
+.mh-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 12px; }
+.mh-item { padding: 16px 18px; border: 1px solid var(--line); border-radius: var(--radius-card, 12px); background: var(--surface); display: grid; gap: 12px; }
+.mh-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; }
+.mh-head > div { display: grid; gap: 2px; min-width: 0; }
+.mh-head small { color: var(--muted); }
+.mh-plan { margin: 0; display: grid; gap: 2px; max-width: 70ch; }
+.mh-plan span, .mh-grid h3 { color: var(--muted); font-size: 0.75rem; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.mh-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 24px; }
+.mh-grid h3 { margin: 0 0 6px; }
+.mh-grid ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.mh-grid small { display: block; color: var(--muted); }
+.mh-grid em { font-style: normal; color: var(--muted); }
+.mh-grid p { margin: 0; }
+.mh-labs-link { margin: 0; color: var(--muted); font-size: var(--text-sm, 0.875rem); }
+.mh-results { width: 100%; border-collapse: collapse; font-size: var(--text-sm, 0.875rem); }
+.mh-results th { text-align: left; color: var(--muted); font-weight: 600; padding: 4px 8px 6px 0; border-bottom: 1px solid var(--line); }
+.mh-results td { padding: 8px 8px 8px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+.mh-results tr:last-child td { border-bottom: 0; }
+.mh-value { font-weight: 700; font-variant-numeric: tabular-nums; display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.rx-print-button { white-space: nowrap; }

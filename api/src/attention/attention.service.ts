@@ -11,10 +11,12 @@ import { PolicyRegistry } from '../platform/policy.registry';
 import { AppointmentCancelDto, AppointmentCreateDto, AppointmentNoShowDto, AppointmentRescheduleDto, AppointmentStatusDto, PatientAppointmentRequestDto, RescheduleDecisionDto } from './attention.dto';
 import { appointmentActions, AppointmentAbilities, cancelableUntil } from './attention.rules';
 import { AttentionSweepService } from './attention-sweep.service';
-import { businessDate } from '../platform/clock';
+import { businessDate, businessDayRange } from '../platform/clock';
 
 type AppointmentRow = Record<string, any>;
 const SLOT_MS = 20 * 60_000;
+/** Lote 5, S6: no doctor of the service works that day. */
+export const NO_STAFF_MESSAGE = 'No hay médicos de turno para ese día y servicio.';
 
 /** RN-20a: days a pending category request counts toward the CITA-07 limit (it has no slot that expires it). */
 export const CATEGORY_REQUEST_COUNT_DAYS = 14;
@@ -62,7 +64,17 @@ export class AttentionService {
         AND periodo @> $2::timestamptz
         AND periodo @> ($3::timestamptz - interval '1 microsecond')
       LIMIT 1`, [doctorId, start, end])).rows[0];
-    if (!row) throw new ProblemException('medico_sin_jornada', 409, 'El médico no tiene una jornada publicada para esa franja.', 'start');
+    if (!row) {
+      // Lote 5, S6: when nobody of the doctor's service (specialty) works that local day, the day cannot be booked at
+      // all; otherwise only this doctor is off and another doctor of the service can take it.
+      const day = businessDayRange(businessDate(start));
+      const staffed = (await c.query(`SELECT 1 FROM personal.turno t JOIN personal.persona p ON p.id=t.persona_id
+          JOIN personal.persona d ON d.id=$1
+        WHERE p.tipo='medico' AND p.activo AND coalesce(p.especialidad,'Medicina general')=coalesce(d.especialidad,'Medicina general')
+          AND t.estado IN ('publicado','en_curso') AND t.periodo && tstzrange($2::timestamptz,$3::timestamptz,'[)') LIMIT 1`, [doctorId, day.start, day.end])).rowCount;
+      if (!staffed) throw new ProblemException('sin_personal_disponible', 409, NO_STAFF_MESSAGE, 'start');
+      throw new ProblemException('medico_sin_jornada', 409, 'El médico no tiene una jornada publicada para esa franja.', 'start');
+    }
     if (requireAligned && (start.valueOf() - new Date(row.start).valueOf()) % SLOT_MS !== 0) throw new ProblemException('franja_desalineada', 400, 'La cita debe empezar en una franja de 20 minutos de la jornada del médico.', 'start');
   }
 

@@ -104,3 +104,9 @@
 .plan-facts dt { font-size: 12px; color: var(--muted); }
 .plan-facts dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .bed-state-line { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+/* Owner batch 5 (S4): free beds per room type under the state legend, for the floor and the whole building. */
+.building-free-types { display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: center; margin: 0 0 var(--space-3, 12px); }
+.building-free-types > span { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+.building-free-types > span > strong { font-size: var(--text-sm, 0.875rem); font-weight: 600; color: var(--ink); }
+.building-free-types .bed-types { font-size: var(--text-sm, 0.875rem); }

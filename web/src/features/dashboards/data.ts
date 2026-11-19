@@ -8,7 +8,7 @@ import type { LabProposal } from './lab-follow-up';
 import type { LabFollowUp } from './lab-results-inbox';
 
 // Tipos mínimos de los listados que ya consumen los módulos: el inicio solo lee, nunca escribe.
-export type QueueTicket = { id: string; service: string; numero: number; patientName?: string | null; state: string; issuedAt: string; officeId?: string | null };
+export type QueueTicket = { id: string; service: string; numero: number; patientName?: string | null; state: string; issuedAt: string; officeId?: string | null; appointmentAt?: string | null; appointmentId?: string | null; arrivalFromAppointment?: boolean | null };
 export type LabOrderRow = { id: string; patientName?: string; priority: string; state: string; createdAt: string; sampleTakenAt?: string | null; completedAt?: string | null; reviewedAt?: string | null; items: { id: string; name: string }[]; external?: boolean; externalPlace?: string | null; externalInstructions?: string | null };
 export type StockRow = { articulo_id: string; codigo: string; nombre: string; tipo: string; unidad: string; minimo: number; disponible: number; vencido: number; bajo_minimo: boolean };
 /** Fase 2, flujo A: solicitud de cita por motivo, sin médico, que Recepción asigna. */

@@ -21,7 +21,7 @@ describe('Precondiciones: lo que el cliente ofrece es lo que la API acepta', () 
   };
 
   beforeAll(async () => {
-    t = await createTestApp(NOW);
+    t = await createTestApp(NOW, { nursingByArea: true });
     await t.enroll('MED');
     glu = (await t.one<{ id: string }>("SELECT id FROM laboratorio.examen WHERE codigo='GLU'")).id;
   });

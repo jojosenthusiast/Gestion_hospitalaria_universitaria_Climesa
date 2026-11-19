@@ -4,7 +4,7 @@ import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { AmbulanceService, LogFilters } from './ambulance.service';
 import { AmbulanceRequestDto, CancelRequestDto, CloseServiceDto, DiscardRequestDto, DispatchDto, LocationDto, MaintenanceDto, MilestoneDto, PrehospitalDto, UndoMilestoneDto } from './ambulance.dto';
-import { AmbulanceRequestCreatedResponse, ArrivalServiceResponse, AmbulanceRequestStateResponse, CloseServiceResponse, HandoverResponse, UndoMilestoneResponse, OwnAmbulanceRequestResponse, AmbulanceStatusResponse, AmbulanceUnitStateResponse, DispatchResponse, LocationRecordedResponse, MilestoneResponse, PrehospitalCreatedResponse, PrehospitalViewResponse, ServiceLogEntryResponse } from './ambulance.responses';
+import { CrewCoverageResponse, AmbulanceRequestCreatedResponse, ArrivalServiceResponse, AmbulanceRequestStateResponse, CloseServiceResponse, HandoverResponse, UndoMilestoneResponse, OwnAmbulanceRequestResponse, AmbulanceStatusResponse, AmbulanceUnitStateResponse, DispatchResponse, LocationRecordedResponse, MilestoneResponse, PrehospitalCreatedResponse, PrehospitalViewResponse, ServiceLogEntryResponse } from './ambulance.responses';
 
 /** Spec 109: rutas de `endpoints.csv`, cada una con su permiso de `permisos.csv`. */
 @ApiTags('ambulancia') @ApiBearerAuth() @UseGuards(SupabaseAuthGuard,PermissionGuard) @Controller('ambulancia')
@@ -12,7 +12,9 @@ export class AmbulanceController {
   constructor(private readonly ambulance:AmbulanceService) {}
   @Get() @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Estado de la unidad, servicio activo con hitos y, para despacho, solicitudes por confirmar'}) @ApiOkResponse({ type: AmbulanceStatusResponse })
   status(@Req() r:ActorRequest){return this.ambulance.status(r.actor);}
-  @Post('mantenimiento') @RequirePermission('ambulancia.mantenimiento') @ApiOperation({summary:'Entrar o salir de mantenimiento; salir exige paramédico con turno en curso'}) @ApiCreatedResponse({ type: AmbulanceUnitStateResponse })
+  @Get('cobertura') @RequirePermission('ambulancia.ver_estado') @ApiOperation({summary:'Lote 5 S8: horas de los próximos días (7 por omisión) sin paramédico y motorista de turno, por día (no bloquea publicar turnos)'}) @ApiQuery({name:'dias',type:Number,required:false,description:'Días desde la hora en curso, 1 a 14; 7 por omisión'}) @ApiOkResponse({ type: CrewCoverageResponse })
+  coverage(@Query('dias') dias?:string){return this.ambulance.crewCoverage(dias===undefined||dias===''?undefined:Number(dias));}
+  @Post('mantenimiento') @RequirePermission('ambulancia.mantenimiento') @ApiOperation({summary:'Entrar o salir de mantenimiento (Jefatura o la tripulación); salir exige paramédico y motorista con turno en curso'}) @ApiCreatedResponse({ type: AmbulanceUnitStateResponse })
   maintenance(@Req() r:ActorRequest,@Body() d:MaintenanceDto,@Headers('idempotency-key') k?:string){return this.ambulance.setMaintenance(r.actor,d,k);}
   @Post('solicitudes') @RequirePermission('ambulancia.solicitar') @ApiOperation({summary:'Solicitar ambulancia; queda por confirmar (paciente verificado o recepción por teléfono)'}) @ApiCreatedResponse({ type: AmbulanceRequestCreatedResponse })
   request(@Req() r:ActorRequest,@Body() d:AmbulanceRequestDto,@Headers('idempotency-key') k?:string){return this.ambulance.request(r.actor,d,k);}

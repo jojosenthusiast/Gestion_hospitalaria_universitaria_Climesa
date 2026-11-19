@@ -36,6 +36,7 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 103,GET,/api/v1/turnos/cobertura,turnos.ver,,E,4,Huecos de cobertura por área y hora
 103,GET,/api/v1/turnos/catalogo,turnos.ver,"Todas las áreas, funciones y personal activo para filtrar y asignar turnos; sin datos personales",R,2,Catálogo de filtros y asignación de turnos
 103,GET,/api/v1/turnos/mios,turnos.ver,Propio,R,3,Mis turnos
+103,GET,/api/v1/me/turno-activo,sesion.perfil,Propio; Lote 5 S9: REC AST ENF MED LAB PAR necesitan turno (margen 30 min) para comandos operativos,R,6,Mi turno vigente y el próximo
 103,GET,/api/v1/turnos/especialistas,turnos.ver,"Médicos de turno por día y especialidad durante 7 días; sin datos de contacto (RN-17, CARGA-04)",R,3,Especialistas de la semana
 103,POST,/api/v1/turnos/{id}/entrada,turnos.ver,"Propio; obsoleto, una versión para apps instaladas: no cambia nada, devuelve el estado del turno ya empezado o 409 entrada_automatica antes del inicio",R,3,Marcar mi entrada al turno (obsoleto)
 103,POST,/api/v1/turnos/{id}/asistencia,turnos.planificar,"La entrada es automática al inicio; ausencia con tipo y motivo, corregir la hora real de entrada o deshacer una ausencia; versión y motivo (ASIS-01 a ASIS-03)",R,3,Registrar la asistencia de un turno
@@ -106,13 +107,14 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 109,POST,/api/v1/ambulancia/servicios,ambulancia.despachar,Solo si Disponible; bloqueo de fila,R,4,Despachar: pasa a En Servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/hitos,ambulancia.operar,Orden de hitos,R,4,"Salida, en escena, trasladando, en hospital, finalizado"
 109,POST,/api/v1/ambulancia/servicios/{id}/hitos/deshacer,ambulancia.operar,Solo la tripulación; último hito; 15 minutos; nunca finalizado ni llegada recibida,R,6,Deshacer el último hito (R7 G-4)
-109,POST,/api/v1/ambulancia/servicios/{id}/cerrar,ambulancia.mantenimiento,Solo servicio activo; motivo; estado final cancelado; unidad a Disponible,R,6,Cierre administrativo del servicio
+109,POST,/api/v1/ambulancia/servicios/{id}/cerrar,ambulancia.mantenimiento,Además ambulancia.despachar (solo Jefatura; Lote 5 S8); solo servicio activo; motivo; estado final cancelado; unidad a Disponible,R,6,Cierre administrativo del servicio
 109,POST,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.reportar_prehospital,Funciona sin conexión con reintento,E,4,Reporte prehospital y hora estimada
 109,GET,/api/v1/ambulancia/servicios/{id}/prehospital,ambulancia.recibir_prehospital,,E,4,Ver reporte prehospital
 109,GET,/api/v1/ambulancia/llegada,ambulancia.recibir_prehospital,Servicios por recibir: primero los llegados sin entrega (24 h) y después el activo; sin datos clínicos; MA-AMB-04,R,6,Servicios cuya llegada recibe el hospital
 109,POST,/api/v1/ambulancia/servicios/{id}/recepcion,ambulancia.recibir_prehospital,Personal clínico (expediente.ver); después de en_hospital; una sola vez; MA-AMB-04,E,6,Marcar recibido al paciente en el hospital
 109,POST,/api/v1/ambulancia/ubicacion,ambulancia.operar,Solo con servicio activo,E,5,Ubicación en vivo
-109,POST,/api/v1/ambulancia/mantenimiento,ambulancia.mantenimiento,Solo sin servicio activo,R,4,Entrar o salir de mantenimiento
+109,GET,/api/v1/ambulancia/cobertura,ambulancia.ver_estado,Lote 5 S8: dias 1 a 14 (7 por omisión); paramédico y motorista por hora; huecos por día local; informativo (no bloquea publicar),R,6,Horas sin tripulación de turno
+109,POST,/api/v1/ambulancia/mantenimiento,ambulancia.mantenimiento,Solo sin servicio activo; Jefatura o la tripulación (Lote 5 S8),R,4,Entrar o salir de mantenimiento
 109,GET,/api/v1/ambulancia/bitacora,ambulancia.ver_bitacora,Datos del paciente ocultos sin relación,R,4,Bitácora filtrable (D-056)
 110,GET,/api/v1/auditoria,auditoria.ver,,R,4,Consultar auditoría
 110,POST,/api/v1/auditoria/verificacion,auditoria.ver,,R,4,Verificar cadena de hash

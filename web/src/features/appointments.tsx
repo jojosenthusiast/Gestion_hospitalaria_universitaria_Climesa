@@ -6,6 +6,9 @@ import { Segmented } from '../components/segmented';
 import { formatDate, formatDayHeading, formatRelative, formatShortDateTime, formatShortDay, plural } from '../lib/format';
 import { DoctorShiftPicker } from './listas/doctor-shifts';
 import { isPendingCategoryRequest } from './listas/requests';
+import { NO_STAFF_REQUEST_TEXT, NoStaffNotice, besidesNoStaff } from './listas/no-staff';
+import { patientFacts } from './listas/patient-facts';
+import { categorySections } from './listas/category-groups';
 import { ChipGroup, LiveSearch, matches } from './listas/chips';
 import { addDays, dayKey, groupAgenda, minutesBetween, shownState, timeRange, weekOf } from './listas/schedule';
 import './listas/lists.css';
@@ -14,7 +17,7 @@ import { patientRowBlock, type PatientPickerGate, type PickerPatientRow } from '
 import { useQuickAction } from './personal/accion';
 import { CategoryBadges, CategoryGlyph, type CategoryRef } from '../components/category';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
-import { can, type AccessProfile, type Api, type Appointment as BaseAppointment } from '../lib/api';
+import { can, type AccessProfile, type Api, type ApiError, type Appointment as BaseAppointment } from '../lib/api';
 import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from './common';
 import './appointments.css';
 import './front-desk.css';
@@ -126,10 +129,14 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
     setNoShows(current => { const next = { ...current }; delete next[row.id]; return next; });
   }
   /** One-click actions (CITA-06): confirm, no-show and accepting a reschedule need no form. */
+  // Lote 5 S6: a «no doctors on shift» refusal of a direct action shows on the card it came from.
+  const [directRow, setDirectRow] = useState<string | null>(null);
+  const cardError = (id: string) => (directRow === id ? direct.error : null);
   async function runDirect(row: Appointment, name: AppointmentAction) {
     if (name === 'no_asistio') { holdNoShow(row); return; }
     const path = name === 'confirmar' ? `/citas/solicitudes/${row.id}/confirmar` : `/citas/reprogramaciones/${row.reschedule!.id}/aceptar`;
     const body = name === 'aceptar_reprogramacion' ? { version: row.reschedule!.version } : { version: row.version };
+    setDirectRow(row.id);
     if (await direct.run(path, body)) data.refresh();
   }
   // #9: Inicio links «Asignar» as #/citas?asignar=<id>; the list opens on «Solicitudes» with that request open.
@@ -175,7 +182,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
             {row.arrival ? <span className="qb-cita" title="Número de fila de la llegada"><Icon name="check" size={14} />Llegó · CON {row.arrival.numero}</span>
               : canArrive && row.state === 'confirmada' && dayKey(row.start) === today && <button type="button" className="row-action ag-arrive" disabled={arrive.busy} aria-label={`Registrar llegada · ${row.patientName}`} onClick={() => void registerArrival(row)}>{arrive.busy ? 'Registrando…' : 'Registrar llegada'}</button>}
             <AppointmentRowActions row={row} busy={direct.busy} onDirect={name => void runDirect(row, name)} onDialog={name => setSelected({ appointment: row, action: name })} /></div>}
-        {arrived?.appointmentId === row.id && <Notice kind="success">{arrived.text}</Notice>}</div>; })}</div>; })}</section>;
+        {arrived?.appointmentId === row.id && <Notice kind="success">{arrived.text}</Notice>}<NoStaffNotice error={cardError(row.id)} /></div>; })}</div>; })}</section>;
   return <>
     <CompactHeader breadcrumb="Atención / Agenda" title="Citas" actions={<>
       {canSchedule && <button className="primary-button" onClick={() => setCreate(true)}><Icon name="plus" size={18}/>Agendar cita</button>}
@@ -194,10 +201,10 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
           <div className="cl-doctor-filter"><SearchPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} minChars={0} placeholder="Todos los médicos" emptyText="Ningún médico con citas coincide." /></div></>}
           <span className="ag-toolbar-end">{filtered && <button type="button" className="cl-link-button" onClick={clear}>Quitar filtros</button>}{!requestsTab && <ExportMenu table={exportTable} disabled={!rows.length} />}</span>
         </div>
-        <WriteError error={direct.error} onReload={data.refresh} reloadLabel="Recargar las citas" />
+        <WriteError error={besidesNoStaff(direct.error)} onReload={data.refresh} reloadLabel="Recargar las citas" />
         {noShowChanged && (!noShow.error || noShow.error.status === 409) ? <Notice kind="error">La cita cambió mientras esperaba; no se marcó «No asistió».</Notice> : <WriteError error={noShow.error} />}
         <WriteError error={arrive.error} />
-        {requestsTab ? <RequestInbox api={api} version={version} requests={requests} query={query} asked={all.filter(a => a.state === 'solicitada' && matches(query, a.patientName, a.doctorName, a.reason))} busy={direct.busy} onDirect={(row, name) => void runDirect(row, name)} onDialog={(row, name) => setSelected({ appointment: row, action: name })} onAssigned={data.refresh} />
+        {requestsTab ? <RequestInbox api={api} version={version} requests={requests} query={query} asked={all.filter(a => a.state === 'solicitada' && matches(query, a.patientName, a.doctorName, a.reason))} busy={direct.busy} cardError={cardError} onDirect={(row, name) => void runDirect(row, name)} onDialog={(row, name) => setSelected({ appointment: row, action: name })} onAssigned={data.refresh} />
         : rows.length ? <>
           {ahead.map(dayGroup)}
           {past.length > 0 && (ahead.length ? <details className="ag-past"><summary>Días anteriores · {plural(past.reduce((n, g) => n + g.doctors.reduce((m, d) => m + d.items.length, 0), 0), 'cita', 'citas')}</summary>{past.map(dayGroup)}</details> : past.map(dayGroup))}</>
@@ -238,7 +245,7 @@ function AppointmentForm({ api, version, patientId, onClose, onSaved }: { api: A
   const freeCount = franjas.filter(item => item.estado === 'libre').length;
   const missing = new Intl.ListFormat('es', { type: 'conjunction' }).format([!patient && 'el paciente', !doctorId && 'el médico', !selectedSlot && 'una franja libre'].filter((part): part is string => !!part));
   async function save(e: FormEvent) { e.preventDefault(); if (!selectedSlot || !patient) return; if (await action.run('/citas', { patientId: patient.id, doctorId, start: selectedSlot.start, end: selectedSlot.end, reason: reason || undefined })) onSaved(); }
-  return <Dialog title="Agendar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p className="form-intro">Busca al paciente por nombre, DUI o expediente (sin importar tildes), elige un médico con turno y toca una franja libre de 20 minutos.</p><WriteError error={action.error} onReload={onSaved} />
+  return <Dialog title="Agendar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}><p className="form-intro">Busca al paciente por nombre, DUI o expediente (sin importar tildes), elige un médico con turno y toca una franja libre de 20 minutos.</p><WriteError error={besidesNoStaff(action.error)} onReload={onSaved} />
     <div className="form-grid">{patientId ? <div className="select-field"><span className="eyebrow">Paciente</span><p className="ag-fixed-patient">{patient ? <><strong>{patient.label}</strong> <small>{patient.detail}</small></> : 'Cargando paciente…'}</p></div>
       : <SearchPicker label="Paciente" value={patient} onChange={setPatient} search={patientPicker(api, 'attend')} required emptyText="No hay pacientes con ese nombre, DUI o expediente." hint="Escribe al menos 2 letras o números." />}<Field label="Fecha" type="date" value={date} onChange={value => setDate(value)} hint={/^\d{4}-\d{2}-\d{2}$/.test(date) ? formatShortDay(date) : undefined} required /><DoctorShiftPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Primero los médicos con turno ese día; «Todos» muestra también a los demás." /></div>
     <section className="slot-section" aria-label="Horarios del día" aria-busy={availabilityLoading}><span className="eyebrow">Horario</span>
@@ -247,6 +254,7 @@ function AppointmentForm({ api, version, patientId, onClose, onSaved }: { api: A
         <SlotGrid franjas={franjas} value={slot} onChange={setSlot} />
         {franjas.length > 0 && <SlotLegend />}
         {franjas.length > 0 && freeCount === 0 && <Notice kind="info">No quedan franjas libres este día. Prueba con otra fecha.</Notice>}</>}
+      <NoStaffNotice error={action.error} />
     </section>
     <Field label="Motivo · opcional" value={reason} onChange={setReason} maxLength={500} />
     {availabilityError && <Notice kind="error">{availabilityError}</Notice>}{missing && <p className="form-hint" role="status">Para confirmar falta elegir {missing}.</p>}{selectedSlot && <Notice kind="info">Horario elegido: {timeOnly(selectedSlot.start)}–{timeOnly(selectedSlot.end)}. Si otra persona lo ocupa antes de confirmar, el sistema te pedirá seleccionar otro.</Notice>}<div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} disabled={!selectedSlot || !patient} label="Confirmar cita" /></div></form></Dialog>;
@@ -317,11 +325,12 @@ function RescheduleDialog({ api, appointment, onClose, onSaved }: { api: Api; ap
   async function save(e: FormEvent) { e.preventDefault(); if (!chosen) return; if (await action.run(`/citas/${appointment.id}/reprogramar`, { version: appointment.version, start: chosen.start, end: chosen.end })) onSaved(); }
   return <Dialog title="Reprogramar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p className="form-intro">Paciente: <strong>{appointment.patientName}</strong> · {appointment.doctorName}<br />Horario actual: {formatShortDateTime(appointment.start)}. Elige una franja libre del mismo médico.</p>
-    <WriteError error={action.error} onReload={onSaved} />
+    <WriteError error={besidesNoStaff(action.error)} onReload={onSaved} />
     <Field label="Fecha" type="date" value={date} onChange={value => value && setDate(value)} required />
     <section className="slot-section" aria-label="Horarios del día" aria-busy={loading}>
       {loading ? <p className="form-hint" role="status">Consultando horarios…</p> : <SlotGrid franjas={franjas} value={slot} onChange={setSlot} />}
       {!loading && franjas.length > 0 && !franjas.some(item => item.estado === 'libre') && <Notice kind="info">No quedan franjas libres este día. Prueba con otra fecha.</Notice>}
+      <NoStaffNotice error={action.error} />
     </section>
     {error && <Notice kind="error">{error}</Notice>}
     <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={!chosen} label="Reprogramar" /></div></form></Dialog>;
@@ -356,6 +365,8 @@ type Category = CategoryRef & { description: string; specialties: string[]; keyw
 type RequestAction = 'asignar' | 'rechazar' | 'cancelar';
 type CategoryRequest = {
   id: string; patientId: string; patientName: string | null; record: string | null; categories: CategoryRef[]; specialties: string[]; franja: Franja; note: string | null;
+  /** Lote 5 S6: false when no doctor of those specialties has a published shift soon; older APIs leave it out. Age and sex only for roles that see them. */
+  staffAvailable?: boolean; patientAge?: number | null; patientSex?: string | null;
   preferredDoctorId: string | null; preferredDoctorName: string | null; state: 'pendiente' | 'asignada' | 'rechazada' | 'cancelada'; rejectionReason: string | null;
   appointment: { id: string; doctorId: string; doctorName: string; start: string; end: string } | null; createdAt: string; version: number;
   allowedActions: RequestAction[]; blockedActions: { action: RequestAction; reason: string }[];
@@ -377,7 +388,7 @@ const CategoryList = ({ categories }: { categories: CategoryRef[] }) => <ul clas
  * not appointments, so no other segment lists them); «Por confirmar» are appointments the patient chose in the app.
  * Actions come from the server. The search of the toolbar filters both groups.
  */
-function RequestInbox({ api, version, requests, query, asked, busy, onDirect, onDialog, onAssigned }: { api: Api; version: number; requests: Remote<CategoryRequest[]>; query: string; asked: Appointment[]; busy: boolean; onDirect: (row: Appointment, name: AppointmentAction) => void; onDialog: (row: Appointment, name: Dialogued) => void; onAssigned: () => void }) {
+function RequestInbox({ api, version, requests, query, asked, busy, cardError, onDirect, onDialog, onAssigned }: { api: Api; version: number; requests: Remote<CategoryRequest[]>; query: string; asked: Appointment[]; busy: boolean; cardError: (id: string) => ApiError | null; onDirect: (row: Appointment, name: AppointmentAction) => void; onDialog: (row: Appointment, name: Dialogued) => void; onAssigned: () => void }) {
   // #9: Inicio links «Asignar» as #/citas?asignar=<id>; that request opens here and the address is cleaned.
   const [linked] = useState(() => readHashParams().get('asignar'));
   const [open, setOpen] = useState<string | null>(linked), [rejecting, setRejecting] = useState<CategoryRequest | null>(null), [done, setDone] = useState<string | null>(null);
@@ -393,16 +404,17 @@ function RequestInbox({ api, version, requests, query, asked, busy, onDirect, on
         <header className="rq-group-head"><h3>Por asignar <span className="rq-count">{pending.length}</span></h3><p>Pidieron cita por motivo, sin médico ni hora: asigna ambos o rechaza con el motivo.</p></header>
         <ol className="rq-list">{pending.map(r => <li key={r.id} id={`rq-${r.id}`} className="rq-row">
       <div className="rq-main">
-        <p className="rq-who"><strong>{r.patientName ?? 'Paciente'}</strong>{r.record && <code>{r.record}</code>}<small className="muted">{formatRelative(r.createdAt)}</small></p>
+        <p className="rq-who"><strong>{r.patientName ?? 'Paciente'}</strong>{r.record && <code>{r.record}</code>}{patientFacts(r) && <span className="rq-facts">{patientFacts(r)}</span>}<small className="muted">{formatRelative(r.createdAt)}</small></p>
         <CategoryList categories={r.categories} />
         {r.note && <p className="rq-note">{r.note}</p>}
         <p className="rq-meta">Prefiere: <strong>{FRANJA_LABEL[r.franja]}</strong>{r.preferredDoctorName && <> · con {r.preferredDoctorName}</>}</p>
       </div>
       <div className="row-actions">
-        {r.allowedActions.includes('asignar') && <button type="button" className="row-action rq-primary" aria-expanded={open === r.id} aria-label={`Asignar · ${r.patientName ?? 'Paciente'}`} onClick={() => setOpen(open === r.id ? null : r.id)}>Asignar</button>}
+        {r.allowedActions.includes('asignar') && r.staffAvailable !== false && <button type="button" className="row-action rq-primary" aria-expanded={open === r.id} aria-label={`Asignar · ${r.patientName ?? 'Paciente'}`} onClick={() => setOpen(open === r.id ? null : r.id)}>Asignar</button>}
         {r.allowedActions.includes('rechazar') && <button type="button" className="row-action" aria-label={`Rechazar · ${r.patientName ?? 'Paciente'}`} onClick={() => setRejecting(r)}>Rechazar</button>}
       </div>
-      {open === r.id && <AssignPanel api={api} version={version} request={r} onCancel={() => setOpen(null)} onSaved={message => finish(message)} />}
+      {r.staffAvailable === false && <Notice kind="warning">{NO_STAFF_REQUEST_TEXT}</Notice>}
+      {open === r.id && r.staffAvailable !== false && <AssignPanel api={api} version={version} request={r} onCancel={() => setOpen(null)} onSaved={message => finish(message)} />}
     </li>)}</ol></section>}
       {asked.length > 0 && <section className="rq-group" aria-label="Por confirmar">
         <header className="rq-group-head"><h3>Por confirmar <span className="rq-count">{asked.length}</span></h3><p>Eligieron médico y hora en la app: confirma la cita o recházala con el motivo.</p></header>
@@ -416,6 +428,7 @@ function RequestInbox({ api, version, requests, query, asked, busy, onDirect, on
       <div className="row-actions">
         {(['confirmar', 'rechazar'] as const).map(name => <ActionButton key={name} action={name} allowed={a.allowedActions ?? []} blocked={a.blockedActions ?? []} disabled={busy} className={name === 'confirmar' ? 'row-action rq-primary' : 'row-action'} aria-label={`${ACTION_LABEL[name]} · ${a.patientName}`} onClick={() => name === 'confirmar' ? onDirect(a, name) : onDialog(a, name)}>{ACTION_LABEL[name]}</ActionButton>)}
       </div>
+      <NoStaffNotice error={cardError(a.id)} />
     </li>)}</ol></section>}</>
       : <p className="rq-empty" role="status"><Icon name="check" size={18} />{query.trim() ? 'Ninguna solicitud coincide con la búsqueda.' : 'Al día: no hay solicitudes por atender.'}</p>}</RemoteState>
     {rejecting && <RejectRequestDialog api={api} request={rejecting} onClose={() => setRejecting(null)} onSaved={() => finish('Solicitud rechazada; el paciente verá el motivo.')} />}
@@ -453,10 +466,11 @@ function AssignPanel({ api, version, request, onCancel, onSaved }: { api: Api; v
   async function save(e: FormEvent) {
     e.preventDefault();
     if (!chosen || !doctor) return;
-    if (await action.run(`/citas/solicitudes-categoria/${request.id}/asignar`, { version: request.version, doctorId, start: chosen.start, end: chosen.end })) onSaved(`Cita asignada: ${request.patientName ?? 'paciente'} con ${doctor.label}, ${formatDateTime(chosen.start)}.`);
+    const saved = await action.run(`/citas/solicitudes-categoria/${request.id}/asignar`, { version: request.version, doctorId, start: chosen.start, end: chosen.end });
+    if (saved) onSaved(`Cita asignada: ${request.patientName ?? 'paciente'} con ${doctor.label}, ${formatDateTime(chosen.start)}.`);
   }
   return <form className="rq-assign" onSubmit={save} aria-label={`Asignar médico y hora a ${request.patientName ?? 'paciente'}`}>
-    <WriteError error={action.error} onReload={onCancel} reloadLabel="Cerrar y actualizar la bandeja" />
+    <WriteError error={besidesNoStaff(action.error)} onReload={onCancel} reloadLabel="Cerrar y actualizar la bandeja" />
     {suggestion.loading && !suggestion.data ? <p className="form-hint" role="status">Buscando el primer hueco…</p>
       : suggested_ ? <p className="form-hint">Primer hueco en la franja pedida: <strong>{formatDayHeading(suggested_.date!)}</strong>, {timeOnly(suggested_.start!)} con {suggested_.doctorName}.</p>
       : suggestion.data ? <Notice kind="info">Nadie tiene hueco en esa franja en las próximas 2 semanas. Elige otra fecha o todo el día.</Notice> : null}
@@ -467,6 +481,7 @@ function AssignPanel({ api, version, request, onCancel, onSaved }: { api: Api; v
       <p className="form-hint">{wholeDay ? 'Todo el día.' : `Solo la franja que pidió: ${FRANJA_LABEL[request.franja].toLowerCase()}.`} {request.franja !== 'cualquiera' && <button type="button" className="cl-link-button" onClick={() => setWholeDay(!wholeDay)}>{wholeDay ? `Solo ${FRANJA_LABEL[request.franja].toLowerCase()}` : 'Ver todo el día'}</button>}</p>
       {!doctorId ? <p className="form-hint">Elige un médico para ver sus horarios.</p> : loading ? <p className="form-hint" role="status">Consultando horarios…</p> : <SlotGrid franjas={franjas} value={slot} onChange={setSlot} />}
       {!loading && doctorId && availability && !franjas.some(f => f.estado === 'libre') && <Notice kind="info">No quedan franjas libres {wholeDay ? 'este día' : 'en esa franja'}. Prueba otra fecha, otro médico o todo el día.</Notice>}
+      <NoStaffNotice error={action.error} />
     </section>
     {error && <Notice kind="error">{error}</Notice>}
     <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onCancel} disabled={action.busy}>Cerrar</button><SaveButton busy={action.busy} disabled={!chosen || !doctor} label="Confirmar cita" /></div>
@@ -527,8 +542,8 @@ function CategoryRequestForm({ api, version, onClose, onSaved }: { api: Api; ver
     <fieldset className="rq-fieldset"><legend>¿Por qué necesitas la cita?</legend>
       <LiveSearch label="Buscar motivo" placeholder="Ej.: fiebre, piel, embarazo, presión" value={query} onChange={setQuery} />
       <p className="form-hint" aria-live="polite">{picked.length ? `${picked.length} de 3 elegidos.` : 'Elige uno o hasta tres. Si no sabes cuál, elige Consulta general.'}</p>
-      <RemoteState state={categories} skeletonRows={3}>{() => visible.length ? <div className="rq-cat-grid">{visible.map(c => <button type="button" key={c.code} className="rq-cat" aria-pressed={picked.includes(c.code)} disabled={!picked.includes(c.code) && picked.length >= 3} onClick={() => toggle(c.code)}>
-        <span className="rq-cat-icon"><CategoryGlyph icon={c.icon} /></span><span><strong>{c.name}</strong><small>{c.description}</small></span></button>)}</div>
+      <RemoteState state={categories} skeletonRows={3}>{() => visible.length ? <div className="rq-cat-sections">{categorySections(visible).map(section => <section key={section.id} className="rq-cat-section" aria-label={section.title}><h3>{section.title}</h3><div className="rq-cat-grid">{section.categories.map(c => <button type="button" key={c.code} className="rq-cat" aria-pressed={picked.includes(c.code)} disabled={!picked.includes(c.code) && picked.length >= 3} onClick={() => toggle(c.code)}>
+        <span className="rq-cat-icon"><CategoryGlyph icon={c.icon} /></span><span><strong>{c.name}</strong><small>{c.description}</small></span></button>)}</div></section>)}</div>
         : <p className="form-hint" role="status">Ningún motivo coincide. Prueba otra palabra o elige Consulta general.</p>}</RemoteState>
     </fieldset>
     <div className="rq-fieldset"><span className="eyebrow">Franja preferida</span><ChipGroup label="Franja preferida" value={franja} onChange={setFranja} options={(['manana', 'tarde', 'cualquiera'] as Franja[]).map(value => ({ value, label: FRANJA_LABEL[value] }))} /></div>

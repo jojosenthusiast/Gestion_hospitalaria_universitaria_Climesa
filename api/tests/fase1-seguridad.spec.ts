@@ -9,7 +9,7 @@ const MINUTE = 60_000;
 
 describe('Fase 1 · seguridad (SEG-03, SEG-08, SEG-09, API-19)', () => {
   let t: TestApp;
-  beforeAll(async () => { t = await createTestApp(now); await t.enroll('MED'); });
+  beforeAll(async () => { t = await createTestApp(now, { nursingByArea: true }); await t.enroll('MED'); });
   afterAll(async () => { await t?.close(); });
 
   const hospitalize = async (code: string) => {

@@ -36,3 +36,5 @@
 .qb-card-menu-item { min-height: 40px; padding: 6px var(--space-2); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 600; text-align: left; cursor: pointer; }
 .qb-card-menu-item:hover, .qb-card-menu-item:focus-visible { background: var(--soft); color: var(--primary-text); }
 @media (pointer: coarse) { .qb-card-menu-item { min-height: 44px; } }
+/* Lote 5 S6: age and sex under the name, for roles that see them. */
+.qb-facts { display: block; font-size: var(--text-sm); font-weight: 400; color: var(--muted); }

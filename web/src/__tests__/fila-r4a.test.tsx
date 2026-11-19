@@ -98,7 +98,7 @@ describe('Fila · resumen arriba', () => {
     expect(within(dock).getByText('En atención').parentElement!.textContent).toMatch(/CON\s*3/);
     // «Sigue» is the server proposal (number 9) once it arrives.
     await vi.waitFor(() => expect(within(dock).getByText('Sigue').parentElement!.textContent).toMatch(/CON\s*9/));
-    expect(within(dock).getByText('2 en espera')).toBeTruthy();
+    expect(within(dock).getByText('2 en espera · 2 de fila, 0 con cita')).toBeTruthy();
     expect(within(dock).getByText('20 min')).toBeTruthy();
     expect(within(dock).getByText('Máxima 30 min')).toBeTruthy();
     const buttons = within(dock).getAllByRole('button');

@@ -124,8 +124,8 @@ describe('inicio por rol', () => {
     expect(screen.queryByText('consulta.leer')).toBeNull();
   });
 
-  it('ENF, MED, AST, PAR y PAC también tienen su tablero', async () => {
-    for (const [rol, titulo] of [['ENF', 'Limpiezas por registrar o verificar'], ['MED', 'Mi agenda de hoy'], ['AST', 'Quién sigue'], ['PAR', 'Servicio en curso'], ['PAC', 'Mis próximas citas']] as const) {
+  it('ENF, MED, PAR y PAC también tienen su tablero; ENF absorbe «Quién sigue» del asistente', async () => {
+    for (const [rol, titulo] of [['ENF', 'Limpiezas por registrar o verificar'], ['MED', 'Mi agenda de hoy'], ['ENF', 'Quién sigue'], ['PAR', 'Servicio en curso'], ['PAC', 'Mis próximas citas']] as const) {
       montar(perfil(rol));
       expect(await screen.findByRole('region', { name: titulo }), rol).toBeTruthy();
       cleanup();

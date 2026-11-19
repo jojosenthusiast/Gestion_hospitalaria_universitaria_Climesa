@@ -31,7 +31,10 @@ export class InvitationsService {
   private async validateRoles(c:PoolClient,roles:string[],staffId?:string|null,invitation=false){
     const found=(await c.query('SELECT codigo,requiere_personal,invitable FROM acceso.rol WHERE codigo=ANY($1::text[])',[roles])).rows;
     if(found.length!==roles.length)throw new BadRequestException('Selecciona roles válidos y sin duplicados.');
-    if(invitation&&found.some(r=>!r.invitable))throw new ProblemException('rol_no_invitable',400,'El paciente crea su cuenta en la app CLIMESA para Android o iOS. Invita solo roles de personal.','roles');
+    const notInvitable=invitation?found.filter(r=>!r.invitable):[];
+    // A non-invitable work role (requiere_personal) is a retired role, such as AST after Lote 5; otherwise it is the patient.
+    if(notInvitable.some(r=>r.requiere_personal))throw new ProblemException('rol_no_invitable',400,'Ese rol ya no se asigna. Elige un rol vigente, por ejemplo Enfermería.','roles');
+    if(notInvitable.length)throw new ProblemException('rol_no_invitable',400,'El paciente crea su cuenta en la app CLIMESA para Android o iOS. Invita solo roles de personal.','roles');
     if(found.some(r=>r.requiere_personal)&&!staffId)throw new BadRequestException('Vincula la cuenta a una persona del directorio para asignar un rol de trabajo.');
     if(staffId&&!(await c.query('SELECT id FROM personal.persona WHERE id=$1 AND activo',[staffId])).rowCount)throw new BadRequestException('La persona vinculada debe estar activa.');
   }

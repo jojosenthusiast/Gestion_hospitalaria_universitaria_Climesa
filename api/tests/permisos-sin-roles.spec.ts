@@ -99,7 +99,8 @@ describe('Decisiones por rol que ahora salen del catálogo de permisos',()=>{
    for(const role of ['REC','MED','JOP'])expect((await call(role,'GET','/auth/me')).body.canInviteAdmin).toBe(false);
   });
   test('los roles de trabajo exigen persona del directorio; JOP y DPD no; PAC no se invita (MA-CTA-02)',async()=>{
-   for(const role of ['REC','AST','ENF','MED','LAB','PAR']){
+   // AST is retired (Lote 5 S10) and no longer invitable: tests/asistente-en-enfermeria.spec.ts.
+   for(const role of ['REC','ENF','MED','LAB','PAR']){
     const without=await invite('ADM',[role]);expect([role,without.status]).toEqual([role,400]);
     const withStaff=await invite('ADM',[role],await staff());expect([role,withStaff.status]).toEqual([role,201]);
    }
