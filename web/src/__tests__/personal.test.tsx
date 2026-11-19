@@ -72,7 +72,7 @@ describe('W07 · personal de salud', () => {
   it('sin el permiso personal.gestionar no ofrece registrar ni editar', async () => {
     montar({ perfil: jefatura });
     await screen.findByText('Ana Ficticia Prueba');
-    expect(screen.queryByRole('button', { name: /Registrar personal/ })).toBeNull();
+    expect(screen.queryByRole('button', { name: /Agregar personal/ })).toBeNull();
     expect(screen.queryByRole('button', { name: /Editar/ })).toBeNull();
   });
 });
@@ -81,8 +81,8 @@ describe('W07 · crear personal', () => {
   it('registra a una persona nueva con POST /personal, sin versión ni motivo, y recarga el directorio', async () => {
     const api = montar();
     await screen.findByText('Ana Ficticia Prueba');
-    await userEvent.click(screen.getByRole('button', { name: /Registrar personal/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Registrar personal' });
+    await userEvent.click(screen.getByRole('button', { name: /Agregar personal/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Agregar personal' });
     await escribir(dialogo, 'Nombres', 'María José');
     await escribir(dialogo, 'Apellidos', 'Prueba Ejemplo');
     await userEvent.selectOptions(within(dialogo).getByLabelText('Función'), 'enfermero');
@@ -90,7 +90,7 @@ describe('W07 · crear personal', () => {
     await userEvent.selectOptions(within(dialogo).getByLabelText('Área de trabajo'), 'a-1');
     await escribir(dialogo, /Teléfono/, '7000-1111');
     await escribir(dialogo, /DUI/, '00000001-8');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Registrar persona/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Agregar persona/ }));
     await waitFor(() => expect(escrituras(api)).toHaveLength(1));
     const [ruta, cuerpo, metodo] = escrituras(api)[0] as [string, Record<string, unknown>, string | undefined];
     expect(ruta).toBe('/personal');
@@ -98,7 +98,7 @@ describe('W07 · crear personal', () => {
     expect(cuerpo).toMatchObject({ givenNames: 'María José', surnames: 'Prueba Ejemplo', type: 'enfermero', specialty: 'Cuidados intensivos', areaId: 'a-1', phone: '7000-1111', dui: '00000001-8' });
     expect(cuerpo).not.toHaveProperty('version');
     expect(cuerpo).not.toHaveProperty('reason');
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Registrar personal' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Agregar personal' })).toBeNull());
     expect(api.request.mock.calls.filter(([p]) => p === '/personal').length).toBeGreaterThanOrEqual(2);
   });
 
@@ -109,12 +109,12 @@ describe('W07 · crear personal', () => {
   ])('antes de enviar rechaza %s con un mensaje en español', async (_caso, etiqueta, valor, mensaje) => {
     const api = montar();
     await screen.findByText('Ana Ficticia Prueba');
-    await userEvent.click(screen.getByRole('button', { name: /Registrar personal/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Registrar personal' });
+    await userEvent.click(screen.getByRole('button', { name: /Agregar personal/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Agregar personal' });
     await escribir(dialogo, 'Nombres', 'María');
     await escribir(dialogo, 'Apellidos', 'Prueba');
     await escribir(dialogo, etiqueta, valor);
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Registrar persona/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Agregar persona/ }));
     expect(await within(dialogo).findByText(mensaje)).toBeTruthy();
     expect(escrituras(api)).toHaveLength(0);
   });
@@ -122,11 +122,11 @@ describe('W07 · crear personal', () => {
   it('muestra en español el rechazo de validación que devuelve la API y conserva lo escrito', async () => {
     const api = montar({ escritura: async () => { throw new ApiError('Selecciona un área válida.', 400, 'validacion'); } });
     await screen.findByText('Ana Ficticia Prueba');
-    await userEvent.click(screen.getByRole('button', { name: /Registrar personal/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Registrar personal' });
+    await userEvent.click(screen.getByRole('button', { name: /Agregar personal/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Agregar personal' });
     await escribir(dialogo, 'Nombres', 'María');
     await escribir(dialogo, 'Apellidos', 'Prueba');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Registrar persona/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Agregar persona/ }));
     expect(await within(dialogo).findByText('Selecciona un área válida.')).toBeTruthy();
     expect((within(dialogo).getByLabelText('Nombres') as HTMLInputElement).value).toBe('María');
     expect(escrituras(api)).toHaveLength(1);
@@ -137,8 +137,8 @@ describe('W07 · especialidad desde el catálogo (obs. 9)', () => {
   it('un médico nuevo parte en Medicina general y solo ofrece especialidades médicas', async () => {
     montar();
     await screen.findByText('Ana Ficticia Prueba');
-    await userEvent.click(screen.getByRole('button', { name: /Registrar personal/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Registrar personal' });
+    await userEvent.click(screen.getByRole('button', { name: /Agregar personal/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Agregar personal' });
     const especialidad = within(dialogo).getByLabelText('Especialidad') as HTMLSelectElement;
     expect(especialidad.value).toBe('Medicina general');
     expect([...especialidad.options].map(o => o.value)).toEqual(['Medicina general', 'Cardiología', 'Medicina interna']);
@@ -147,8 +147,8 @@ describe('W07 · especialidad desde el catálogo (obs. 9)', () => {
   it('al cambiar la función cambia la lista y los tipos sin catálogo no llevan especialidad', async () => {
     const api = montar();
     await screen.findByText('Ana Ficticia Prueba');
-    await userEvent.click(screen.getByRole('button', { name: /Registrar personal/ }));
-    const dialogo = await screen.findByRole('dialog', { name: 'Registrar personal' });
+    await userEvent.click(screen.getByRole('button', { name: /Agregar personal/ }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Agregar personal' });
     await userEvent.selectOptions(within(dialogo).getByLabelText('Función'), 'enfermero');
     const area = within(dialogo).getByLabelText(/Área de enfermería/) as HTMLSelectElement;
     expect([...area.options].map(o => o.value)).toEqual(['', 'Cuidados intensivos']);
@@ -157,7 +157,7 @@ describe('W07 · especialidad desde el catálogo (obs. 9)', () => {
     expect(within(dialogo).getByText(/no lleva especialidad/)).toBeTruthy();
     await escribir(dialogo, 'Nombres', 'Rosa');
     await escribir(dialogo, 'Apellidos', 'Ejemplo');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Registrar persona/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: /Agregar persona/ }));
     await waitFor(() => expect(escrituras(api)).toHaveLength(1));
     expect((escrituras(api)[0] as [string, Record<string, unknown>])[1]).toMatchObject({ type: 'recepcionista', specialty: '' });
   });
@@ -196,24 +196,44 @@ describe('W07 · editar e inactivar', () => {
     expect(escrituras(api)).toHaveLength(0);
   });
 
-  it('inactiva a la persona desmarcando "activa" con motivo y envía active en falso', async () => {
+  it('desactiva con el bote de basura: confirma que no borra, pide motivo y envía la ficha completa con active en falso', async () => {
     const api = montar();
-    const dialogo = await abrirEdicion();
-    await userEvent.click(within(dialogo).getByLabelText('Persona activa en el directorio'));
-    await escribir(dialogo, 'Motivo de la modificación', 'Renuncia de la persona');
-    await userEvent.click(within(dialogo).getByRole('button', { name: 'Guardar cambios' }));
+    await screen.findByText('Ana Ficticia Prueba');
+    await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Desactivar a Ana Ficticia Prueba' });
+    expect(within(dialogo).getByText(/Desactivar no borra a nadie/)).toBeTruthy();
+    await escribir(dialogo, 'Motivo', 'Renuncia de la persona');
+    await userEvent.click(within(dialogo).getByRole('button', { name: /^Desactivar$/ }));
     await waitFor(() => expect(escrituras(api)).toHaveLength(1));
-    expect(escrituras(api)[0][1]).toMatchObject({ active: false, version: 3, reason: 'Renuncia de la persona' });
+    expect(escrituras(api)[0][0]).toBe('/personal/s-1');
+    expect(escrituras(api)[0][1]).toMatchObject({ givenNames: 'Ana', surnames: 'Ficticia Prueba', type: 'medico', areaId: 'a-1', active: false, version: 3, reason: 'Renuncia de la persona' });
+    expect(escrituras(api)[0][2]).toBe('PATCH');
   });
 
-  it('si la API rechaza inactivar por turnos futuros, muestra su mensaje y deja el diálogo abierto', async () => {
-    montar({ escritura: async () => { throw new ApiError('Reasigna o cancela sus turnos futuros antes de inactivarla.', 409, 'conflicto'); } });
-    const dialogo = await abrirEdicion();
-    await userEvent.click(within(dialogo).getByLabelText('Persona activa en el directorio'));
-    await escribir(dialogo, 'Motivo de la modificación', 'Renuncia de la persona');
+  it('la edición de una persona activa no ofrece inactivarla (eso es «Desactivar»); una inactiva se reactiva desde «Editar»', async () => {
+    const api = montar();
+    const activa = await abrirEdicion();
+    expect(within(activa).queryByLabelText(/persona activa en el directorio/)).toBeNull();
+    await userEvent.click(within(activa).getByRole('button', { name: 'Cancelar' }));
+    await userEvent.selectOptions(screen.getByLabelText('Mostrar'), 'inactivos');
+    await userEvent.click(await screen.findByRole('button', { name: 'Editar' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Editar persona' });
+    await userEvent.click(within(dialogo).getByLabelText('Reactivar: persona activa en el directorio'));
+    await escribir(dialogo, 'Motivo de la modificación', 'Regresa a laborar');
     await userEvent.click(within(dialogo).getByRole('button', { name: 'Guardar cambios' }));
+    await waitFor(() => expect(escrituras(api)).toHaveLength(1));
+    expect(escrituras(api)[0]).toEqual(['/personal/s-2', expect.objectContaining({ active: true, version: 1 }), 'PATCH']);
+  });
+
+  it('si la API rechaza desactivar por turnos futuros, muestra su mensaje y deja el diálogo abierto', async () => {
+    montar({ escritura: async () => { throw new ApiError('Reasigna o cancela sus turnos futuros antes de inactivarla.', 409, 'conflicto'); } });
+    await screen.findByText('Ana Ficticia Prueba');
+    await userEvent.click(screen.getByRole('button', { name: 'Desactivar' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Desactivar a Ana Ficticia Prueba' });
+    await escribir(dialogo, 'Motivo', 'Renuncia de la persona');
+    await userEvent.click(within(dialogo).getByRole('button', { name: /^Desactivar$/ }));
     expect(await within(dialogo).findByText(/Reasigna o cancela sus turnos futuros/)).toBeTruthy();
-    expect(screen.getByRole('dialog', { name: 'Editar persona' })).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Desactivar a Ana Ficticia Prueba' })).toBeTruthy();
   });
 
   it('ante un conflicto de versión (409) avisa que la ficha cambió y recarga el directorio al cerrar', async () => {
