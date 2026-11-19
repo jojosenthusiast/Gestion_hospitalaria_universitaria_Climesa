@@ -123,7 +123,7 @@ private struct DoctorPatientVitals: View {
                     if items.isEmpty { Text("consultation.vitals.none").font(Typo.small).foregroundStyle(Theme.muted) }
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, sign in
                         if index > 0 { Divider().overlay(Theme.line) }
-                        ListRow(title: ConsultationView.vitalsText(sign), meta: ClimesaDates.short(sign.takenAt))
+                        VitalSignsBlock(sign: sign, when: ClimesaDates.short(sign.takenAt))
                     }
                     // D5 · rule 8: recording depends on `signos.registrar`, never on the role.
                     if VitalsEntryRules.canRecord(account.profile) {

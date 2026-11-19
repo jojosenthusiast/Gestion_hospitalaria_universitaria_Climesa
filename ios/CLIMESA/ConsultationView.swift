@@ -109,6 +109,30 @@ struct ConsultationView: View {
     @State private var labOrders: Part<[LabOrder]>?
     /// Exams ordered from this device in this consultation (stored per account), so a repeat is blocked at once.
     @State private var orderedHere: Set<String> = []
+    @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dynamicTypeSize) private var typeSize
+    /// Lote 5 S12: the consultation's version as the API last answered it (a save or autosave moves it), so the next
+    /// write never sends a stale one and hits `version_conflicto`.
+    @State private var version: Int?
+    /// Lote 5 S3: the red errors under motive and plan after a sign attempt with them empty.
+    @State private var signErrors: [String: String] = [:]
+    /// The field the screen scrolls to after a failed sign ("reason" or "plan").
+    @State private var scrollTarget: String?
+    /// Lote 5 S12: the autosave waits 2.5 s after the last key (`debounce`); `inflight` is the PATCH being sent, which
+    /// «Guardar borrador» and «Firmar consulta» wait for so two writes never race on one version.
+    @State private var debounce: Task<Void, Never>?
+    @State private var inflight: Task<Int?, Never>?
+    @State private var autosaving = Submission()
+    /// «Borrador guardado…» with the time of the last save that reached the server.
+    @State private var savedFeedback: String?
+    /// Lote 5 S12: «Lo que pidió el paciente».
+    @State private var context: VisitContext?
+    /// Lote 5 S12: another unsigned consultation of this doctor, asked about before starting a new one.
+    @State private var unsignedOther: UnsignedConsultation?
+    @State private var askingUnsigned = false
+    /// «Reanudarla» switched this screen to that consultation.
+    @State private var resumedOther: UnsignedConsultation?
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
@@ -122,6 +146,7 @@ struct ConsultationView: View {
     }
 
     private var patientName: String {
+        if let resumedOther { return resumedOther.patientName ?? L.text("day.patient.unknown") }
         switch origin {
         case let .appointment(entry): return entry.patientName ?? L.text("day.patient.unknown")
         case let .ticket(ticket): return ticket.patientName ?? String(format: L.text("consultation.ticket"), ticket.number)
@@ -129,25 +154,241 @@ struct ConsultationView: View {
         }
     }
 
+    /// The consultation is loaded, open and this doctor may write it: the bottom action bar shows.
+    private var editableNow: Bool {
+        guard consultationId != nil, let value = detail.value else { return false }
+        return ConsultationRules.isEditable(value.consultation.state) && profile.hasPermission("consulta.registrar")
+    }
+
     var body: some View {
-        ScreenFrame(title: "consultation.title") {
-            Text(verbatim: patientName).font(Typo.heading).foregroundStyle(Theme.ink)
-            if consultationId == nil {
-                WriteNotice(submission: starting, reload: loadDetail)
-                if starting.busy || !autoStartTried { Skeleton(rows: 3) }
-                else if profile.hasPermission("consulta.iniciar") {
-                    // Only after the automatic start failed: retry by hand.
-                    ClimesaButton(title: L.text("consultation.start"), loading: starting.busy) { Task { await start() } }
-                }
-            } else {
-                LoadState(loader: detail, retry: loadDetail) { value in
-                    editor(value)
+        // Own frame instead of `ScreenFrame`: the scroll reader reaches the first error and the action bar docks at the bottom.
+        ScrollViewReader { proxy in
+            ScrollView {
+                VStack(alignment: .leading, spacing: Spacing.gap) { content }
+                    .padding(Spacing.gutter).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
+            }
+            .dismissibleKeyboard()
+            .background(Theme.bg).navigationTitle(Text("consultation.title")).navigationBarTitleDisplayMode(.inline)
+            .climesaNavBar()
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { LiveClock() } }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                if editableNow, let value = detail.value { actionBar(value) }
+            }
+            .onChange(of: scrollTarget) { _, target in
+                guard let target else { return }
+                scrollTarget = nil
+                // The step that holds the field draws first; then the field comes into view.
+                Task { @MainActor in
+                    try? await Task.sleep(nanoseconds: 150_000_000)
+                    withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(target, anchor: .top) }
                 }
             }
         }
-        .task { await autoStart() }
+        .task { await prepare() }
         .task(id: "\(consultationId ?? "-")|\(live.snapshot.version(.consultations))") { await loadDetail() }
         .onChange(of: currentDraft) { _, _ in persistDraft() }
+        .onChange(of: "\(reason)\u{1F}\(exam)\u{1F}\(plan)") { _, _ in
+            if !signErrors.isEmpty { signErrors = ConsultationForm.errors(reason: reason, plan: plan) }
+            scheduleAutosave()
+        }
+        // Lote 5 S12: leaving the app saves the draft on the server at once (the device copy stays as a fallback).
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background || phase == .inactive { Task { await autosaveNow() } }
+        }
+        .onDisappear { debounce?.cancel(); Task { await autosaveNow() } }
+        .alert(unsignedOther.map(ConsultationGuard.title) ?? "", isPresented: $askingUnsigned, presenting: unsignedOther) { other in
+            Button(L.text("consultation.unsigned.resume")) { resume(other) }
+            Button(L.text("consultation.unsigned.startAnyway")) { Task { await start() } }
+            Button(L.text("consultation.unsigned.back"), role: .cancel) { dismiss() }
+        } message: { _ in
+            Text("consultation.unsigned.message")
+        }
+    }
+
+    @ViewBuilder private var content: some View {
+        Text(verbatim: patientName).font(Typo.heading).foregroundStyle(Theme.ink)
+        contextCard
+        if consultationId == nil {
+            WriteNotice(submission: starting, reload: loadDetail)
+            if starting.busy || !autoStartTried { Skeleton(rows: 3) }
+            else if profile.hasPermission("consulta.iniciar") {
+                // Only after the automatic start failed: retry by hand.
+                ClimesaButton(title: L.text("consultation.start"), loading: starting.busy) { Task { await start() } }
+            }
+        } else {
+            LoadState(loader: detail, retry: loadDetail) { value in
+                editor(value)
+            }
+        }
+    }
+
+    /// Lote 5 S12 · «Lo que pidió el paciente»: the appointment's reason and categories, or the queue number it came from.
+    @ViewBuilder private var contextCard: some View {
+        if let context {
+            SectionCard(title: L.text("consultation.context.title")) {
+                HStack(spacing: Spacing.s) {
+                    Text(verbatim: context.origin).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    if let priority = context.priority { PriorityBadge(priority) }
+                }
+                if !context.categories.isEmpty {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+                        CategoryMarks(categories: context.categories)
+                        Text(verbatim: context.categories.map(\.name).joined(separator: ", ")).font(Typo.label).foregroundStyle(Theme.ink)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                if let reason = context.reason {
+                    Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                } else if context.categories.isEmpty {
+                    Text("consultation.context.none").font(Typo.small).foregroundStyle(Theme.muted)
+                }
+            }
+        }
+    }
+
+    /// Lote 5 S12 · bottom action bar: what signing still needs, the save feedback, «Guardar borrador» (edit) and
+    /// «Firmar consulta» (the one primary), above the keyboard and the home indicator.
+    @ViewBuilder private func actionBar(_ value: ConsultationDetail) -> some View {
+        let stacked = typeSize.isAccessibilitySize
+        let buttons = stacked
+            ? AnyLayout(VStackLayout(alignment: .leading, spacing: Spacing.s))
+            : AnyLayout(HStackLayout(spacing: Spacing.m))
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            if let missing = FormCopy.missingSummary(ConsultationForm.missingNames(reason: reason, plan: plan)) {
+                Label { Text(verbatim: missing).fixedSize(horizontal: false, vertical: true) } icon: { ClimesaIcon(.alert, size: 14) }
+                    .font(Typo.small).foregroundStyle(signErrors.isEmpty ? Theme.warning : Theme.danger)
+            } else if let savedFeedback {
+                SavedFeedback(text: savedFeedback)
+            }
+            buttons {
+                CardActionButton(title: L.text("consultation.save"), role: .edit, loading: saving.busy && !signFlow) { Task { await saveDraft(value) } }
+                    .disabled(signFlow || signing.busy)
+                CardActionButton(title: L.text("consultation.sign"), role: .primary, icon: .check, loading: signFlow || signing.busy) { trySign() }
+                    .disabled(saving.busy)
+            }
+        }
+        .padding(.horizontal, Spacing.gutter).padding(.vertical, Spacing.m)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.surface)
+        .overlay(alignment: .top) { Rectangle().fill(Theme.line).frame(height: 1) }
+        .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
+            Button(L.text("consultation.sign")) { Task { await sign(value) } }
+        } message: {
+            Text(verbatim: ConsultationRecordRules.signRecap(diagnoses: value.diagnoses.count, prescriptions: value.prescriptions.count,
+                                                            labOrders: labOrders?.value?.count, notesPending: notesPending, unsentWork: unsentWork))
+        }
+    }
+
+    /// Lote 5 S3: signing without motive or plan marks each empty field in red and scrolls to the first one.
+    private func trySign() {
+        signErrors = ConsultationForm.errors(reason: reason, plan: plan)
+        guard let first = ConsultationForm.missing(reason: reason, plan: plan).first else { confirmingSign = true; return }
+        if let target = ConsultationRecordRules.stepFor(reason: reason, plan: plan) { step = target }
+        scrollTarget = first
+    }
+
+    // MARK: - Contexto y consulta sin firmar (S12)
+
+    /// Reads what the patient asked for and, before a new start, whether another consultation is still unsigned.
+    private func prepare() async {
+        await loadContext()
+        guard !autoStartTried else { return }
+        if consultationId == nil && profile.hasPermission("consulta.iniciar") {
+            let open = (try? await account.client().get("/consultas/sin-firmar", as: [UnsignedConsultation].self)) ?? []
+            if let other = ConsultationGuard.unsignedOther(open, current: nil) {
+                unsignedOther = other
+                askingUnsigned = true
+                autoStartTried = true
+                return
+            }
+        }
+        await autoStart()
+    }
+
+    private func resume(_ other: UnsignedConsultation) {
+        resumedOther = other
+        context = nil
+        consultationId = other.id
+        Task { await loadContext() }
+    }
+
+    private func loadContext() async {
+        if let resumedOther {
+            context = await resumedContext(appointmentId: resumedOther.appointmentId, ticketId: resumedOther.ticketId)
+            return
+        }
+        switch origin {
+        case let .appointment(entry): context = ConsultationContextRules.of(appointment: entry, ticket: nil)
+        case let .ticket(ticket): context = ConsultationContextRules.of(appointment: nil, ticket: ticket)
+        case let .resume(open): context = await resumedContext(appointmentId: open.appointmentId, ticketId: open.ticketId)
+        }
+    }
+
+    /// A resumed consultation finds its appointment in the agenda or its number in today's queue; best effort.
+    private func resumedContext(appointmentId: String?, ticketId: String?) async -> VisitContext? {
+        guard let api = try? account.client() else { return nil }
+        if let appointmentId, profile.hasPermission("consulta.iniciar"),
+           let agenda = try? await api.get("/consultas/agenda", as: [AgendaEntry].self),
+           let entry = agenda.first(where: { $0.appointmentId == appointmentId }) {
+            return ConsultationContextRules.of(appointment: entry, ticket: nil)
+        }
+        if let ticketId, profile.hasPermission("fila.ver"),
+           let tickets = try? await api.get("/fila", as: [QueueTicket].self),
+           let ticket = tickets.first(where: { $0.id == ticketId }) {
+            return ConsultationContextRules.of(appointment: nil, ticket: ticket)
+        }
+        return nil
+    }
+
+    // MARK: - Autoguardado en el servidor (S12)
+
+    /// Restarts the 2.5 s wait after each key; only an open consultation this doctor writes is saved.
+    private func scheduleAutosave() {
+        debounce?.cancel()
+        guard editableNow, prefilledVersion != nil else { return }
+        debounce = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: ConsultationAutosave.debounceNanoseconds)
+            guard !Task.isCancelled else { return }
+            await autosaveNow()
+        }
+    }
+
+    /// Sends the notes now if they differ from the server's, through the draft PATCH with the current version. Waits for
+    /// a save already in flight first. Returns the version the API answered with, or the known one when nothing was sent.
+    @discardableResult
+    private func autosaveNow() async -> Int? {
+        if let running = inflight { _ = await running.value }
+        guard editableNow, let id = consultationId, let current = version,
+              ConsultationRules.draftErrors(reason: reason, physicalExam: exam, plan: plan).isEmpty,
+              ConsultationAutosave.changed(savedReason: savedNotes.reason, savedExam: savedNotes.exam, savedPlan: savedNotes.plan,
+                                           reason: reason, exam: exam, plan: plan),
+              !saving.busy, !signFlow
+        else { return version }
+        let notes = (reason, exam, plan)
+        let body = ConsultationUpdateBody(version: current, reason: notes.0, physicalExam: notes.1, plan: notes.2)
+        let task = Task { @MainActor () -> Int? in
+            var saved: ConsultationCommandResult?
+            let ok = await autosaving.run("autosave", body: body) { key in
+                saved = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
+            }
+            guard ok, let saved else { return nil }
+            version = saved.version
+            savedNotes = ConsultationDraft(reason: notes.0, exam: notes.1, plan: notes.2)
+            savedFeedback = ConsultationAutosave.savedText(Date())
+            persistDraft()
+            return saved.version
+        }
+        inflight = task
+        let result = await task.value
+        inflight = nil
+        return result ?? version
+    }
+
+    /// Cancels the pending wait and joins a PATCH in flight, so the next write uses the version it returned.
+    private func joinAutosave() async {
+        debounce?.cancel()
+        debounce = nil
+        if let running = inflight { _ = await running.value }
     }
 
     // MARK: - Borrador local
@@ -226,6 +467,9 @@ struct ConsultationView: View {
         // Sweep #7: the signature result shows after signing too, when the screen is no longer editable.
         WriteNotice(submission: signing, reload: loadDetail)
         if editable {
+            // Lote 5 S3: one legend for the whole form; motive and plan carry the «*».
+            RequiredLegend()
+            WriteNotice(submission: autosaving, reload: loadDetail)
             // S9 / I-19: consultation → procedures → prescription and exams → close, one step at a time. Each step
             // carries how many records it already holds.
             ConsultationStepBar(current: $step, counts: stepCounts(value))
@@ -290,18 +534,12 @@ struct ConsultationView: View {
             Text("consultation.sign.saveFailed").font(Typo.small).foregroundStyle(Theme.danger).fixedSize(horizontal: false, vertical: true)
             WriteNotice(submission: saving, reload: loadDetail)
         }
-        // S7: the API signs only with a reason and a plan: the button stays disabled with what is missing under it, and a
-        // link takes the doctor there, instead of failing.
-        let blocker = ConsultationRecordRules.signBlocker(reason: reason, plan: plan)
-        ClimesaButton(title: L.text("consultation.sign"), kind: kind(.sign, editable: editable), loading: signFlow || signing.busy || saving.busy,
-                      blockedReason: blocker) { confirmingSign = true }
-            .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
-                Button(L.text("consultation.sign")) { Task { await sign(value) } }
-            } message: {
-                Text(verbatim: ConsultationRecordRules.signRecap(diagnoses: value.diagnoses.count, prescriptions: value.prescriptions.count,
-                                                                labOrders: labOrders?.value?.count, notesPending: notesPending, unsentWork: unsentWork))
-            }
-        if blocker != nil, let target = ConsultationRecordRules.stepFor(reason: reason, plan: plan) {
+        // S7 / Lote 5 S12: «Firmar consulta» lives in the bottom bar; here the doctor reads what is still missing and a
+        // link takes them to that step.
+        if let blocker = ConsultationRecordRules.signBlocker(reason: reason, plan: plan) {
+            Text(verbatim: blocker).font(Typo.small).foregroundStyle(signErrors.isEmpty ? Theme.muted : Theme.danger).fixedSize(horizontal: false, vertical: true)
+        }
+        if ConsultationRecordRules.signBlocker(reason: reason, plan: plan) != nil, let target = ConsultationRecordRules.stepFor(reason: reason, plan: plan) {
             Button { step = target } label: {
                 Label { Text(verbatim: String(format: L.text("consultation.sign.goTo"), L.text(target.titleKey))) } icon: { ClimesaIcon(.back, size: 18) }
                     .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
@@ -340,35 +578,32 @@ struct ConsultationView: View {
             if signs.isEmpty { Text("consultation.vitals.none").font(Typo.small).foregroundStyle(Theme.muted) }
             ForEach(Array(signs.enumerated()), id: \.element.id) { index, sign in
                 if index > 0 { Divider().overlay(Theme.line) }
-                ListRow(title: Self.vitalsText(sign), meta: ClimesaDates.display(sign.takenAt, .time))
+                VitalSignsBlock(sign: sign, when: ClimesaDates.display(sign.takenAt, .time))
             }
         }
     }
 
+    /// Lote 5 S3: full names, never «FC», «Temp» or «PA» (`ConsultationVitalsText`).
     static func vitalsText(_ sign: ConsultationDetail.VitalSigns) -> String {
-        var parts: [String] = []
-        if let s = sign.systolic, let d = sign.diastolic { parts.append("PA \(s)/\(d)") }
-        if let value = sign.heartRate { parts.append("FC \(value)") }
-        if let value = sign.respiratoryRate { parts.append("FR \(value)") }
-        if let value = sign.temperature { parts.append("T \(value) °C") }
-        if let value = sign.oxygenSaturation { parts.append("SpO₂ \(value) %") }
-        if let value = sign.weightKg { parts.append("\(value) kg") }
-        if let value = sign.heightCm { parts.append("\(value) cm") }
-        return parts.isEmpty ? "—" : parts.joined(separator: " · ")
+        let parts = ConsultationVitalsText.parts(sign)
+        return parts.isEmpty ? "—" : parts.map { "\($0.name): \($0.value)" }.joined(separator: " · ")
     }
 
     @ViewBuilder private func draftSection(_ value: ConsultationDetail, editable: Bool, planOnly: Bool) -> some View {
         SectionCard(title: L.text(planOnly ? "consultation.plan" : "consultation.notes")) {
             if editable {
                 if planOnly {
-                    MedicoTextArea(label: L.text("consultation.plan"), text: $plan, error: draftErrors["plan"], lines: 2...6)
+                    MedicoTextArea(label: L.text("consultation.plan"), text: $plan, error: draftErrors["plan"] ?? signErrors[ConsultationForm.planKey],
+                                   lines: 2...6, required: true)
+                        .id(ConsultationForm.planKey)
                 } else {
-                    MedicoTextArea(label: L.text("consultation.reason"), text: $reason, error: draftErrors["reason"], lines: 2...5)
+                    MedicoTextArea(label: L.text("consultation.reason"), text: $reason, error: draftErrors["reason"] ?? signErrors[ConsultationForm.reasonKey],
+                                   lines: 2...5, required: true)
+                        .id(ConsultationForm.reasonKey)
                     MedicoTextArea(label: L.text("consultation.exam"), text: $exam, error: draftErrors["physicalExam"])
                 }
                 draftStatus
                 WriteNotice(submission: saving, reload: loadDetail)
-                ClimesaButton(title: L.text("consultation.save"), kind: kind(.save, editable: editable), loading: saving.busy) { Task { await save(value) } }
             } else {
                 if let text = value.consultation.reason, !text.isEmpty { readOnly("consultation.reason", text) }
                 if let text = value.consultation.physicalExam, !text.isEmpty { readOnly("consultation.exam", text) }
@@ -547,8 +782,12 @@ struct ConsultationView: View {
     private func loadDetail() async {
         guard let id = consultationId else { return }
         await detail.load { try await account.client().get("/consultas/\(id)/detalle", as: ConsultationDetail.self) }
+        // The server's version is the one the next write sends (a live event after our own save brings it too).
+        if let summary = detail.value?.consultation, inflight == nil { version = summary.version }
         // El borrador se llena con lo guardado al abrir y cuando otra versión reemplaza la que se estaba editando.
-        if let summary = detail.value?.consultation, prefilledVersion == nil || saving.lastFailure?.isVersionConflict == true {
+        if let summary = detail.value?.consultation, prefilledVersion == nil || saving.lastFailure?.isVersionConflict == true
+            || autosaving.lastFailure?.isVersionConflict == true {
+            autosaving.clearFailure()
             let firstFill = prefilledVersion == nil
             reason = summary.reason ?? ""; exam = summary.physicalExam ?? ""; plan = summary.plan ?? ""
             savedNotes = ConsultationDraft(reason: reason, exam: exam, plan: plan)
@@ -616,14 +855,18 @@ struct ConsultationView: View {
     /// Saves the notes; returns the consultation version the API answered with, or nil if the save did not go through.
     @discardableResult
     private func save(_ value: ConsultationDetail) async -> Int? {
+        // Lote 5 S12: a pending autosave goes first, so this save sends the version it returned (no 409).
+        await joinAutosave()
         draftErrors = ConsultationRules.draftErrors(reason: reason, physicalExam: exam, plan: plan)
         guard draftErrors.isEmpty, let id = consultationId else { return nil }
-        let body = ConsultationUpdateBody(version: value.consultation.version, reason: reason, physicalExam: exam, plan: plan)
+        let body = ConsultationUpdateBody(version: version ?? value.consultation.version, reason: reason, physicalExam: exam, plan: plan)
         var saved: ConsultationCommandResult?
-        let ok = await saving.run(id, body: body, success: L.text("consultation.saved")) { key in
+        let ok = await saving.run(id, body: body) { key in
             saved = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
         }
         if ok {
+            if let saved { version = saved.version }
+            savedFeedback = ConsultationAutosave.savedByHandText(Date())
             // The notes are saved, so an earlier "not saved" error next to «Firmar» no longer applies.
             signSaveFailed = false
             // Las notas ya están en la API: el borrador local solo conserva el diagnóstico o la receta pendientes.
@@ -682,12 +925,19 @@ struct ConsultationView: View {
         await loadLabOrders()
     }
 
+    /// «Guardar borrador»: the notes go to the server now; the bar says «Borrador guardado a las …».
+    private func saveDraft(_ value: ConsultationDetail) async {
+        if notesPending { await save(value) } else { await joinAutosave(); savedFeedback = ConsultationAutosave.savedByHandText(Date()) }
+    }
+
     private func sign(_ value: ConsultationDetail) async {
         guard !signFlow, let id = consultationId else { return }
+        // Lote 5 S12: join a pending autosave before anything else, so the sign uses the version it returned.
+        await joinAutosave()
         signFlow = true
         signSaveFailed = false
         defer { signFlow = false }
-        var version = value.consultation.version
+        var version = self.version ?? value.consultation.version
         // Signing never loses typed notes: they are saved first, then the consultation is signed at the version the
         // save returned.
         if notesPending {
@@ -834,5 +1084,34 @@ private struct PrescriptionLineFields: View {
             }
             FormField(label: L.text("rx.instructions"), text: $line.instructions)
         }
+    }
+}
+
+/// Lote 5 S3: one vital-signs reading, each sign on its own line with its full name and unit.
+struct VitalSignsBlock: View {
+    let sign: ConsultationDetail.VitalSigns
+    let when: String
+
+    var body: some View {
+        let parts = ConsultationVitalsText.parts(sign)
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            Text(verbatim: when).font(Typo.time).foregroundStyle(Theme.muted)
+            if parts.isEmpty { Text(verbatim: "—").font(Typo.body).foregroundStyle(Theme.muted) }
+            ForEach(parts, id: \.name) { part in
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+                        Text(verbatim: part.name).font(Typo.small).foregroundStyle(Theme.muted)
+                        Spacer(minLength: Spacing.s)
+                        Text(verbatim: part.value).font(Typo.label).foregroundStyle(Theme.ink)
+                    }
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(verbatim: part.name).font(Typo.small).foregroundStyle(Theme.muted)
+                        Text(verbatim: part.value).font(Typo.label).foregroundStyle(Theme.ink)
+                    }
+                }
+            }
+        }
+        .padding(.vertical, Spacing.s)
+        .accessibilityElement(children: .combine)
     }
 }

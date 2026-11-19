@@ -227,7 +227,7 @@ struct ProfileContent:View {
             SectionCard {
                 HStack(spacing:Spacing.m) {
                     Text(verbatim:String((profile.name.isEmpty ? profile.email:profile.name).prefix(1)).uppercased()).font(Typo.heading)
-                        .foregroundStyle(Theme.primaryText).frame(width:48,height:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
+                        .foregroundStyle(Theme.primaryText).frame(minWidth:48,minHeight:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
                     VStack(alignment:.leading,spacing:2) {
                         Text(verbatim:profile.name.isEmpty ? L.text("profile.welcome"):profile.name).font(Typo.heading).foregroundStyle(Theme.ink)
                         Text(verbatim:profile.email).font(Typo.small).foregroundStyle(Theme.muted)
