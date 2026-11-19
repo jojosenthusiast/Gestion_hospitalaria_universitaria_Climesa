@@ -107,7 +107,7 @@ describe('ficha con una sola acción principal (S13)', () => {
     montar();
     await userEvent.click(await screen.findByRole('button', { name: /Abrir ficha de Ana Ficticia/ }));
     await screen.findByRole('button', { name: /Editar datos/ });
-    const principales = [...document.querySelectorAll('.primary-button')].map(b => b.textContent);
+    const principales = [...document.querySelectorAll('.primary-button, .crud-create')].map(b => b.textContent);
     expect(principales).toEqual(['Registrar paciente']);
   });
 });

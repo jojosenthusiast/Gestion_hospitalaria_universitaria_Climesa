@@ -6,13 +6,13 @@ import { can, type AccessProfile, type Api } from '../../lib/api';
 import { patientPicker } from '../appointments';
 import { Dialog, Empty, RemoteState, WriteError, formatDateTime, useAction, useData } from '../common';
 import {
-  MOTIVE_MAX, VISITOR_LIMIT, admissionBody, categoryNames, feasibilityQuery, groupBeds, initialForm, isImmediate, isolationNames, originNames, originRecordLabel, salvadorInstant, salvadorNow, stepError, stepTitles, stepsFor, visitorError,
+  MOTIVE_MAX, VISITOR_LIMIT, admissionBody, doctorChoice, categoryNames, feasibilityQuery, groupBeds, initialForm, isImmediate, isolationNames, originNames, originRecordLabel, salvadorInstant, salvadorNow, stepError, stepTitles, stepsFor, visitorError,
   type AdmissionForm, type StepId, type BedPick, type Category, type CategoryCount, type Check, type DoctorPick, type IsolationType, type OriginKind, type OriginRecord,
 } from './admission-rules';
 import './admission-stepper.css';
 
 type BedMap = { categories: CategoryCount[]; beds: BedPick[] };
-type DoctorRow = { id: string; name: string; specialty: string | null; available: boolean; reason: string | null };
+type DoctorRow = { id: string; name: string; specialty: string | null; available: boolean; reason: string | null; hasAccount?: boolean };
 const originKinds: OriginKind[] = ['cita', 'emergencia', 'ambulancia', 'consulta'];
 
 /**
@@ -82,14 +82,16 @@ function OriginStep({ api, form, update }: StepProps & { api: Api }) {
 
 function DoctorStep({ api, form, update }: StepProps & { api: Api }) {
   const at = useMemo(() => { const instant = new Date(salvadorInstant(form.at)); return Number.isNaN(instant.getTime()) ? null : instant.toISOString(); }, [form.at]);
-  const doctors = useData<DoctorRow[]>(api, `/admisiones/medicos-disponibles${at ? `?at=${encodeURIComponent(at)}` : ''}`, 0, true);
+  const raw = useData<DoctorRow[]>(api, `/admisiones/medicos-disponibles${at ? `?at=${encodeURIComponent(at)}` : ''}`, 0, true);
+  // Obs. 21: a doctor without an app account could never sign the discharge, so the row is off with that reason.
+  const doctors = { ...raw, data: raw.data?.map(doctorChoice) ?? null };
   const items = (doctors.data ?? []).map(d => ({ id: d.id, label: d.name, detail: d.specialty ?? 'Medicina general', disabled: !d.available, reason: d.reason ?? undefined }));
   // Si cambia la hora y el médico elegido ya no tiene turno, se apaga y la validación lo avisa.
   useEffect(() => {
     if (!form.doctor || !doctors.data) return;
     const current = doctors.data.find(d => d.id === form.doctor!.id);
     if (current && (current.available !== form.doctor.available || current.reason !== form.doctor.reason)) update({ doctor: { id: current.id, label: current.name, available: current.available, reason: current.reason } });
-  }, [doctors.data]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [raw.data]); // eslint-disable-line react-hooks/exhaustive-deps
   const pick = (item: PickerItem | null) => {
     const row = item && doctors.data?.find(d => d.id === item.id);
     update({ doctor: row ? { id: row.id, label: row.name, available: row.available, reason: row.reason } as DoctorPick : null });

@@ -1,0 +1,25 @@
+/*
+ * Owner obs. 21: the admissions table header.
+ * `.data-workbench` scrolls sideways (overflow-x: auto), which makes it the scroll container of the sticky header. The
+ * shared `top: 76px` (the app bar height) then pushed the header 76px down inside the card, over the first row, and left
+ * an empty band above it. On wide screens the card no longer clips, so the header sticks under the app bar of the page;
+ * on narrower screens (the card may scroll sideways) the header stays in place.
+ */
+.admission-table th { top: 0; }
+@media (min-width: 1200px) {
+  .data-workbench.admission-workbench { overflow: visible; }
+  .admission-table th { top: 76px; }
+  .admission-table thead th:first-child { border-top-left-radius: 6px; }
+  .admission-table thead th:last-child { border-top-right-radius: 6px; }
+}
+
+/* One primary next step, the menu of the rest, then the edit and destructive CRUD buttons. */
+.admission-row-actions { display: flex; align-items: flex-start; justify-content: flex-end; gap: 10px; }
+.admission-row-actions .crud-actions { flex: 0 0 auto; }
+@media (max-width: 767px) { .admission-row-actions { justify-content: flex-start; flex-wrap: wrap; } }
+
+/* A doctor without an app account cannot sign the discharge: a visible warning, not a grey footnote. */
+.admission-no-account { margin-top: 6px; display: grid; gap: 2px; padding: 6px 10px; border-left: 3px solid var(--priority-urgente); border-radius: 4px; background: color-mix(in srgb, var(--priority-urgente) 10%, var(--surface)); }
+.admission-no-account strong { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; }
+.admission-no-account strong svg { color: var(--priority-urgente); flex: 0 0 auto; }
+.admission-no-account small { color: var(--ink); font-size: 13px; }

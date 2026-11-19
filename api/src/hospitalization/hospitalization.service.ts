@@ -194,8 +194,10 @@ export class HospitalizationService {
       await this.checkIntake(c, dto);
       const patient = (await c.query(`SELECT id,coalesce(sexo,'no_registrado') AS sex FROM pacientes.paciente WHERE id=$1`, [dto.patientId])).rows[0] as Row | undefined;
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
-      const doctor = (await c.query(`SELECT id FROM personal.persona WHERE id=$1 AND tipo='medico' AND activo`, [dto.attendingDoctorId])).rows[0];
+      const doctor = (await c.query(`SELECT p.id,EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS "hasAccount" FROM personal.persona p WHERE p.id=$1 AND p.tipo='medico' AND p.activo`, [dto.attendingDoctorId])).rows[0] as Row | undefined;
       if (!doctor) throw new BadRequestException('El médico tratante no está activo.');
+      // Owner obs. 21: the attending doctor signs the discharge from the app (D-02); without an account nobody could sign it.
+      if (!doctor.hasAccount) throw new ProblemException('validacion', 400, 'El médico tratante no tiene cuenta en la app; no podría firmar el alta. Elige un médico con cuenta.', 'attendingDoctorId');
       if (dto.bedId) {
         if (!hasPermission(actor, 'camas.asignar')) throw new ForbiddenException('No tienes permiso para asignar cama.');
         if (!dto.bedVersion) throw new BadRequestException('Indica la versión de la cama elegida.');

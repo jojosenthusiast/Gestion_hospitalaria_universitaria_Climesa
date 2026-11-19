@@ -58,7 +58,7 @@ export class AdmissionIntakeService {
     return this.db.transaction(async c => (await c.query(`SELECT p.id,p.nombres||' '||p.apellidos AS name,p.especialidad AS specialty,
         EXISTS(SELECT 1 FROM personal.turno t WHERE t.persona_id=p.id AND t.estado IN ('publicado','en_curso') AND t.periodo @> $1::timestamptz) AS available,
         EXISTS(SELECT 1 FROM acceso.usuario u WHERE u.persona_personal_id=p.id AND u.estado='activo') AS "hasAccount"
-      FROM personal.persona p WHERE p.tipo='medico' AND p.activo ORDER BY p.nombres,p.apellidos LIMIT 200`, [at])).rows.map(r => ({ ...r, reason: r.available ? null : 'Sin turno en ese horario' })));
+      FROM personal.persona p WHERE p.tipo='medico' AND p.activo ORDER BY p.nombres,p.apellidos LIMIT 200`, [at])).rows.map(r => ({ ...r, reason: !r.hasAccount ? 'No tiene cuenta en la app: no podrá firmar el alta.' : r.available ? null : 'Sin turno en ese horario' })));
   }
 
   private async patientSex(c: PoolClient, patientId: string) {

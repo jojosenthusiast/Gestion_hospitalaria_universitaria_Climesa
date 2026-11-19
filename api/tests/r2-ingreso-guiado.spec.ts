@@ -106,6 +106,19 @@ describe('Ingreso guiado · motivo, origen, turno y cama (observación 11)', () 
     expect(later.body.find((d: any) => d.id === doctorId)).toMatchObject({ available: false, reason: 'Sin turno en ese horario' });
   });
 
+  test('obs. 21: un médico sin cuenta en la app sale apagado con su motivo y el alta del ingreso lo rechaza', async () => {
+    const noAccount = await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT 'Médico','Sin Cuenta Ingreso','medico',id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`);
+    const body = await valid({ attendingDoctorId: noAccount.id });
+    const listed = (await t.call('REC', 'GET', `/admisiones/medicos-disponibles?at=${now.toISOString()}`)).body.find((d: any) => d.id === noAccount.id);
+    expect(listed).toMatchObject({ available: true, hasAccount: false, reason: 'No tiene cuenta en la app: no podrá firmar el alta.' });
+    const before = await t.one<{ n: number }>('SELECT count(*)::int AS n FROM hospitalizacion.admision');
+    const refused = await post(body);
+    expect(refused.status).toBe(400);
+    expect(refused.body).toMatchObject({ codigo: 'validacion', campo: 'attendingDoctorId' });
+    expect(refused.body.detail ?? refused.body.title ?? JSON.stringify(refused.body)).toMatch(/no tiene cuenta en la app/);
+    expect(await t.one<{ n: number }>('SELECT count(*)::int AS n FROM hospitalizacion.admision')).toEqual(before);
+  });
+
   test('mapa de camas: conteo por categoría, compatibilidad por sexo y una sugerencia', async () => {
     const man = await t.patient({ sex: 'masculino' }), woman = await t.patient({ sex: 'femenino' });
     const first = await t.admissionBody(woman, { requestedCategory: 'semiprivada', isolation: false });

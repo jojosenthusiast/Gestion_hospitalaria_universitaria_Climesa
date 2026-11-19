@@ -43,8 +43,11 @@ export function sanitizePatientFilters(filters: PatientFilters, profile: AccessP
   };
 }
 
-export function patientListPath(filters: PatientFilters, typed: string) {
-  const params = new URLSearchParams({ limit: '50' });
+/** The list API returns at most this many patients per page (`limit` maximum); `offset` pages through the rest. */
+export const PATIENT_PAGE = 50;
+export function patientListPath(filters: PatientFilters, typed: string, offset = 0) {
+  const params = new URLSearchParams({ limit: String(PATIENT_PAGE) });
+  if (offset > 0) params.set('offset', String(offset));
   if (typed) params.set('query', typed);
   if (filters.estado && filters.estado !== 'todos') params.set('estado', filters.estado);
   if (filters.situacion) params.set('situacion', filters.situacion);

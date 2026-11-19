@@ -9,6 +9,8 @@ import { useQuickAction } from './personal/accion';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
 import './hospitalization/admission-actions.css';
 import { RowMenu } from '../components/row-menu';
+import { CrudActions, CrudButton } from '../components/system';
+import './hospitalization/admission-table.css';
 import { useFold } from '../components/fold';
 
 const ADMISSIONS_SHOWN = 20;
@@ -36,11 +38,50 @@ function availableActions(row: Admission) {
   return rowActions.filter(a => allowed.includes(a.key) && (a.key !== 'trasladar' || !!row.occupationId));
 }
 
-/** D-02: la Web no firma el alta. Mientras el médico no la firma, la fila dice quién la firma y cuándo se pidió. */
+/** Destructive row actions: they close the admission, so they take the red CRUD «deactivate» button (S0). */
+const DESTRUCTIVE: RowAction[] = ['cancelar', 'anular'];
+const labelOf = (key: RowAction) => rowActions.find(a => a.key === key)!.label;
+const lacksAccount = (row: Admission) => row.attendingDoctorHasAccount === false && (row.state === 'pendiente_cama' || row.state === 'hospitalizado');
+
+/**
+ * Owner obs. 21: one primary next step per row, the rest under «Más acciones». Changing the attending doctor is an edit
+ * (blue pencil) and cancel/annul are destructive (red trash), so the cell never stacks long links. When the attending
+ * doctor has no app account, reassigning is the next step, so it becomes the row's primary action.
+ */
+export function admissionRowPlan(row: Admission) {
+  const available = availableActions(row).map(a => a.key);
+  const destructive = available.filter(k => DESTRUCTIVE.includes(k));
+  const reassign = available.includes('reasignar_tratante');
+  const flow = available.filter(k => !DESTRUCTIVE.includes(k) && k !== 'reasignar_tratante');
+  const primary: RowAction | null = reassign && (lacksAccount(row) || !flow.length) ? 'reasignar_tratante' : flow[0] ?? null;
+  return { primary, more: flow.filter(k => k !== primary), edit: reassign && primary !== 'reasignar_tratante', destructive };
+}
+
+function AdmissionRowActions({ row, onPick }: { row: Admission; onPick: (kind: RowAction) => void }) {
+  const plan = admissionRowPlan(row);
+  const menu = [plan.primary, ...plan.more].filter((k): k is RowAction => !!k).map(key => ({ key, label: labelOf(key), onClick: () => onPick(key) }));
+  if (!menu.length && !plan.edit && !plan.destructive.length) return null;
+  return <div className="admission-row-actions">
+    <RowMenu label={row.patientName} actions={menu} />
+    {(plan.edit || plan.destructive.length > 0) && <CrudActions>
+      {plan.edit && <CrudButton kind="edit" iconOnly label={labelOf('reasignar_tratante')} onClick={() => onPick('reasignar_tratante')} />}
+      {plan.destructive.map(key => <CrudButton key={key} kind="deactivate" iconOnly label={labelOf(key)} onClick={() => onPick(key)} />)}
+    </CrudActions>}
+  </div>;
+}
+
+/**
+ * D-02: la Web no firma el alta. Mientras el médico no la firma, la fila dice quién la firma y cuándo se pidió.
+ * Obs. 21: a doctor without an app account can never sign, so the row shows it as a warning and says what to do.
+ */
 function DischargeWait({ row }: { row: Admission }) {
+  if (lacksAccount(row)) return <span className="admission-no-account" role="note">
+    <strong><Icon name="alert" size={16} />Médico tratante sin cuenta en la app</strong>
+    <small>{`${row.attendingDoctorName ? `${row.attendingDoctorName} no` : 'No'} podrá firmar el alta. ${row.allowedActions?.includes('reasignar_tratante') ? 'Reasígnalo a un médico con cuenta.' : 'Pide a Jefatura de Operaciones que lo reasigne.'}`}</small>
+  </span>;
   if (row.state !== 'hospitalizado' || row.allowedActions?.includes('firmar_alta')) return null;
   return <>
-    <small className="admission-wait">{row.attendingDoctorHasAccount === false ? `El médico tratante no tiene cuenta en la app; ${row.allowedActions?.includes('reasignar_tratante') ? 'reasígnalo' : 'Jefatura de operaciones debe reasignarlo'}` : row.dischargeRequestedAt ? `Esperando alta médica: la firma ${row.attendingDoctorName || 'el médico tratante'} desde la app` : `El alta la firma ${row.attendingDoctorName || 'el médico tratante'} desde la app`}</small>
+    <small className="admission-wait">{row.dischargeRequestedAt ? `Esperando alta médica: la firma ${row.attendingDoctorName || 'el médico tratante'} desde la app` : `El alta la firma ${row.attendingDoctorName || 'el médico tratante'} desde la app`}</small>
     {row.dischargeRequestedAt && <small>{`Alta solicitada ${relativeTime(row.dischargeRequestedAt)}`}</small>}
   </>;
 }
@@ -87,13 +128,13 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
         <button type="button" className="secondary-button" onClick={() => setDialog({ kind: 'asignar_cama', admission: row })}>Ingresar</button>
       </li>)}</ul>
     </section>}
-    <section className="data-workbench"><RemoteState state={data}>{rows => rows.length ? <><table className="record-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{fold.shown.map(row => <tr key={row.id}>
+    <section className="data-workbench admission-workbench"><RemoteState state={data}>{rows => rows.length ? <><table className="record-table admission-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{fold.shown.map(row => <tr key={row.id}>
       <td data-label="Paciente" className="cell-person"><strong>{row.patientName}</strong><small>{[row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null, row.postSurgical ? 'Posquirúrgico' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</td>
       <td data-label="Origen">{originNames[row.origin] ?? row.origin}</td>
       <td data-label="Categoría">{categoryNames[row.requestedCategory] ?? row.requestedCategory}{row.authorized && <small>Excepción autorizada</small>}</td>
       <td data-label="Estado"><Tag value={row.state} /><DischargeWait row={row} /></td>
       <td data-label="Cama">{row.bed ? <span className="nowrap-code">{row.bed}</span> : 'Sin cama'}</td>
-      <td data-label="Acción" className="cell-actions"><RowMenu label={row.patientName} actions={availableActions(row).map(a => ({ key: a.key, label: a.label, onClick: () => setDialog({ kind: a.key, admission: row }) }))} /></td>
+      <td data-label="Acción" className="cell-actions"><AdmissionRowActions row={row} onPick={kind => setDialog({ kind, admission: row })} /></td>
     </tr>)}</tbody></table>{fold.more}</> : <Empty title="No hay admisiones activas" description="Las nuevas admisiones aparecerán aquí cuando Recepción o Jefatura las registren." />}</RemoteState></section>
     {creating && <AdmissionStepper api={api} profile={profile} patient={prefill} onClose={() => { setCreating(false); setPrefill(null); }} onSaved={() => { setCreating(false); setPrefill(null); setDone('Ingreso registrado; aparece en la lista.'); data.refresh(); }} />}
     {dialog?.kind === 'asignar_cama' && <BedSuggestionDialog api={api} admission={dialog.admission} version={version} onClose={close} onSaved={saved} />}

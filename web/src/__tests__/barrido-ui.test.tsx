@@ -51,7 +51,7 @@ describe('noise', () => {
   it('patient rows show only the exceptional state, never «Activo» on every row', async () => {
     const api = { request: vi.fn(async () => rows), write: vi.fn() } as unknown as Api;
     render(<PatientsPage api={api} profile={perfil} version={0} />);
-    const list = await screen.findByRole('list', { name: 'Pacientes encontrados' });
+    const list = await screen.findByRole('table', { name: 'Pacientes encontrados' });
     expect(within(list).queryByText('Activo')).toBeNull();
     expect(within(list).getByText('Inactivo')).toBeTruthy();
   });
