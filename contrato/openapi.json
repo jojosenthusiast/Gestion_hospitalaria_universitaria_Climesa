@@ -23555,6 +23555,14 @@
             "type": "string",
             "nullable": true
           },
+          "isolation": {
+            "type": "boolean",
+            "description": "Lote 5: quien ocupa o tiene reservada la cama está en aislamiento"
+          },
+          "roomIsolation": {
+            "type": "boolean",
+            "description": "Lote 5: la habitación tiene un paciente en aislamiento (sus otras camas no se asignan)"
+          },
           "occupant": {
             "type": "string",
             "description": "Nombre completo o iniciales según camas.ver_ocupante; solo si la cama tiene paciente"
@@ -25013,6 +25021,16 @@
       "QueueTicketResponse": {
         "type": "object",
         "properties": {
+          "patientAge": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Lote 5: edad en años el día del número; solo con pacientes.ver_nacimiento"
+          },
+          "patientSex": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lote 5: sexo del paciente; solo con pacientes.ver_ficha"
+          },
           "id": {
             "type": "string",
             "format": "uuid"
@@ -25383,6 +25401,17 @@
           },
           "llamados": {
             "type": "integer"
+          },
+          "officeId": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true,
+            "description": "Lote 5: consultorio con que se llamó (el enviado o el que ya tenía)"
+          },
+          "officeCode": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lote 5: código del consultorio, por ejemplo P1-CON-02"
           },
           "numero": {
             "type": "integer"
@@ -26913,6 +26942,16 @@
           "record": {
             "type": "string",
             "nullable": true
+          },
+          "patientAge": {
+            "type": "integer",
+            "nullable": true,
+            "description": "Lote 5: edad en años hoy; solo con pacientes.ver_nacimiento"
+          },
+          "patientSex": {
+            "type": "string",
+            "nullable": true,
+            "description": "Lote 5: sexo del paciente; solo con pacientes.ver_ficha"
           },
           "categories": {
             "type": "array",

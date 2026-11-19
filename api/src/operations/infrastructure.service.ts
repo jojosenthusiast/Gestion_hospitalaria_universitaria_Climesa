@@ -27,7 +27,8 @@ export class InfrastructureService {
       EXISTS(SELECT 1 FROM infra.limpieza_cama l WHERE l.cama_id=b.cama_id AND l.verificada_en IS NULL) AS "cleaningPending",
       EXISTS(SELECT 1 FROM infra.limpieza_cama l WHERE l.cama_id=b.cama_id AND l.verificada_en IS NULL AND l.limpiada_en IS NOT NULL) AS "cleaningCompleted",
       EXISTS(SELECT 1 FROM infra.limpieza_cama l WHERE l.cama_id=b.cama_id AND l.verificada_en IS NULL AND l.limpiada_por=$1) AS "cleanedByCurrentUser",
-      infra.ruta(b.cama_id) AS path,a.medico_tratante_id,p.id AS "patientId",p.nombres,p.primer_apellido,p.segundo_apellido,o.area_id
+      infra.ruta(b.cama_id) AS path,coalesce(b.aislamiento,false) AS isolation,
+      EXISTS(SELECT 1 FROM infra.v_estado_cama r WHERE r.habitacion_id=b.habitacion_id AND r.aislamiento) AS "roomIsolation",a.medico_tratante_id,p.id AS "patientId",p.nombres,p.primer_apellido,p.segundo_apellido,o.area_id
       FROM infra.v_estado_cama b JOIN infra.espacio c ON c.id=b.cama_id LEFT JOIN hospitalizacion.admision a ON a.id=b.admision_id LEFT JOIN pacientes.paciente p ON p.id=a.paciente_id
       LEFT JOIN LATERAL (WITH RECURSIVE up AS (SELECT id,padre_id,tipo FROM infra.espacio WHERE id=b.habitacion_id UNION ALL SELECT e.id,e.padre_id,e.tipo FROM infra.espacio e JOIN up ON up.padre_id=e.id) SELECT id AS area_id FROM up WHERE tipo='area' LIMIT 1) o ON true ORDER BY b.nivel,b.habitacion,b.codigo`,[actor.id])).rows;
       const areas=actor.staffId?(await c.query('SELECT area_id FROM personal.v_turno_en_curso WHERE persona_id=$1',[actor.staffId])).rows.map(r=>r.area_id):[];

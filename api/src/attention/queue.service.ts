@@ -1,7 +1,7 @@
 import { appointmentCategoriesSql } from './appointment-categories';
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { Actor, contextsOf } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { businessDate, Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
@@ -102,7 +102,7 @@ export class QueueService {
     return this.db.transaction(async c => { const rows = (await c.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
       t.estado AS state,t.consultorio_id AS "officeId",e.codigo AS "officeCode",t.llamados,t.version,t.emitido_en AS "issuedAt",
-      t.prioridad AS priority,
+      t.prioridad AS priority,date_part('year',age(t.fecha,p.nacimiento))::int AS "patientAge",p.sexo AS "patientSex",
       CASE WHEN t.estado='en_espera' THEN (SELECT count(*) FROM atencion.ticket_fila w WHERE w.servicio=t.servicio AND w.fecha=t.fecha AND w.estado='en_espera' AND w.numero<t.numero)::int END AS ahead,
       ap.start AS "appointmentAt",ap.id AS "appointmentId",ap.doctor_id AS "appointmentDoctorId",ap.doctor_name AS "appointmentDoctorName",
       ${appointmentCategoriesSql('ap.id')} AS categories,
@@ -121,7 +121,9 @@ export class QueueService {
       const policies = await this.queuePolicies(c);
       const abilities = { call: contextsOf(actor, 'fila.llamar').length > 0, manage: contextsOf(actor, 'fila.gestionar').length > 0 };
       const now = this.clock.now().valueOf();
-      return rows.map(({ issuedByMe, ...row }) => ({ ...row, area: QUEUE_AREA[row.service] ?? 'GEN', walkIn: !row.appointmentAt, ...policies,
+      // Lote 5: age only with pacientes.ver_nacimiento, sex only with pacientes.ver_ficha (privacidad.md).
+      const seesAge = hasPermission(actor, 'pacientes.ver_nacimiento'), seesSex = hasPermission(actor, 'pacientes.ver_ficha');
+      return rows.map(({ issuedByMe, patientAge, patientSex, ...row }) => ({ ...row, patientAge: seesAge ? patientAge ?? null : null, patientSex: seesSex ? patientSex ?? null : null, area: QUEUE_AREA[row.service] ?? 'GEN', walkIn: !row.appointmentAt, ...policies,
         voidableUntil: this.voidableUntil(row, issuedByMe, now),
         ...queueActions({ state: row.state, calls: row.llamados }, policies, abilities),
         undoActions: queueUndoActions({ state: row.state, calls: row.llamados }, abilities) }));
@@ -276,10 +278,11 @@ export class QueueService {
       const chosen = proposeNextFor(waiting as any[], this.clock.now(), this.doctorOf(actor));
       if (!chosen) throw new ProblemException('fila_sin_espera', 409, waiting.length ? 'Quienes esperan tienen cita con otro médico en este momento.' : 'No hay números en espera en este servicio.');
       const next = chosen.ticket as QueueRow;
-      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [next.id, dto.officeId ?? null, actor.staffId ?? null])).rows[0];
+      const { consultorio_id: officeId, ...row } = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados,consultorio_id`, [next.id, dto.officeId ?? null, actor.staffId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: next.id, patientId: next.patientId ?? undefined, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null, next: true, reason: chosen.reason, ownAppointment: chosen.own } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', next.id, row.version, await this.channels(c, next.patientId));
-      return { ...row, numero: next.numero, patientName: next.patientName, area: QUEUE_AREA[dto.service], reason: chosen.reason, reasonText: nextReasonText(chosen.reason, next.appointmentAt, chosen.own), ownAppointment: chosen.own };
+      const officeCode = officeId ? (await c.query<{ codigo: string }>('SELECT codigo FROM infra.espacio WHERE id=$1', [officeId])).rows[0]?.codigo ?? null : null;
+      return { ...row, officeId: officeId ?? null, officeCode, numero: next.numero, patientName: next.patientName, area: QUEUE_AREA[dto.service], reason: chosen.reason, reasonText: nextReasonText(chosen.reason, next.appointmentAt, chosen.own), ownAppointment: chosen.own };
     });
   }
 

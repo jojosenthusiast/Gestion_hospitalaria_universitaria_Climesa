@@ -335,6 +335,8 @@ export class BedBoardResponse {
   @BoolProp() cleaningCompleted!: boolean;
   @BoolProp() cleanedByCurrentUser!: boolean;
   @StrProp({ nullable: true }) path!: string | null;
+  @BoolProp({ optional: true, description: 'Lote 5: quien ocupa o tiene reservada la cama está en aislamiento' }) isolation?: boolean;
+  @BoolProp({ optional: true, description: 'Lote 5: la habitación tiene un paciente en aislamiento (sus otras camas no se asignan)' }) roomIsolation?: boolean;
   @StrProp({ optional: true, description: 'Nombre completo o iniciales según camas.ver_ocupante; solo si la cama tiene paciente' }) occupant?: string;
   @UuidProp({ optional: true, description: 'Solo con acceso completo al ocupante' }) patientId?: string;
   @BoolProp({ optional: true, description: 'Solo si la cama tiene paciente' }) occupantRestricted?: boolean;

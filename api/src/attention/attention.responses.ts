@@ -366,6 +366,8 @@ export class BlockedQueueActionResponse {
 }
 
 export class QueueTicketResponse {
+  @IntProp({ optional: true, nullable: true, description: 'Lote 5: edad en años el día del número; solo con pacientes.ver_nacimiento' }) patientAge?: number | null;
+  @StrProp({ optional: true, nullable: true, description: 'Lote 5: sexo del paciente; solo con pacientes.ver_ficha' }) patientSex?: string | null;
   @UuidProp() id!: string;
   @EnumProp(QUEUE_SERVICES, 'ServicioFila') service!: string;
   @DateTimeProp({ description: 'Columna date de PostgreSQL serializada como instante (medianoche del servidor)' }) fecha!: string;
@@ -438,6 +440,8 @@ export class QueueCallResponse extends QueueTransitionResponse {
 }
 
 export class QueueCallNextResponse extends QueueCallResponse {
+  @UuidProp({ optional: true, nullable: true, description: 'Lote 5: consultorio con que se llamó (el enviado o el que ya tenía)' }) officeId?: string | null;
+  @StrProp({ optional: true, nullable: true, description: 'Lote 5: código del consultorio, por ejemplo P1-CON-02' }) officeCode?: string | null;
   @IntProp() numero!: number;
   @StrProp({ nullable: true }) patientName!: string | null;
   @EnumProp(AREA_FILA, 'AreaFila') area!: string;

@@ -1,6 +1,6 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { PoolClient } from 'pg';
-import { Actor, contextsOf } from '../platform/actor';
+import { Actor, contextsOf, hasPermission } from '../platform/actor';
 import { channelsFor, patientAccount } from '../platform/channels';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
@@ -68,6 +68,7 @@ export class AppointmentRequestService {
           (SELECT coalesce(json_agg(json_build_object('code',k.codigo,'name',k.nombre,'icon',k.icono) ORDER BY array_position(s.categorias,k.codigo)),'[]')
             FROM atencion.categoria_cita k WHERE k.codigo = ANY(s.categorias)) AS categories,
           (SELECT array_agg(e ORDER BY array_position(s.categorias,k.codigo), o) FROM atencion.categoria_cita k, unnest(k.especialidades) WITH ORDINALITY u(e,o) WHERE k.codigo = ANY(s.categorias)) AS "specialtyOrder",
+          date_part('year',age($3::date,p.nacimiento))::int AS "patientAge",p.sexo AS "patientSex",
           s.franja,s.nota AS note,s.medico_preferido_id AS "preferredDoctorId",
           (SELECT concat_ws(' ',m.nombres,m.apellidos) FROM personal.persona m WHERE m.id=s.medico_preferido_id) AS "preferredDoctorName",
           s.estado AS state,s.motivo_rechazo AS "rejectionReason",s.creado_en AS "createdAt",s.version,
@@ -76,7 +77,7 @@ export class AppointmentRequestService {
         FROM atencion.solicitud_cita s JOIN pacientes.paciente p ON p.id=s.paciente_id
         WHERE ($1::uuid IS NULL OR s.paciente_id=$1) AND (s.estado='pendiente' OR s.creado_en > $2::timestamptz OR $1::uuid IS NOT NULL)
         ORDER BY (s.estado='pendiente') DESC, CASE WHEN s.estado='pendiente' THEN s.creado_en END ASC, s.creado_en DESC, s.id
-        LIMIT 300`, [ownPatient, new Date(this.clock.now().valueOf() - 30 * 86_400_000)])).rows as RequestRow[];
+        LIMIT 300`, [ownPatient, new Date(this.clock.now().valueOf() - 30 * 86_400_000), this.clock.today()])).rows as RequestRow[];
       // Lote 5, S6: whether some doctor of the request's specialties (any doctor when no active doctor has one, as the
       // suggestion does) has a published shift in the next SUGGESTION_DAYS; reception sees the request cannot be booked.
       const now = this.clock.now();
@@ -90,8 +91,11 @@ export class AppointmentRequestService {
       };
       // SEG-02: aggregated read audit with every patient listed.
       await this.commands.audit(c, actor, { action: 'citas.solicitudes_leer', entity: 'solicitud_cita', permission: 'citas.ver', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
-      return rows.map(({ specialtyOrder, appointment, createdAt, ...row }) => ({
+      const seesAge = hasPermission(actor, 'pacientes.ver_nacimiento'), seesSex = hasPermission(actor, 'pacientes.ver_ficha');
+      return rows.map(({ specialtyOrder, appointment, createdAt, patientAge, patientSex, ...row }) => ({
         ...row,
+        patientAge: seesAge ? patientAge ?? null : null,
+        patientSex: seesSex ? patientSex ?? null : null,
         specialties: [...new Set<string>(specialtyOrder ?? [])],
         staffAvailable: staffAvailable(specialtyOrder ?? []),
         createdAt: new Date(createdAt).toISOString(),

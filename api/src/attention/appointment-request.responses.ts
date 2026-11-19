@@ -38,6 +38,8 @@ export class CategoryRequestResponse {
   @UuidProp() patientId!: string;
   @StrProp({ nullable: true }) patientName!: string | null;
   @StrProp({ nullable: true }) record!: string | null;
+  @IntProp({ optional: true, nullable: true, description: 'Lote 5: edad en años hoy; solo con pacientes.ver_nacimiento' }) patientAge?: number | null;
+  @StrProp({ optional: true, nullable: true, description: 'Lote 5: sexo del paciente; solo con pacientes.ver_ficha' }) patientSex?: string | null;
   @ClassArrayProp(CategoryRefResponse) categories!: CategoryRefResponse[];
   @StrArrayProp({ description: 'Especialidades sugeridas por las categorías, sin repetir' }) specialties!: string[];
   @BoolProp({ description: 'Lote 5 S6: algún médico de esas especialidades (o cualquiera, si ninguno las tiene) tiene turno publicado en los próximos 14 días; si es false, asignar responde sin_personal_disponible' }) staffAvailable!: boolean;

@@ -4113,6 +4113,10 @@ export interface components {
             cleaningCompleted: boolean;
             cleanedByCurrentUser: boolean;
             path: string | null;
+            /** @description Lote 5: quien ocupa o tiene reservada la cama está en aislamiento */
+            isolation?: boolean;
+            /** @description Lote 5: la habitación tiene un paciente en aislamiento (sus otras camas no se asignan) */
+            roomIsolation?: boolean;
             /** @description Nombre completo o iniciales según camas.ver_ocupante; solo si la cama tiene paciente */
             occupant?: string;
             /**
@@ -4535,6 +4539,10 @@ export interface components {
             reason: string;
         };
         QueueTicketResponse: {
+            /** @description Lote 5: edad en años el día del número; solo con pacientes.ver_nacimiento */
+            patientAge?: number | null;
+            /** @description Lote 5: sexo del paciente; solo con pacientes.ver_ficha */
+            patientSex?: string | null;
             /** Format: uuid */
             id: string;
             service: components["schemas"]["ServicioFila"];
@@ -4670,6 +4678,13 @@ export interface components {
             version: number;
             state: components["schemas"]["EstadoFila"];
             llamados: number;
+            /**
+             * Format: uuid
+             * @description Lote 5: consultorio con que se llamó (el enviado o el que ya tenía)
+             */
+            officeId?: string | null;
+            /** @description Lote 5: código del consultorio, por ejemplo P1-CON-02 */
+            officeCode?: string | null;
             numero: number;
             patientName: string | null;
             area: components["schemas"]["AreaFila"];
@@ -5088,6 +5103,10 @@ export interface components {
             patientId: string;
             patientName: string | null;
             record: string | null;
+            /** @description Lote 5: edad en años hoy; solo con pacientes.ver_nacimiento */
+            patientAge?: number | null;
+            /** @description Lote 5: sexo del paciente; solo con pacientes.ver_ficha */
+            patientSex?: string | null;
             categories: components["schemas"]["CategoryRefResponse"][];
             /** @description Especialidades sugeridas por las categorías, sin repetir */
             specialties: string[];
