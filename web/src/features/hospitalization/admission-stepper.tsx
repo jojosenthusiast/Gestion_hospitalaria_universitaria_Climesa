@@ -16,20 +16,52 @@ type DoctorRow = { id: string; name: string; specialty: string | null; available
 const originKinds: OriginKind[] = ['cita', 'emergencia', 'ambulancia', 'consulta'];
 
 /**
+ * S27 (owner, Lote 2: «si te sales se pierde el progreso»): the unfinished admission is kept per user in this browser tab
+ * (sessionStorage), so closing and reopening the dialog offers to continue at the same step with the same data. It is
+ * cleared when the admission is confirmed, on «Empezar de nuevo» and on «Cancelar» in the first step.
+ */
+type Draft = { form: AdmissionForm; step: StepId };
+export const admissionDraftKey = (userId: string) => `climesa.ingreso-borrador.${userId}`;
+function readDraft(key: string): Draft | null {
+  try {
+    const raw = sessionStorage.getItem(key);
+    const draft = raw ? JSON.parse(raw) as Draft : null;
+    return draft?.form?.patient?.id && draft.step ? draft : null;
+  } catch { return null; }
+}
+function writeDraft(key: string, draft: Draft) { try { sessionStorage.setItem(key, JSON.stringify(draft)); } catch { /* storage unavailable: nothing is kept */ } }
+function clearDraft(key: string) { try { sessionStorage.removeItem(key); } catch { /* storage unavailable */ } }
+
+/**
  * W14 · ingreso guiado: seis pasos (cinco sin cama), cada uno se valida antes de avanzar y la API vuelve a comprobar todo al confirmar.
  * S13: category, requirements and visitors share the «Habitación» step; the bed step only appears when a bed is assigned now.
  */
 export function AdmissionStepper({ api, profile, patient, onClose, onSaved }: { api: Api; profile: AccessProfile; patient?: { id: string; label: string } | null; onClose: () => void; onSaved: () => void }) {
   // R7 U1 (G2): opened from the patient record, the patient comes chosen; the steps after it are unchanged.
   const [index, setIndex] = useState(0), [form, setForm] = useState<AdmissionForm>(() => ({ ...initialForm(salvadorNow()), patient: patient ?? null }));
-  const canAssignBed = can(profile, 'camas.asignar'), action = useAction(api);
+  const canAssignBed = can(profile, 'camas.asignar'), action = useAction(api), draftKey = admissionDraftKey(profile.id);
+  // Opened for another patient (from a patient record), an older draft is not offered; it is replaced once this one starts.
+  const [draft, setDraft] = useState<Draft | null>(() => { const saved = readDraft(draftKey); return saved && (!patient || saved.form.patient?.id === patient.id) ? saved : null; });
   const update = (patch: Partial<AdmissionForm>) => setForm(current => ({ ...current, ...patch }));
   // The list can shrink when the date moves to later (no bed step): keep the position inside it.
   const steps = stepsFor(form, canAssignBed), step: StepId = steps[Math.min(index, steps.length - 1)], position = steps.indexOf(step);
   const error = stepError(step, form, canAssignBed), last = step === 'resumen';
+  useEffect(() => { if (!draft && form.patient) writeDraft(draftKey, { form: { ...form, feasible: false }, step }); }, [draft, form, step, draftKey]);
   async function confirm() {
-    if (await action.run('/admisiones', admissionBody(form, canAssignBed))) onSaved();
+    if (await action.run('/admisiones', admissionBody(form, canAssignBed))) { clearDraft(draftKey); onSaved(); }
   }
+  function resume(saved: Draft) {
+    const restored = { ...saved.form, feasible: false }, at = stepsFor(restored, canAssignBed).indexOf(saved.step);
+    setForm(restored); setIndex(at < 0 ? stepsFor(restored, canAssignBed).length - 1 : at); setDraft(null);
+  }
+  function restart() { clearDraft(draftKey); setDraft(null); }
+  if (draft) return <Dialog title="Ingresar paciente" onClose={onClose}><div className="module-form admission-stepper">
+    <p className="form-intro">Tienes un ingreso sin terminar de <strong>{draft.form.patient!.label}</strong>, guardado en el paso «{stepTitles[draft.step]}».</p>
+    <div className="dialog-actions">
+      <button type="button" className="secondary-button" onClick={restart}>Empezar de nuevo</button>
+      <button type="button" className="primary-button" onClick={() => resume(draft)} autoFocus>Continuar ingreso de {draft.form.patient!.label} <Icon name="arrow" size={16} /></button>
+    </div>
+  </div></Dialog>;
   return <Dialog title="Ingresar paciente" onClose={onClose} busy={action.busy}><div className="module-form admission-stepper">
     <ol className="stepper-track" aria-label="Pasos del ingreso">{steps.map((id, i) => <li key={id} className={i === position ? 'is-current' : i < position ? 'is-done' : ''} aria-current={i === position ? 'step' : undefined}><span>{i < position ? <Icon name="check" size={14} /> : i + 1}</span><small>{stepTitles[id]}</small></li>)}</ol>
     <h3 className="stepper-title">Paso {position + 1} de {steps.length} · {stepTitles[step]}</h3>
@@ -42,7 +74,7 @@ export function AdmissionStepper({ api, profile, patient, onClose, onSaved }: { 
     {step === 'resumen' && <SummaryStep api={api} form={form} update={update} canAssignBed={canAssignBed} />}
     {error && <p className="step-error" role="alert">{error}</p>}
     <div className="dialog-actions">
-      <button type="button" className="secondary-button" onClick={position === 0 ? onClose : () => setIndex(position - 1)} disabled={action.busy}>{position === 0 ? 'Cancelar' : 'Atrás'}</button>
+      <button type="button" className="secondary-button" onClick={position === 0 ? () => { clearDraft(draftKey); onClose(); } : () => setIndex(position - 1)} disabled={action.busy}>{position === 0 ? 'Cancelar' : 'Atrás'}</button>
       {last ? <SaveButtonLike busy={action.busy} disabled={!!error} onClick={() => void confirm()} /> : <button type="button" className="primary-button" onClick={() => setIndex(position + 1)} disabled={!!error}>Siguiente <Icon name="arrow" size={16} /></button>}
     </div>
   </div></Dialog>;
@@ -98,10 +130,26 @@ function DoctorStep({ api, form, update }: StepProps & { api: Api }) {
   };
   return <>
     <p className="form-intro">Primero la fecha y la hora: solo los médicos con turno en ese horario se pueden elegir; los demás aparecen apagados con su motivo.</p>
-    <Field label="Fecha y hora del ingreso" type="datetime-local" value={form.at} onChange={value => update({ at: value, bed: null })} required />
+    <AdmissionWhen value={form.at} onChange={at => update({ at, bed: null })} />
     <DoctorShiftPicker label="Médico tratante" value={form.doctor && { id: form.doctor.id, label: form.doctor.label }} onChange={pick} items={items} required emptyText={doctors.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint="Primero los médicos con turno en ese horario; «Todos» muestra también a los demás." />
     {doctors.error && <Notice kind="error">{doctors.error.message}</Notice>}
   </>;
+}
+
+/**
+ * S27: a native `datetime-local` follows the browser language («11 / 18 / 2026 , 11:38 PM» in an English browser). The date
+ * uses the shared dd/mm/aaaa field and the time is typed as hh:mm in 24 h, so the step always reads in Spanish. While the
+ * time is incomplete the value is empty and the step asks for the date and time.
+ */
+const TIME_24H = /^([01]\d|2[0-3]):([0-5]\d)$/;
+function AdmissionWhen({ value, onChange }: { value: string; onChange: (at: string) => void }) {
+  const [date, setDate] = useState(value.slice(0, 10)), [time, setTime] = useState(value.slice(11, 16));
+  const emit = (d: string, t: string) => onChange(d && TIME_24H.test(t) ? `${d}T${t}` : '');
+  const timeInvalid = time.length > 0 && !TIME_24H.test(time);
+  return <div className="admission-when">
+    <Field label="Fecha del ingreso" type="date" value={date} onChange={d => { setDate(d); emit(d, time); }} required />
+    <Field label="Hora del ingreso" value={time} onChange={raw => { const t = /^\d{4}$/.test(raw) ? `${raw.slice(0, 2)}:${raw.slice(2)}` : raw; setTime(t); emit(date, t); }} required inputMode="numeric" autoComplete="off" maxLength={5} placeholder="hh:mm" hint="Formato de 24 horas, por ejemplo 14:30." aria-invalid={timeInvalid || undefined} />
+  </div>;
 }
 
 function CategoryStep({ api, form, update }: StepProps & { api: Api }) {

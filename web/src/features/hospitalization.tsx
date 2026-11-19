@@ -12,10 +12,10 @@ import { RowMenu } from '../components/row-menu';
 import { CrudActions, CrudButton } from '../components/system';
 import './hospitalization/admission-table.css';
 import { useFold } from '../components/fold';
+import { AdmissionOrigin, SuggestedBedRooms, type Suggestion } from './hospitalization/bed-rooms';
 
 const ADMISSIONS_SHOWN = 20;
 const urgency = (a: Admission) => a.state === 'pendiente_cama' ? 0 : a.unstable ? 1 : 2;
-type Suggestion = { id: string; version: number; code: string; room: string; category: string; reason: string };
 /** Row actions the web offers, in display order; the first one present is the row's primary action. `firmar_alta` is MED-only in the apps (D-02). */
 type RowAction = 'asignar_cama' | 'registrar_salida' | 'solicitar_alta' | 'trasladar' | 'autorizar' | 'reasignar_tratante' | 'revocar_alta' | 'cancelar' | 'anular';
 const rowActions: { key: RowAction; label: string }[] = [
@@ -180,10 +180,13 @@ function BedSuggestionDialog({ api, admission, version, onClose, onSaved }: { ap
   useEffect(() => { if (!prefilled.current && first) { prefilled.current = true; setBedId(first); } }, [first]);
   // WEB-08: el motivo lo escribe la persona; si queda vacío no se envía uno inventado.
   async function assign() { if (selected && await action.run(`/admisiones/${admission.id}/cama`, { bedId: selected.id, version: selected.version, ...(reason.trim() ? { reason: reason.trim() } : {}) })) onSaved(`${admission.patientName}: ingresada · Cama ${selected.code}.`); }
-  const group = (category: string, rows: Suggestion[]) => <fieldset className="choice-list" key={category}><legend>{both ? `Camas sugeridas · ${categoryNames[category] ?? category}${category !== admission.requestedCategory ? ' (excepción)' : ''}` : 'Camas sugeridas'}</legend>
-    {rows.length ? <BedRadios rows={rows} name="bed" bedId={bedId} onPick={setBedId} detail={row => `${row.room} · ${categoryNames[row.category] ?? row.category} · ${row.reason}`} /> : <p className="muted">Sin camas libres de esta categoría.</p>}</fieldset>;
-  const summary = [['Paciente', admission.patientName], ['Origen', originNames[admission.origin] ?? admission.origin], ['Médico tratante', admission.attendingDoctorName || 'Sin asignar'], ['Categoría', categoryNames[admission.requestedCategory] ?? admission.requestedCategory], ['Aislamiento', admission.isolation ? 'Sí' : 'No'], ...(admission.motive ? [['Motivo', admission.motive]] : [])];
+  const group = (category: string, rows: Suggestion[]) => rows.length
+    ? <SuggestedBedRooms key={category} rows={rows} name="bed" bedId={bedId} onPick={setBedId} label={both ? `Camas sugeridas · ${categoryNames[category] ?? category}${category !== admission.requestedCategory ? ' (excepción)' : ''}` : 'Camas sugeridas'} />
+    : <fieldset className="choice-list" key={category}><legend>{`Camas sugeridas · ${categoryNames[category] ?? category}`}</legend><p className="muted">Sin camas libres de esta categoría.</p></fieldset>;
+  // S27: origin, doctor and reason live in the origin block above; the summary keeps only what the bed choice depends on.
+  const summary = [['Paciente', admission.patientName], ['Categoría', categoryNames[admission.requestedCategory] ?? admission.requestedCategory], ['Aislamiento', admission.isolation ? 'Sí' : 'No']];
   return <Dialog title={admission.origin === 'consulta' ? 'Ingresar paciente indicado' : 'Asignar cama'} onClose={onClose} busy={action.busy}>
+    <AdmissionOrigin admission={admission} />
     <dl className="detail-grid admission-summary">{summary.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     <RemoteState state={requested}>{rows => rows.length || (both && other.data?.length) ? <div className="module-form"><WriteError error={spanishProblem(action.error)} onReload={onSaved} /><p className="form-intro">Te proponemos la primera cama libre; cambia si prefieres otra. Se vuelve a comprobar al confirmar.</p>{group(options[0], rows)}{both && (other.data ? group(options[1], other.data) : other.error ? <p className="muted">No pudimos cargar las camas de la otra categoría.</p> : null)}<Field label="Motivo de la asignación (opcional)" value={reason} onChange={setReason} maxLength={500} hint="Si lo escribes, al menos 10 caracteres." aria-invalid={reasonInvalid || undefined} /><div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={action.busy}>Cancelar</button><button className="primary-button" type="button" onClick={() => void assign()} disabled={action.busy || !selected || reasonInvalid}>Confirmar cama</button></div></div> : both && !other.data && !other.error ? <p className="muted" role="status">Buscando camas…</p> : <div className="admission-no-beds"><Empty title="No hay camas compatibles" description={both ? 'No hay camas libres en ninguna de las dos categorías. Revisa el aislamiento y la disponibilidad del edificio.' : `Ninguna cama libre cumple ${admission.isolation ? 'aislamiento y ' : ''}la categoría ${categoryNames[admission.requestedCategory] ?? admission.requestedCategory}. Jefatura puede autorizar una excepción de categoría.`} /><div className="dialog-actions"><a className="secondary-button" href="#/camas">Ver tablero</a><button type="button" className="primary-button" onClick={() => onSaved(admission.origin === 'consulta' ? `${admission.patientName} queda pendiente de cama en «Ingresos indicados»; asígnale una desde ahí cuando se libere.` : `${admission.patientName} queda ingresada sin cama; aparece en «Admisiones sin cama» de Inicio.`)}>Ingresar sin cama</button></div></div>}</RemoteState>
   </Dialog>;

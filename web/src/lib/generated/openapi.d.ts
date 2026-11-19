@@ -5831,6 +5831,16 @@ export interface components {
             originId: string | null;
             /** @description Motivo del ingreso; nulo solo en admisiones anteriores a la regla. */
             motive: string | null;
+            /**
+             * Format: date-time
+             * @description Cuándo se registró la admisión (o se indicó, si nace de una consulta).
+             */
+            createdAt: string;
+            /**
+             * Format: date-time
+             * @description Cuándo ocurrió el registro de origen (consulta, emergencia, ambulancia o cita); nulo si no se encuentra.
+             */
+            originAt: string | null;
             isolationType: components["schemas"]["TipoAislamiento"] | null;
             unstable: boolean;
             postSurgical: boolean;

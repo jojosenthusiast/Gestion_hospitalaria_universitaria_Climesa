@@ -29497,6 +29497,17 @@
             "nullable": true,
             "description": "Motivo del ingreso; nulo solo en admisiones anteriores a la regla."
           },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Cuándo se registró la admisión (o se indicó, si nace de una consulta)."
+          },
+          "originAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Cuándo ocurrió el registro de origen (consulta, emergencia, ambulancia o cita); nulo si no se encuentra."
+          },
           "isolationType": {
             "nullable": true,
             "allOf": [
@@ -29575,6 +29586,8 @@
           "occupationId",
           "originId",
           "motive",
+          "createdAt",
+          "originAt",
           "isolationType",
           "unstable",
           "postSurgical",

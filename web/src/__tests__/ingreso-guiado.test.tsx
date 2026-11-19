@@ -9,7 +9,7 @@ beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
 });
-afterEach(() => { cleanup(); history.replaceState(null, '', '#/'); });
+afterEach(() => { cleanup(); sessionStorage.clear(); history.replaceState(null, '', '#/'); });
 
 const bed = (over: Partial<BedPick> = {}): BedPick => ({ id: 'b1', version: 3, code: 'C-201', roomId: 'r1', room: 'H-201', floor: 2, category: 'semiprivada', capacity: 2, state: 'libre', occupiedInRoom: 0, compatible: true, reason: null, suggested: true, ...over });
 const complete = (over: Partial<AdmissionForm> = {}): AdmissionForm => ({
