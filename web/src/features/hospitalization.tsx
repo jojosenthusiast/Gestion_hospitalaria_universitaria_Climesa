@@ -13,6 +13,9 @@ import { CrudActions, CrudButton } from '../components/system';
 import './hospitalization/admission-table.css';
 import { useFold } from '../components/fold';
 import { AdmissionOrigin, SuggestedBedRooms, type Suggestion } from './hospitalization/bed-rooms';
+import { ALL_FLOORS, bedFloors, defaultFloor, floorKey, floorLabel, floorsOf, onFloor } from './hospitalization/floors';
+import { ChipGroup } from './listas/chips';
+import type { ActiveShift } from './shift-status';
 
 const ADMISSIONS_SHOWN = 20;
 const urgency = (a: Admission) => a.state === 'pendiente_cama' ? 0 : a.unstable ? 1 : 2;
@@ -116,7 +119,14 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
   const indicatedRows = (data.data ?? []).filter(a => a.state === 'pendiente_cama' && a.origin === 'consulta' && a.allowedActions?.includes('asignar_cama'));
   const props = dialog && { api, admission: dialog.admission, onClose: close, onSaved: saved };
   // What needs a hand first: waiting for a bed, then unstable patients; the rest keeps the API order and folds.
-  const ordered = (data.data ?? []).map((row, index) => ({ row, index })).sort((a, b) => urgency(a.row) - urgency(b.row) || a.index - b.index).map(x => x.row);
+  // Lote 5 S10: floor chips over the ward. The own shift's floor is only the starting filter; «Todos los pisos» shows everyone.
+  const beds = useData<Bed[]>(api, '/camas', version, can(profile, 'camas.ver_tablero'));
+  const shift = useData<ActiveShift>(api, '/me/turno-activo', version);
+  const floors = bedFloors(beds.data), floorCounts = floorsOf(data.data ?? [], floors);
+  const [chosenFloor, setFloor] = useState<string | null>(null);
+  const floor = chosenFloor ?? (floorCounts.length > 1 ? defaultFloor(shift.data?.shift?.area, floorCounts.map(f => f.level)) : ALL_FLOORS);
+  const visible = onFloor(data.data ?? [], floors, floor);
+  const ordered = visible.map((row, index) => ({ row, index })).sort((a, b) => urgency(a.row) - urgency(b.row) || a.index - b.index).map(x => x.row);
   const fold = useFold(ordered, ADMISSIONS_SHOWN);
   return <>
     <CompactHeader breadcrumb="Hospital / Admisiones" title="Hospitalización" actions={can(profile, 'admision.crear') && <button className="primary-button" onClick={() => setCreating(true)}><Icon name="plus" size={18}/>Ingresar paciente</button>}/>
@@ -128,6 +138,7 @@ export function HospitalizationPage({ api, profile, version }: { api: Api; profi
         <button type="button" className="secondary-button" onClick={() => setDialog({ kind: 'asignar_cama', admission: row })}>Ingresar</button>
       </li>)}</ul>
     </section>}
+    {floorCounts.length > 1 && <ChipGroup label="Piso" value={floor} onChange={setFloor} options={[{ value: ALL_FLOORS, label: 'Todos los pisos', count: (data.data ?? []).length }, ...floorCounts.map(f => ({ value: floorKey(f.level), label: floorLabel(f.level), count: f.patients }))]} />}
     <section className="data-workbench admission-workbench"><RemoteState state={data}>{rows => rows.length ? <><table className="record-table admission-table"><caption className="sr-only">Admisiones activas</caption><thead><tr><th>Paciente</th><th>Origen</th><th>Categoría</th><th>Estado</th><th>Cama</th><th>Acción</th></tr></thead><tbody>{fold.shown.map(row => <tr key={row.id}>
       <td data-label="Paciente" className="cell-person"><strong>{row.patientName}</strong><small>{[row.isolation ? 'Aislamiento' : null, row.unstable ? 'Inestable' : null, row.postSurgical ? 'Posquirúrgico' : null].filter(Boolean).join(' · ')}</small>{row.motive && <small>{row.motive}</small>}</td>
       <td data-label="Origen">{originNames[row.origin] ?? row.origin}</td>

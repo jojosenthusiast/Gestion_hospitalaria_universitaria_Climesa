@@ -1,23 +1,23 @@
 import { useState, type FormEvent, type ReactNode } from 'react';
 import { Field, Icon, Notice } from '../../components/ui';
-import { roleNames, type Api, type Staff, type StaffInput, type UserAccount } from '../../lib/api';
+import { RETIRED_ROLES, roleNames, type Api, type Staff, type StaffInput, type UserAccount } from '../../lib/api';
 import { RoleChip } from '../../components/identity';
 import { Dialog, SaveButton, Select, WriteError, useAction } from '../common';
 
 /** Rol de trabajo que corresponde a cada función del directorio; se sugiere al invitar a alguien ya registrado. */
-export const roleForType: Record<string, string> = { medico: 'MED', enfermero: 'ENF', asistente: 'AST', recepcionista: 'REC', laboratorista: 'LAB', paramedico: 'PAR' };
+export const roleForType: Record<string, string> = { medico: 'MED', enfermero: 'ENF', asistente: 'ENF', recepcionista: 'REC', laboratorista: 'LAB', paramedico: 'PAR' };
 export const workingRoles = ['REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR'];
 const working = (roles: string[]) => roles.some(r => workingRoles.includes(r));
 
 /** The patient role is never invited (MA-CTA-02, `rol_no_invitable`): patients create their account in the mobile apps. */
 const PATIENT_ROLE = 'PAC';
 /** Roles an invitation may name: never the patient role, and Administración only for who may invite it. */
-export const invitableRoles = (allowAdmin: boolean) => Object.keys(roleNames).filter(key => key !== PATIENT_ROLE && (key !== 'ADM' || allowAdmin));
+export const invitableRoles = (allowAdmin: boolean) => Object.keys(roleNames).filter(key => key !== PATIENT_ROLE && !RETIRED_ROLES.includes(key) && (key !== 'ADM' || allowAdmin));
 /** A plain address check before sending; the API still decides. */
 export const validEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 /** The account's roles as checkboxes; an account may hold several roles. */
 export function RoleChecks({ selected, onChange, allowAdmin, invitation = false, legend = 'Roles de la cuenta' }: { selected: string[]; onChange: (roles: string[]) => void; allowAdmin: boolean; invitation?: boolean; legend?: string }) {
-  return <fieldset className="role-checks"><legend>{legend}</legend>{Object.entries(roleNames).filter(([key]) => (key !== 'ADM' || allowAdmin || selected.includes(key)) && (!invitation || key !== PATIENT_ROLE)).map(([key, label]) => <label key={key}><input type="checkbox" checked={selected.includes(key)} onChange={e => onChange(e.target.checked ? [...selected, key] : selected.filter(r => r !== key))} /><span><strong>{label}</strong><small>{key}</small></span></label>)}</fieldset>;
+  return <fieldset className="role-checks"><legend>{legend}</legend>{Object.entries(roleNames).filter(([key]) => (key !== 'ADM' || allowAdmin || selected.includes(key)) && (!invitation || key !== PATIENT_ROLE) && (!RETIRED_ROLES.includes(key) || (!invitation && selected.includes(key)))).map(([key, label]) => <label key={key}><input type="checkbox" checked={selected.includes(key)} onChange={e => onChange(e.target.checked ? [...selected, key] : selected.filter(r => r !== key))} /><span><strong>{label}</strong><small>{key}</small></span></label>)}</fieldset>;
 }
 function StaffBinding({ staff, value, onChange, required }: { staff: Staff[]; value: string; onChange: (v: string) => void; required: boolean }) {
   return <Select label="Persona del directorio" value={value} onChange={onChange} required={required}><option value="">Sin vínculo de personal</option>{staff.filter(p => p.active).map(p => <option key={p.id} value={p.id}>{p.givenNames} {p.surnames}</option>)}</Select>;

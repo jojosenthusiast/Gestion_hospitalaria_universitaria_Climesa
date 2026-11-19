@@ -13,14 +13,15 @@ export type IdentityIcon =
   | 'alert' | 'building' | 'layers' | 'door' | 'bed' | 'box' | 'bay' | 'scalpel' | 'pill' | 'calendar' | 'cube';
 export type Identity = { key: string; label: string; icon: IdentityIcon; tone: IdentityTone };
 
-export const ROLE_CODES: RoleCode[] = ['ADM', 'DPD', 'JOP', 'REC', 'AST', 'ENF', 'MED', 'LAB', 'PAR', 'PAC'];
+/** Roles in force. AST (Asistencia) was retired into Enfermería in Lote 5 (S10); it keeps an identity only for history. */
+export const ROLE_CODES: RoleCode[] = ['ADM', 'DPD', 'JOP', 'REC', 'ENF', 'MED', 'LAB', 'PAR', 'PAC'];
 
 const ROLES: Record<RoleCode, Identity> = {
   ADM: { key: 'ADM', label: 'Administración', icon: 'shield', tone: 'indigo' },
   DPD: { key: 'DPD', label: 'Protección de datos', icon: 'lock', tone: 'teal' },
   JOP: { key: 'JOP', label: 'Jefatura de operaciones', icon: 'clipboard', tone: 'blue' },
   REC: { key: 'REC', label: 'Recepción', icon: 'desk', tone: 'orange' },
-  AST: { key: 'AST', label: 'Asistencia', icon: 'hand', tone: 'green' },
+  AST: { key: 'AST', label: 'Asistencia (retirado)', icon: 'hand', tone: 'green' },
   ENF: { key: 'ENF', label: 'Enfermería', icon: 'heart', tone: 'magenta' },
   MED: { key: 'MED', label: 'Medicina', icon: 'steth', tone: 'cyan' },
   LAB: { key: 'LAB', label: 'Laboratorio', icon: 'flask', tone: 'purple' },
@@ -30,7 +31,7 @@ const ROLES: Record<RoleCode, Identity> = {
 
 /** Tipo de personal de la API (`medico`, `enfermero`...) al código de rol con el que se identifica. */
 const STAFF_ROLE: Record<string, RoleCode> = {
-  medico: 'MED', enfermero: 'ENF', asistente: 'AST', recepcionista: 'REC', laboratorista: 'LAB', paramedico: 'PAR',
+  medico: 'MED', enfermero: 'ENF', asistente: 'ENF', recepcionista: 'REC', laboratorista: 'LAB', paramedico: 'PAR',
   administrativo: 'ADM', motorista: 'PAR',
 };
 const STAFF_LABEL: Record<string, string> = { medico: 'Médico', enfermero: 'Enfermería', asistente: 'Asistencia', recepcionista: 'Recepción', laboratorista: 'Laboratorio', paramedico: 'Paramédico', motorista: 'Motorista', limpieza: 'Limpieza', administrativo: 'Administración', otro: 'Otro' };

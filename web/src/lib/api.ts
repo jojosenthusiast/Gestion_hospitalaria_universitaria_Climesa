@@ -63,4 +63,6 @@ export const getAccessProfile=(token:string)=>new HttpApi(async()=>token).reques
 export const can=(profile:AccessProfile,permission:string)=>profile.permissions.some(p=>p.code===permission);
 /** Función del personal (`type` de la API) con su etiqueta en español. */
 export const staffTypeNames:Record<string,string>={medico:'Médico',enfermero:'Enfermería',asistente:'Asistencia',recepcionista:'Recepción',laboratorista:'Laboratorio',paramedico:'Paramédico',motorista:'Motorista',limpieza:'Limpieza',administrativo:'Administración',otro:'Otro'};
-export const roleNames:Record<string,string>={ADM:'Administración',JOP:'Operaciones',REC:'Recepción',AST:'Asistencia',ENF:'Enfermería',MED:'Medicina',LAB:'Laboratorio',PAR:'Atención prehospitalaria',DPD:'Protección de datos',PAC:'Paciente'};
+/** Lote 5 S10: AST is retired into Enfermería; its name stays for history (audit, old notices, an account not yet moved). */
+export const RETIRED_ROLES=['AST'];
+export const roleNames:Record<string,string>={ADM:'Administración',JOP:'Operaciones',REC:'Recepción',AST:'Asistencia (retirado)',ENF:'Enfermería',MED:'Medicina',LAB:'Laboratorio',PAR:'Atención prehospitalaria',DPD:'Protección de datos',PAC:'Paciente'};

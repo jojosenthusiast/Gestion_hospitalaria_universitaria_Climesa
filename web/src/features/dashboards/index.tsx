@@ -6,7 +6,7 @@ import { useDashboardData, type Source } from './data';
 import { LabFollowUpPanel } from './lab-follow-up';
 import { LabResultsInbox } from './lab-results-inbox';
 import { DayFigures, PendingTray, QuickActions, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
-import { MyShift, OnShiftNow, roleDashboards, roleOrder, type RoleId } from './roles';
+import { MyShift, OnShiftNow, canonicalRole, roleDashboards, roleOrder, type RoleId } from './roles';
 import { coverageTodayGroup } from './coverage-tray';
 
 const unique = <T extends { id: string }>(items: T[]) => [...new Map(items.map(item => [item.id, item])).values()];
@@ -18,7 +18,7 @@ const unique = <T extends { id: string }>(items: T[]) => [...new Map(items.map(i
  * An account with several roles gets one tray and one figure strip, merged without duplicates.
  */
 export function Dashboard({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
-  const roles = useMemo(() => roleOrder.filter(role => profile.roles.includes(role)), [profile.roles]);
+  const roles = useMemo(() => { const held = profile.roles.map(canonicalRole); return roleOrder.filter(role => held.includes(role)); }, [profile.roles]);
   const needed = useMemo(() => {
     const set = new Set<Source>(roles.flatMap(role => roleDashboards[role].needs));
     set.add('followUps'); set.add('labPending');
