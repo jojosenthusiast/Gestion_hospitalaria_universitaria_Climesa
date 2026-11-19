@@ -72,6 +72,17 @@ actor AuthService {
         if let task=refreshTask { return try await task.value }
         guard let saved=try KeychainStore.load() else { return nil }
         if saved.expires_at > Date().timeIntervalSince1970+60 { return saved }
+        return try await refresh(saved)
+    }
+    /// Renews the session after the API rejected `rejected` with 401. If another call already renewed it, returns that
+    /// newer session. Nil without a saved session; throws `AuthFailure` (400/401: the refresh token is no longer valid).
+    func renewAfterRejection(_ rejected: String) async throws -> AuthSession? {
+        if let task=refreshTask { return try await task.value }
+        guard let saved=try KeychainStore.load() else { return nil }
+        if saved.access_token != rejected { return saved }
+        return try await refresh(saved)
+    }
+    private func refresh(_ saved: AuthSession) async throws -> AuthSession {
         let stamp=revision
         let task=Task<AuthSession,Error> { let next=try self.parse(await self.send("/auth/v1/token?grant_type=refresh_token",["refresh_token":saved.refresh_token])); guard stamp==self.revision else { throw CancellationError() }; try KeychainStore.save(next); return next }
         refreshTask=task; defer { refreshTask=nil }; return try await task.value
@@ -79,11 +90,12 @@ actor AuthService {
     func signOut() async { revision+=1; refreshTask?.cancel(); refreshTask=nil; let saved=try? KeychainStore.load(); KeychainStore.clear(); if let saved { _ = try? await send("/auth/v1/logout?scope=local",[:],token:saved.access_token) } }
 }
 /// Cliente de la API con Bearer. Los errores son `APIFailure` (problem+json en español, Core/Contract/Problem.swift).
-/// Un 401 cierra la sesión y avisa a `AccountModel`, que vuelve al ingreso con "Tu sesión expiró".
+/// Un 401 renueva la sesión una vez; si sigue, cierra la sesión y avisa a `AccountModel` con el motivo (`SessionEnd`):
+/// "Tu sesión expiró" o "Tu acceso fue retirado".
 actor APIClient {
     private let transport=URLSession(configuration:.ephemeral)
     private let config: AppConfiguration; private let auth: AuthService
-    private var onUnauthorized: (@Sendable () async -> Void)?
+    private var onUnauthorized: (@Sendable (SessionEnd) async -> Void)?
     /// Última respuesta del servidor: sin respuestas recientes se asume dormido (ColdStartPolicy, MA-OPS-01).
     private var lastSuccess: Date?
     /// A call failed without an answer (network or 502-504) after the last answer: the server may be asleep.
@@ -92,7 +104,7 @@ actor APIClient {
     private var slowCalls=Set<UUID>()
     private var pendingCalls=Set<UUID>()
     init(config: AppConfiguration,auth: AuthService) { self.config=config; self.auth=auth }
-    func setUnauthorizedHandler(_ handler: @escaping @Sendable () async -> Void) { onUnauthorized=handler }
+    func setUnauthorizedHandler(_ handler: @escaping @Sendable (SessionEnd) async -> Void) { onUnauthorized=handler }
     func get<T:Decodable>(_ path: String, as type: T.Type = T.self) async throws -> T {
         try decode(await getData(path))
     }
@@ -127,20 +139,42 @@ actor APIClient {
         do { return try JSONDecoder().decode(T.self,from:data) } catch { throw APIFailure.invalidResponse }
     }
     /// `progress` set means an upload: the body goes through `URLSession.upload` so its bytes can be reported.
+    /// A 401 renews the session once and repeats the call with the new token (same `Idempotency-Key`, same intent). A
+    /// rejected refresh token ends the session as expired; a second 401 with the fresh token means the API no longer
+    /// accepts the account, so it ends as revoked (`SessionEndRules`). Network errors and 403 never end the session.
     private func perform(method: String, path: String, body: Data?, idempotencyKey: String?, contentType: String="application/json", progress: (@Sendable (Double) -> Void)?=nil) async throws -> Data {
-        let session: AuthSession
+        let first=try await currentSession()
+        do { return try await attempt(method:method,path:path,body:body,idempotencyKey:idempotencyKey,contentType:contentType,progress:progress,token:first.access_token) }
+        catch APIFailure.sessionExpired {}
+        let renewed=try await currentSession(replacing:first.access_token)
+        do { return try await attempt(method:method,path:path,body:body,idempotencyKey:idempotencyKey,contentType:contentType,progress:progress,token:renewed.access_token) }
+        catch APIFailure.sessionExpired {
+            await expire(SessionEndRules.afterRenewedCall(status:401) ?? .expired)
+            throw APIFailure.sessionExpired
+        }
+    }
+    /// The saved session (renewed by clock), or the one renewed after the API rejected `rejected`.
+    private func currentSession(replacing rejected: String?=nil) async throws -> AuthSession {
         do {
-            guard let current=try await auth.session() else { await expire(); throw APIFailure.sessionExpired }
-            session=current
+            let loaded: AuthSession?
+            if let rejected { loaded=try await auth.renewAfterRejection(rejected) } else { loaded=try await auth.session() }
+            guard let loaded else { await expire(.expired); throw APIFailure.sessionExpired }
+            return loaded
         } catch let failure as APIFailure { throw failure }
         catch is CancellationError { throw CancellationError() }
         catch is URLError { throw APIFailure.transport }
-        catch { await expire(); throw APIFailure.sessionExpired }
+        catch let failure as AuthFailure where SessionEndRules.afterRefreshFailure(status:failure.status) == nil {
+            // Auth unavailable (5xx, 429): the refresh token may still be valid, so the session stays.
+            throw APIFailure.http(status:failure.status,problem:nil)
+        }
+        catch { await expire(.expired); throw APIFailure.sessionExpired }
+    }
+    private func attempt(method: String, path: String, body: Data?, idempotencyKey: String?, contentType: String, progress: (@Sendable (Double) -> Void)?, token: String) async throws -> Data {
         guard let url=URL(string:config.api.absoluteString.trimmingCharacters(in:CharacterSet(charactersIn:"/"))+path) else { throw APIFailure.invalidResponse }
         let timeout=progress==nil ? ColdStartPolicy.timeout(path:path,lastSuccess:lastSuccess,now:Date()) : ColdStartPolicy.uploadTimeout
         var request=URLRequest(url:url,cachePolicy:.reloadIgnoringLocalCacheData,timeoutInterval:timeout)
         request.httpMethod=method
-        request.setValue("Bearer \(session.access_token)",forHTTPHeaderField:"Authorization")
+        request.setValue("Bearer \(token)",forHTTPHeaderField:"Authorization")
         request.setValue("application/json",forHTTPHeaderField:"Accept")
         if let body {
             if progress==nil { request.httpBody=body }
@@ -161,11 +195,7 @@ actor APIClient {
         catch { failedSinceSuccess=true; throw APIFailure.transport }
         guard let http=response as? HTTPURLResponse else { throw APIFailure.transport }
         if http.statusCode < 502 || http.statusCode > 504 { lastSuccess=Date(); failedSinceSuccess=false } else { failedSinceSuccess=true }
-        guard (200..<300).contains(http.statusCode) else {
-            let failure=APIFailure.from(status:http.statusCode,body:data)
-            if failure == .sessionExpired { await expire() }
-            throw failure
-        }
+        guard (200..<300).contains(http.statusCode) else { throw APIFailure.from(status:http.statusCode,body:data) }
         return data
     }
     /// "El servidor se está activando" (ServerWake) shows only when this one call has waited 5 s and the server seems
@@ -187,10 +217,12 @@ actor APIClient {
         guard slowCalls.remove(call) != nil, slowCalls.isEmpty else { return }
         Task { @MainActor in ServerWake.shared.waking=false }
     }
-    private func expire() async {
+    private func expire(_ reason: SessionEnd) async {
         await auth.signOut()
-        if let onUnauthorized { await onUnauthorized() }
+        if let onUnauthorized { await onUnauthorized(reason) }
     }
+    /// Ends the session outside a call (a refused own profile, `SessionEndRules.afterProfile`) through the same path as a 401.
+    func endSession(_ reason: SessionEnd) async { await expire(reason) }
 }
 
 /// Reports how much of an upload body has gone out (0...1). It holds only an immutable closure, so it is Sendable.

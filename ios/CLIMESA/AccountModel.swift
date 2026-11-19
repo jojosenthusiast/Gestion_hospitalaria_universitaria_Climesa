@@ -30,15 +30,24 @@ final class LoginDraft {
     init() {
         do { let config=try AppConfiguration.load(); let auth=AuthService(config:config); self.config=config; self.auth=auth; self.api=APIClient(config:config,auth:auth) }
         catch { config=nil; auth=nil; api=nil; self.error=error.localizedDescription; loading=false }
-        // 401 en cualquier llamada: la sesión ya se borró del Keychain; se vuelve al ingreso sin datos en memoria.
-        if let api { Task { await api.setUnauthorizedHandler { [weak self] in await self?.sessionExpired() } } }
+        // Sesión terminada por la API (SessionEnd): ya se borró del Keychain; se vuelve al ingreso sin datos en memoria.
+        if let api { Task { await api.setUnauthorizedHandler { [weak self] reason in await self?.sessionEnded(reason) } } }
     }
-    func sessionExpired() {
+    /// The API withdrew access while restoring or signing in: that flow shows the revoked message instead of its own error.
+    private var accessRevoked=false
+    func sessionEnded(_ reason: SessionEnd) {
+        if reason == .revoked { accessRevoked=true }
         guard profile != nil || pending else { return }
         revision+=1; profile=nil; pending=false; busy=false; loading=false; notice=nil
         // Automatic sign-out: local clinical drafts do not outlive the session (DraftStore).
         DraftStore.shared.clearAll()
-        error="Tu sesión expiró. Vuelve a ingresar."
+        error=reason.message
+    }
+    /// Login screen with «Tu acceso fue retirado…» after a restore or sign-in whose session the API ended as revoked.
+    private func showRevoked() {
+        accessRevoked=false; profile=nil; pending=false; notice=nil
+        DraftStore.shared.clearAll()
+        error=SessionEnd.revoked.message
     }
     /// Al volver de segundo plano: con sesión abierta solo se verifica de nuevo el perfil (no se pierde lo que estaba en pantalla).
     func resume() async {
@@ -65,21 +74,28 @@ final class LoginDraft {
         try? await verify()
     }
     func restore() async {
-        guard !busy, let auth else { return }; let stamp=revision; loading=true
+        guard !busy, let auth else { return }; let stamp=revision; loading=true; accessRevoked=false
         do {
             guard try await auth.session() != nil else { profile=nil; pending=false; loading=false; return }
             try await verify()
         } catch {
             guard stamp==revision else { return }
             // Una cancelación no es un fallo: no muestra error ni ofrece reintento.
-            if let message=SessionFailure.visibleMessage(for:error) { self.error=message; pending=true; profile=nil }
+            if accessRevoked { showRevoked() }
+            else if let message=SessionFailure.visibleMessage(for:error) { self.error=message; pending=true; profile=nil }
         }
         if stamp==revision { loading=false }
     }
     private func verify() async throws {
         guard let api else { throw ClientError.message("Falta configurar el servidor.") }
         let stamp=revision
-        let verified=try await api.get("/auth/me",as:AccessProfile.self)
+        let verified: AccessProfile
+        do { verified=try await api.get("/auth/me",as:AccessProfile.self) }
+        catch let failure as APIFailure {
+            // A refused own profile (403) means the account lost access; APIClient already ended a 401 itself.
+            if let end=SessionEndRules.afterProfile(status:failure.status) { await api.endSession(end) }
+            throw failure
+        }
         guard stamp==revision else { throw CancellationError() }
         // Un rol sin iOS (por ejemplo Recepción) no es un error: la pantalla muestra "Tu rol no usa esta aplicación".
         draft.clear()
@@ -88,7 +104,7 @@ final class LoginDraft {
         profile=verified; if let first=verified.allowedIOSRoles.first { role=verified.allowedIOSRoles.contains(role) ? role : first }; pending=false; error=nil; notice=nil
     }
     func signIn(email:String,password:String) async {
-        guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil; notice=nil; unconfirmedEmail=nil
+        guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil; notice=nil; unconfirmedEmail=nil; accessRevoked=false
         var signedIn=false
         do {
             try await auth.signIn(email:email,password:password); signedIn=true
@@ -98,7 +114,8 @@ final class LoginDraft {
         } catch {
             guard stamp==revision else { return }
             if (error as? AuthFailure)?.isEmailNotConfirmed == true { unconfirmedEmail=email.trimmingCharacters(in:.whitespacesAndNewlines) }
-            if let message=SessionFailure.visibleMessage(for:error) {
+            if accessRevoked { showRevoked() }
+            else if let message=SessionFailure.visibleMessage(for:error) {
                 self.error=message
                 if SessionFailure.offersRetry(after:error,signedIn:signedIn) { pending=true }
             }
@@ -137,7 +154,7 @@ final class LoginDraft {
     func register(name:String,email:String,password:String,confirmation:String) async {
         let errors=RegistrationRules.errors(name:name,email:email,password:password,confirmation:confirmation)
         guard errors.isEmpty else { error=errors.joined(separator:" "); return }
-        guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil
+        guard !busy, let auth else { return }; let stamp=revision; busy=true; error=nil; accessRevoked=false
         var savedSession=false
         do {
             let signedIn=try await auth.signUp(name:name,email:email,password:password)
@@ -146,7 +163,8 @@ final class LoginDraft {
             else { notice=nil; confirmationEmail=email.trimmingCharacters(in:.whitespacesAndNewlines); resendAvailableAt=ResendCooldown.availableAt(sentAt:Date()) }
         } catch {
             guard stamp==revision else { return }
-            if let message=SessionFailure.visibleMessage(for:error) {
+            if accessRevoked { showRevoked() }
+            else if let message=SessionFailure.visibleMessage(for:error) {
                 self.error=message
                 if SessionFailure.offersRetry(after:error,signedIn:savedSession) { pending=true }
             }
