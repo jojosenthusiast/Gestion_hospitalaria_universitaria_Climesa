@@ -63,3 +63,20 @@
   .inv-layout[data-selected="false"] > .inv-pane-detail { display: none; }
   .inv-back { display: inline-flex; }
 }
+
+/* Owner obs. 10: counts beside each filter, warehouse names with their code as quiet text, openable history rows. */
+.inv-count { margin-left: 2px; padding: 0 7px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.inv-toggle[aria-pressed="true"] .inv-count { background: var(--surface); color: var(--primary-text); }
+.inv-check { display: inline-flex; align-items: center; gap: 8px; min-height: 40px; color: var(--ink); font-size: 14px; font-weight: 700; cursor: pointer; }
+.inv-check input { width: 18px; height: 18px; accent-color: var(--primary); }
+.inv-filter-button { align-self: flex-end; }
+.inv-chips { align-items: center; }
+.inv-place small { font-weight: 600; }
+.inv-lot-places { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }
+.inv-history-tools { align-items: flex-end; }
+.inv-history-tools .select-field { flex: 0 1 200px; font-size: 13px; }
+.inv-history-tools .select-field select { min-height: 44px; }
+.inv-history tbody tr { cursor: pointer; }
+@media (hover: hover) { .inv-history tbody tr:hover { background: var(--bg); } }
+.inv-table td:last-child .crud-actions { width: 100%; }
+.inv-movement-detail dd { overflow-wrap: anywhere; }
