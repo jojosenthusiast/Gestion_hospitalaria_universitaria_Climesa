@@ -7,32 +7,36 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.LocalDate
 
 class AccountLinkingTest {
-    private val today = LocalDate.of(2026, 11, 13)
-    /** Fictitious DUI with a valid check digit. */
-    private val dui = "10000001-9"
+    private fun mine(linked: Boolean, email: String?, verified: Boolean) =
+        JSONObject().put("linked", linked).put("email", email ?: JSONObject.NULL).put("emailVerified", verified).put("request", JSONObject.NULL)
 
-    @Test fun formRequiresValidDuiAndPastIsoDate() {
-        assertEquals(emptyMap<String, String>(), LinkRules.errors(dui, "1990-01-01", today))
-        assertTrue("dui" in LinkRules.errors("10000001-8", "1990-01-01", today))
-        assertTrue("birth" in LinkRules.errors(dui, "01/01/1990", today))
-        assertTrue("birth" in LinkRules.errors(dui, "1990-02-30", today))
-        assertTrue("birth" in LinkRules.errors(dui, "2026-11-14", today))
+    @Test fun statusFollowsLinkedAndVerifiedEmail() {
+        val notVerified = LinkStatusRules.parse(mine(false, "ana@example.test", false))
+        assertEquals(MyLink(false, "ana@example.test", false), notVerified)
+        assertEquals(LinkStatus.EMAIL_NOT_VERIFIED, LinkStatusRules.status(notVerified, profileLinked = false))
+        assertEquals(LinkStatus.NOT_LINKED, LinkStatusRules.status(LinkStatusRules.parse(mine(false, "ana@example.test", true)), false))
+        assertEquals(LinkStatus.LINKED, LinkStatusRules.status(LinkStatusRules.parse(mine(true, "ana@example.test", true)), false))
+        assertEquals(LinkStatus.LINKED, LinkStatusRules.status(notVerified, profileLinked = true))
+        assertNull(LinkStatusRules.parse(mine(false, null, false)).email)
     }
 
-    @Test fun bodyCarriesFormattedDuiAndDate() {
-        val body = LinkRules.body("100000019", " 1990-01-01 ")
-        assertEquals("10000001-9", body.getString("dui"))
-        assertEquals("1990-01-01", body.getString("birth"))
-        assertEquals(LinkStatus.PENDING, LinkRules.statusOf("pendiente"))
-        assertEquals(LinkStatus.REJECTED, LinkRules.statusOf("rechazada"))
+    @Test fun recordEmailConflictsKeepTheApiTextAndOtherCodesAreIgnored() {
+        val inUse = "Ese correo ya está en el expediente activo 0000002-5. Cada correo puede estar en un solo expediente activo: revisa si es la misma persona o usa otro correo."
+        assertEquals(inUse, PatientEmail.conflict("correo_en_uso", inUse))
+        assertTrue(PatientEmail.conflict("correo_de_otra_cuenta", "")!!.startsWith("Ese correo es de una cuenta de la app"))
+        assertNull(PatientEmail.conflict("dui_duplicado", "x"))
+        assertEquals("Tu correo lo actualiza Recepción. Pídelo en ventanilla.", BusinessErrors.message("correo_lo_gestiona_recepcion"))
+        assertEquals("Vinculada", PatientEmail.appAccount("vinculada"))
+        assertEquals("Sin cuenta todavía", PatientEmail.appAccount("sin_cuenta"))
+        assertNull(PatientEmail.appAccount(null))
     }
 
     @Test fun resolutionEventsRefreshTheProfile() {
         val resolved = EventoDominio("vinculacion.resuelta", "vinculacion_paciente", "v1", 2)
         assertTrue(LinkEvents.matches(resolved) && LinkEvents.resolved(resolved))
+        assertTrue(LinkEvents.matches(EventoDominio("vinculacion.resuelta", "usuario", "u1", 2)))
         assertFalse(LinkEvents.resolved(EventoDominio("vinculacion.solicitada", "vinculacion_paciente", "v1", 1)))
         assertTrue(ProfileEvents.matches(resolved))
         assertFalse(ProfileEvents.matches(EventoDominio("vinculacion.solicitada", "vinculacion_paciente", "v1", 1)))

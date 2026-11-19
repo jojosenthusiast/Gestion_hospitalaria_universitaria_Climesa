@@ -81,22 +81,6 @@ class ReceptionSchedulingTest {
         assertFalse(ReceptionScheduling.createBody(patient, doctor, free, "  ").has("reason"))
     }
 
-    @Test fun linkRequestsExplainWhatToDo() {
-        val rows = ReceptionLinking.parse(JSONArray("""[
-          {"id":"v1","version":1,"createdAt":"2026-11-13T15:12:00Z","account":{"email":"a@x.test","name":"Ana"},"declared":{"dui":"06612345-2","birth":"1999-05-30"},"candidate":{"id":"p","record":"000412-7","fullName":"Ana","birth":"1999-05-30"},"candidates":1},
-          {"id":"v2","version":3,"createdAt":"2026-11-13T16:05:00Z","account":{"email":"b@x.test","name":""},"declared":{"dui":"07788990-1","birth":"1988-02-14"},"candidate":null,"candidates":0},
-          {"id":"v3","version":1,"createdAt":"2026-11-13T16:06:00Z","account":{"email":"c@x.test","name":""},"declared":{"dui":"1","birth":"1"},"candidate":null,"candidates":2}]"""))
-        assertTrue(rows[0].canApprove)
-        assertTrue(rows[0].birthMatches)
-        assertFalse(rows[1].canApprove)
-        assertTrue(rows[1].guidance.contains("búscalo en Pacientes"))
-        assertTrue(rows[2].guidance.contains("posible duplicado"))
-        assertEquals(3, ReceptionLinking.approveBody(rows[1]).getInt("version"))
-        assertEquals("motivo suficiente", ReceptionLinking.rejectBody(rows[0], " motivo suficiente ").getString("reason"))
-        assertEquals("El motivo debe tener al menos 10 caracteres.", ReceptionLinking.rejectError("corto"))
-        assertNull(ReceptionLinking.rejectError("motivo suficiente"))
-    }
-
     @Test fun prefillCopiesWhatWasSearched() {
         assertEquals(PatientDraft(dui = "12345678-9"), PatientRules.prefill("123456789"))
         assertEquals(PatientDraft(givenNames = "Pedro"), PatientRules.prefill(" Pedro "))

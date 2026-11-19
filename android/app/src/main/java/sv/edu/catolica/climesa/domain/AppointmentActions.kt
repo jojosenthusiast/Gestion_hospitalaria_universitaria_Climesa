@@ -169,6 +169,8 @@ object BusinessErrors {
         "expediente_ya_vinculado" -> "Ese expediente ya está vinculado a otra cuenta."
         "cuenta_ya_vinculada" -> "Esta cuenta ya está vinculada a un expediente."
         "vinculacion_pendiente" -> "Ya tienes una solicitud de vinculación en revisión."
+        // U12: the patient's own email is Recepción's; the API gives the same text (`PATCH /me/paciente`, 403).
+        "correo_lo_gestiona_recepcion" -> "Tu correo lo actualiza Recepción. Pídelo en ventanilla."
         "consulta_firmada" -> "La consulta ya está firmada; no se puede modificar."
         "existencia_insuficiente" -> "No hay existencia suficiente en ese lote o bodega."
         // trabajo_abierto and capacidad_excedida keep the API text: it lists what to reassign / names the full room.

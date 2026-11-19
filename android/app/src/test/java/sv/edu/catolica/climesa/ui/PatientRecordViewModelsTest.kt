@@ -36,51 +36,45 @@ class PatientRecordViewModelsTest {
     @After fun tearDown() = Dispatchers.resetMain()
     private val resolved = RealtimeSignal.Event(EventoDominio("vinculacion.resuelta", "vinculacion_paciente", "v1", 2))
 
-    private fun linkModel(api: FakeGateway, bus: RecordSignalBus) = LinkRecordViewModel(api, bus).also { it.today = { LocalDate.of(2026, 11, 13) } }
+    private fun linkModel(api: FakeGateway, bus: RecordSignalBus) = LinkRecordViewModel(api, bus)
+    private fun mine(linked: Boolean, verified: Boolean, email: String? = "ana@example.test") =
+        JSONObject().put("linked", linked).put("email", email ?: JSONObject.NULL).put("emailVerified", verified).put("request", JSONObject.NULL)
 
-    @Test fun invalidFormIsNotSent() = runTest(dispatcher) {
-        val api = FakeGateway(); val vm = linkModel(api, RecordSignalBus())
-        vm.submit("10000001-8", "1990-01-01"); runCurrent()
-        assertTrue("dui" in vm.state.value.fieldErrors)
-        assertTrue(api.calls.isEmpty())
+    @Test fun unverifiedEmailAsksToConfirmItFirst() = runTest(dispatcher) {
+        val api = FakeGateway(); api.responses["/me/vinculacion"] = mine(linked = false, verified = false)
+        val vm = linkModel(api, RecordSignalBus()); vm.init(null); runCurrent()
+        assertEquals(LinkStatus.EMAIL_NOT_VERIFIED, vm.state.value.status)
+        assertEquals("ana@example.test", vm.state.value.email)
     }
 
-    @Test fun pendingRequestBecomesApprovedWhenReceptionApproves() = runTest(dispatcher) {
+    @Test fun notLinkedShowsTheEmailForReceptionAndJoinsLive() = runTest(dispatcher) {
         val api = FakeGateway(); val bus = RecordSignalBus()
-        val pending = JSONObject().put("id", "v1").put("state", "pendiente").put("createdAt", "2026-11-13T15:00:00Z")
-        api.responses["/cuentas/vinculacion"] = pending
-        api.responses["/me/vinculacion"] = JSONObject().put("linked", false).put("request", pending)
+        api.responses["/me/vinculacion"] = mine(linked = false, verified = true)
         val vm = linkModel(api, bus)
-        vm.startLive(listOf("usuario:u1")); vm.submit("10000001-9", "1990-01-01"); runCurrent()
-        assertEquals(LinkStatus.PENDING, vm.state.value.status)
-        assertEquals("10000001-9", api.calls.single { it.first == "/cuentas/vinculacion" }.third!!.getString("dui"))
-        api.responses["/me/vinculacion"] = JSONObject().put("linked", true).put("request", JSONObject(pending.toString()).put("state", "aprobada"))
+        vm.startLive(listOf("usuario:u1")); vm.init(null); runCurrent()
+        assertEquals(LinkStatus.NOT_LINKED, vm.state.value.status)
+        assertEquals("ana@example.test", vm.state.value.email)
+        api.responses["/me/vinculacion"] = mine(linked = true, verified = true)
         bus.signals.tryEmit(resolved); runCurrent()
-        assertEquals(LinkStatus.APPROVED, vm.state.value.status)
+        assertEquals(LinkStatus.LINKED, vm.state.value.status)
+        // U12: there is no request to send any more.
+        assertTrue(api.calls.none { it.first == "/cuentas/vinculacion" })
     }
 
-    @Test fun resolutionWithoutLinkedRecordIsARejection() = runTest(dispatcher) {
-        val api = FakeGateway(); val bus = RecordSignalBus()
-        val pending = JSONObject().put("id", "v1").put("state", "pendiente").put("createdAt", "2026-11-12T15:00:00Z")
-        api.failures["/cuentas/vinculacion"] = AuthRequestException("Ya tienes una solicitud en verificación.", 409, "vinculacion_pendiente")
-        api.responses["/me/vinculacion"] = JSONObject().put("linked", false).put("request", pending)
-        val vm = linkModel(api, bus)
-        vm.startLive(listOf("usuario:u1")); vm.submit("10000001-9", "1990-01-01"); runCurrent()
-        assertEquals(LinkStatus.PENDING, vm.state.value.status)
-        assertEquals("the API says since when", LocalDate.of(2026, 11, 12), vm.state.value.since)
-        bus.signals.tryEmit(RealtimeSignal.Resync); runCurrent()
-        assertEquals(LinkStatus.PENDING, vm.state.value.status)
-        api.responses["/me/vinculacion"] = JSONObject().put("linked", false).put("request", JSONObject(pending.toString()).put("state", "rechazada").put("rejectionReason", "Datos distintos."))
-        bus.signals.tryEmit(resolved); runCurrent()
-        assertEquals(LinkStatus.REJECTED, vm.state.value.status)
-        vm.retry()
-        assertEquals(LinkStatus.FORM, vm.state.value.status)
+    @Test fun failedReadIsUnavailableNotNotLinked() = runTest(dispatcher) {
+        val api = FakeGateway(); api.failures["/me/vinculacion"] = AuthRequestException("Sin conexión.")
+        val vm = linkModel(api, RecordSignalBus()); vm.init(null); runCurrent()
+        assertEquals(LinkStatus.UNAVAILABLE, vm.state.value.status)
+        api.failures.clear(); api.responses["/me/vinculacion"] = mine(linked = false, verified = true)
+        vm.reload(); runCurrent()
+        assertEquals(LinkStatus.NOT_LINKED, vm.state.value.status)
+        assertNull(vm.state.value.readError)
     }
 
-    @Test fun linkedProfileShowsApprovedWithoutCallingTheApi() = runTest(dispatcher) {
+    @Test fun linkedProfileShowsLinkedWithoutCallingTheApi() = runTest(dispatcher) {
         val api = FakeGateway(); val vm = linkModel(api, RecordSignalBus())
         vm.init("p1")
-        assertEquals(LinkStatus.APPROVED, vm.state.value.status)
+        assertEquals(LinkStatus.LINKED, vm.state.value.status)
         assertTrue(api.calls.isEmpty())
     }
 

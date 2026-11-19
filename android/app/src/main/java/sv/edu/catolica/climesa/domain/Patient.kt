@@ -9,16 +9,49 @@ import java.util.UUID
 enum class Sex(val label: String) { FEMALE("Femenino"), MALE("Masculino"), INDETERMINATE("Indeterminado"), UNKNOWN("No registrado") }
 data class Patient(val id: String = UUID.randomUUID().toString(), val record: String,
     val givenNames: String, val surnames: String, val dui: String?, val birth: LocalDate?,
-    val sex: Sex, val phone: String, val active: Boolean = true, val version: Int = 1) {
+    val sex: Sex, val phone: String, val active: Boolean = true, val version: Int = 1,
+    /** Record email; null when the role does not see contact data (the API leaves the field out). */
+    val email: String? = null,
+    /** `appAccount` of the record (U12): vinculada, sin_cuenta or correo_repetido; null without contact data. */
+    val appAccount: String? = null) {
     val fullName get() = "$givenNames $surnames"
 }
 data class PatientDraft(val givenNames: String = "", val surnames: String = "", val dui: String = "",
-    val birth: String = "", val sex: Sex = Sex.UNKNOWN, val phone: String = "") {
-    companion object { fun from(p: Patient) = PatientDraft(p.givenNames,p.surnames,p.dui.orEmpty(),p.birth?.toString().orEmpty(),p.sex,p.phone) }
+    val birth: String = "", val sex: Sex = Sex.UNKNOWN, val phone: String = "",
+    /** Null when the email is not shown to this role: then the save never sends it, so it is never cleared by mistake. */
+    val email: String? = null) {
+    companion object { fun from(p: Patient) = PatientDraft(p.givenNames,p.surnames,p.dui.orEmpty(),p.birth?.toString().orEmpty(),p.sex,p.phone,p.email) }
 }
 data class AuditEvent(val record: String, val action: String, val reason: String, val version: Int,
     val at: String = Instant.now().toString(), val changes: Map<String,String> = emptyMap())
 data class Registry(val patients: List<Patient>, val audit: List<AuditEvent> = emptyList(), val nextSequence: Long = 6, val totalActive: Int? = null, val totalInactive: Int? = null)
+
+/**
+ * U12: the record email links the patient's app account on its own (verified email). The API refuses an email already on
+ * another active record (`correo_en_uso`) or owned by an account joined to another record (`correo_de_otra_cuenta`); the
+ * form shows that 409 on the email field, with the API text, which names the other record (web `EMAIL_CONFLICTS`).
+ */
+object PatientEmail {
+    const val FORMAT_ERROR = "Revisa el correo: falta el @ o el dominio."
+    val CONFLICTS = setOf("correo_en_uso", "correo_de_otra_cuenta")
+
+    /** The field message for an email 409; null for any other code. */
+    fun conflict(code: String?, message: String?): String? {
+        if (code !in CONFLICTS) return null
+        return message?.trim()?.takeIf { it.isNotBlank() } ?: when (code) {
+            "correo_en_uso" -> "Ese correo ya está en otro expediente activo. Cada correo puede estar en un solo expediente activo: revisa si es la misma persona o usa otro correo."
+            else -> "Ese correo es de una cuenta de la app que ya está unida a otro expediente. Revisa si es la misma persona antes de usarlo aquí."
+        }
+    }
+
+    /** The record's «Cuenta de la app» line, the same words as the web (`appAccountNames`). */
+    fun appAccount(state: String?): String? = when (state) {
+        "vinculada" -> "Vinculada"
+        "sin_cuenta" -> "Sin cuenta todavía"
+        "correo_repetido" -> "Sin vincular: otro expediente activo tiene este mismo correo. Corrige uno de los dos."
+        else -> null
+    }
+}
 
 /** Datos extra del 409 de registro: `dui_duplicado` (paciente) y `posible_duplicado` (candidatos). */
 object PatientDuplicates {
@@ -74,6 +107,7 @@ object PatientRules {
         if(!nameValid(d.surnames,100)) put("surnames","Escribe apellidos válidos (2 a 100 caracteres, sin números).")
         if(d.dui.isNotBlank() && (!d.dui.matches(Regex("[0-9]{8}-?[0-9]")) || !validDui(d.dui))) put("dui","Usa 9 dígitos con un verificador válido.")
         if(d.phone.isNotBlank() && !d.phone.matches(Regex("[267][0-9]{3}-?[0-9]{4}"))) put("phone","Usa un teléfono de 8 dígitos: 7000-0000.")
+        d.email?.trim()?.takeIf(String::isNotBlank)?.let { if(!it.matches(Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$"))) put("email",PatientEmail.FORMAT_ERROR) }
         if(d.birth.isNotBlank()) {
             val date=runCatching { LocalDate.parse(d.birth) }.getOrNull()
             if(date==null || date>today || date<today.minusYears(120)) put("birth","Usa AAAA-MM-DD, sin fechas futuras ni mayores a 120 años.")

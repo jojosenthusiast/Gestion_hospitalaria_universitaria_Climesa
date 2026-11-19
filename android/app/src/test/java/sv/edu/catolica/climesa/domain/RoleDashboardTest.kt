@@ -25,7 +25,7 @@ class RoleDashboardTest {
             listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.APPOINTMENTS, DashboardSource.SHIFTS),
             RoleDashboard.sources("REC", setOf("camas.ver_tablero", "fila.ver", "admision.ver", "ambulancia.ver_estado", "citas.ver", "turnos.ver")),
         )
-        assertFalse(DashboardSource.LINKS in RoleDashboard.sources("REC", setOf("fila.ver")))
+        assertTrue(RoleDashboard.sources("REC", everything).none { it.path.startsWith("/cuentas/vinculaciones") })
         assertTrue(RoleDashboard.sources("LAB", setOf("sesion.perfil")).isEmpty())
     }
 
@@ -60,7 +60,7 @@ class RoleDashboardTest {
         assertEquals(listOf(QuickAction.ISSUE_NUMBER), limited)
     }
 
-    @Test fun recepcionAvisaLasSolicitudesDeCitaYLasVinculaciones() {
+    @Test fun recepcionAvisaLasSolicitudesDeCitaSinVinculaciones() {
         val model = RoleDashboard.build(
             "REC", everything,
             mapOf(
@@ -72,7 +72,6 @@ class RoleDashboardTest {
                 ),
                 // S8: a pending request by category also waits on Recepción; an assigned one does not.
                 DashboardSource.CATEGORY_REQUESTS to rows(row("state" to "pendiente"), row("state" to "asignada")),
-                DashboardSource.LINKS to rows(row("id" to "a"), row("id" to "b")),
             ),
             now = now,
         )
@@ -81,8 +80,8 @@ class RoleDashboardTest {
         assertEquals("2 solicitudes de cita", model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.title)
         assertEquals(QuickAction.REVIEW_REQUESTS, model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.request.action)
         assertTrue(model.attention.first { it.request.section == AndroidSection.APPOINTMENTS }.detail.contains("reprograma"))
-        assertEquals("2 vinculaciones por verificar", model.attention.first { it.request.section == AndroidSection.LINKING }.title)
-        assertTrue(model.attention.any { it.request.section == AndroidSection.LINKING })
+        // U12: the account joins its record by verified email; Recepción has no linking tray any more.
+        assertTrue(model.attention.none { it.title.contains("vinculaci") })
         assertTrue(model.attention.any { it.request.section == AndroidSection.APPOINTMENTS })
     }
 

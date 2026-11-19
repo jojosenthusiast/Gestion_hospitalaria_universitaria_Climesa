@@ -23,7 +23,6 @@ import sv.edu.catolica.climesa.data.realtime.RealtimeRepository
 import sv.edu.catolica.climesa.domain.NoticeInboxParser
 import sv.edu.catolica.climesa.domain.NoticeInboxRules
 import sv.edu.catolica.climesa.domain.RealtimeSignal
-import sv.edu.catolica.climesa.domain.ReceptionLinking
 
 /** U5: "Ingresos indicados" (G3), the notices badge (D1), link requests (G2) and new results reaching 0 (G6). */
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -114,29 +113,6 @@ class TrayBadgeLinkingU5Test {
         assertEquals("9+", NoticeInboxRules.badgeText(12))
         assertEquals("4", NoticeInboxRules.badgeText(4))
         assertNull(NoticeInboxRules.badgeText(0))
-    }
-
-    @Test fun linkRequestShowsTheClosestRecordWithoutMakingItApprovable() {
-        val rows = ReceptionLinking.parse(JSONArray().put(JSONObject().put("id", "l1").put("version", 1).put("createdAt", "2026-11-17T15:00:00Z")
-            .put("account", JSONObject().put("email", "ana@example.com").put("name", "Ana")).put("declared", JSONObject().put("dui", "01234567-8").put("birth", "1990-01-01"))
-            .put("candidate", JSONObject.NULL).put("candidates", 0)
-            .put("closest", JSONObject().put("id", "p9").put("record", "EXP-9").put("fullName", "Ana Ficticia").put("birth", "1990-01-01").put("dui", "01234567-9"))))
-        val row = rows.single()
-        assertFalse(row.hasCandidate)
-        assertFalse(row.canApprove)
-        assertEquals("EXP-9", row.closestRecord)
-        assertEquals("01234567-9", row.closestDui)
-        assertTrue(row.guidance.contains("EXP-9"))
-    }
-
-    @Test fun aFailedRejectKeepsItsErrorAfterTheListReloads() = runTest(dispatcher) {
-        val api = FakeGateway()
-        api.responses["/cuentas/vinculaciones"] = JSONArray()
-        api.failures["/cuentas/vinculaciones/l1/rechazar"] = RuntimeException("red")
-        val vm = ReceptionLinkingViewModel(api, quiet)
-        val row = sv.edu.catolica.climesa.domain.LinkRequestRow("l1", 1, "", "ana@example.com", "Ana", "01234567-8", "1990-01-01", null, null, null, 0)
-        vm.reject(row, "Los datos no coinciden con el DUI"); runCurrent()
-        assertTrue("the error stays for the open dialog", vm.state.value.error != null)
     }
 
     @Test fun openingMyResultsMarksThemSeenWithTheServerTime() = runTest(dispatcher) {

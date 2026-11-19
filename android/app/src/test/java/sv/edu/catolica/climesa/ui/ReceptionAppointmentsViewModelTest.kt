@@ -101,12 +101,12 @@ class ReceptionRegistrationViewModelTest {
 
     private class Repo : PatientRepository {
         override val remote = true
-        var searches = 0; var saves = mutableListOf<Boolean>(); var failWith: Exception? = null
+        var searches = 0; var saves = mutableListOf<Boolean>(); val emails = mutableListOf<String?>(); var failWith: Exception? = null
         override suspend fun load() = Registry(emptyList())
         override suspend fun update(transform: (Registry) -> Registry) = throw UnsupportedOperationException()
         override suspend fun search(query: String) = PatientSearchResult(Registry(emptyList()), "tok", java.time.Instant.now().epochSecond + 600).also { searches++ }
         override suspend fun save(draft: PatientDraft, id: String?, version: Int?, reason: String, token: String?, query: String, confirmNew: Boolean): PatientDetails {
-            saves += confirmNew; failWith?.let { throw it }
+            saves += confirmNew; emails += draft.email; failWith?.let { throw it }
             return PatientDetails(sv.edu.catolica.climesa.domain.Patient(id = "p9", record = "9", givenNames = draft.givenNames, surnames = draft.surnames, dui = null, birth = null, sex = draft.sex, phone = ""), emptyList())
         }
         override suspend fun detail(id: String) = throw UnsupportedOperationException()
@@ -118,6 +118,34 @@ class ReceptionRegistrationViewModelTest {
         assertEquals(1, repo.searches)
         assertTrue(vm.state.value.formOpen)
         assertEquals("Pedro", vm.state.value.draft.givenNames); assertEquals("Gomez", vm.state.value.draft.surnames)
+    }
+
+    @Test fun anEmailConflictIsShownOnceOnTheEmailField() = runTest(dispatcher) {
+        val repo = Repo(); val vm = ReceptionViewModel(repo, QuietBus()); vm.setPermissions(listOf("pacientes.buscar", "pacientes.registrar"))
+        vm.query("Ana Ficticia"); vm.newPatient(); advanceUntilIdle()
+        assertEquals("the new-patient form asks for the email", "", vm.state.value.draft.email)
+        vm.draft(vm.state.value.draft.copy(email = "ana@example.test"))
+        val inUse = "Ese correo ya está en el expediente activo 0000002-5. Cada correo puede estar en un solo expediente activo: revisa si es la misma persona o usa otro correo."
+        repo.failWith = AuthRequestException(inUse, 409, "correo_en_uso")
+        vm.save(); advanceUntilIdle()
+        assertEquals(inUse, vm.state.value.fields["email"])
+        assertNull("not repeated as a banner", vm.state.value.error)
+        assertTrue(vm.state.value.formOpen)
+        val other = "Ese correo es de una cuenta de la app que ya está unida al expediente 0000003-1. Revisa si es la misma persona antes de usarlo aquí."
+        repo.failWith = AuthRequestException(other, 409, "correo_de_otra_cuenta")
+        vm.save(); advanceUntilIdle()
+        assertEquals(other, vm.state.value.fields["email"])
+        assertNull(vm.state.value.error)
+        assertEquals(listOf("ana@example.test", "ana@example.test"), repo.emails)
+    }
+
+    @Test fun anInvalidEmailIsNotSent() = runTest(dispatcher) {
+        val repo = Repo(); val vm = ReceptionViewModel(repo, QuietBus()); vm.setPermissions(listOf("pacientes.buscar", "pacientes.registrar"))
+        vm.query("Ana Ficticia"); vm.newPatient(); advanceUntilIdle()
+        vm.draft(vm.state.value.draft.copy(email = "sin-arroba"))
+        vm.save(); advanceUntilIdle()
+        assertEquals("Revisa el correo: falta el @ o el dominio.", vm.state.value.fields["email"])
+        assertTrue(repo.saves.isEmpty())
     }
 
     @Test fun registeringWithoutAnythingTypedExplainsWhatToDo() = runTest(dispatcher) {
