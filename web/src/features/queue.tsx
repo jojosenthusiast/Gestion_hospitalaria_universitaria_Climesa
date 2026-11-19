@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type DragEvent, type FormEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type DragEvent, type FormEvent } from 'react';
 import { ExportMenu } from '../components/export-menu';
 import { SearchPicker, type PickerItem } from '../components/search-picker';
-import { StatusBadge, ActionButton, AreaTag, PriorityBadge, ReadOnlyBadge, type Priority } from '../components/system';
+import { StatusBadge, ActionButton, AreaTag, CrudButton, PriorityBadge, ReadOnlyBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
 import { can, type AccessProfile, type Api, type Space } from '../lib/api';
-import { MOVE_LABEL, MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
+import { MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
 import { NO_SHOW_DELAY_MS, patientPicker } from './appointments';
 import { useQuickAction } from './personal/accion';
 import { FrontDeskDialog } from './front-desk';
@@ -16,6 +16,8 @@ import { formatDuration, formatTime, plural } from '../lib/format';
 import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
 import './listas/lists.css';
 import { CategoryBadges, type CategoryRef } from '../components/category';
+import { QueueCardMenu, type CardMenuItem } from './queue/card-menu';
+import './queue/queue.css';
 
 type QueueAction = 'llamar' | 'atender' | 'completar' | 'no_se_presento';
 /** FILA-01/CITA-04: the server says which actions the reader may take now (`allowedActions`) and why the others are blocked. */
@@ -147,11 +149,16 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const waitingNext = loaded.filter(t => t.service === nextService && t.state === 'en_espera').length;
   // One request for «Quién sigue»: the panel and the bottom dock read the same server proposal.
   const next = useData<NextProposal>(api, `/fila/siguiente?service=${nextService ?? ''}`, version + tick, showNext);
-  const dockShown = !!data.data && (loaded.length > 0 || call || issue || !!undo);
+  const summaryShown = !!data.data && (loaded.length > 0 || call || issue);
   return <>
     <CompactHeader breadcrumb="Atención / Flujo de llegada" title="Fila del día" actions={<>
       {readOnly && <ReadOnlyBadge who="Recepción, Asistencia o Medicina" what="la fila del día" />}
       </>}/>
+    {/* Owner batch 2 (S28): the summary and the line's actions sit on top, so a long board never hides them. */}
+    {summaryShown && <QueueSummary visible={loadedVisible} now={now} proposal={showNext && next.data && !Array.isArray(next.data) && next.data.service === nextService ? next.data.proposal : null}
+            onCallNext={call && showNext && nextService ? () => void callNext(nextService, office) : null} callDisabled={action.busy || waitingNext === 0}
+            onIssue={issue ? () => setIssueOpen(true) : null} />}
+    {undo && !action.error && <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoCall(undo)}><Icon name="retry" size={16} />Deshacer</button></div>}
     <section className="data-workbench" aria-label="Tablero de la fila">
       <RemoteState state={data}>{all => {
         const visible = loadedVisible;
@@ -177,10 +184,6 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
         </>;
       }}</RemoteState>
     </section>
-    {dockShown && <QueueDock visible={loadedVisible} now={now} proposal={showNext && next.data && !Array.isArray(next.data) && next.data.service === nextService ? next.data.proposal : null}
-            undo={undo && !action.error ? <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoCall(undo)}><Icon name="retry" size={16} />Deshacer</button></div> : null}
-            onCallNext={call && showNext && nextService ? () => void callNext(nextService, office) : null} callDisabled={action.busy || waitingNext === 0}
-            onIssue={issue ? () => setIssueOpen(true) : null} />}
     {issueOpen && (profile.patientId && !manage
       ? <IssueDialog api={api} profile={profile} onClose={() => setIssueOpen(false)} onSaved={() => { setIssueOpen(false); refresh(); }} />
       : <FrontDeskDialog api={api} patientId={deskPatient} onClose={() => { setIssueOpen(false); setDeskPatient(null); }} onIssued={refresh} />)}
@@ -219,47 +222,32 @@ function NextPanel({ api, profile, service, named, next, canCall, waiting, offic
   </section>;
 }
 
-type DockProposal = NonNullable<NextProposal['proposal']>;
+type SummaryProposal = NonNullable<NextProposal['proposal']>;
 /**
- * Android parity (QueueDock): a bottom dock that stays in view while the board scrolls. Who is being seen, who goes
- * next (the server proposal when there is one, else the head of the line) with the area tag, the wait times in large
- * type, and «Llamar siguiente» / «Emitir número» splitting the full width. Buttons the account cannot use are absent.
+ * Owner batch 2 (S28): one compact line under the title. Who is being seen, who goes next (the server proposal when
+ * there is one, else the head of the line) with the area tag, the average and longest wait, and «Llamar siguiente» /
+ * «Emitir número» at its end. It used to be a dock under the board; with many numbers the reader had to scroll to it.
+ * On a wide screen it stays under the hospital header while the board scrolls. Buttons the account cannot use are absent.
  */
-export function QueueDock({ visible, now, proposal, undo, onCallNext, callDisabled, onIssue }: { visible: QueueTicket[]; now: number; proposal: DockProposal | null; undo?: ReactNode; onCallNext: (() => void) | null; callDisabled: boolean; onIssue: (() => void) | null }) {
+export function QueueSummary({ visible, now, proposal, onCallNext, callDisabled, onIssue }: { visible: QueueTicket[]; now: number; proposal: SummaryProposal | null; onCallNext: (() => void) | null; callDisabled: boolean; onIssue: (() => void) | null }) {
   const serving = visible.filter(t => t.state === 'en_atencion' || t.state === 'llamado').sort((a, b) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0] ?? null;
   const waiting = sortColumn(visible.filter(t => t.state === 'en_espera'), 'espera');
   const summary = boardSummary(visible, now);
   const nextArea = proposal ? proposal.area || 'GEN' : waiting[0] ? areaOfTicket(waiting[0]) : null;
   const nextNumber = proposal?.numero ?? waiting[0]?.numero ?? null;
-  const ref = useRef<HTMLElement>(null);
-  // The board reserves the dock's height under its last card (and scroll-into-view stops above it), so nothing ends
-  // up hidden under the sticky dock. The height changes with the undo line and the window width, so it is measured.
-  useEffect(() => {
-    const dock = ref.current;
-    const root = document.documentElement;
-    if (!dock) return;
-    const measure = () => root.style.setProperty('--qb-dock-h', `${Math.ceil(dock.getBoundingClientRect().height)}px`);
-    measure();
-    root.classList.add('qb-has-dock');
-    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
-    observer?.observe(dock);
-    return () => { observer?.disconnect(); root.classList.remove('qb-has-dock'); root.style.removeProperty('--qb-dock-h'); };
-  }, []);
-  return <section ref={ref} className="qb-dock" aria-label="Resumen de atención">
-    {undo}
-    <div className="qb-dock-stats">
-      <div className="qb-dock-stat"><span className="qb-dock-label">En atención</span>
-        <span className="qb-dock-value">{serving ? <><AreaTag code={areaOfTicket(serving)} /><strong className="mono-data">{serving.numero}</strong></> : <strong className="qb-dock-none">Nadie</strong>}</span></div>
-      <div className="qb-dock-stat"><span className="qb-dock-label">Sigue</span>
-        <span className="qb-dock-value">{nextNumber !== null && nextArea ? <><AreaTag code={nextArea} /><strong className="mono-data">{nextNumber}</strong></> : <strong className="qb-dock-none">Nadie</strong>}</span>
-        {waiting.length > 0 && <small>{waiting.length} en espera</small>}</div>
-      <div className="qb-dock-stat qb-dock-wait"><span className="qb-dock-label">Espera promedio</span>
-        <span className="qb-dock-value"><strong>{formatDuration(summary.averageWait)}</strong></span>
-        <small>Máxima {formatDuration(summary.longestWait)}</small></div>
+  return <section className="qb-summary" aria-label="Resumen de atención">
+    <div className="qb-summary-stats">
+      <div className="qb-summary-stat"><span className="qb-summary-label">En atención</span>
+        <span className="qb-summary-value">{serving ? <><AreaTag code={areaOfTicket(serving)} /><strong className="mono-data">{serving.numero}</strong></> : <strong className="qb-summary-none">Nadie</strong>}</span></div>
+      <div className="qb-summary-stat"><span className="qb-summary-label">Sigue</span>
+        <span className="qb-summary-value">{nextNumber !== null && nextArea ? <><AreaTag code={nextArea} /><strong className="mono-data">{nextNumber}</strong></> : <strong className="qb-summary-none">Nadie</strong>}
+          {waiting.length > 0 && <small>{waiting.length} en espera</small>}</span></div>
+      <div className="qb-summary-stat qb-summary-wait"><span className="qb-summary-label">Espera promedio</span>
+        <span className="qb-summary-value"><strong>{formatDuration(summary.averageWait)}</strong><small>Máxima {formatDuration(summary.longestWait)}</small></span></div>
     </div>
-    {(onCallNext || onIssue) && <div className="qb-dock-actions">
-      {onCallNext && <button type="button" className={onIssue ? 'secondary-button' : 'primary-button'} disabled={callDisabled} onClick={onCallNext}><Icon name="megaphone" size={18} />Llamar siguiente</button>}
-      {onIssue && <button type="button" className="primary-button" onClick={onIssue}><Icon name="plus" size={18} />Emitir número</button>}
+    {(onCallNext || onIssue) && <div className="qb-summary-actions">
+      {onCallNext && <button type="button" className="secondary-button" disabled={callDisabled} onClick={onCallNext}><Icon name="megaphone" size={18} />Llamar siguiente</button>}
+      {onIssue && <CrudButton kind="create" label="Emitir número" onClick={onIssue} />}
     </div>}
   </section>;
 }
@@ -334,31 +322,31 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
         {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento'} disabled={busy} onClick={() => void (name === 'no_se_presento' ? onMove(ticket, 'cerrado') : onTransition(ticket, actionPath[name]))}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
         {undos[ticket.id] && ticket.state === 'llamado' && <button type="button" className="row-action" disabled={busy} onClick={() => onUndo(undos[ticket.id])}><Icon name="retry" size={16} />Deshacer llamado</button>}
-        {(moves.length > 0 || changingPriority || (call && canRemoveCall(ticket)) || voidable(ticket, issue, now)) && <CardMenu ticket={ticket} moves={moves} priorities={changingPriority} removeCall={call && canRemoveCall(ticket)} canVoid={voidable(ticket, issue, now)} busy={busy} onMove={onMove} onPriority={onPriority} onRemoveCall={() => void onTransition(ticket, 'deshacer-llamado')} onVoid={() => onVoid(ticket)} />}
+        <QueueCardMenu label={`Más acciones de ${ticketCode(ticket)}`} disabled={busy} items={cardMenuItems(ticket, { moves, priorities: changingPriority, removeCall: call && canRemoveCall(ticket), canVoid: voidable(ticket, issue, now),
+          onMove: to => void onMove(ticket, to), onPriority: p => void onPriority(ticket, p), onRemoveCall: () => void onTransition(ticket, 'deshacer-llamado'), onVoid: () => onVoid(ticket) })} />
       </div>}
       </li>;
     })}</ul>{shownTickets.length < tickets.length && <button type="button" className="cl-link-button qb-more" onClick={() => setUnfolded(true)}>Ver {tickets.length - shownTickets.length} más</button>}</> : <p className="muted">Nadie por ahora.</p>}</section>;
 }
 
-/** Keyboard and touch alternative to dragging: a native menu with the moves the server accepts and the priority. */
 /** B-3: «Anular» while the server says this reader issued it and the 10 minutes have not passed. */
 const voidable = (ticket: QueueTicket, issue: boolean, now: number) => issue && ticket.state === 'en_espera' && !!ticket.voidableUntil && Date.parse(ticket.voidableUntil) > now;
 
-function CardMenu({ ticket, moves, priorities, removeCall, canVoid, busy, onMove, onPriority, onRemoveCall, onVoid }: { ticket: QueueTicket; moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; removeCall: boolean; canVoid: boolean; busy: boolean; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>; onRemoveCall: () => void; onVoid: () => void }) {
-  function choose(value: string) {
-    if (value === 'quitar-llamado') { onRemoveCall(); return; }
-    if (value === 'anular') { onVoid(); return; }
-    const [kind, target] = value.split(':');
-    if (kind === 'mover') void onMove(ticket, target as BoardColumn);
-    if (kind === 'prioridad') void onPriority(ticket, target as Priority);
-  }
-  return <select className="qb-menu" value="" disabled={busy} onChange={event => choose(event.target.value)} aria-label={`Mover o cambiar prioridad de ${ticketCode(ticket)}`}>
-    <option value="">Mover…</option>
-    {removeCall && <option value="quitar-llamado">Quitar un llamado (van {ticket.llamados})</option>}
-    {canVoid && <option value="anular">Anular número (emitido por error)</option>}
-    {moves.length > 0 && <optgroup label="Mover a">{moves.map(item => <option key={item.to} value={`mover:${item.to}`}>{COLUMN_LABEL[item.to as Column]} ({MOVE_LABEL[item.action].toLowerCase()})</option>)}</optgroup>}
-    {priorities && <optgroup label="Prioridad">{(['emergencia', 'urgente', 'rutina'] as Priority[]).filter(p => p !== (ticket.priority ?? 'rutina')).map(p => <option key={p} value={`prioridad:${p}`}>{PRIORITY_LABEL[p]}</option>)}</optgroup>}
-  </select>;
+/**
+ * Keyboard and touch alternative to dragging (owner batch 2, S28). A move whose server action is already a button on
+ * the card («Llamar», «Iniciar atención», «Completar», «No se presentó») is not repeated here, so the menu only offers
+ * what the card does not show: back to waiting, remove one call, void, and the priority.
+ */
+function cardMenuItems(ticket: QueueTicket, options: { moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; removeCall: boolean; canVoid: boolean;
+  onMove: (to: BoardColumn) => void; onPriority: (priority: Priority) => void; onRemoveCall: () => void; onVoid: () => void }): CardMenuItem[] {
+  const onCard = new Set<string>(ACTION_ORDER.filter(name => (ticket.allowedActions ?? []).includes(name)));
+  const items: CardMenuItem[] = options.moves.filter(item => !onCard.has(item.action))
+    .map(item => ({ key: `mover:${item.to}`, label: `Mover a ${COLUMN_LABEL[item.to as Column]}`, onSelect: () => options.onMove(item.to) }));
+  if (options.removeCall) items.push({ key: 'quitar-llamado', label: `Quitar un llamado (van ${ticket.llamados})`, onSelect: options.onRemoveCall });
+  if (options.canVoid) items.push({ key: 'anular', label: 'Anular número (emitido por error)', onSelect: options.onVoid });
+  if (options.priorities) for (const p of (['emergencia', 'urgente', 'rutina'] as Priority[]).filter(p => p !== (ticket.priority ?? 'rutina')))
+    items.push({ key: `prioridad:${p}`, label: `Cambiar a ${PRIORITY_LABEL[p]}`, group: 'Prioridad', onSelect: () => options.onPriority(p) });
+  return items;
 }
 
 function IssueDialog({ api, profile, onClose, onSaved }: { api: Api; profile: AccessProfile; onClose: () => void; onSaved: () => void }) {

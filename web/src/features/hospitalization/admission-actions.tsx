@@ -11,6 +11,8 @@ export type Admission = {
   occupationId?: string | null; scheduledAt?: string | null; motive?: string | null; unstable?: boolean; postSurgical?: boolean; visitorsAllowed?: boolean; visitorsMax?: number;
   attendingDoctorName?: string | null; attendingDoctorHasAccount?: boolean; bedCategory?: 'vip' | 'semiprivada' | null; authorized?: boolean;
   dischargeRequestedAt?: string | null;
+  /** S27: when the admission was registered (indicated) and when its source record happened. */
+  createdAt?: string; originAt?: string | null;
   /** D-031: `type` and `pending` come null without a care relationship; `pendingCount` and `specialHandling` always come. */
   discharge?: { type: string | null; signedAt: string; signedByName: string | null; pending: DischargePending[] | null; pendingCount: number; specialHandling: boolean } | null;
   /** D-02: the API decides which actions this person may run on this row; the page never infers them from role permissions. */

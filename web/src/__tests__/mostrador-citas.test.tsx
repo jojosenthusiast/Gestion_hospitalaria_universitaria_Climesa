@@ -67,16 +67,18 @@ describe('#9 and #15 · the request tray', () => {
     expect(location.hash).not.toContain('asignar=');
   });
 
-  it('a tray of more than 3 folds to 3 with «Ver N más» on every width, each row tagged by its state', async () => {
+  it('the «Solicitudes» segment lists every request in two groups, each group named once', async () => {
     const asked = [1, 2, 3, 4].map(n => row({ id: `a-${n}`, state: 'solicitada', patientName: `Pide Ficticia ${n}`, start: `2026-11-2${n}T16:20:00Z`, end: `2026-11-2${n}T16:40:00Z`, allowedActions: ['confirmar', 'rechazar'] }));
     mount(rec(), asked);
-    const tray = await screen.findByRole('region', { name: 'Solicitudes por asignar' });
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Estado de la cita' })).getByRole('button', { name: /^Solicitudes/ }));
+    const tray = await screen.findByRole('region', { name: 'Solicitudes' });
     await within(tray).findByText('Ana Ficticia Agenda');
-    expect(tray.querySelectorAll('.rq-row')).toHaveLength(3);
-    expect(within(tray).getByText('Por asignar')).toBeTruthy();
-    expect(within(tray).getAllByText('Por confirmar')).toHaveLength(2);
-    await userEvent.click(within(tray).getByRole('button', { name: 'Ver 2 más' }));
     expect(tray.querySelectorAll('.rq-row')).toHaveLength(5);
+    expect(within(tray).getByRole('region', { name: 'Por asignar' }).querySelectorAll('.rq-row')).toHaveLength(1);
+    expect(within(tray).getByRole('region', { name: 'Por confirmar' }).querySelectorAll('.rq-row')).toHaveLength(4);
+    // The group heading says the state; the rows do not repeat it as a tag.
+    expect(within(tray).getAllByText('Por asignar')).toHaveLength(1);
+    expect(within(tray).getAllByText('Por confirmar')).toHaveLength(1);
   });
 
   it('on a phone each doctor of the day starts folded (except the first) and opens on its header', async () => {
@@ -218,6 +220,7 @@ describe('A4 · cancelar (D-8)', () => {
 describe('A2 · asignar abre en el primer hueco (A-1)', () => {
   it('the panel opens on the suggested day with the suggested doctor and offers 7 day chips', async () => {
     const api = mount(rec(), []);
+    await userEvent.click(within(await screen.findByRole('group', { name: 'Estado de la cita' })).getByRole('button', { name: /^Solicitudes/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Asignar · Ana Ficticia Agenda' }));
     expect(await screen.findByText(/Primer hueco en la franja pedida/)).toBeTruthy();
     await vi.waitFor(() => expect(api.request).toHaveBeenCalledWith('/citas/catalogos?date=2026-11-19', expect.anything()));

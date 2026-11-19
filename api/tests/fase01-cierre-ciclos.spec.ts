@@ -100,7 +100,9 @@ describe('Fase 0 · cierre del ciclo de la admisión', () => {
 
   test('BL-03: el MED con relación de atención vigente (no tratante) ve la hospitalización y puede firmar el alta', async () => {
     const other = await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT 'Tratante','Sin Cuenta','medico',id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`);
-    const created = await admit({ attendingDoctorId: other.id });
+    // Obs. 21: create refuses a doctor without an account; the attending doctor is swapped in storage instead.
+    const created = await admit();
+    await t.pg.query('UPDATE hospitalizacion.admision SET medico_tratante_id=$2 WHERE id=$1', [created.id, other.id]);
     const bed = await t.one<{ id: string; version: number }>('SELECT id,version FROM infra.espacio WHERE codigo=$1', ['HAB-205-A']);
     expect((await t.call('REC', 'POST', `/admisiones/${created.id}/cama`, { bedId: bed.id, version: bed.version })).status).toBe(201);
     expect(await row('MED', created.id)).toBeUndefined();
@@ -116,7 +118,10 @@ describe('Fase 0 · cierre del ciclo de la admisión', () => {
 
   test('BL-03: Jefatura reasigna el tratante a un médico con cuenta; sin cuenta se rechaza', async () => {
     const noAccount = await t.one<{ id: string }>(`INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT 'Otro','Sin Cuenta','medico',id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id`);
-    const created = await admit({ attendingDoctorId: noAccount.id });
+    // Obs. 21: the create command refuses a doctor without an account, so the orphan comes from an attending doctor
+    // whose account went away after the admission (stored directly, as the data would be).
+    const created = await admit();
+    await t.pg.query('UPDATE hospitalizacion.admision SET medico_tratante_id=$2 WHERE id=$1', [created.id, noAccount.id]);
     const rec = await row('REC', created.id);
     expect(rec.allowedActions).not.toContain('reasignar_tratante');
     const doctors = (await t.call('JOP', 'GET', '/admisiones/medicos-disponibles')).body as Array<{ id: string; hasAccount: boolean }>;

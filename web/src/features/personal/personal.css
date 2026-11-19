@@ -1,0 +1,41 @@
+/* Personal (S4-S6, S16): one compact filter bar, counts beside each option, icon-only CRUD actions per row. */
+.personal-toolbar { flex-wrap: wrap; gap: 14px 16px; }
+.personal-toolbar > .select-field { flex: 1 1 180px; max-width: 240px; }
+.personal-toolbar > .personal-create { margin-left: auto; align-self: flex-end; min-height: 48px; }
+
+.personal-filter-row { margin: 0; padding: 12px 24px 14px; border-bottom: 1px solid var(--line); align-items: flex-end; gap: 12px 24px; }
+.personal-filter-row > .select-field { flex: 0 1 260px; }
+.personal-shift-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; min-width: 0; }
+
+.personal-results { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; padding: 12px 24px; color: var(--muted); font-size: 14px; font-weight: 700; }
+.personal-results p { margin: 0; }
+.personal-results.is-bottom { border-top: 1px solid var(--line); }
+.personal-pager { display: inline-flex; align-items: center; gap: 10px; color: var(--ink); }
+.personal-pager .secondary-button { min-height: 38px; padding: 0 14px; }
+
+.personal-table td { vertical-align: middle; }
+.personal-table td.cell-person strong { overflow-wrap: anywhere; }
+.personal-table td.cell-person small { font-size: 14px; }
+.personal-account { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.personal-account-email { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
+.personal-account-mark { display: inline-grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 999px; }
+.personal-account-mark.is-on { background: var(--success-soft); color: var(--success); }
+.personal-account-mark.is-off { background: var(--soft); color: var(--ink); }
+.personal-account-mark.is-none { background: var(--bg); color: var(--muted); }
+.personal-shift { font-size: 14px; font-weight: 700; white-space: nowrap; }
+.personal-shift.is-de_turno { color: var(--success); }
+
+.personal-access { display: grid; gap: 12px; margin: 0; padding: 16px; border: 1px solid var(--line); border-radius: var(--radius-control, 10px); }
+.personal-access > legend { padding: 0 6px; font-weight: 800; }
+.personal-access .form-intro { margin: 0; }
+.personal-access-fields { display: grid; gap: 12px; }
+.personal-account-extras { display: flex; flex-wrap: wrap; gap: 8px; }
+.personal-deactivate-effects { margin: 0; padding-left: 20px; display: grid; gap: 6px; }
+
+@media (max-width: 767px) {
+  .personal-toolbar > .select-field { max-width: none; }
+  .personal-toolbar > .personal-create { width: 100%; justify-content: center; }
+  .personal-filter-row { padding: 12px 16px; }
+  .personal-filter-row > .select-field { flex: 1 1 100%; }
+  .personal-results { padding: 12px 16px; }
+}

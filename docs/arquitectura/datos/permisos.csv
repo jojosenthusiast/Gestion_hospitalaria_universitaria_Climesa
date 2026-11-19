@@ -73,5 +73,5 @@ auditoria.mis_accesos,Ver quién consultó mi expediente,,,,,,,,,,propio
 inventario.ver,Ver existencias,x,x,,,x,,x,,,
 inventario.mover,"Registrar entradas, salidas, ajustes y traslados",,x,,,consumo,,reactivos,,,
 inventario.configurar,"Artículos, bodegas y mínimos",x,x,,,,,,,,
-avisos.publicar,Publicar avisos generales,,x,,,,,,,,
+avisos.publicar,Publicar avisos generales,x,x,,,,,,,,
 metricas.ver,Ver métricas y tablero,x,x,,,,,,,x,

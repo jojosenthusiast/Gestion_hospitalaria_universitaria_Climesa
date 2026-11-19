@@ -1,9 +1,9 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Field, Notice } from '../../components/ui';
 import { validDui, validPersonName, validPhone } from '../../lib/identity';
-import { roleNames, staffTypeNames, type Api, type Space, type Staff, type StaffInput } from '../../lib/api';
+import { staffTypeNames, type Api, type Space, type Staff, type StaffInput, type UserAccount } from '../../lib/api';
 import { Dialog, SaveButton, Select, WriteError, isVersionConflict, useAction } from '../common';
-import { invitableRoles, roleForType, validEmail } from './account-forms';
+import { RoleChecks, roleForType, validEmail } from './account-forms';
 
 export type Specialty = { code: string; name: string; category: 'medico' | 'enfermero' };
 /**
@@ -13,25 +13,37 @@ export type Specialty = { code: string; name: string; category: 'medico' | 'enfe
 export type StaffSaved = { id: string; name: string; invited: boolean | null; email?: string };
 /** WEB-11: a validation problem and the field it belongs to. */
 type Problem = { field: string; message: string } | null;
+/**
+ * S4/S6: the account part of the one person form. `invite`: a new person may get an account in the same act.
+ * `account` + `editRoles`: editing a person with an account also edits its roles (no separate «Roles» action).
+ * `extras`: account actions the server allows (resend, cancel, reactivate), shown inside the same screen.
+ */
+export type AccessOptions = { allowAdmin: boolean; invite?: boolean; account?: UserAccount | null; editRoles?: boolean; extras?: ReactNode };
 
 /** Tipos de personal con catálogo de especialidades; los demás no llevan especialidad. */
 export const specialtyCategories = ['medico', 'enfermero'];
 const defaultSpecialty = (type: string) => (type === 'medico' ? 'Medicina general' : '');
+const suggestedRoles = (type: string) => (roleForType[type] ? [roleForType[type]] : []);
+const sameRoles = (a: string[], b: string[]) => a.length === b.length && a.every(r => b.includes(r));
 
 /**
  * Alta y edición de una persona del directorio. La especialidad es un select dependiente del tipo (obs. 9).
- * G1: with `invite` (the actor may invite), a new person can also get an account in the same act: the form saves the
- * record and then sends the invitation. If only the invitation fails, the record stays and only the invitation is retried.
+ * S4: one create flow: the record plus an optional «Acceso a la app» section that sends the invitation in the same act.
+ * If only the invitation fails, the record stays and only the invitation is retried.
  */
-export function StaffForm({ api, staff, spaces, specialties, invite, onClose, onSaved }: { api: Api; staff: Staff | null; spaces: Space[]; specialties: Specialty[]; invite?: { allowAdmin: boolean }; onClose: () => void; onSaved: (saved?: StaffSaved) => void }) {
+export function StaffForm({ api, staff, spaces, specialties, access, onClose, onSaved }: { api: Api; staff: Staff | null; spaces: Space[]; specialties: Specialty[]; access?: AccessOptions; onClose: () => void; onSaved: (saved?: StaffSaved) => void }) {
   const initialType = (staff?.type ?? 'medico') as StaffInput['type'];
   const [form, setForm] = useState<StaffInput>({ givenNames: staff?.givenNames ?? '', surnames: staff?.surnames ?? '', type: initialType, specialty: staff ? staff.specialty ?? defaultSpecialty(initialType) : defaultSpecialty(initialType), areaId: staff?.areaId ?? undefined, phone: staff?.phone ?? '', dui: staff?.dui ?? '', active: staff?.active ?? true });
   const [reason, setReason] = useState(''), [problem, setProblem] = useState<Problem>(null), action = useAction(api);
-  const canInvite = !staff && !!invite;
-  const [inviting, setInviting] = useState(canInvite), [email, setEmail] = useState(''), [role, setRole] = useState(roleForType[initialType] ?? '');
-  const roleChosen = useRef(false), sendInvite = useAction(api);
+  const canInvite = !staff && !!access?.invite;
+  const account = staff ? access?.account ?? null : null, editRoles = !!account && !!access?.editRoles;
+  const [inviting, setInviting] = useState(canInvite), [email, setEmail] = useState('');
+  const [roles, setRoles] = useState<string[]>(account ? account.roles : suggestedRoles(initialType));
+  const rolesChosen = useRef(false), sendInvite = useAction(api), saveRoles = useAction(api);
   // The record already saved in this act: a retry sends only the invitation, never a second POST /personal.
   const [created, setCreated] = useState<{ id: string; name: string } | null>(null);
+  // Editing: the record was saved but the roles were not; a retry sends only the roles, never the record again.
+  const [staffSaved, setStaffSaved] = useState(false);
   const put = <K extends keyof StaffInput>(k: K, v: StaffInput[K]) => setForm(f => ({ ...f, [k]: v }));
   const options = specialties.filter(s => s.category === form.type);
   const hasCatalog = specialtyCategories.includes(form.type);
@@ -40,15 +52,16 @@ export function StaffForm({ api, staff, spaces, specialties, invite, onClose, on
   function changeType(type: StaffInput['type']) {
     const next = specialties.filter(s => s.category === type);
     setForm(f => ({ ...f, type, specialty: next.some(s => s.name === f.specialty) ? f.specialty : defaultSpecialty(type) }));
-    if (!roleChosen.current) setRole(roleForType[type] ?? '');
+    if (!rolesChosen.current && !account) setRoles(suggestedRoles(type));
   }
+  const chooseRoles = (next: string[]) => { rolesChosen.current = true; setRoles(next); };
   function checkInvite(): Problem {
     if (!validEmail(email)) return { field: 'email', message: 'Escribe un correo válido para la invitación.' };
-    if (!role) return { field: 'role', message: 'Elige el rol de la cuenta.' };
+    if (!roles.length) return { field: 'role', message: 'Elige al menos un rol para su cuenta.' };
     return null;
   }
   async function sendInvitation(person: { id: string; name: string }) {
-    const sent = await sendInvite.run('/usuarios/invitaciones', { email: email.trim(), displayName: person.name, roles: [role], staffId: person.id });
+    const sent = await sendInvite.run('/usuarios/invitaciones', { email: email.trim(), displayName: person.name, roles, staffId: person.id });
     if (sent) onSaved({ ...person, invited: true, email: email.trim() });
   }
   /** Closing after a failed invitation still reports the saved record, so the directory never closes silently. */
@@ -60,6 +73,7 @@ export function StaffForm({ api, staff, spaces, specialties, invite, onClose, on
     if (!validPersonName(given + surnames)) return { field: validPersonName(given) ? 'surnames' : 'givenNames', message: 'Los nombres y apellidos no pueden contener números.' };
     if (form.phone && !validPhone(form.phone)) return { field: 'phone', message: 'Revisa el teléfono de ocho dígitos.' };
     if (form.dui && (!/^\d{8}-?\d$/.test(form.dui) || !validDui(form.dui))) return { field: 'dui', message: 'Revisa el dígito verificador del DUI.' };
+    if (editRoles && !roles.length) return { field: 'role', message: 'La cuenta necesita al menos un rol. Para quitarle el acceso, usa «Desactivar».' };
     if (staff && reason.trim().length < 10) return { field: 'reason', message: 'Indica el motivo de la modificación, de al menos 10 caracteres.' };
     return null;
   }
@@ -75,23 +89,28 @@ export function StaffForm({ api, staff, spaces, specialties, invite, onClose, on
     const found = check() ?? (canInvite && inviting ? checkInvite() : null);
     setProblem(found);
     if (found) return;
-    const body = { ...form, specialty: hasCatalog ? form.specialty : '', areaId: form.areaId || undefined, ...(staff ? { version: staff.version, reason } : {}) };
-    const result = await action.run<{ id: string }>(staff ? `/personal/${staff.id}` : '/personal', body, staff ? 'PATCH' : 'POST');
-    if (!result) return;
-    const person = { id: staff?.id ?? result.id, name: `${form.givenNames.trim()} ${form.surnames.trim()}` };
-    if (canInvite && inviting) { setCreated(person); await sendInvitation(person); }
-    else onSaved({ ...person, invited: null });
+    const person = { id: staff?.id ?? '', name: `${form.givenNames.trim()} ${form.surnames.trim()}` };
+    if (!staffSaved) {
+      const body = { ...form, specialty: hasCatalog ? form.specialty : '', areaId: form.areaId || undefined, ...(staff ? { version: staff.version, reason } : {}) };
+      const result = await action.run<{ id: string }>(staff ? `/personal/${staff.id}` : '/personal', body, staff ? 'PATCH' : 'POST');
+      if (!result) return;
+      person.id = staff?.id ?? result.id;
+    }
+    if (canInvite && inviting) { setCreated(person); await sendInvitation(person); return; }
+    if (editRoles && account && !sameRoles(roles, account.roles)) {
+      setStaffSaved(true);
+      if (!(await saveRoles.run(`/usuarios/${account.id}/roles`, { roles, staffId: staff!.id, version: account.version, reason }, 'PATCH'))) return;
+    }
+    onSaved({ ...person, invited: null });
   }
-  const busy = action.busy || sendInvite.busy;
-  const inviteFields = <div className="form-grid">
+  const busy = action.busy || sendInvite.busy || saveRoles.busy;
+  const roleProblem = problem?.field === 'role' && <Notice kind="error">{problem.message}</Notice>;
+  const inviteFields = <div className="personal-access-fields">
     <Field label="Correo electrónico" type="email" value={email} onChange={setEmail} required maxLength={254} error={problem?.field === 'email' ? problem.message : undefined} />
-    <Select label="Rol de la cuenta" value={role} onChange={v => { roleChosen.current = true; setRole(v); }}>
-      <option value="">Elige un rol</option>
-      {invitableRoles(!!invite?.allowAdmin).map(key => <option key={key} value={key}>{roleNames[key]}</option>)}
-    </Select>
-    {problem?.field === 'role' && <Notice kind="error">{problem.message}</Notice>}
+    <RoleChecks legend="Roles en la app" selected={roles} onChange={chooseRoles} allowAdmin={!!access?.allowAdmin} invitation />
+    {roleProblem}
   </div>;
-  if (created) return <Dialog title="Registrar personal" onClose={closeCreated} busy={busy}>
+  if (created) return <Dialog title="Agregar personal" onClose={closeCreated} busy={busy}>
     <form className="module-form" onSubmit={save} noValidate>
       <Notice kind="error">{created.name} quedó registrada, pero la invitación no se envió. Su ficha ya está en el directorio: reintenta solo la invitación.</Notice>
       <WriteError error={sendInvite.error} />
@@ -99,12 +118,10 @@ export function StaffForm({ api, staff, spaces, specialties, invite, onClose, on
       <div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeCreated} disabled={busy}>Cerrar sin invitar</button><SaveButton busy={busy} label="Reintentar invitación" /></div>
     </form>
   </Dialog>;
-  return <Dialog title={staff ? 'Editar persona' : 'Registrar personal'} onClose={onClose} busy={busy}>
+  return <Dialog title={staff ? 'Editar persona' : 'Agregar personal'} onClose={staffSaved ? () => onSaved() : onClose} busy={busy}>
     <form className="module-form" onSubmit={save} noValidate>
       {isVersionConflict(action.error) ? <><Notice kind="error">La ficha cambió. Vuelve a abrirla para ver los datos actuales; tus cambios no se guardaron.</Notice><button type="button" className="secondary-button" onClick={() => onSaved()}>Cerrar y recargar</button></> : <WriteError error={action.error} />}
-      <p className="form-intro">{canInvite
-        ? 'Con “Crear cuenta e invitar”, además de la ficha se crea su cuenta y le llega un correo para definir su contraseña.'
-        : 'Registrar a una persona en el directorio no crea una cuenta de acceso. Para darle acceso, usa “Invitar” en su fila: se envía un correo para que defina su contraseña.'}</p>
+      {staffSaved && <><Notice kind="error">La ficha quedó guardada, pero los roles de su cuenta no cambiaron.</Notice><WriteError error={saveRoles.error} onReload={() => onSaved()} /></>}
       <div className="form-grid">
         <Field label="Nombres" value={form.givenNames} onChange={v => put('givenNames', v)} required minLength={2} maxLength={80} autoFocus error={fieldError('givenNames')} />
         <Field label="Apellidos" value={form.surnames} onChange={v => put('surnames', v)} required minLength={2} maxLength={100} error={fieldError('surnames')} />
@@ -120,15 +137,23 @@ export function StaffForm({ api, staff, spaces, specialties, invite, onClose, on
         <Field label="Teléfono · opcional" type="tel" value={form.phone ?? ''} onChange={v => put('phone', v)} maxLength={9} error={fieldError('phone')} />
         <Field label="DUI · opcional" value={form.dui ?? ''} onChange={v => put('dui', v)} maxLength={10} error={fieldError('dui')} />
       </div>
-      {staff && <>
-        <label className="check-field"><input type="checkbox" checked={form.active ?? true} onChange={e => put('active', e.target.checked)} />Persona activa en el directorio</label>
-        <Field label="Motivo de la modificación" value={reason} onChange={setReason} required minLength={10} maxLength={500} error={fieldError('reason')} />
-      </>}
-      {canInvite && <>
-        <label className="check-field"><input type="checkbox" checked={inviting} onChange={e => setInviting(e.target.checked)} />Crear cuenta e invitar</label>
+      {/* S6: deactivation is the row's trash action; here only an inactive person can be brought back. */}
+      {staff && !staff.active && <label className="check-field"><input type="checkbox" checked={form.active ?? false} onChange={e => put('active', e.target.checked)} />Reactivar: persona activa en el directorio</label>}
+      {canInvite && <fieldset className="personal-access">
+        <legend>Acceso a la app · opcional</legend>
+        <label className="check-field"><input type="checkbox" checked={inviting} onChange={e => setInviting(e.target.checked)} />Darle acceso a la app</label>
+        <p className="form-intro">{inviting ? 'Le llega un correo para definir su contraseña; su cuenta queda vinculada con esta ficha.' : 'Solo se registra la ficha. Podrás darle acceso después desde su fila.'}</p>
         {inviting && inviteFields}
-      </>}
-      <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={busy}>Cancelar</button><SaveButton busy={busy} label={staff ? 'Guardar cambios' : canInvite && inviting ? 'Registrar e invitar' : 'Registrar persona'} /></div>
+      </fieldset>}
+      {account && <fieldset className="personal-access">
+        <legend>Acceso a la app</legend>
+        <p className="form-intro">Cuenta: <strong>{account.email}</strong></p>
+        {editRoles && <RoleChecks legend="Roles en la app" selected={roles} onChange={chooseRoles} allowAdmin={!!access?.allowAdmin} />}
+        {roleProblem}
+        {access?.extras && <div className="personal-account-extras">{access.extras}</div>}
+      </fieldset>}
+      {staff && <Field label="Motivo de la modificación" value={reason} onChange={setReason} required minLength={10} maxLength={500} error={fieldError('reason')} />}
+      <div className="dialog-actions"><button className="secondary-button" type="button" onClick={staffSaved ? () => onSaved() : onClose} disabled={busy}>Cancelar</button><SaveButton busy={busy} label={staff ? 'Guardar cambios' : canInvite && inviting ? 'Agregar e invitar' : 'Agregar persona'} /></div>
     </form>
   </Dialog>;
 }

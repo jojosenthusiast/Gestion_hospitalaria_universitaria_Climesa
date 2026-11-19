@@ -232,3 +232,125 @@
 .gap-candidate small { display: block; }
 .gap-rejected { margin-top: 8px; }
 .gap-rejected ul { margin: 6px 0 0; padding-left: 18px; }
+
+/* Owner obs 8: one view selector in the header, a compact status line where the banner was, and the day in full. */
+.compact-header .segmented { flex-wrap: nowrap; }
+.shift-status { margin: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; color: var(--muted); font-size: var(--text-sm, 0.875rem); }
+.shift-status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 22%, transparent); margin-right: -4px; }
+.shift-status-gaps { display: inline-flex; align-items: center; gap: 8px; color: var(--priority-urgente); font-weight: 700; }
+.shift-status-gaps .row-action { color: var(--priority-urgente); }
+.shift-status-gaps.is-error { color: var(--danger); font-weight: 600; }
+.shift-weeknav .shift-day-picker { margin-left: 8px; flex-wrap: wrap; }
+.shift-day-pill { min-height: 44px; padding: 6px 12px; border: 1px solid var(--control-line); border-radius: 999px; background: var(--surface); color: var(--ink); font: inherit; font-weight: 600; text-transform: capitalize; font-variant-numeric: tabular-nums; white-space: nowrap; cursor: pointer; }
+.shift-day-pill.is-today:not(.is-selected) { border-color: color-mix(in srgb, var(--primary) 45%, var(--line)); color: var(--primary-text); }
+.shift-day-pill.is-selected { border-color: var(--primary); background: var(--primary); color: var(--on-primary, #fff); text-transform: none; }
+.shift-day-pill:focus-visible { outline: 3px solid var(--outline); outline-offset: 2px; }
+.shift-plan-tools { margin-left: auto; }
+.shift-tools { position: relative; }
+.shift-publish { gap: 6px; }
+.shift-area-filter { gap: 10px; }
+.shift-tools-popover { min-width: 300px; }
+.shift-filter-count { min-width: 1.75em; margin-left: 4px; padding: 0 6px; border-radius: 999px; background: var(--soft); color: var(--muted); font-size: 0.75rem; font-weight: 700; font-variant-numeric: tabular-nums; text-align: center; }
+
+/* Área de trabajo: floors as groups with their areas below, searchable. */
+.shift-area-search { max-width: 22rem; min-height: 40px; padding: 6px 12px; border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; }
+.shift-area-tree { margin: 0; padding: 0; list-style: none; display: flex; flex-wrap: wrap; gap: 6px 8px; }
+.shift-area-tree.is-depth-0 { display: grid; grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr)); gap: 10px; }
+.shift-area-tree.is-depth-0 > li { padding: 8px; display: grid; gap: 6px; align-content: start; border: 1px solid var(--line); border-radius: var(--radius-control); }
+.shift-area-tree.is-depth-0 > li:not(.has-children) { border-style: dashed; }
+.shift-area-tree.is-depth-0 > li > .shift-area-option { font-weight: 700; }
+.shift-area-tree:not(.is-depth-0) { padding-left: 10px; border-left: 2px solid var(--line); }
+.shift-area-option { min-height: 36px; }
+
+/* Semana: one card per day with bands, roles and holes; readable with 30+ shifts a day. */
+.shift-summary-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+.shift-summary-day { min-width: 0; padding: 10px; display: grid; gap: 8px; align-content: start; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.shift-summary-day.is-today { border-color: color-mix(in srgb, var(--primary) 55%, var(--line)); background: color-mix(in srgb, var(--soft) 45%, var(--surface)); }
+.shift-summary-head { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
+.shift-summary-open { min-width: 0; padding: 2px 4px; display: grid; justify-items: start; gap: 0; border: 0; border-radius: var(--radius-control); background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.shift-summary-open:hover .shift-summary-cta { text-decoration: underline; }
+.shift-summary-open:focus-visible { outline: 3px solid var(--outline); outline-offset: 2px; }
+.shift-summary-weekday { color: var(--muted); font-size: 0.8125rem; text-transform: capitalize; overflow-wrap: anywhere; }
+.shift-summary-date { font-size: 1.375rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
+.shift-summary-cta { display: inline-flex; align-items: center; gap: 2px; color: var(--primary-text); font-size: 0.75rem; font-weight: 700; }
+.shift-summary-day.is-today .shift-summary-weekday, .shift-summary-day.is-today .shift-summary-date { color: var(--primary-text); font-weight: 700; }
+.shift-summary-head .shift-week-add { position: static; transform: none; flex: none; }
+.shift-summary-total, .shift-summary-carried, .shift-summary-empty { margin: 0; font-size: 0.8125rem; }
+.shift-summary-total { font-weight: 700; }
+.shift-summary-drafts { color: var(--state-reserved); }
+.shift-summary-carried { color: var(--muted); }
+.shift-summary-empty { color: var(--muted); }
+.shift-bands, .shift-summary-gaps { margin: 0; padding: 0; list-style: none; display: grid; gap: 6px; }
+.shift-band { padding: 6px 8px; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 6px; border-left: 3px solid var(--line); border-radius: 4px; background: color-mix(in srgb, var(--soft) 40%, transparent); }
+.shift-band.is-manana { border-left-color: var(--warning); }
+.shift-band.is-tarde { border-left-color: var(--primary); }
+.shift-band.is-noche { border-left-color: var(--state-reserved); }
+.shift-band.is-guardia { border-left-color: var(--ink); }
+.shift-band-name { font-size: 0.8125rem; font-weight: 700; }
+.shift-band-count { font-size: 0.875rem; font-variant-numeric: tabular-nums; }
+.shift-band-roles { grid-column: 1 / -1; color: var(--muted); font-size: 0.75rem; line-height: 1.35; }
+.shift-summary-gaps li { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.shift-gap-tag { padding: 0 6px; border: 1px dashed var(--priority-urgente); border-radius: 4px; color: var(--priority-urgente); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
+.shift-summary-more { color: var(--muted); }
+@media (max-width: 1180px) { .shift-summary-week { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+@media (max-width: 720px) { .shift-summary-week { grid-template-columns: minmax(0, 1fr); } }
+
+/* Día: per-hour staffing strip, then one row per shift with full name, role, area and its bar over 24 h. */
+.shift-day { --who: minmax(14rem, 20rem); display: grid; gap: 16px; }
+.shift-load { display: grid; grid-template-columns: var(--who) minmax(0, 1fr); align-items: center; gap: 8px 12px; }
+/* The hour strip sits over the same 24 h as the bars below it. */
+.shift-load-head { display: grid; gap: 4px; }
+.shift-load-head h3 { margin: 0; font-size: 0.9375rem; }
+.shift-load-head p { margin: 0; font-size: 0.8125rem; }
+.shift-load-hours { margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(24, minmax(0, 1fr)); gap: 2px; }
+.shift-load-hour { min-width: 0; padding: 4px 2px; display: grid; justify-items: center; gap: 1px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface); font-variant-numeric: tabular-nums; }
+.shift-load-hour.is-now { border-color: var(--primary); box-shadow: inset 0 -3px 0 var(--primary); }
+.shift-load-hour.is-gap { border: 1px dashed var(--priority-urgente); background: repeating-linear-gradient(135deg, color-mix(in srgb, var(--priority-urgente) 16%, transparent) 0 5px, transparent 5px 10px); }
+.shift-load-time { color: var(--muted); font-size: 0.6875rem; }
+.shift-load-count { font-size: 0.8125rem; white-space: nowrap; }
+.shift-load-missing { color: var(--priority-urgente); font-size: 0.6875rem; font-weight: 700; }
+.shift-day-grid { display: grid; gap: 10px; }
+.shift-day-axis, .shift-day-row { display: grid; grid-template-columns: var(--who) minmax(0, 1fr); align-items: center; gap: 12px; }
+.shift-day-ticks { position: relative; height: 18px; color: var(--muted); font-size: 0.75rem; font-variant-numeric: tabular-nums; }
+.shift-day-ticks span { position: absolute; left: calc(var(--at) * 100%); }
+.shift-day-group { display: grid; gap: 4px; }
+.shift-day-group-title { margin: 6px 0 2px; display: flex; align-items: baseline; gap: 8px; font-size: 0.875rem; }
+.shift-day-group-title span { color: var(--muted); font-weight: 600; font-variant-numeric: tabular-nums; }
+.shift-day-rows { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; }
+.shift-day-row { padding: 4px 0; border-top: 1px solid var(--line); }
+.shift-day-who { min-width: 0; display: grid; gap: 4px; }
+.shift-day-who strong { font-size: 0.9375rem; overflow-wrap: anywhere; }
+.shift-day-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.shift-day-track { position: relative; height: 34px; border-radius: var(--radius-control); background-color: color-mix(in srgb, var(--soft) 35%, transparent);
+  background-image: repeating-linear-gradient(to right, transparent 0 calc(12.5% - 1px), var(--line) calc(12.5% - 1px) 12.5%); }
+.shift-day-now { position: absolute; z-index: 3; top: -2px; bottom: -2px; left: calc(var(--from) * 100%); width: 2px; background: var(--primary); pointer-events: none; }
+.shift-bar { position: absolute; z-index: 2; top: 3px; bottom: 3px; box-sizing: border-box; min-width: 24px; padding: 0 8px; display: flex; align-items: center; overflow: hidden;
+  left: calc(var(--from) * 100%); width: calc(var(--len) * 100%); border: 1px solid; border-radius: 6px; font: inherit; font-size: 0.75rem; text-align: left; cursor: pointer;
+  transition-property: box-shadow, filter; transition-duration: 150ms; transition-timing-function: ease-out; }
+.shift-bar:hover { box-shadow: var(--shadow-soft); filter: saturate(1.15); }
+.shift-bar:focus-visible { z-index: 4; outline: 3px solid var(--outline); outline-offset: 1px; }
+.shift-bar-time { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.shift-bar.starts-before { border-left-style: dashed; border-top-left-radius: 0; border-bottom-left-radius: 0; }
+.shift-bar.ends-after { border-right-style: dashed; border-top-right-radius: 0; border-bottom-right-radius: 0; }
+.shift-bar.is-borrador { background: var(--state-reserved-soft); border-color: var(--state-reserved); border-style: dashed; color: var(--ink); }
+.shift-bar.is-publicado { background: var(--state-process-soft); border-color: var(--state-process); color: var(--ink); }
+.shift-bar.is-en_curso { background: var(--primary); border-color: var(--primary-strong); color: var(--on-primary, #fff); }
+.shift-bar.is-completado { background: var(--success-soft); border-color: var(--success); color: var(--ink); }
+.shift-bar.is-ausente { background: var(--warning-soft); border-color: var(--warning); color: var(--ink); }
+.shift-bar.is-cancelado { background: var(--state-blocked-soft); border-color: var(--state-blocked); border-style: dashed; color: var(--muted); }
+.shift-bar.is-cancelado .shift-bar-time { text-decoration: line-through; }
+.shift-bar.is-movable { cursor: grab; touch-action: pan-y; }
+.shift-bar.is-dragging { z-index: 5; cursor: grabbing; transform: translateX(var(--dx, 0)); width: calc(var(--len) * 100% + var(--grow, 0px)); box-shadow: var(--shadow-float); opacity: 0.92; transition: none; }
+.shift-bar-resize { position: absolute; top: 0; bottom: 0; right: 0; width: 8px; cursor: ew-resize; }
+.shift-bar-resize::after { content: ""; position: absolute; top: 50%; right: 2px; width: 2px; height: 14px; margin-top: -7px; border-radius: 1px; background: currentColor; opacity: 0.45; }
+.shift-bar.is-new { z-index: 4; outline: 3px solid var(--primary); outline-offset: 1px; animation: shift-new var(--motion-standard) var(--ease-out); }
+.shift-day-empty { margin: 0; color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { .shift-bar.is-new { animation: none; } .shift-bar { transition: none; } }
+@media (max-width: 1100px) { .shift-load-hours { grid-template-columns: repeat(12, minmax(0, 1fr)); } }
+@media (max-width: 720px) {
+  .shift-day-axis { display: none; }
+  .shift-load { grid-template-columns: minmax(0, 1fr); }
+  .shift-day-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
+  .shift-load-hours { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+  .shift-plan-tools { margin-left: 0; }
+}

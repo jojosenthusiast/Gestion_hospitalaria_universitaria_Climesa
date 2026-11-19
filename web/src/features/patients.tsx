@@ -1,6 +1,6 @@
 import { useEffect,useRef,useState,type FormEvent } from 'react';
 import { Field,Icon,Notice } from '../components/ui';
-import { ReadOnlyBadge } from '../components/system';
+import { CrudActions,CrudButton,ReadOnlyBadge } from '../components/system';
 import { ExportMenu } from '../components/export-menu';
 import { takePatientSearch } from './patient-handoff';
 import { RegisterExternalResultDialog } from './lab-external-record';
@@ -11,7 +11,8 @@ import { ageFrom,profileGaps,validatePatientDraft } from './listas/patient-rules
 import type { ClinicalHistory } from './clinical-history';
 import { dayKey,dayLabel,timeRange } from './listas/schedule';
 import './listas/lists.css';
-import { matchesPatientState,sanitizePatientFilters,canFilterAdmissions,patientEmptyState,patientFilterDefaults,patientListPath,patientStateOptions,situationChip,situationOptions,stateChip,type PatientFilters } from './listas/patient-filters';
+import './listas/patients-table.css';
+import { matchesPatientState,sanitizePatientFilters,canFilterAdmissions,patientEmptyState,patientFilterDefaults,patientListPath,PATIENT_PAGE,patientStateOptions,situationChip,situationOptions,stateChip,type PatientFilters } from './listas/patient-filters';
 import type { ShiftCatalog } from './shifts/rules';
 import { useHashFilters } from '../lib/hash-params';
 import { useQuickAction } from './personal/accion';
@@ -63,7 +64,10 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  const [query,setQuery]=useState(''),[typed,setTyped]=useState('');
  // Búsqueda mientras se escribe: la lista se pide con una pequeña espera; el botón «Buscar» sigue registrando la constancia que exige el alta.
  useEffect(()=>{const t=setTimeout(()=>setTyped(query.trim().length>=2?query.trim():''),300);return()=>clearTimeout(t);},[query]);
- const initial=useData<Patient[]>(api,patientListPath(filters,typed),version),search=useAction(api);
+ // Obs. 15: the list pages by 50 (the API maximum); any change of search or filter goes back to the first page.
+ const listKey=patientListPath(filters,typed),[paging,setPaging]=useState({key:listKey,offset:0});
+ const offset=paging.key===listKey?paging.offset:0,setOffset=(next:number)=>setPaging({key:listKey,offset:next});
+ const initial=useData<Patient[]>(api,patientListPath(filters,typed,offset),version),search=useAction(api);
  const situations=situationOptions(profile),byAdmission=canFilterAdmissions(profile)&&can(profile,'turnos.ver');
  const catalog=useData<ShiftCatalog>(api,'/turnos/catalogo',version,byAdmission);
  const areas=(catalog.data?.areas??[]).filter(a=>a.type==='area'||a.type==='planta'),doctors=(catalog.data?.staff??[]).filter(s=>s.type==='medico');
@@ -97,9 +101,9 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  const reasonOf=(p:Patient)=>(typed||receipt)&&/documento|expediente/i.test(p.matchReason??'')?p.matchReason:null;
  const empty=patientEmptyState(filters,{area:areaName,medico:doctorName});
  const exportTable=()=>({filename:'pacientes',title:'Pacientes',subtitle:`${rows.length} expedientes${active.length?` · ${active.map(f=>f.label).join(' · ')}`:''}`,columns:['Expediente','Paciente','Sexo','Nacimiento','Estado'],rows:rows.map(p=>[p.record,p.fullName,sexNames[p.sex]??p.sex,p.birth?formatDate(p.birth,{withYear:true}):p.ageRange?`${p.ageRange} años`:'',p.active?'Activo':'Inactivo'])});
- return <><CompactHeader breadcrumb="Pacientes / Registro compartido" title="Pacientes" actions={register?<button className="primary-button" onClick={()=>setCreating(true)}><Icon name="plus" size={18}/>Registrar paciente</button>:<ReadOnlyBadge who="Recepción" what="el registro de pacientes"/>}/>
+ return <><CompactHeader breadcrumb="Pacientes / Registro compartido" title="Pacientes" actions={register?<CrudButton kind="create" label="Registrar paciente" onClick={()=>setCreating(true)}/>:<ReadOnlyBadge who="Recepción" what="el registro de pacientes"/>}/>
  {/* R4a: the search first; every filter in one «Filtros» popover that counts what is on. */}
- <section className="data-workbench" aria-label="Registro de pacientes"><div className="cl-toolbar pt-toolbar"><form className="search-form" onSubmit={find}><Field label="Nombre, DUI o expediente" placeholder="Escribe al menos dos caracteres" value={query} onChange={v=>{setQuery(v);setReceipt(null);}} minLength={2} maxLength={100} required/><button className="secondary-button" disabled={search.busy} type="submit"><Icon name="search" size={18}/>{search.busy?'Buscando…':'Buscar'}</button></form>
+ <section className="data-workbench pt-workbench" aria-label="Registro de pacientes"><div className="cl-toolbar pt-toolbar"><form className="search-form" onSubmit={find}><Field label="Nombre, DUI o expediente" placeholder="Escribe al menos dos caracteres" value={query} onChange={v=>{setQuery(v);setReceipt(null);}} minLength={2} maxLength={100} required/><button className="secondary-button" disabled={search.busy} type="submit"><Icon name="search" size={18}/>{search.busy?'Buscando…':'Buscar'}</button></form>
  <FilterPopover count={filterCount}>
   <div className="filter-field"><span>Expediente</span><ChipGroup label="Estado del expediente" value={filters.estado} onChange={estado=>setFilters({estado})} options={patientStateOptions.map(o=>({...o,status:o.value}))}/></div>
   {situations.length>0&&<div className="filter-field"><span>Hoy</span><ChipGroup label="Situación de hoy" value={filters.situacion} onChange={situacion=>setFilters({situacion})} options={[{value:'',label:'Cualquiera'},...situations.map(s=>({value:s.value,label:s.label,status:s.value}))]}/></div>}
@@ -108,12 +112,29 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  <ActiveFilters filters={active} onClear={()=>{clearQuery();setFilters({estado:'vigente',situacion:'',area:'',medico:''});}}/>
  <WriteError error={search.error}/><p className="table-caption">{receipt?`${plural(rows.length,'coincidencia','coincidencias')} · ${query}`:typed?`${plural(rows.length,'resultado','resultados')} mientras escribes · ${typed}`:filtered?`${plural(rows.length,'expediente','expedientes')} con estos filtros · por nombre`:'Pacientes por nombre (A–Z)'}{register&&receipt&&<span>{validReceipt?'Puedes registrar después de revisar las coincidencias.':expiredText}</span>}</p>
  {register&&validReceipt&&receipt.candidates.length>0&&<Notice kind="info">Posibles coincidencias: revisa cada ficha y su motivo antes de registrar a alguien nuevo.</Notice>}
- <RemoteState state={initial}>{()=>rows.length?<div className={`cl-master-detail${selected?'':' is-collapsed'}`}><ul className="cl-master" aria-label="Pacientes encontrados">{rows.map(p=><li key={p.id}><button type="button" className="pt-row" aria-current={p.id===selected} aria-label={viewFicha?`Abrir ficha de ${p.fullName}`:`Paciente ${p.fullName}`} disabled={!viewFicha} onClick={()=>setSelected(p.id)}><span className="pt-name"><strong>{p.fullName}</strong>{reasonOf(p)&&<small>{reasonOf(p)}</small>}</span><span className="mono-data">{p.record}</span><span className="pt-meta">{patientMeta(p)}</span>{p.state!=='activo'&&<Tag value={p.state}/>}</button></li>)}</ul>
-  {selected?<PatientPanel key={selected} api={api} id={selected} profile={profile} version={version} onClose={()=>setSelected(null)} onEdit={p=>setEditing(p)} onState={p=>setStatus(p)}/>:null}</div>:<Empty title={empty.title} description={empty.description}/>}</RemoteState>
- {rows.length>=50&&<p className="table-footnote">Se muestran los primeros 50. Afina la búsqueda o los filtros.</p>}</section>
+ <RemoteState state={initial}>{()=>rows.length?<div className={`cl-master-detail pt-master-detail${selected?'':' is-collapsed'}`}><PatientTable rows={rows} selected={selected} canOpen={viewFicha} showAge={rows.some(p=>!!p.birth||!!p.ageRange)} reasonOf={reasonOf} onSelect={setSelected}/>
+  {selected?<PatientPanel key={selected} api={api} id={selected} profile={profile} version={version} onClose={()=>setSelected(null)} onEdit={p=>setEditing(p)} onState={p=>setStatus(p)}/>:null}</div>:offset>0?<div className="pt-page-empty"><p>No hay más pacientes después de los primeros {offset}.</p><button type="button" className="secondary-button" onClick={()=>setOffset(Math.max(0,offset-PATIENT_PAGE))}>Ver los anteriores</button></div>:<Empty title={empty.title} description={empty.description}/>}</RemoteState>
+ {receipt&&!byCare?rows.length>=PATIENT_PAGE&&<p className="table-footnote">Se muestran las primeras {PATIENT_PAGE} coincidencias. Escribe el DUI o el expediente para encontrar a una persona exacta.</p>
+  :(rows.length>0&&(offset>0||rows.length>=PATIENT_PAGE))&&<nav className="table-footnote pt-pager" aria-label="Páginas de pacientes"><span>Mostrando {offset+1}–{offset+rows.length}{rows.length>=PATIENT_PAGE?' · hay más pacientes; afina la búsqueda o pasa a los siguientes':''}</span><span className="pt-pager-buttons">{offset>0&&<button type="button" className="secondary-button" onClick={()=>setOffset(Math.max(0,offset-PATIENT_PAGE))}>Anteriores {PATIENT_PAGE}</button>}{rows.length>=PATIENT_PAGE&&<button type="button" className="secondary-button" onClick={()=>setOffset(offset+PATIENT_PAGE)}>Siguientes {PATIENT_PAGE}</button>}</span></nav>}</section>
  {registered&&<Notice kind="success">Paciente registrado{registered.record?` con expediente ${registered.record}`:''}. <a className="cl-link-button" href={`#/fila?accion=emitir&paciente=${registered.id}`}>Emitir número</a></Notice>}
  {(creating||editing)&&<PatientForm api={api} patient={editing} receipt={editing?receipt:deskQuery!==null?null:receipt} query={!editing&&deskQuery!==null?deskQuery:query} prefill={!editing&&deskQuery!==null} onClose={()=>{setCreating(false);setEditing(null);setDeskQuery(null);}} onSaved={saved}/>}
  {status&&<PatientStateForm api={api} patient={status} onClose={()=>setStatus(null)} onSaved={done}/>}</>;
+}
+const ageText=(p:Pick<Patient,'birth'|'ageRange'>)=>{const age=p.birth?ageFrom(p.birth):null;return age!==null?plural(age,'año','años'):p.ageRange?`${p.ageRange} años`:'Sin fecha';};
+/**
+ * Owner obs. 15: the patients list is a table with a header row like the other modules. Edad shows only to an account
+ * that sees the birth date or its range (privacidad.md); the DUI stays in the record (the search returns minimal fields,
+ * FR-102-01). Only an exceptional state (provisional, inactive) shows, next to the name. The chosen row stays highlighted.
+ */
+function PatientTable({rows,selected,canOpen,showAge,reasonOf,onSelect}:{rows:Patient[];selected:string|null;canOpen:boolean;showAge:boolean;reasonOf:(p:Patient)=>string|null|undefined;onSelect:(id:string)=>void}){
+ return <div className="pt-table-wrap"><table className="record-table pt-table"><caption className="sr-only">Pacientes encontrados</caption>
+  <thead><tr><th scope="col">Nombre</th><th scope="col">Expediente</th>{showAge&&<th scope="col">Edad</th>}<th scope="col">Sexo</th></tr></thead>
+  <tbody>{rows.map(p=>{const current=p.id===selected,reason=reasonOf(p);return <tr key={p.id} className={`${canOpen?'is-clickable':''}${current?' is-selected':''}`} aria-selected={canOpen?current:undefined} onClick={canOpen?()=>onSelect(p.id):undefined}>
+   <td data-label="Nombre" className="cell-person">{canOpen?<button type="button" className="pt-open" aria-current={current||undefined} aria-label={`Abrir ficha de ${p.fullName}`} onClick={e=>{e.stopPropagation();onSelect(p.id);}}><strong>{p.fullName}</strong></button>:<strong>{p.fullName}</strong>}{p.state!=='activo'&&<> <Tag value={p.state}/></>}{reason&&<small>{reason}</small>}</td>
+   <td data-label="Expediente"><span className="mono-data">{p.record}</span></td>
+   {showAge&&<td data-label="Edad">{ageText(p)}{p.birth&&<small>{formatDate(p.birth,{withYear:true})}</small>}</td>}
+   <td data-label="Sexo">{sexNames[p.sex]??p.sex}</td>
+  </tr>;})}</tbody></table></div>;
 }
 /**
  * R7 U1 (G2, hub): the record is where the front desk starts. Each action opens its module with this patient already
@@ -140,14 +161,17 @@ function PatientPanel({api,id,profile,version,onClose,onEdit,onState}:{api:Api;i
  const mayRecordExternal=seesClinical&&can(profile,'laboratorio.ordenar'),history=useData<ClinicalHistory>(api,`/pacientes/${id}/historial`,version,mayRecordExternal);
  const [external,setExternal]=useState(false),[externalDone,setExternalDone]=useState(''),recordsExternal=mayRecordExternal&&!!history.data?.allowedActions?.includes('resultado_externo');
  const tabs:Tab[]=['datos',...(seesAppointments?['citas' as Tab]:[]),...(seesClinical?['consultas','laboratorio','ingresos'] as Tab[]:[]),'cambios'];
- return <aside className="cl-detail" aria-label="Ficha de paciente"><button type="button" className="cl-link-button" onClick={onClose}>Cerrar ficha</button><RemoteState state={data}>{p=>{const gaps=profileGaps(p),age='birth'in p?ageFrom(p.birth):null;return <>
+ // Obs. 15: opening a record from far down the list brings it into view (the panel is sticky on wide screens).
+ const panel=useRef<HTMLElement>(null);
+ useEffect(()=>{const reduce=window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;panel.current?.scrollIntoView?.({block:'nearest',behavior:reduce?'auto':'smooth'});},[]);
+ return <aside ref={panel} className="cl-detail pt-detail" aria-label="Ficha de paciente"><button type="button" className="cl-link-button" onClick={onClose}>Cerrar ficha</button><RemoteState state={data}>{p=>{const gaps=profileGaps(p),age='birth'in p?ageFrom(p.birth):null;return <>
   <div className="patient-banner"><span className="mono-label">EXPEDIENTE {p.record}</span><h3>{p.fullName}</h3><p className="patient-banner-meta"><Tag value={p.state}/>{age!==null&&<span>{plural(age,'año','años')} · {sexNames[p.sex]}</span>}</p></div>
   {gaps.length>0&&<Notice kind="info">Faltan datos: {gaps.join(', ')}.</Notice>}
   <PatientHubActions profile={profile} patient={p}/>
   {recordsExternal&&<div className="dialog-actions"><button type="button" className="secondary-button" onClick={()=>{setExternalDone('');setExternal(true);}}>Registrar resultado externo</button></div>}
   {externalDone&&<Notice kind="success">{externalDone}</Notice>}
   {external&&<RegisterExternalResultDialog api={api} patient={p} onClose={()=>setExternal(false)} onSaved={message=>{setExternal(false);setExternalDone(message);setTab('laboratorio');}}/>}
-  {can(profile,'pacientes.editar_demograficos')&&<div className="dialog-actions"><button type="button" className="secondary-button" onClick={()=>onEdit(p)}>Editar datos</button>{/* R4a: inactivating is rare and serious: a quiet danger link, apart from the normal action; it confirms in a dialog. */}<button type="button" className={p.active?'danger-link':'cl-link-button'} onClick={()=>onState(p)}>{p.active?'Inactivar paciente':'Reactivar paciente'}</button></div>}
+  {can(profile,'pacientes.editar_demograficos')&&<CrudActions><CrudButton kind="edit" label="Editar datos" onClick={()=>onEdit(p)}/>{/* S0: edit is the blue outline pencil, inactivating the red trash; it confirms in a dialog. Reactivating is not a CRUD verb. */}{p.active?<CrudButton kind="deactivate" label="Inactivar paciente" onClick={()=>onState(p)}/>:<button type="button" className="secondary-button" onClick={()=>onState(p)}>Reactivar paciente</button>}</CrudActions>}
   <div className="cl-tabs" role="tablist" aria-label="Secciones de la ficha">{tabs.map(t=><button key={t} type="button" role="tab" id={`pt-tab-${t}`} aria-selected={tab===t} aria-controls="pt-panel" className="cl-tab" onClick={()=>setTab(t)}>{tabNames[t]}</button>)}</div>
   <div role="tabpanel" id="pt-panel" aria-labelledby={`pt-tab-${tab}`}>
    {tab==='datos'&&<><dl className="detail-grid"><div><dt>Sexo</dt><dd>{sexNames[p.sex]}</dd></div>{'birth'in p&&<div><dt>Nacimiento</dt><dd>{formatDate(p.birth,{withYear:true})}</dd></div>}{'dui'in p&&<div><dt>DUI</dt><dd>{p.dui||'Sin documento registrado'}</dd></div>}{'phone'in p&&<div><dt>Teléfono</dt><dd>{p.phone||'Sin registrar'}</dd></div>}{'email'in p&&<div><dt>Correo</dt><dd>{p.email||'Sin registrar'}</dd></div>}{'address'in p&&<div><dt>Dirección</dt><dd>{p.address||'Sin registrar'}</dd></div>}</dl></>}

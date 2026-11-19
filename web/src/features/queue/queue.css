@@ -1,0 +1,38 @@
+/* Owner batch 2 (S28) · Fila del día: the summary line on top and the card's «Más» menu. */
+
+/* One compact line under the title: three stats on the left, «Llamar siguiente» / «Emitir número» on the right. */
+.qb-summary { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5); margin: 0 0 var(--space-4); padding: var(--space-3) var(--space-4); border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
+.qb-summary-stats { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-6); min-width: 0; }
+.qb-summary-stat { display: grid; gap: 2px; min-width: 0; }
+.qb-summary-label { color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+.qb-summary-value { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-2); min-width: 0; }
+.qb-summary-value > .area-tag { align-self: center; }
+.qb-summary-value strong { font-size: var(--text-xl); line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.qb-summary-value .qb-summary-none { color: var(--muted); font-size: var(--text-md); }
+.qb-summary-value small { color: var(--muted); font-size: var(--text-xs); font-weight: 600; white-space: nowrap; }
+.qb-summary-wait .qb-summary-value strong { color: var(--primary-text); }
+.qb-summary-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.qb-summary-actions > button { min-height: 44px; }
+/* On a wide screen the line stays under the sticky hospital header (76 px) while a long board scrolls. */
+@media (min-width: 900px) {
+  .qb-summary { position: sticky; top: 76px; z-index: 15; box-shadow: 0 6px 18px rgb(15 23 42 / 0.06); }
+}
+@media (max-width: 767px) {
+  .qb-summary { padding: var(--space-3); }
+  .qb-summary-stats { gap: var(--space-2) var(--space-4); }
+  .qb-summary-actions { flex: 1 1 100%; }
+  .qb-summary-actions > button { flex: 1 1 0; justify-content: center; }
+}
+
+/* The card's extra moves: a small «Más» toggle and a floating list of plain sentences. */
+.qb-card-menu { position: relative; display: inline-flex; margin-left: auto; }
+.qb-card-menu-toggle { color: var(--muted); font-weight: 600; }
+.qb-card-menu-toggle svg { transition: transform var(--motion-fast) var(--ease-out); transform: rotate(90deg); }
+.qb-card-menu-toggle[aria-expanded='true'] svg { transform: rotate(-90deg); }
+.qb-card-menu-list { position: absolute; z-index: 25; top: calc(100% + 4px); right: 0; display: grid; gap: 2px; min-width: 220px; max-width: min(300px, calc(100vw - 32px)); padding: var(--space-1); border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); box-shadow: var(--shadow-float); }
+.qb-card-menu-group { display: grid; gap: 2px; }
+.qb-card-menu-group + .qb-card-menu-group { margin-top: 2px; padding-top: 4px; border-top: 1px solid var(--line); }
+.qb-card-menu-heading { padding: 4px var(--space-2) 0; color: var(--muted); font-size: var(--text-xs); font-weight: 700; }
+.qb-card-menu-item { min-height: 40px; padding: 6px var(--space-2); border: 0; border-radius: var(--radius-control); background: transparent; color: var(--ink); font: inherit; font-size: var(--text-sm); font-weight: 600; text-align: left; cursor: pointer; }
+.qb-card-menu-item:hover, .qb-card-menu-item:focus-visible { background: var(--soft); color: var(--primary-text); }
+@media (pointer: coarse) { .qb-card-menu-item { min-height: 44px; } }

@@ -12,11 +12,13 @@ export class InfrastructureService {
   constructor(private readonly db:DatabaseService,private readonly commands:CommandService,private readonly clock:Clock) {}
   /** Roles que ven el tablero de camas o el árbol de espacios según el catálogo de permisos. */
   private spaceChannels(c:PoolClient){return channelsFor(c,['camas.ver_tablero','espacios.ver']);}
+  /** Owner obs. 7: every `espacios.ver` role sees each bed's state (never its occupant), so the building map shows the same colours as the bed board. */
   async tree() {
     return this.db.query(`WITH RECURSIVE descendants(ancestor,id) AS (SELECT id,id FROM infra.espacio WHERE activo UNION ALL SELECT d.ancestor,e.id FROM descendants d JOIN infra.espacio e ON e.padre_id=d.id AND e.activo)
       SELECT e.id,e.padre_id AS "parentId",e.tipo AS type,e.codigo AS code,e.nombre AS name,e.categoria AS category,e.capacidad AS capacity,e.nivel AS level,e.activo AS active,e.version,infra.ruta(e.id) AS path,
       (SELECT count(*)::int FROM descendants d JOIN infra.v_estado_cama b ON b.cama_id=d.id WHERE d.ancestor=e.id) AS "totalBeds",
-      (SELECT count(*)::int FROM descendants d JOIN infra.v_estado_cama b ON b.cama_id=d.id WHERE d.ancestor=e.id AND b.estado='libre') AS "freeBeds"
+      (SELECT count(*)::int FROM descendants d JOIN infra.v_estado_cama b ON b.cama_id=d.id WHERE d.ancestor=e.id AND b.estado='libre') AS "freeBeds",
+      (SELECT b.estado FROM infra.v_estado_cama b WHERE b.cama_id=e.id) AS "bedState"
       FROM infra.espacio e ORDER BY coalesce(e.nivel,0),e.codigo`);
   }
   async beds(actor:Actor) {
