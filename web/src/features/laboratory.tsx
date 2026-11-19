@@ -1,7 +1,7 @@
-import { useEffect, useId, useState, type ReactNode } from 'react';
+import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import './laboratory.css';
 import { Field, Icon, Notice } from '../components/ui';
-import { PriorityBadge, StatusBadge } from '../components/system';
+import { CrudButton, PriorityBadge, StatusBadge } from '../components/system';
 import { ExportMenu } from '../components/export-menu';
 import { ApiError, can, type AccessProfile, type Api } from '../lib/api';
 import { downloadAttachment, uploadAttachment } from '../lib/lab-attachments';
@@ -88,6 +88,17 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
   const [query, setQuery] = useState(''), [stage, setStage] = useState<StageFilter>('todas'), [urgentOnly, setUrgentOnly] = useState(false), [criticalOnly, setCriticalOnly] = useState(false), [sort, setSort] = useState<WorkSort>('prioridad');
   const [opened, setOpened] = useState<Set<LabGroupId>>(new Set()), [batch, setBatch] = useState<Set<string>>(new Set()), [batchBusy, setBatchBusy] = useState(false), [outcome, setOutcome] = useState<BatchOutcome | null>(null);
   const [quick, consumeQuick] = useQuickAction(), isLab = can(profile, 'laboratorio.procesar');
+  // Obs. lote 3: on a narrow screen list and detail stack; choosing an order shows its detail with «Volver a la lista».
+  const [detailOpen, setDetailOpen] = useState(false);
+  const pick = (id: string) => { setSelectedId(id); setDetailOpen(true); };
+  const split = useRef<HTMLDivElement>(null);
+  // Stacked layout only: the side that just appeared takes the focus (which also scrolls to it). Side by side, the back
+  // control is not rendered, so nothing moves.
+  useEffect(() => {
+    const back = split.current?.querySelector<HTMLElement>('.lab-back');
+    if (detailOpen && back?.getClientRects().length) back.focus();
+  }, [detailOpen, selectedId]);
+  const backToList = () => { setDetailOpen(false); requestAnimationFrame(() => split.current?.querySelector<HTMLElement>('.lab-row[aria-current="true"]')?.focus()); };
   const all = data.data ?? [];
   // El reloj se lee al pintar: cada evento en vivo vuelve a pintar la lista, así no hace falta ningún temporizador.
   const now = Date.now();
@@ -146,6 +157,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
   return <>
     <CompactHeader breadcrumb="Atención / Diagnóstico" title="Laboratorio"/>
     <section className="data-workbench" aria-label="Lista de trabajo de laboratorio"><RemoteState state={data}>{() => <>
+      <div className="lab-controls">
       <ListToolbar trailing={<><label className="cl-sort">Ordenar<select value={sort} onChange={event => setSort(event.target.value as WorkSort)}>{(Object.keys(SORT_NAMES) as WorkSort[]).map(key => <option key={key} value={key}>{SORT_NAMES[key]}</option>)}</select></label><ExportMenu table={exportTable} disabled={!rows.length} /></>}>
         <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} />
       </ListToolbar>
@@ -158,6 +170,8 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
         <div className="cl-filter-group"><span className="cl-filter-label">Valores</span>
           <ChipGroup label="Valores críticos" value={criticalOnly ? 'si' : 'no'} onChange={value => setCriticalOnly(value === 'si')} options={[{ value: 'no', label: 'Todos los valores' }, { value: 'si', label: 'Con valores críticos', status: 'critico_alto', count: all.filter(isCritical).length }]} /></div>
       </div>
+      </div>
+      <div className="lab-body">
       <ActiveFilters filters={filters} onClear={clear} />
       {completable.length > 0 && <div className="lab-batch" role="group" aria-label="Completar por lote">
         <span><strong className="lab-num">{chosen.length}</strong> de <span className="lab-num">{completable.length}</span> órdenes con todos sus valores seleccionadas</span>
@@ -168,7 +182,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
         {outcome.failed.length > 0 && <Notice kind="error">No se completaron {outcome.failed.length}: {outcome.failed.map(f => `${f.name} (${f.message})`).join('; ')}</Notice>}</div>}
       {rows.length ? <>
         <p className="cl-count" aria-live="polite">{rows.length} de {all.length} órdenes · agrupadas por lo que toca hacer; dentro de cada grupo, las urgentes y las que más esperan primero.</p>
-        <div className="cl-master-detail">
+        <div ref={split} className={detailOpen ? 'cl-master-detail lab-split is-detail-open' : 'cl-master-detail lab-split'}>
           <ul className="cl-master lab-groups" aria-label="Órdenes de laboratorio">{groups.flatMap(group => {
             const open = isOpen(group.id, group.folded);
             return [
@@ -176,14 +190,15 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
                 <h3>{group.label}</h3><span className="lab-num lab-group-count">{group.orders.length}</span>
                 {group.folded && foldable && <button type="button" className="lab-fold" aria-expanded={open} onClick={() => setOpened(current => toggle(current, group.id))}>{open ? `Ocultar ${group.label.toLowerCase()}` : `Mostrar ${group.label.toLowerCase()}`}</button>}
               </li>,
-              ...(open ? group.orders.map(order => <LabWorkRow key={order.id} order={order} now={now} current={order.id === selected?.id} onSelect={() => setSelectedId(order.id)}
+              ...(open ? group.orders.map(order => <LabWorkRow key={order.id} order={order} now={now} current={order.id === selected?.id} onSelect={() => pick(order.id)}
                 batchable={allows(order, 'completar')} inBatch={batch.has(order.id)} onBatch={() => setBatch(current => toggle(current, order.id))} />) : []),
             ];
           })}</ul>
-          {selected && <LabDetail key={selected.id} api={api} order={selected} canAttach={can(profile, 'laboratorio.procesar') || can(profile, 'laboratorio.revisar')} canComplete={can(profile, 'laboratorio.validar')} onChanged={data.refresh} onSample={() => setSampleFor(selected)} />}
+          {selected && <LabDetail key={selected.id} api={api} order={selected} canAttach={can(profile, 'laboratorio.procesar') || can(profile, 'laboratorio.revisar')} canComplete={can(profile, 'laboratorio.validar')} onChanged={data.refresh} onSample={() => setSampleFor(selected)} onBack={backToList} />}
         </div></>
         : all.length ? <Empty title="Ninguna orden coincide con los filtros" description="Quita algún filtro o cambia lo que buscas." />
           : <Empty title="No hay órdenes de laboratorio" description="Las órdenes aparecerán cuando Medicina solicite estudios para una consulta." />}
+      </div>
     </>}</RemoteState></section>
     {sampleFor && <SampleDialog api={api} order={sampleFor} onClose={() => setSampleFor(null)} onSaved={() => { setSampleFor(null); data.refresh(); }} />}
   </>;
@@ -199,7 +214,7 @@ function LabWorkRow({ order, now, current, onSelect, batchable, inBatch, onBatch
     <button type="button" className="lw-row lab-row" aria-current={current} aria-label={`Orden de ${order.patientName}, ${urgent ? 'urgente' : 'rutina'}, ${externalPending ? 'externa' : STAGE_LABEL[stage]}`} onClick={onSelect}>
       {/* Routine is the default and has no tag (as on Android); only urgent shows, inline, so the name keeps the width. */}
       <span className="lw-patient"><span className="lab-row-name"><strong>{order.patientName}</strong>{urgent && <PriorityBadge value="urgente" />}</span><small>{patientLine(order) || 'Sin datos del expediente'}</small></span>
-      <span className="lw-exams">{shown.map(item => <span className="lw-exam" key={item.id} title={item.name}>{item.code}</span>)}{more > 0 && <span className="lw-exam">+{more}</span>}<small>{order.doctorName ? `Pidió: ${order.doctorName}` : ''}</small></span>
+      <span className="lw-exams">{shown.map(item => <span className="lw-exam" key={item.id} title={item.name}>{item.code}</span>)}{more > 0 && <span className="lw-exam">+{more}</span>}<small title={order.doctorName ? `Pidió: ${order.doctorName}` : undefined}>{order.doctorName ? `Pidió: ${order.doctorName}` : ''}</small></span>
       <span className="lw-end">
         {externalPending ? <span className="lab-external-chip"><Icon name="building" size={14} />Externa</span> : <StageBadge stage={stage} />}
         {level !== 'none' && !externalPending && <span className={`lw-elapsed sla-${level}`} title={level === 'late' ? 'Pasó la meta de tiempo' : level === 'warn' ? 'Cerca de la meta de tiempo' : 'Tiempo desde que se pidió'}><Icon name="clock" size={14} />{formatElapsed(minutes)}</span>}
@@ -219,14 +234,16 @@ function LabStepper({ order }: { order: LabOrder }) {
  * Panel de detalle con detalle progresivo: arriba quién actúa y la acción principal, luego los valores; las fechas quedan
  * plegadas en «Datos de la orden» y el avance va al final.
  */
-function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: { api: Api; order: LabOrder; canAttach: boolean; canComplete: boolean; onChanged: () => void; onSample: () => void }) {
+function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample, onBack }: { api: Api; order: LabOrder; canAttach: boolean; canComplete: boolean; onChanged: () => void; onSample: () => void; onBack: () => void }) {
   const action = useAction(api), [cancelOpen, setCancelOpen] = useState(false), [externalOpen, setExternalOpen] = useState(false), [loadOpen, setLoadOpen] = useState(false);
   const [releaseOpen, setReleaseOpen] = useState(false), [done, setDone] = useState<string | null>(null), [completeOpen, setCompleteOpen] = useState(false);
   const capturing = allows(order, 'capturar');
   const next = nextActor(order), stage = stageOf(order);
   const when = (value?: string | null) => value ? formatDateTime(value) : 'Pendiente';
   async function transition(path: string, body: unknown) { if (await action.run(path, body)) onChanged(); }
-  return <aside className="cl-detail" aria-label={`Detalle de la orden de ${order.patientName}`}>
+  return <aside className="cl-detail lab-detail" aria-label={`Detalle de la orden de ${order.patientName}`}>
+    {/* Shown only when list and detail are stacked (narrow screens): the list is hidden while the detail is open. */}
+    <button type="button" className="lab-back" onClick={onBack}><Icon name="back" size={18} />Volver a la lista</button>
     {/* One stage badge: above the name, with the finer label when there is one («Pendiente de revisar»). */}
     <header><StatusBadge value={STAGE_STATUS[stage]} label={stageLabel(order, allows(order, 'revisar')) ?? STAGE_LABEL[stage]} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p>
       {next && <small className="lab-next"><strong>Ahora: {next.who}</strong> {next.what}</small>}</header>
@@ -241,7 +258,7 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample }: 
       {allows(order, 'completar') && !capturing && <button className="primary-button" disabled={action.busy} onClick={() => setCompleteOpen(true)}>Completar</button>}
       {allows(order, 'revisar') && <button className="primary-button" disabled={action.busy} onClick={() => { setDone(null); setReleaseOpen(true); }}>Revisar y liberar</button>}
       {allowsExternal(order, 'enviar_externo') && <button className="secondary-button" onClick={() => setExternalOpen(true)}>Se realiza en otro sitio</button>}
-      {allows(order, 'cancelar') && <button className="secondary-button" onClick={() => setCancelOpen(true)}>Cancelar orden</button>}
+      {allows(order, 'cancelar') && <CrudButton kind="deactivate" label="Cancelar orden" onClick={() => setCancelOpen(true)} />}
     </div>
     {order.amendedAt && <p className="lab-requirement" role="note">Un resultado se corrigió el {formatDateTime(order.amendedAt)}; el valor anterior queda en el historial.{order.reviewedAt ? '' : ' Medicina debe revisarlo de nuevo antes de que el paciente lo vea.'}</p>}
     {capturing
@@ -472,8 +489,15 @@ function LabItemRow({ api, order, item, onChanged }: { api: Api; order: LabOrder
   const title = <strong>{item.code} · {item.name}{item.unit ? <small className="muted"> ({item.unit})</small> : null}</strong>;
   return <div className="lab-result-row">{title}{item.result ? <span><Tag value={item.result.mark} /> {resultText(item)}</span> : <span>Resultado pendiente</span>}
     {item.result && <ObservationLine result={item.result} />}
-    {allows(order, 'enmendar') && item.result && <button className="secondary-button" type="button" onClick={() => setAmending(true)}>Corregir resultado</button>}
+    {allows(order, 'enmendar') && item.result && <CrudButton kind="edit" label="Corregir resultado" onClick={() => setAmending(true)} />}
     {amending && <AmendDialog api={api} order={order} item={item} onClose={() => setAmending(false)} onSaved={() => { setAmending(false); onChanged(); }} />}</div>;
+}
+
+/** Normal range and critical limits on their own lines, each kept whole, so a range never breaks into three lines. */
+function RangeCell({ range }: { range?: ReferenceRange | null }) {
+  if (!rangeText(range)) return <span className="muted">Sin rango</span>;
+  const normal = rangeText({ ...range!, criticalLow: null, criticalHigh: null }), critical = rangeText({ ...range!, min: null, max: null });
+  return <>{normal && <span className="lab-range-part">{normal}</span>}{critical && <span className="lab-range-part">{critical}</span>}</>;
 }
 
 type SheetRow = { raw: string; note: string; relevant: boolean; noteOpen: boolean; left: boolean };
@@ -542,7 +566,7 @@ function ResultSheet({ api, order, canComplete, onSaved }: { api: Api; order: La
                 <label className="lab-relevant"><input type="checkbox" checked={row.relevant} disabled={!row.note.trim() || action.busy} onChange={event => patch(item.id, { relevant: event.target.checked })} />Avisar al médico</label></span>
               : <button type="button" className="lab-sheet-add" onClick={() => patch(item.id, { noteOpen: true })}>Agregar observación</button>}
           </td>
-          <td className="lab-num">{rangeText(item.referenceRange) || <span className="muted">Sin rango</span>}</td>
+          <td className="lab-num"><RangeCell range={item.referenceRange} /></td>
           <td aria-live="polite">{shown && <StatusBadge value={shown.status} label={shown.label} />}</td>
         </tr>;
       })}</tbody>

@@ -3,7 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccessProfile, Api } from '../lib/api';
 import { InventoryPage } from '../features/inventory';
-import { articleExport, daysUntil, quantityText, emptyFilters, expiryText, filterArticles, gaugePercent, movementBody, movementTypesFor, emptyMovement, sortArticles, validateMovement, type ArticleDetail, type ArticleSummary } from '../features/inventory/model';
+import { articleExport, daysUntil, warehouseNames, quantityText, emptyFilters, expiryText, filterArticles, gaugePercent, movementBody, movementTypesFor, emptyMovement, sortArticles, validateMovement, type ArticleDetail, type ArticleSummary } from '../features/inventory/model';
 
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
@@ -21,7 +21,10 @@ const rows: ArticleSummary[] = [
 const detail: ArticleDetail = { ...rows[0], lotList: [
   { id: 'l-1', number: 'DL-26-A', expiresAt: '2027-08-31', active: true, version: 1, expired: false, total: 300, warehouses: [{ warehouseId: 'w-1', warehouseCode: 'BOD-CEN', warehouseName: 'Bodega central', quantity: 300 }] },
 ], warehouses: [{ warehouseId: 'w-1', warehouseCode: 'BOD-CEN', warehouseName: 'Bodega central', quantity: 300 }],
-movements: [{ id: 'm-1', type: 'consumo', lotNumber: 'DL-26-A', quantity: 20, reason: 'Consumo ficticio', originWarehouseCode: 'BOD-CEN', destinationWarehouseCode: null, authorName: 'Enfermera Ficticia', registeredAt: '2026-11-13T15:00:00Z' }] };
+movements: [
+  { id: 'm-1', type: 'consumo', lotNumber: 'DL-26-A', quantity: 20, reason: 'Consumo ficticio', originWarehouseCode: 'BOD-CEN', destinationWarehouseCode: null, authorName: 'Enfermera Ficticia', registeredAt: '2026-11-13T15:00:00Z' },
+  { id: 'm-2', type: 'traslado', lotNumber: 'DL-26-A', quantity: 5, reason: 'Traslado ficticio', originWarehouseCode: 'BOD-CEN', destinationWarehouseCode: 'BOD-LAB', authorName: 'Jefe Ficticio', registeredAt: '2026-11-12T15:00:00Z' },
+] };
 
 describe('inventario · modelo', () => {
   it('la cantidad lleva la unidad en plural salvo con 1, y las abreviaturas no cambian', () => {
@@ -40,6 +43,18 @@ describe('inventario · modelo', () => {
     expect(filterArticles(rows, { ...emptyFilters, statuses: ['agotado', 'por_vencer'] }).map(a => a.id)).toEqual(['a-3', 'a-4']);
     expect(sortArticles(rows, 'estado').map(a => a.id)).toEqual(['a-3', 'a-2', 'a-4', 'a-1']);
     expect(sortArticles(rows, 'vencimiento').map(a => a.id)).toEqual(['a-4', 'a-2', 'a-1', 'a-3']);
+  });
+  // Owner obs. 10: inactive articles stay out of the list until «Mostrar inactivos» is checked.
+  it('oculta los inactivos salvo con «Mostrar inactivos»', () => {
+    const withInactive = [...rows, article({ id: 'a-9', code: 'OLD', name: 'Guante viejo', active: false, status: 'inactivo' })];
+    expect(filterArticles(withInactive, emptyFilters).map(a => a.id)).not.toContain('a-9');
+    expect(filterArticles(withInactive, { ...emptyFilters, showInactive: true }).map(a => a.id)).toContain('a-9');
+  });
+  it('resuelve el nombre de la bodega por su código y deja el código si no lo conoce', () => {
+    const names = warehouseNames(detail, [{ id: 'w-2', code: 'BOD-LAB', name: 'Bodega de laboratorio' }]);
+    expect(names.get('BOD-CEN')).toBe('Bodega central');
+    expect(names.get('BOD-LAB')).toBe('Bodega de laboratorio');
+    expect(names.get('BOD-X')).toBeUndefined();
   });
   it('el medidor llena hasta el doble del mínimo', () => {
     expect(gaugePercent({ available: 100, minimum: 100 })).toBe(50);
@@ -102,11 +117,11 @@ describe('inventario · maestro-detalle', () => {
   it('lista artículos con estado y resumen, y al elegir uno muestra lotes, bodegas e historial', async () => {
     mount(jop());
     expect(await screen.findByText('Reactivo de creatinina')).toBeTruthy();
-    expect(within(screen.getByRole('group', { name: 'Resumen por estado' })).getByRole('button', { name: /Agotado/ }).textContent).toContain('1');
+    expect(within(screen.getByRole('group', { name: 'Filtrar por estado' })).getByRole('button', { name: /Agotado/ }).textContent).toContain('1');
     await userEvent.click(screen.getByRole('button', { name: /Paracetamol 500 mg/ }));
     const detailPane = await screen.findByRole('region', { name: 'Detalle del artículo' });
     expect((await within(detailPane).findAllByText('DL-26-A')).length).toBeGreaterThan(0);
-    expect(within(detailPane).getByText(/Bodega central/)).toBeTruthy();
+    expect(within(detailPane).getAllByText('Bodega central').length).toBeGreaterThan(0);
     expect(within(detailPane).getByText('Consumo ficticio')).toBeTruthy();
     expect(within(detailPane).getByRole('button', { name: 'Editar artículo' })).toBeTruthy();
     expect(within(detailPane).getByRole('button', { name: 'Nuevo lote' })).toBeTruthy();
@@ -148,6 +163,57 @@ describe('inventario · maestro-detalle', () => {
     expect(screen.getByText(/· Todas las categorías, solo consulta y configuración$/)).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Nuevo artículo' })).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Registrar movimiento' })).toBeNull();
+  });
+});
+
+// Owner obs. 10: one status filter, export with the page actions, CRUD colors, warehouse names and movement detail.
+describe('inventario · observación 10', () => {
+  it('el estado se filtra solo con las tarjetas de conteo; el panel no lo repite y ofrece «Mostrar inactivos»', async () => {
+    mount(jop());
+    await screen.findByText('Suero oral');
+    await userEvent.click(within(screen.getByRole('group', { name: 'Filtrar por estado' })).getByRole('button', { name: /Agotado/ }));
+    expect(screen.queryByText('Suero oral')).toBeNull();
+    expect(screen.getByText('Tubo de muestra')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /^Filtros/ }));
+    const panel = document.getElementById('inv-filters')!;
+    expect(within(panel).queryByText('Estado')).toBeNull();
+    expect(within(panel).queryByRole('button', { name: /Agotado|Bajo mínimo|En orden/ })).toBeNull();
+    expect(within(panel).getByRole('checkbox', { name: /Mostrar inactivos/ })).toBeTruthy();
+  });
+
+  it('exportar vive en la cabecera y «Nuevo artículo» es el botón de crear', async () => {
+    mount(profile([['inventario.ver', 'x'], ['inventario.configurar', 'x']]));
+    await screen.findByText('Suero oral');
+    expect(within(screen.getByRole('region', { name: 'Artículos' })).queryByRole('button', { name: /Exportar/ })).toBeNull();
+    expect(screen.getByRole('button', { name: /Exportar/ })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Nuevo artículo' }).className).toContain('crud-create');
+  });
+
+  it('el detalle usa los colores de crear, editar y desactivar, y el lote se edita con el lápiz', async () => {
+    mount(jop());
+    await userEvent.click(await screen.findByRole('button', { name: /Paracetamol 500 mg/ }));
+    const pane = await screen.findByRole('region', { name: 'Detalle del artículo' });
+    await within(pane).findByRole('button', { name: 'Editar artículo' });
+    expect(within(pane).getByRole('button', { name: 'Editar artículo' }).className).toContain('crud-edit');
+    expect(within(pane).getByRole('button', { name: 'Nuevo lote' }).className).toContain('crud-create');
+    expect(within(pane).getByRole('button', { name: 'Desactivar' }).className).toContain('crud-deactivate');
+    const lotEdit = within(pane).getByRole('button', { name: 'Editar lote DL-26-A' });
+    expect(lotEdit.className).toContain('crud-icon');
+    expect(within(pane).getByRole('combobox', { name: 'Tipo' }).closest('.select-field')).toBeTruthy();
+  });
+
+  it('el historial muestra nombres de bodega y abre el detalle del movimiento', async () => {
+    mount(jop());
+    await userEvent.click(await screen.findByRole('button', { name: /Paracetamol 500 mg/ }));
+    const pane = await screen.findByRole('region', { name: 'Detalle del artículo' });
+    const history = within(pane).getByRole('region', { name: 'Historial de movimientos' });
+    expect(await within(history).findByText('Bodega de laboratorio')).toBeTruthy();
+    await userEvent.click(within(history).getAllByRole('button', { name: /Ver detalle del movimiento/ })[1]);
+    const dialog = screen.getByRole('dialog');
+    expect(within(dialog).getByText('Bodega central (BOD-CEN)')).toBeTruthy();
+    expect(within(dialog).getByText('Bodega de laboratorio (BOD-LAB)')).toBeTruthy();
+    expect(within(dialog).getByText('Traslado ficticio')).toBeTruthy();
+    expect(within(dialog).getByText('Jefe Ficticio')).toBeTruthy();
   });
 });
 
