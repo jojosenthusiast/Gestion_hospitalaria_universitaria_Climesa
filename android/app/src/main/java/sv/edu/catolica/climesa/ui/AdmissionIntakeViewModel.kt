@@ -52,7 +52,10 @@ data class AdmissionIntakeState(
     val finished: Boolean = false,
     /** S13: fields the guide chose on its own (single possible answer), named in its notice. */
     val prefilled: List<sv.edu.catolica.climesa.domain.IntakeField> = emptyList(),
-)
+) {
+    /** Lote 2: the patient of a kept draft, so the list offers «Continuar ingreso de X» or «Empezar de nuevo». */
+    val resumeName: String? get() = if (kept && !open) draft.patient?.name else null
+}
 
 /** A34: guided admission in eight steps. Every step validates before moving on; the API repeats every check when confirming. */
 @HiltViewModel
@@ -111,6 +114,19 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
         if (s.busy) return
         if (s.step > 0) back(canAssignBed) else mutable.value = s.copy(open = false, kept = true)
     }
+    /**
+     * Lote 2: «Cancelar ingreso» keeps what was chosen. With a patient picked the draft stays in this ViewModel and the list
+     * offers to continue it; with nothing picked there is nothing to keep and the guide just closes.
+     */
+    fun leave() {
+        val s = mutable.value
+        if (s.busy) return
+        if (s.draft.patient == null) close() else { searchJob?.cancel(); stepJob?.cancel(); doctorsJob?.cancel(); liveJob?.cancel(); mutable.value = s.copy(open = false, kept = true, error = null) }
+    }
+
+    /** «Empezar de nuevo»: drops the kept draft and opens an empty guide. */
+    fun restart() { close(); open() }
+
     fun close() { searchJob?.cancel(); stepJob?.cancel(); doctorsJob?.cancel(); liveJob?.cancel(); prefillTried.clear(); mutable.value = AdmissionIntakeState() }
 
     /** Each automatic choice runs once per guide: a field the person cleared or changed is not filled again. */

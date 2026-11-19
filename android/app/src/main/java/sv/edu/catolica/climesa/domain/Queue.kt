@@ -252,4 +252,17 @@ object QueueMoves {
     fun canRemoveCall(ticket: QueueTicket) = ticket.state == "llamado" && ticket.calls > 1 && "deshacer_llamado" in ticket.undoActions
     fun destinations(ticket: QueueTicket): List<Pair<QueueColumn, QueueMove>> = QueueColumn.entries.mapNotNull { c -> moveFor(ticket, c)?.let { c to it } }
     fun path(ticket: QueueTicket, move: QueueMove) = "/fila/${ticket.id}/${move.path}"
+
+    /** Moves the card already shows as direct buttons from `allowedActions` (Llamar, Iniciar atención, Completar, No se presentó). */
+    private val direct = setOf(QueueMove.CALL, QueueMove.ATTEND, QueueMove.COMPLETE, QueueMove.ABSENT)
+
+    /**
+     * Lote 2 «Mover»: the main next step is a direct button on the card, so the menu keeps only the other moves, with plain
+     * labels ("Devolver a espera", "Quitar un llamado"), and never repeats a button. [undoShown] is true when the card
+     * already shows its own "Deshacer" for this call.
+     */
+    fun menuMoves(ticket: QueueTicket, undoShown: Boolean = false): List<QueueMove> = buildList {
+        if (canRemoveCall(ticket) && !undoShown) add(QueueMove.REMOVE_CALL)
+        destinations(ticket).map { it.second }.filter { it !in direct && !(it == QueueMove.UNDO_CALL && undoShown) }.forEach(::add)
+    }
 }

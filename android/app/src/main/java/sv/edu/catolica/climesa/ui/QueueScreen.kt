@@ -33,6 +33,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Phone
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
@@ -57,6 +58,9 @@ import sv.edu.catolica.climesa.domain.QueueTicket
 import sv.edu.catolica.climesa.domain.PatientQueue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.material3.Icon
 import sv.edu.catolica.climesa.domain.QueueBoard
 import sv.edu.catolica.climesa.domain.QueueColumn
 import sv.edu.catolica.climesa.domain.SlaLevel
@@ -164,7 +168,7 @@ fun QueueScreen(
             state.error != null && state.tickets.isEmpty() -> item { ErrorState(state.error, onRetry = { model.clearMessages(); model.load() }) }
             state.tickets.isEmpty() -> item { EmptyState("No hay números emitidos hoy.") }
             else -> {
-                if (readOnly) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.fila_solo_lectura)) }
+                if (readOnly) item { ReadOnlyBadge(who = stringResource(R.string.fila_solo_lectura_quien), what = stringResource(R.string.fila_solo_lectura_que)) }
                 // The clock is read when the board is drawn; every realtime event redraws it, no timers.
                 val now = System.currentTimeMillis()
                 val visible = QueueBoard.visible(state.tickets, service, query)
@@ -346,29 +350,33 @@ private fun QueueTicketCard(ticket: QueueTicket, canCall: Boolean, canManage: Bo
             QueueActionButton(ticket, QueueAction.ABSENT, "No se presentó", busy, false) { model.absent(ticket) }
             // B-3: the issuer may void a number issued by mistake while the server window is open (like the web card menu).
             if (canIssue && QueueRules.voidable(ticket.voidableUntilMillis, ticket.state, now)) RowAction(stringResource(R.string.fila_anular), { model.voidTicket(ticket) }, enabled = !busy, loading = sending)
-            CardMenu(ticket, canCall, canManage, busy, model)
+            CardMenu(ticket, canCall, canManage, busy, model, undoShown = ticket.id in state.calledByMe && ticket.state == "llamado" && "deshacer_llamado" in ticket.undoActions)
         }
     }
 }
 
-/** Board moves without dragging (touch and keyboard): only the moves the server accepts now, plus the priority. */
+/**
+ * Board moves without dragging (touch and keyboard). The main next step is already a direct button on the card; this "Más"
+ * menu holds only the other moves the server accepts now and the priority change, with plain labels and no "Mover a…".
+ */
 @Composable
-private fun CardMenu(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel) {
-    val moves = remember(ticket) { QueueMoves.destinations(ticket) }
-    val removeCall = canCall && QueueMoves.canRemoveCall(ticket)
+private fun CardMenu(ticket: QueueTicket, canCall: Boolean, canManage: Boolean, busy: Boolean, model: QueueViewModel, undoShown: Boolean = false) {
+    val moves = remember(ticket, undoShown) { QueueMoves.menuMoves(ticket, undoShown).filter { it != QueueMove.REMOVE_CALL || canCall } }
     val priorities = if (canManage && ticket.state in listOf("en_espera", "llamado")) listOf("emergencia", "urgente", "rutina").filter { it != ticket.priority } else emptyList()
-    if (moves.isEmpty() && priorities.isEmpty() && !removeCall) return
+    if (moves.isEmpty() && priorities.isEmpty()) return
     var open by remember { mutableStateOf(false) }
     Box {
-        TextButton(onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.fila_mover)) }
+        TextButton(onClick = { open = true }, enabled = !busy, modifier = Modifier.heightIn(min = Spacing.touch).semantics { contentDescription = "Más acciones de ${QueueLabels.code(ticket)}" }) {
+            Icon(Icons.Default.MoreVert, null, Modifier.size(20.dp)); Spacer(Modifier.width(Spacing.xs)); Text(stringResource(R.string.fila_mas))
+        }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-            if (removeCall) DropdownMenuItem(text = { Text(stringResource(R.string.fila_quitar_llamado, ticket.calls)) }, onClick = { open = false; model.move(ticket, QueueMove.REMOVE_CALL) })
-            moves.forEach { (column, move) ->
-                DropdownMenuItem(text = { Text(stringResource(R.string.fila_mover_a, column.label, move.label.lowercase())) }, onClick = { open = false; model.move(ticket, move) })
+            moves.forEach { move ->
+                val label = if (move == QueueMove.REMOVE_CALL) stringResource(R.string.fila_quitar_llamado, ticket.calls) else move.label
+                DropdownMenuItem(text = { Text(label) }, onClick = { open = false; model.move(ticket, move) })
             }
             if (moves.isNotEmpty() && priorities.isNotEmpty()) HorizontalDivider()
             priorities.forEach { p ->
-                DropdownMenuItem(text = { Text(stringResource(R.string.fila_prioridad_a, QueueLabels.priority(p))) }, onClick = { open = false; model.changePriority(ticket, p) })
+                DropdownMenuItem(text = { Text(stringResource(R.string.fila_prioridad_cambiar, QueueLabels.priority(p))) }, onClick = { open = false; model.changePriority(ticket, p) })
             }
         }
     }

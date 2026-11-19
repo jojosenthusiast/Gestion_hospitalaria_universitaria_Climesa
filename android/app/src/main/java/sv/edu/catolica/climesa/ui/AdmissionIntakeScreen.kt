@@ -48,7 +48,6 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
     val draft = state.draft
     val step = state.step
     val problem = AdmissionIntake.stepError(step, draft, canAssignBed, state.feasibility?.feasible == true)
-    var leaving by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
     PageList(modifier) {
         item { CompactHeader(stringResource(R.string.ing_titulo), breadcrumb = stringResource(R.string.ing_paso, step + 1, AdmissionIntake.STEP_TITLES.size, AdmissionIntake.STEP_TITLES[step])) }
         item { LinearProgressIndicator(progress = { (step + 1f) / AdmissionIntake.STEP_TITLES.size }, modifier = Modifier.fillMaxWidth()) }
@@ -73,14 +72,14 @@ fun AdmissionIntakeScreen(canAssignBed: Boolean, modifier: Modifier = Modifier, 
             else PrimaryButton(stringResource(R.string.ing_siguiente), { model.next(canAssignBed) }, enabled = problem == null && !state.loading)
         }
         item { if (step > 0) SecondaryButton(stringResource(R.string.ing_atras), { model.back(canAssignBed) }, enabled = !state.busy) }
-        item { SecondaryButton(stringResource(R.string.ing_cancelar), { if (draft.patient != null) leaving = true else model.close() }, icon = Icons.Default.Close, enabled = !state.busy) }
+        // Lote 2: leaving keeps the draft; the list then offers «Continuar ingreso de X» or «Empezar de nuevo».
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                SecondaryButton(stringResource(R.string.ing_cancelar), model::leave, icon = Icons.Default.Close, enabled = !state.busy)
+                if (draft.patient != null) BlockedReason(stringResource(R.string.ing_borrador_se_guarda))
+            }
+        }
     }
-    // Leaving the guide drops everything typed: confirm once something was chosen.
-    if (leaving) ConfirmDialog(
-        title = stringResource(R.string.ing_salir_titulo), confirmLabel = stringResource(R.string.ing_salir), destructive = true,
-        message = stringResource(R.string.ing_salir_detalle), dismissLabel = stringResource(R.string.rec_seguir_editando),
-        onConfirm = { leaving = false; model.close() }, onDismiss = { leaving = false },
-    )
 }
 
 private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this) {

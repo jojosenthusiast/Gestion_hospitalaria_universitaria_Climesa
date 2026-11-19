@@ -12,6 +12,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Surface
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Button
@@ -34,7 +50,7 @@ private val ButtonPadding = PaddingValues(horizontal = 18.dp, vertical = 12.dp)
 @Composable
 private fun ButtonBody(text: String, icon: ImageVector?, loading: Boolean, spinnerColor: androidx.compose.ui.graphics.Color) {
     if (loading) {
-        CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = spinnerColor)
+        Spinner(size = 20.dp, strokeWidth = 2.dp, color = spinnerColor)
         Spacer(Modifier.width(10.dp))
         Text(stringResource(R.string.ui_un_momento), style = MaterialTheme.typography.labelLarge)
     } else {
@@ -131,4 +147,102 @@ internal fun RowAction(
     }
     if (blockedReason == null) button(modifier)
     else Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) { button(Modifier); BlockedReason(blockedReason, Modifier.padding(horizontal = Spacing.md)) }
+}
+
+/** The four CRUD verbs (S0, obs 6/10). Each one always has the same look, on every screen and role, like the web `CrudButton`. */
+internal enum class CrudKind { Create, Edit, Deactivate, View }
+
+/** Icon of each CRUD verb: create = add, edit = pencil, deactivate = trash, view = eye. */
+internal fun CrudKind.icon(): ImageVector = when (this) {
+    CrudKind.Create -> Icons.Default.Add
+    CrudKind.Edit -> Icons.Default.Edit
+    CrudKind.Deactivate -> Icons.Default.Delete
+    CrudKind.View -> Icons.Default.Visibility
+}
+
+/**
+ * Shared CRUD action (S0): create is the filled primary button with the add icon; edit is outlined in the primary color with
+ * a pencil; deactivate, delete or retire is outlined in red with a trash icon; view is outlined neutral with an eye.
+ * [iconOnly] draws a 48dp icon button for list rows, with [label] as its content description.
+ */
+@Composable
+internal fun CrudButton(
+    kind: CrudKind,
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    iconOnly: Boolean = false,
+    enabled: Boolean = true,
+    loading: Boolean = false,
+    fill: Boolean = true,
+) {
+    val tint = when (kind) {
+        CrudKind.Create -> MaterialTheme.colorScheme.primary
+        CrudKind.Edit -> MaterialTheme.climesa.primaryText
+        CrudKind.Deactivate -> MaterialTheme.climesa.danger
+        CrudKind.View -> MaterialTheme.colorScheme.onSurfaceVariant
+    }
+    if (iconOnly) {
+        IconButton(onClick = onClick, enabled = enabled && !loading, modifier = modifier.size(Spacing.touch).semantics { contentDescription = label }) {
+            if (loading) Spinner(size = 20.dp, strokeWidth = 2.dp, color = tint)
+            else Icon(kind.icon(), null, tint = if (enabled) tint else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f))
+        }
+        return
+    }
+    if (kind == CrudKind.Create) {
+        Button(
+            onClick = onClick,
+            enabled = enabled && !loading,
+            modifier = modifier.buttonSize(fill),
+            contentPadding = ButtonPadding,
+        ) { ButtonBody(label, kind.icon(), loading, MaterialTheme.colorScheme.onPrimary) }
+        return
+    }
+    val border = when {
+        !enabled -> MaterialTheme.climesa.line
+        kind == CrudKind.View -> MaterialTheme.climesa.controlLine
+        else -> tint
+    }
+    OutlinedButton(
+        onClick = onClick,
+        enabled = enabled && !loading,
+        modifier = modifier.buttonSize(fill),
+        border = BorderStroke(1.dp, border),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (kind == CrudKind.View) MaterialTheme.colorScheme.onSurface else tint),
+        contentPadding = ButtonPadding,
+    ) { ButtonBody(label, kind.icon(), loading, tint) }
+}
+
+/** Text of the read-only explanation (obs 15), the same sentence as the web `ReadOnlyBadge`. */
+internal object ReadOnlyCopy {
+    const val LABEL = "Solo lectura"
+    fun explain(who: String, what: String = "esta información"): String = "Puedes consultar $what. Para hacer cambios, contacta a $who."
+}
+
+/**
+ * Visible read-only cue (obs 15): a lock pill «Solo lectura». A tap or long press opens the explanation under it
+ * («Puedes consultar X. Para hacer cambios, contacta a Y.»); screen readers hear the full sentence right away.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun ReadOnlyBadge(who: String, what: String = "esta información", modifier: Modifier = Modifier) {
+    var open by rememberSaveable { mutableStateOf(false) }
+    val explanation = ReadOnlyCopy.explain(who, what)
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Surface(
+            shape = RoundedCornerShape(50),
+            color = MaterialTheme.climesa.blockedSoft,
+            contentColor = MaterialTheme.climesa.blocked,
+            modifier = Modifier
+                .heightIn(min = Spacing.touch)
+                .combinedClickable(onClick = { open = !open }, onLongClick = { open = true })
+                .semantics(mergeDescendants = true) { contentDescription = "${ReadOnlyCopy.LABEL}. $explanation" },
+        ) {
+            Row(Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm), horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Default.Lock, null, Modifier.size(16.dp))
+                Text(ReadOnlyCopy.LABEL, style = MaterialTheme.typography.labelLarge)
+            }
+        }
+        if (open) Text(explanation, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
 }

@@ -430,3 +430,22 @@ object AmbulanceEvents {
     fun matches(event: EventoDominio) = LiveEntities.matches(event, "ambulancia") && event.type != "ambulancia.ubicacion"
     fun isPrehospital(event: EventoDominio) = event.type == "ambulancia.prehospital"
 }
+
+/**
+ * Status tag of the unit header (obs 19): when the API says the unit cannot be dispatched, the tag reads «No se puede
+ * despachar» instead of «Disponible», and the reason sits under it in the same card; never a second banner.
+ */
+object UnitStatusBadge {
+    const val BLOCKED = "no_despachable"
+    const val BLOCKED_LABEL = "No se puede despachar"
+    const val NO_SERVICE = "Sin servicio activo"
+
+    fun code(unitState: String, blocked: Boolean): String = if (blocked) BLOCKED else unitState
+
+    fun label(unitState: String, blocked: Boolean, stateLabel: String): String = if (blocked) BLOCKED_LABEL else stateLabel
+
+    /** Reason under the tag: the API message and its next step. A unit busy on a service waits for it to end, like the web. */
+    fun reason(block: DispatchBlock): String =
+        listOf(block.message, if (block.code == "en_servicio") "Despacha cuando la unidad termine ese servicio." else block.action)
+            .filter { it.isNotBlank() }.joinToString(" ")
+}

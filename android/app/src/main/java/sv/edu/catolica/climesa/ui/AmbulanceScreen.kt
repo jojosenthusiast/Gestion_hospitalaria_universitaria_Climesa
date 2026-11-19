@@ -51,6 +51,7 @@ import java.net.URLEncoder
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AccessProfile
 import sv.edu.catolica.climesa.domain.AmbulanceLabels
+import sv.edu.catolica.climesa.domain.UnitStatusBadge
 import sv.edu.catolica.climesa.domain.AmbulanceRequestRow
 import sv.edu.catolica.climesa.domain.AmbulanceRules
 import sv.edu.catolica.climesa.domain.AmbulanceService
@@ -225,7 +226,14 @@ private fun RequestField.label(): Int = when (this) {
 private fun LazyListScope.unitHeader(state: AmbulanceUiState) {
     val status = state.status ?: return
     item {
-        SectionCard(status.unit.plate, eyebrow = stringResource(R.string.op_amb_unidad), action = { OperacionStatusTag(status.unit.state, label = AmbulanceLabels.unitState(status.unit.state)) }) {
+        val block = status.dispatchBlock
+        val blocked = block != null
+        SectionCard(status.unit.plate, eyebrow = stringResource(R.string.op_amb_unidad), action = {
+            OperacionStatusTag(UnitStatusBadge.code(status.unit.state, blocked), label = UnitStatusBadge.label(status.unit.state, blocked, AmbulanceLabels.unitState(status.unit.state)))
+        }) {
+            // Obs 19: why it cannot be dispatched lives here, under the tag, once; and an idle unit says so plainly.
+            if (block != null) Text(UnitStatusBadge.reason(block), style = MaterialTheme.typography.bodyMedium)
+            if (status.activeService == null) Text(UnitStatusBadge.NO_SERVICE, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.climesa.primaryText)
             Text(stringResource(if (status.paramedicOnDuty) R.string.amb_paramedico_si else R.string.amb_paramedico_no), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(stringResource(if (status.driverOnDuty) R.string.amb_motorista_si else R.string.amb_motorista_no), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (status.unit.state == "en_mantenimiento") {
@@ -241,7 +249,6 @@ private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: Ambula
     unitHeader(state)
     val status = state.status ?: return
     status.activeService?.let { service -> item { ServiceSummary(service) } }
-    status.dispatchBlock?.let { block -> item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_no_despachable) + ". " + block.message + " " + block.action) } }
     item { Text(stringResource(R.string.amb_solicitudes_titulo, status.pendingRequests.size), style = MaterialTheme.typography.titleMedium) }
     if (status.pendingRequests.isEmpty()) item { EmptyState(stringResource(R.string.amb_sin_solicitudes)) }
     // One primary per screen: only the oldest request (the one the unit serves next) gets the filled "Despachar".

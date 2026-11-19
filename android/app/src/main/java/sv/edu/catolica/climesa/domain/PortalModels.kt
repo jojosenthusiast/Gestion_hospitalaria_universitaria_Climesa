@@ -7,7 +7,8 @@ import org.json.JSONObject
 data class BedSummary(val free: Int, val total: Int)
 
 /** One row of `GET /pacientes`. */
-data class PatientHit(val fullName: String, val record: String)
+/** [summary] is age (or the age range the role may see) and sex, "34 años · Femenino"; null when the API sends neither. */
+data class PatientHit(val fullName: String, val record: String, val summary: String? = null)
 
 /** Ambulance unit of `GET /ambulancia`, with the active service if there is one. */
 data class UnitView(
@@ -36,7 +37,7 @@ object PortalParsers {
     fun patients(data: Any?): List<PatientHit> {
         val rows = data as? JSONArray ?: return emptyList()
         return (0 until rows.length()).mapNotNull { i ->
-            rows.optJSONObject(i)?.let { PatientHit(it.optString("fullName"), it.optString("record")) }
+            rows.optJSONObject(i)?.let { PatientHit(it.optString("fullName"), it.optString("record"), PatientSummary.fromApi(it.optString("birth"), it.optString("ageRange"), it.optString("sex"))) }
         }
     }
 
