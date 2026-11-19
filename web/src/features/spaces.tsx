@@ -1,28 +1,38 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Field, Icon } from '../components/ui';
+import { Field } from '../components/ui';
+import { CrudButton, ReadOnlyBadge } from '../components/system';
+import './spaces/building.css';
 import { can, type AccessProfile, type Api, type Bed, type Space, type SpaceInput } from '../lib/api';
 import { Dialog, CompactHeader, RemoteState, SaveButton, Select, WriteError, useAction, useData } from './common';
 import { useQuickAction } from './personal/accion';
 import { BuildingBoard } from './spaces/BuildingBoard';
-import { spaceTypeNames, spacesFromBeds } from './spaces/building';
+import { bedStateMap, bedTotals, spaceTypeNames, spacesFromBeds, type SpaceWithState } from './spaces/building';
 
 /** Tipos de espacio que pueden contener a cada tipo: hospital → planta → área → habitación → cama. */
 const parentTypes: Record<string, string[]> = { planta: ['hospital'], area: ['planta'], habitacion: ['area', 'planta'], cama: ['habitacion'], consultorio: ['area', 'planta'], cubiculo: ['area', 'planta'], bodega: ['area', 'planta'], bahia: ['area', 'planta'] };
 
-/** Edificio (ADM y consulta): mapa interactivo por planta. La asignación de espacios es definir dónde está cada cosa; las camas se asignan a pacientes desde el plano. */
+/** Obs. 17: one quiet line of hospital totals in the header (the plan below has the per-floor counts). */
+function BedTotals({ totals }: { totals: ReturnType<typeof bedTotals> }) {
+  if (!totals) return null;
+  return <dl className="beds-summary" aria-label="Camas del hospital"><div><dd>{totals.total}</dd><dt>{totals.total === 1 ? 'cama' : 'camas'}</dt></div><div><dd>{totals.free}</dd><dt>{totals.free === 1 ? 'libre' : 'libres'}</dt></div><div><dd>{totals.occupied}</dd><dt>{totals.occupied === 1 ? 'ocupada' : 'ocupadas'}</dt></div></dl>;
+}
+
+/** Edificio: the one complete building view (structure for ADM, bed states and bed actions by permission). */
 export function SpacesPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
-  const data = useData<Space[]>(api, '/espacios', version);
+  const data = useData<SpaceWithState[]>(api, '/espacios', version);
   const beds = useData<Bed[]>(api, '/camas', version, can(profile, 'camas.ver_tablero'));
   const [form, setForm] = useState<{ space: Space | null; parent?: Space } | null>(null);
   const [quick, consumeQuick] = useQuickAction(), configure = can(profile, 'espacios.configurar');
   useEffect(() => { if (!quick) return; if (quick === 'crear' && configure) setForm({ space: null }); consumeQuick(); }, [quick, configure, consumeQuick]);
   const rows = data.data ?? [];
+  // R1 (S3): figures only from loaded data; while loading or after an error there is no number to show.
+  const totals = data.data && !data.error ? bedTotals(rows, bedStateMap(rows, beds.data && !beds.error ? beds.data : null)) : null;
   const refresh = () => { data.refresh(); beds.refresh(); };
   return <>
-    <CompactHeader breadcrumb="Hospital / Edificio" title="Espacios" actions={configure && <button className="primary-button" onClick={() => setForm({ space: null })}><Icon name="plus" size={18}/>Crear espacio</button>}/>
-    <p className="form-intro space-guide">Asignar espacios es decidir dónde está cada cosa: cada planta contiene áreas, cada área sus habitaciones o consultorios y cada habitación sus camas. Con esa estructura, Recepción y Operaciones asignan camas a los pacientes. Toca una cama o un espacio del plano para ver su detalle{configure ? ' y editarlo' : ''}.</p>
+    <CompactHeader breadcrumb="Hospital / Edificio" title="Espacios" filters={<BedTotals totals={totals} />} actions={configure ? <CrudButton kind="create" label="Crear espacio" onClick={() => setForm({ space: null })} /> : <ReadOnlyBadge who="Administración" what="la estructura del edificio" />}/>
+    <p className="space-guide">Planta → área → habitación → cama. Toca un espacio o una cama para ver su detalle{configure ? ' y editarlo' : ''}.</p>
     <section className="data-workbench">
-      <RemoteState state={data}>{() => <BuildingBoard api={api} profile={profile} version={version} spaces={rows} beds={beds.data} focus="estructura" onRefresh={refresh} onEdit={(space, parent) => setForm({ space, parent })} />}</RemoteState>
+      <RemoteState state={data}>{() => <BuildingBoard api={api} profile={profile} version={version} spaces={rows} beds={beds.data} onRefresh={refresh} onEdit={(space, parent) => setForm({ space, parent })} />}</RemoteState>
     </section>
     {form && <SpaceForm api={api} space={form.space} parent={form.parent} spaces={rows} onClose={() => setForm(null)} onSaved={() => { setForm(null); refresh(); }} />}
   </>;
@@ -67,18 +77,15 @@ function SpaceForm({ api, space, parent, spaces, onClose, onSaved }: { api: Api;
   </Dialog>;
 }
 
-/** Camas (Operaciones y Recepción): el mismo plano por planta con el estado de cada cama, filtros y acciones por permiso. */
+/** Camas: only for accounts that read the bed board without the building (Edificio replaces it otherwise); same plan and actions. */
 export function BedsPage({ api, profile, version }: { api: Api; profile: AccessProfile; version: number }) {
   const data = useData<Bed[]>(api, '/camas', version);
   const spaces = useMemo(() => spacesFromBeds(data.data ?? []), [data.data]);
-  const all = data.data ?? [];
+  const totals = data.data && !data.error ? bedTotals([], bedStateMap([], data.data)) : null;
   return <>
-    <CompactHeader breadcrumb="Operaciones / Disponibilidad" title="Camas"/>
-    {/* R4a: one quiet line of hospital totals, not three giant cards (the plan below has the per-floor counts). */}
-    {/* R1 (S3): figures only from loaded data; while loading or after an error there is no number to show. */}
-    {data.data && !data.error && <dl className="beds-summary" aria-label="Camas del hospital"><div><dd>{all.length}</dd><dt>Camas de hospitalización</dt></div><div><dd>{all.filter(b => b.state === 'libre').length}</dd><dt>Libres</dt></div><div><dd>{all.filter(b => b.state === 'ocupada').length}</dd><dt>Ocupadas</dt></div></dl>}
+    <CompactHeader breadcrumb="Operaciones / Disponibilidad" title="Camas" filters={<BedTotals totals={totals} />}/>
     <section className="data-workbench">
-      <RemoteState state={data}>{beds => <BuildingBoard api={api} profile={profile} version={version} spaces={spaces} beds={beds} focus="camas" onRefresh={data.refresh} />}</RemoteState>
+      <RemoteState state={data}>{beds => <BuildingBoard api={api} profile={profile} version={version} spaces={spaces} beds={beds} onRefresh={data.refresh} />}</RemoteState>
     </section>
   </>;
 }

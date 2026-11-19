@@ -6,7 +6,8 @@ import { useDashboardData, type Source } from './data';
 import { LabFollowUpPanel } from './lab-follow-up';
 import { LabResultsInbox } from './lab-results-inbox';
 import { DayFigures, PendingTray, QuickActions, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
-import { MyShift, roleDashboards, roleOrder, type RoleId } from './roles';
+import { MyShift, OnShiftNow, roleDashboards, roleOrder, type RoleId } from './roles';
+import { coverageTodayGroup } from './coverage-tray';
 
 const unique = <T extends { id: string }>(items: T[]) => [...new Map(items.map(item => [item.id, item])).values()];
 
@@ -21,11 +22,13 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
   const needed = useMemo(() => {
     const set = new Set<Source>(roles.flatMap(role => roleDashboards[role].needs));
     set.add('followUps'); set.add('labPending');
-    if (can(profile, 'turnos.ver')) set.add('myShifts');
+    // An account with a staff record reads its own shifts; one without (ADM, JOP) reads who is on shift now.
+    if (can(profile, 'turnos.ver')) { if (profile.staffId) set.add('myShifts'); else { set.add('shifts'); set.add('board'); } }
     return set;
   }, [roles, profile]);
   // R7 F3: every role that sees shifts gets «Mi turno» on Inicio; roles whose panels already show it keep theirs.
   const ownShiftPanel = can(profile, 'turnos.ver') && !roles.some(role => roleDashboards[role].needs.includes('myShifts'));
+  const onShiftPanel = can(profile, 'turnos.ver') && !profile.staffId;
   const d = useDashboardData(api, profile, version, needed);
   if (roles.length === 0) return <>
     <CompactHeader breadcrumb="CLIMESA / Inicio" title="Inicio" />
@@ -52,7 +55,8 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
       ]} />
       <DayFigures figures={figures} />
     </div>
-    {ownShiftPanel && <div className="role-dashboard"><MyShift shifts={d.myShifts} /></div>}
+    {onShiftPanel ? <div className="role-dashboard"><OnShiftNow shifts={d.shifts} gapsToday={groups.some(g => g.id === 'huecos') || !d.board.data?.cobertura ? null : coverageTodayGroup(d).items.length} /></div>
+      : ownShiftPanel && <div className="role-dashboard"><MyShift shifts={d.myShifts} /></div>}
     {roles.map((role: RoleId) => { const panels = roleDashboards[role].panels?.(ctx); return panels ? <div className="role-dashboard" key={role}>{panels}</div> : null; })}
   </>;
 }

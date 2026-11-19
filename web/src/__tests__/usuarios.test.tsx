@@ -39,10 +39,11 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
   it('desactiva una cuenta con motivo y versión, y recarga la lista', async () => {
     const api = montar(['usuarios.ver', 'usuarios.desactivar']);
     await screen.findByText('Operaciones Ficticia');
-    await clickRowAction('Operaciones Ficticia', 'Desactivar cuenta');
-    const dialogo = await screen.findByRole('dialog', { name: 'Desactivar cuenta' });
+    await clickRowAction('Operaciones Ficticia', 'Desactivar');
+    const dialogo = await screen.findByRole('dialog', { name: 'Desactivar a Operaciones Ficticia' });
+    expect(within(dialogo).getByText(/Desactivar no borra a nadie/)).toBeTruthy();
     await userEvent.type(within(dialogo).getByLabelText('Motivo'), 'Fin del contrato de prueba');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar cambio/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: /^Desactivar$/ }));
     expect(api.write).toHaveBeenCalledWith('/usuarios/u-2/estado', { state: 'desactivado', version: 3, reason: 'Fin del contrato de prueba' }, 'PATCH');
     await vi.waitFor(() => expect(usuarios(api)).toBe(2));
   });
@@ -56,6 +57,7 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
     expect(screen.queryByRole('columnheader', { name: 'Estado' })).toBeNull();
     expect(screen.queryByText('Solo cuenta')).toBeNull();
     expect(screen.getAllByText('Solo consulta').length).toBeGreaterThan(0);
+    expect(screen.getByText('Solo lectura')).toBeTruthy();
   });
 
   it('solo con usuarios.ver es de consulta: sin invitar, roles ni desactivar', async () => {
@@ -65,14 +67,17 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
     expect(screen.getAllByText('Solo consulta').length).toBe(1);
   });
 
-  // S13 (T10w, W1): with both permissions the header keeps one action; inviting someone without a record is a quiet link.
-  it('con registrar e invitar, el encabezado tiene una sola acción y la invitación sigue a mano', async () => {
+  // S4/S5 (owner obs. 4-5): one create action in the filter bar; no header button, no separate «Invitar persona» link.
+  it('con registrar e invitar hay una sola acción de alta, en la barra de filtros, con el acceso a la app opcional', async () => {
     montar(['usuarios.ver', 'usuarios.invitar', 'personal.ver', 'personal.gestionar']);
     const encabezado = (await screen.findByRole('heading', { level: 1, name: 'Personal' })).closest('header')!;
-    expect(within(encabezado).getAllByRole('button').map(b => b.textContent)).toEqual(['Registrar personal']);
-    expect(document.querySelectorAll('.primary-button')).toHaveLength(1);
-    await userEvent.click(screen.getByRole('button', { name: 'Invitar persona' }));
-    expect(await screen.findByRole('dialog', { name: 'Invitar persona' })).toBeTruthy();
+    expect(within(encabezado).queryAllByRole('button')).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: /Agregar personal|Invitar persona|Registrar personal/ })).toHaveLength(1);
+    expect(screen.queryByText(/Alguien sin ficha/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Agregar personal' }));
+    const dialogo = await screen.findByRole('dialog', { name: 'Agregar personal' });
+    expect(within(dialogo).getByText('Acceso a la app · opcional')).toBeTruthy();
+    expect(within(dialogo).getByLabelText('Darle acceso a la app')).toBeTruthy();
   });
 
   it('?accion=invitar abre la invitación y limpia el parámetro', async () => {
@@ -86,10 +91,11 @@ describe('Personal · cuentas de acceso (W05, W06)', () => {
   it('un 409 de versión al desactivar ofrece cerrar y recargar', async () => {
     const api = montar(['usuarios.ver', 'usuarios.desactivar'], vi.fn(async () => { throw new ApiError('La cuenta cambió.', 409, 'version_conflicto', 4); }) as Api['write']);
     await screen.findByText('Operaciones Ficticia');
-    await clickRowAction('Operaciones Ficticia', 'Desactivar cuenta');
-    const dialogo = await screen.findByRole('dialog', { name: 'Desactivar cuenta' });
+    await clickRowAction('Operaciones Ficticia', 'Desactivar');
+    const dialogo = await screen.findByRole('dialog', { name: 'Desactivar a Operaciones Ficticia' });
+    expect(within(dialogo).getByText(/Desactivar no borra a nadie/)).toBeTruthy();
     await userEvent.type(within(dialogo).getByLabelText('Motivo'), 'Fin del contrato de prueba');
-    await userEvent.click(within(dialogo).getByRole('button', { name: /Confirmar cambio/ }));
+    await userEvent.click(within(dialogo).getByRole('button', { name: /^Desactivar$/ }));
     await userEvent.click(await within(dialogo).findByRole('button', { name: /Cerrar y recargar/ }));
     await vi.waitFor(() => expect(usuarios(api)).toBe(2));
     expect(screen.queryByRole('dialog')).toBeNull();
@@ -109,7 +115,8 @@ describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03
     const api = montarCon([pendiente]);
     await screen.findByText('Persona Invitada');
     expect(screen.getByText('Invitación enviada')).toBeTruthy();
-    await clickRowAction('Persona Invitada', 'Reenviar invitación');
+    await clickRowAction('Persona Invitada', 'Editar');
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Editar cuenta de acceso' })).getByRole('button', { name: 'Reenviar invitación' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Reenviar invitación' });
     await userEvent.click(within(dialogo).getByRole('button', { name: /Reenviar invitación/ }));
     expect(api.write).toHaveBeenCalledWith('/usuarios/u-9/invitacion/reenvio', {}, 'POST');
@@ -118,7 +125,8 @@ describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03
   it('cancelar una invitación pide motivo', async () => {
     const api = montarCon([pendiente]);
     await screen.findByText('Persona Invitada');
-    await clickRowAction('Persona Invitada', 'Cancelar invitación');
+    await clickRowAction('Persona Invitada', 'Editar');
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Editar cuenta de acceso' })).getByRole('button', { name: 'Cancelar invitación' }));
     const dialogo = await screen.findByRole('dialog', { name: 'Cancelar invitación' });
     await userEvent.type(within(dialogo).getByLabelText('Motivo de la cancelación'), 'El correo de la invitación estaba mal');
     await userEvent.click(within(dialogo).getByRole('button', { name: /Cancelar invitación/ }));
@@ -128,9 +136,8 @@ describe('Personal · invitaciones y acciones según el servidor (MA-CTA-01 a 03
   it('no ofrece roles ni desactivar cuando el servidor no lo permite (jerarquía de administración)', async () => {
     montarCon([principal]);
     await screen.findByText('Administración Principal');
-    const labels = await rowActionLabels('Administración Principal');
-    expect(labels).not.toContain('Roles');
-    expect(labels).not.toContain('Desactivar cuenta');
+    expect(await rowActionLabels('Administración Principal')).toEqual([]);
+    expect(screen.getByText('Solo consulta')).toBeTruthy();
   });
 
   it('la invitación no ofrece el rol de paciente: el paciente se registra en la app', async () => {
@@ -163,11 +170,11 @@ describe('Personal · cuentas sin ficha vinculada (Inicio de Administración)', 
     expect(screen.getByRole('button', { name: /Cuenta sin ficha vinculada/ })).toBeTruthy();
   });
 
-  it('las acciones de la fila: una principal y el resto en «Más acciones»; «Vincular con su ficha» abre la vinculación', async () => {
+  it('las acciones de la fila son iconos CRUD (ver, editar, desactivar); «Vincular con su ficha» abre la vinculación', async () => {
     const api = montarSinFicha();
     await screen.findByText('Recepción Sin Ficha');
-    expect(await rowActionLabels('Enfermería Vinculada')).toEqual(['Ver ficha', 'Roles', 'Desactivar cuenta']);
-    expect(await rowActionLabels('Recepción Sin Ficha')).toEqual(['Vincular con su ficha', 'Roles', 'Desactivar cuenta']);
+    expect(await rowActionLabels('Enfermería Vinculada')).toEqual(['Ver ficha', 'Editar', 'Desactivar']);
+    expect(await rowActionLabels('Recepción Sin Ficha')).toEqual(['Vincular con su ficha', 'Desactivar']);
     await clickRowAction('Recepción Sin Ficha', 'Vincular con su ficha');
     const dialogo = await screen.findByRole('dialog', { name: 'Vincular con su ficha' });
     await userEvent.selectOptions(within(dialogo).getByLabelText('Persona del directorio'), 's-2');

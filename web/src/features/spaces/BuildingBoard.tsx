@@ -1,10 +1,10 @@
 import { useMemo, useState, type FormEvent, type ReactElement } from 'react';
 import './building.css';
 import { Field, Icon, Notice, type IconName } from '../../components/ui';
-import { AreaTag, areaOf, type AreaCode } from '../../components/system';
+import { AreaTag, CrudButton, areaOf, type AreaCode } from '../../components/system';
 import { can, type AccessProfile, type Api, type Bed, type BedBlockInput, type BedTransitionInput, type Space } from '../../lib/api';
 import { Empty, SaveButton, Select, Tag, WriteError, useAction, useData } from '../common';
-import { BED_STATES, bedsOf, categoryName, countBeds, floorsOf, plain, spaceTypeNames, stateLabel, type Floor, type SpaceNode } from './building';
+import { BED_STATES, bedStateMap, bedsOf, categoryName, countBeds, floorsOf, plain, spaceTypeNames, stateLabel, type Floor, type SpaceNode, type SpaceWithState } from './building';
 
 type BedActionKind = 'block' | 'unblock' | 'request' | 'complete' | 'verify';
 const bedActionText: Record<BedActionKind, string> = { block: 'Bloquear', unblock: 'Retirar bloqueo', request: 'Solicitar limpieza', complete: 'Completar limpieza', verify: 'Verificar limpieza' };
@@ -25,24 +25,24 @@ export function availableBedActions(profile: AccessProfile, b: Bed): BedActionKi
 }
 
 type Props = {
-  api: Api; profile: AccessProfile; version: number; spaces: Space[]; beds: Bed[] | null;
-  /** `estructura`: pantalla de Edificio (configurar); `camas`: tablero operativo (estado y limpieza). */
-  focus: 'estructura' | 'camas';
+  api: Api; profile: AccessProfile; version: number; spaces: SpaceWithState[]; beds: Bed[] | null;
   onRefresh: () => void;
   onEdit?: (space: Space | null, parent?: Space) => void;
 };
 
 /** Mapa interactivo del hospital: plantas (de los datos) → áreas → habitaciones → camas, con estados, filtros y panel de acciones. */
-export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRefresh, onEdit }: Props) {
+export function BuildingBoard({ api, profile, version, spaces, beds, onRefresh, onEdit }: Props) {
   const floors = useMemo(() => floorsOf(spaces), [spaces]);
   const bedMap = useMemo(() => (beds ? new Map(beds.map(b => [b.id, b])) : null), [beds]);
+  /** Owner obs. 7: the bed state comes from the board or, for accounts without it (ADM), from the building tree. */
+  const states = useMemo(() => bedStateMap(spaces, beds), [spaces, beds]);
   const byId = useMemo(() => new Map(spaces.map(s => [s.id, s])), [spaces]);
   const [floorId, setFloorId] = useState(''), [filter, setFilter] = useState('todos'), [query, setQuery] = useState(''), [showInactive, setShowInactive] = useState(false), [selectedId, setSelectedId] = useState<string | null>(null), [feedback, setFeedback] = useState('');
   const floor = floors.find(f => f.id === floorId) ?? floors[0];
   const q = plain(query.trim());
   const canConfigure = can(profile, 'espacios.configurar') && !!onEdit;
 
-  const stateOf = (space: Space) => bedMap?.get(space.id)?.state;
+  const stateOf = (space: Space) => states?.get(space.id);
   const stateOk = (space: Space) => filter === 'todos' || stateOf(space) === filter;
   const textOk = (node: SpaceNode) => !q || plain(`${node.space.code} ${node.space.name}`).includes(q);
   /** Un nodo se muestra si está activo (o se piden inactivos) y, según el filtro, él o algún descendiente coincide. */
@@ -56,8 +56,8 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
   const visibleChildren = (node: SpaceNode, ancestorMatches: boolean) => node.children.filter(child => shown(child, ancestorMatches || textOk(node)));
 
   const floorStats = (f: Floor) => {
-    const list = f.children.flatMap(bedsOf), counts = countBeds(list, bedMap);
-    const free = bedMap ? counts.byState.libre : f.node?.space.freeBeds ?? 0;
+    const list = f.children.flatMap(bedsOf), counts = countBeds(list, states);
+    const free = states ? counts.byState.libre : f.node?.space.freeBeds ?? 0;
     return { counts, free, total: list.length };
   };
   const current = floor ? floorStats(floor) : null;
@@ -82,19 +82,19 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
   };
   const roomTile = (room: SpaceNode, ancestor: boolean) => {
     const roomBeds = room.children.filter(child => child.space.type === 'cama' && shown(child, ancestor || textOk(room)));
-    const allBeds = bedsOf(room), counts = countBeds(allBeds, bedMap);
-    const free = bedMap ? counts.byState.libre : room.space.freeBeds;
+    const free = room.space.freeBeds;
     const area = areaFor(room.space);
     return <article className={`plan-room area-surface area-${area.toLowerCase()} ${selectedId === room.space.id ? 'is-selected' : ''} ${room.space.active ? '' : 'is-inactive'}`} key={room.space.id} aria-label={`Habitación ${room.space.code}`}>
-      <header><h3><button type="button" className="plan-room-title" aria-pressed={selectedId === room.space.id} aria-label={`Ver habitación ${room.space.code}`} onClick={() => select(room.space.id)}><AreaTag code={area} /><strong className="nowrap-code">{room.space.code}</strong>{categoryName(room.space.category) && <span>{categoryName(room.space.category)}</span>}{!room.space.active && <span>Inactiva</span>}</button></h3><span className="plan-free">{free}/{allBeds.length} libres</span></header>
-      <div className="plan-beds">{roomBeds.map(bed => bedGlyph(bed, room))}{!roomBeds.length && <small className="muted">Sin camas con este filtro</small>}</div>
+      <header><h3><button type="button" className="plan-room-title" aria-pressed={selectedId === room.space.id} aria-label={`Ver habitación ${room.space.code}`} onClick={() => select(room.space.id)}><AreaTag code={area} /><strong className="nowrap-code">{room.space.code}</strong>{categoryName(room.space.category) && <span className="plan-room-category">{categoryName(room.space.category)}</span>}{!room.space.active && <span>Inactiva</span>}</button></h3></header>
+      {/* Obs. 7/17: the coloured beds already say which are free; a count only appears when states are unknown. */}
+      <div className="plan-beds">{roomBeds.map(bed => bedGlyph(bed, room))}{!roomBeds.length && <small className="muted">Sin camas con este filtro</small>}{!states && room.space.totalBeds > 0 && <span className="plan-free-pill">{free} {free === 1 ? 'libre' : 'libres'}</span>}</div>
     </article>;
   };
   const leafTile = (node: SpaceNode) => <button type="button" key={node.space.id} className={`plan-tile ${selectedId === node.space.id ? 'is-selected' : ''} ${node.space.active ? '' : 'is-inactive'}`} aria-pressed={selectedId === node.space.id} onClick={() => select(node.space.id)}><Icon name={tileIcons[node.space.type] ?? 'grid'} size={18} /><span><strong>{node.space.code}</strong><small>{node.space.name !== node.space.code ? node.space.name : spaceTypeNames[node.space.type]}{!node.space.active ? ' · Inactivo' : ''}</small></span></button>;
   const group = (node: SpaceNode, ancestor: boolean): ReactElement => {
-    const kids = visibleChildren(node, ancestor), counts = countBeds(bedsOf(node), bedMap), typeName = spaceTypeNames[node.space.type] ?? 'Espacio';
+    const kids = visibleChildren(node, ancestor), counts = countBeds(bedsOf(node), states), typeName = spaceTypeNames[node.space.type] ?? 'Espacio';
     return <section className={`plan-area ${selectedId === node.space.id ? 'is-selected' : ''}`} key={node.space.id} aria-label={`${typeName} ${node.space.name}`}>
-      <header><h3><button type="button" className="plan-area-title" aria-pressed={selectedId === node.space.id} aria-label={`Ver ${typeName.toLowerCase()} ${node.space.name}`} onClick={() => select(node.space.id)}><strong>{node.space.name}</strong><span className="nowrap-code">{node.space.code}</span></button></h3>{counts.total > 0 && <span className="plan-free">{bedMap ? counts.byState.libre : node.space.freeBeds}/{counts.total} libres</span>}</header>
+      <header><h3><button type="button" className="plan-area-title" aria-pressed={selectedId === node.space.id} aria-label={`Ver ${typeName.toLowerCase()} ${node.space.name}`} onClick={() => select(node.space.id)}><strong>{node.space.name}</strong><span className="nowrap-code">{node.space.code}</span></button></h3>{counts.total > 0 && <span className="plan-free">{states ? counts.byState.libre : node.space.freeBeds}/{counts.total} libres</span>}</header>
       <div className="plan-grid">{kids.map(kid => kid.space.type === 'habitacion' ? roomTile(kid, ancestor || textOk(node)) : kid.children.length ? group(kid, ancestor || textOk(node)) : leafTile(kid))}</div>
     </section>;
   };
@@ -102,12 +102,11 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
   return <div className="building">
     <div className="table-toolbar building-toolbar">
       <div className="floor-switch" role="group" aria-label="Planta">{floors.map(f => { const stats = floorStats(f); return <button type="button" key={f.id} aria-pressed={floor?.id === f.id} onClick={() => { setFloorId(f.id); setSelectedId(null); }}><span>{f.label}</span>{stats.total > 0 && <small>{stats.free}/{stats.total} libres</small>}</button>; })}</div>
-      {bedMap && <Select label="Estado de cama" value={filter} onChange={setFilter}><option value="todos">Todos los estados</option>{BED_STATES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</Select>}
+      {states && <Select label="Estado de cama" value={filter} onChange={setFilter}><option value="todos">Todos los estados</option>{BED_STATES.map(s => <option key={s.key} value={s.key}>{s.label}</option>)}</Select>}
       <Field label="Buscar espacio o cama" value={query} onChange={setQuery} placeholder="Código o nombre" />
       {canConfigure && <label className="check-field"><input type="checkbox" checked={showInactive} onChange={e => setShowInactive(e.target.checked)} />Mostrar inactivos</label>}
     </div>
-    {bedMap && current && <ul className="state-legend" aria-label="Leyenda y conteo de camas de la planta">{BED_STATES.map(s => <li key={s.key}><button type="button" className={`legend-chip bed-state-${s.key}`} aria-pressed={filter === s.key} title={s.hint} onClick={() => setFilter(filter === s.key ? 'todos' : s.key)}><span className="bed-glyph-mark" aria-hidden="true" /><span>{s.label}</span><strong>{current.counts.byState[s.key]}</strong></button></li>)}</ul>}
-    {!bedMap && <p className="refresh-hint">{focus === 'estructura' ? 'Tu cuenta ve la estructura y la disponibilidad por planta; el estado cama por cama lo consulta Operaciones.' : 'Sin acceso al estado individual de las camas.'}</p>}
+    {states && current && <ul className="state-legend" aria-label="Leyenda y conteo de camas de la planta">{BED_STATES.map(s => <li key={s.key}><button type="button" className={`legend-chip bed-state-${s.key}`} aria-pressed={filter === s.key} title={s.hint} onClick={() => setFilter(filter === s.key ? 'todos' : s.key)}><span className="bed-glyph-mark" aria-hidden="true" /><span>{s.label}</span><strong>{current.counts.byState[s.key]}</strong></button></li>)}</ul>}
     {feedback && <Notice kind="success">{feedback}</Notice>}
     <div className={`building-split${sel ? '' : ' is-collapsed'}`}>
       <div className="floor-plan" aria-label={`Plano de ${floor?.label ?? 'la planta'}`}>
@@ -118,29 +117,37 @@ export function BuildingBoard({ api, profile, version, spaces, beds, focus, onRe
       </div>
       {/* R4a: the detail column only exists while something is selected; the plan takes the full width otherwise. */}
       {sel && <aside className="plan-side" aria-label="Detalle del espacio">
-        <SpaceDetail key={sel.id} api={api} profile={profile} version={version} space={sel} bed={bedMap?.get(sel.id) ?? null} parent={sel.parentId ? byId.get(sel.parentId) : undefined} spaces={spaces} bedMap={bedMap} onEdit={canConfigure ? onEdit : undefined} onSelect={select} onChanged={message => { setFeedback(message); onRefresh(); }} />
+        <SpaceDetail key={sel.id} api={api} profile={profile} version={version} space={sel} bed={bedMap?.get(sel.id) ?? null} parent={sel.parentId ? byId.get(sel.parentId) : undefined} spaces={spaces} states={states} onEdit={canConfigure ? onEdit : undefined} onSelect={select} onChanged={message => { setFeedback(message); onRefresh(); }} />
       </aside>}
     </div>
   </div>;
 }
 
 type Admission = { id: string; patientName: string; requestedCategory: string; state: string; isolation: boolean };
-type DetailProps = { api: Api; profile: AccessProfile; version: number; space: Space; bed: Bed | null; parent?: Space; spaces: Space[]; bedMap: Map<string, Bed> | null; onEdit?: (space: Space | null, parent?: Space) => void; onSelect: (id: string) => void; onChanged: (message: string) => void };
+type DetailProps = { api: Api; profile: AccessProfile; version: number; space: Space; bed: Bed | null; parent?: Space; spaces: Space[]; states: Map<string, string> | null; onEdit?: (space: Space | null, parent?: Space) => void; onSelect: (id: string) => void; onChanged: (message: string) => void };
 
-function SpaceDetail({ api, profile, version, space, bed, parent, spaces, bedMap, onEdit, onSelect, onChanged }: DetailProps) {
+/** Obs. 7: the detail lists everything the building tree knows about the space, editable or not. */
+function SpaceDetail({ api, profile, version, space, bed, parent, spaces, states, onEdit, onSelect, onChanged }: DetailProps) {
   const children = spaces.filter(s => s.parentId === space.id && s.active), isBed = space.type === 'cama';
   const nodeBeds = isBed ? [space] : spaces.filter(s => s.type === 'cama' && s.active && (s.parentId === space.id || spaces.find(p => p.id === s.parentId)?.parentId === space.id));
-  const counts = countBeds(nodeBeds, bedMap);
+  const counts = countBeds(nodeBeds, states), state = states?.get(space.id), typeName = spaceTypeNames[space.type] ?? space.type;
+  const facts: [string, string][] = [['Tipo', typeName]];
+  if (categoryName(space.category)) facts.push(['Categoría', categoryName(space.category)]);
+  if (space.level != null) facts.push(['Planta', String(space.level)]);
+  if (space.capacity != null) facts.push(['Capacidad', `${space.capacity} ${space.capacity === 1 ? 'cama' : 'camas'}${!isBed && counts.total !== space.capacity ? ` · ${counts.total} creadas` : ''}`]);
+  else if (!isBed && counts.total > 0) facts.push(['Camas', String(counts.total)]);
+  facts.push(['Estado', space.active ? 'Activo' : 'Inactivo']);
   return <div className="plan-side-body">
-    <header><span className="eyebrow">{spaceTypeNames[space.type] ?? space.type}{space.category ? ` · ${categoryName(space.category)}` : ''}</span><h3>{space.code}{space.name !== space.code ? ` · ${space.name}` : ''}</h3>{space.path && <p className="muted">{space.path}</p>}{!space.active && <Tag value="inactivo" />}</header>
+    <header><span className="eyebrow">{typeName}</span><h3>{space.code}{space.name !== space.code ? ` · ${space.name}` : ''}</h3>{space.path && <p className="muted">{space.path}</p>}</header>
+    <dl className="plan-facts">{facts.map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
     {isBed && bed && <BedPanel api={api} profile={profile} version={version} bed={bed} onChanged={onChanged} />}
-    {isBed && !bed && <p className="muted">El estado de esta cama lo consulta Operaciones desde el tablero de camas.</p>}
+    {isBed && !bed && state && <p className="bed-state-line"><Tag value={state} /><span className="muted">{BED_STATES.find(s => s.key === state)?.hint}</span></p>}
     {!isBed && <>
-      {counts.total > 0 && <dl className="plan-counts"><div><dt>Camas</dt><dd>{counts.total}</dd></div>{bedMap ? BED_STATES.filter(s => counts.byState[s.key] > 0).map(s => <div key={s.key}><dt>{s.label}</dt><dd>{counts.byState[s.key]}</dd></div>) : <div><dt>Libres</dt><dd>{space.freeBeds}</dd></div>}</dl>}
-      {space.capacity != null && <p className="muted">Capacidad configurada: {space.capacity} {space.capacity === 1 ? 'cama' : 'camas'}.</p>}
-      {children.length > 0 && <ul className="plan-children" aria-label="Contenido">{children.map(child => <li key={child.id}><button type="button" onClick={() => onSelect(child.id)}><span><strong>{child.code}</strong><small>{spaceTypeNames[child.type]}</small></span>{child.type === 'cama' && bedMap?.get(child.id) ? <Tag value={bedMap.get(child.id)!.state} /> : child.totalBeds > 0 ? <span className="mono-data">{child.freeBeds}/{child.totalBeds}</span> : null}</button></li>)}</ul>}
+      {states && counts.total > 0 && <dl className="plan-counts" aria-label="Camas por estado">{BED_STATES.filter(s => counts.byState[s.key] > 0).map(s => <div key={s.key}><dt>{s.label}</dt><dd>{counts.byState[s.key]}</dd></div>)}</dl>}
+      {!states && counts.total > 0 && <dl className="plan-counts"><div><dt>Libres</dt><dd>{space.freeBeds}</dd></div></dl>}
+      {children.length > 0 && <ul className="plan-children" aria-label="Contenido">{children.map(child => <li key={child.id}><button type="button" onClick={() => onSelect(child.id)}><span><strong>{child.code}</strong><small>{spaceTypeNames[child.type]}</small></span>{child.type === 'cama' && states?.get(child.id) ? <Tag value={states.get(child.id)!} /> : child.totalBeds > 0 ? <span className="mono-data">{child.freeBeds}/{child.totalBeds} libres</span> : null}</button></li>)}</ul>}
     </>}
-    {onEdit && <div className="plan-actions"><button type="button" className="secondary-button" onClick={() => onEdit(space)}>Editar {spaceTypeNames[space.type]?.toLowerCase() ?? 'espacio'}</button>{!isBed && space.type !== 'hospital' && <button type="button" className="secondary-button" onClick={() => onEdit(null, space)}><Icon name="plus" size={16} />Agregar espacio dentro</button>}</div>}
+    {onEdit && <div className="plan-actions"><CrudButton kind="edit" label={`Editar ${typeName.toLowerCase()}`} onClick={() => onEdit(space)} />{!isBed && space.type !== 'hospital' && <CrudButton kind="create" label="Agregar espacio dentro" onClick={() => onEdit(null, space)} />}</div>}
     {parent && <button type="button" className="row-action" onClick={() => onSelect(parent.id)}>Ver {spaceTypeNames[parent.type]?.toLowerCase() ?? 'espacio'} {parent.code}</button>}
   </div>;
 }
