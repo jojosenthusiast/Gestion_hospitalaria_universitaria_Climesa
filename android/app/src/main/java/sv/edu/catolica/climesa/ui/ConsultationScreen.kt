@@ -53,6 +53,15 @@ import sv.edu.catolica.climesa.domain.DraftStatus
 import sv.edu.catolica.climesa.domain.QueueConsultation
 import sv.edu.catolica.climesa.domain.ConsultationAgenda
 import sv.edu.catolica.climesa.domain.QueueCardActions
+import sv.edu.catolica.climesa.domain.DoctorDaySections
+import sv.edu.catolica.climesa.domain.QueueContext
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.size
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 
 private val sanSalvador = ZoneId.of("America/El_Salvador")
 
@@ -69,6 +78,10 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     var showLater by rememberSaveable { mutableStateOf(false) }
     var allUnsigned by rememberSaveable { mutableStateOf(false) }
     var allReschedules by rememberSaveable { mutableStateOf(false) }
+    var showMoreToday by rememberSaveable { mutableStateOf(false) }
+    var showDone by rememberSaveable { mutableStateOf(false) }
+    // S15: the record opens over the module that needs it (Mi día, the consultation) and back returns there.
+    var recordPatient by rememberSaveable { mutableStateOf<String?>(null) }
     var confirmAbsent by remember { mutableStateOf<QueueConsultation?>(null) }
     val permissions = profile?.permissions.orEmpty()
     LaunchedEffect(userId) { userId?.let { model.configure(it, "fila.ver" in permissions && "consulta.iniciar" in permissions, withUnsigned = "consulta.iniciar" in permissions, withReschedules = "citas.ver" in permissions && "consulta.iniciar" in permissions) }; model.load() }
@@ -76,11 +89,11 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     // A consultation opened by id (queue): reopen it after process death, and select it when it arrives.
     LaunchedEffect(selected) { selected?.takeIf { it.startsWith("consulta:") }?.split(':')?.let { parts -> model.open(parts[1], parts.getOrNull(2)?.toIntOrNull()) } }
     LaunchedEffect(state.resumed?.key) { state.resumed?.let { selected = it.key } }
+    if (profile != null) recordPatient?.let { id -> BackHandler { recordPatient = null }; PatientRecordPage(profile, id, modifier) { recordPatient = null }; return }
     val selectedItem = state.appointments.firstOrNull { it.key == selected } ?: state.resumed?.takeIf { it.key == selected }
     // R3 A-3: the consultation is its own full screen (web `consultations.tsx`), not a dialog; system back leaves it.
     selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, record = state.record?.takeIf { it.consultationId == item.consultationId }, stepNotice = state.stepNotice, recordError = state.recordError, onClose = { selected = null; model.closeResumed() }); return }
     val retry = { model.clearMessages(); model.load() }
-    // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
     val canCall = "fila.llamar" in permissions
     val canManage = "fila.gestionar" in permissions
     confirmAbsent?.let { ticket ->
@@ -92,115 +105,232 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     }
     val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && canCall,
         canCallWaiting = state.handoff == null && canCall && state.waitingGeneral)
+    val canRecord = "expediente.ver" in permissions
+    val openRecord: (String?) -> Unit = { id -> id?.takeIf { it.isNotBlank() }?.let { recordPatient = it } }
+    // Lote 5 S11: today by what comes next (Ahora, Próximas, Pendientes de firmar); other days are separate, labelled entries.
+    val plan = DoctorDaySections.plan(state.appointments, Instant.now())
+    val officeBusy = state.queue.any { it.calledByMe && it.state in setOf("llamado", "en_atencion") }
     PageList(modifier) {
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        actionState.done?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
+        if (state.loading && state.appointments.isEmpty() && state.queue.isEmpty()) { item { LoadingState() }; return@PageList }
+        if (state.error != null && state.appointments.isEmpty() && state.queue.isEmpty()) { item { ErrorState(state.error, retry) }; return@PageList }
+        if (state.loading) item { RefreshHint() }
+        state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+
+        // 1. Ahora: who goes next, who is in the office and the appointments whose slot is running.
+        val nowCount = state.queue.size + plan.today.now.size
+        item(key = "s-ahora") { DaySectionHeader(stringResource(R.string.med5_ahora), nowCount, ClimesaIcons.Pulse) }
         state.handoff?.let { handoff -> item { NextPatientHandoff(handoff, canCall, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
         // B4: with nobody in the office yet, calling who waits in general consultation is the day's first action.
-        // QA final: with an unsigned consultation as primary, the call stays available as a secondary button (iOS parity).
-        if (ConsultationPrimary.showsCallWaiting(state.handoff != null, canCall, state.waitingGeneral, officeBusy = state.queue.any { it.calledByMe && it.state in setOf("llamado", "en_atencion") })) item {
+        if (ConsultationPrimary.showsCallWaiting(state.handoff != null, canCall, state.waitingGeneral, officeBusy)) item {
             SectionCard(stringResource(R.string.clin_llamar_primero_titulo)) {
                 Text(stringResource(R.string.clin_llamar_primero_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val call = { model.clearMessages(); model.callWaiting() }
-                if (primary == ConsultationPrimary.CallWaiting) PrimaryButton(stringResource(R.string.fila_llamar_siguiente), call, enabled = !state.saving, loading = state.saving)
-                else SecondaryButton(stringResource(R.string.fila_llamar_siguiente), call, enabled = !state.saving)
+                CardActionButton(CardAction(stringResource(R.string.fila_llamar_siguiente), if (primary == ConsultationPrimary.CallWaiting) ActionRole.Primary else ActionRole.Edit, call, icon = ClimesaIcons.Megaphone, enabled = !state.saving, loading = state.saving), Modifier.fillMaxWidth())
             }
         }
-        actionState.done?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-        if (state.unsigned.isNotEmpty()) {
-            item { Text(stringResource(R.string.clin_sin_firmar_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
+        items(state.queue, key = { "fila-${it.ticketId}" }) { ticket ->
+            QueueConsultationCard(ticket, opening = state.opening, onAttend = { model.clearMessages(); model.attend(ticket) },
+                canCall = canCall, canManage = canManage, busy = state.queueBusy, model = model, onAbsent = { confirmAbsent = ticket },
+                onRecord = if (canRecord && ticket.patientId != null) ({ openRecord(ticket.patientId) }) else null)
+        }
+        items(plan.today.now, key = { "ya-${it.appointmentId}" }) { item ->
+            AgendaCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }, onRecord = if (canRecord) ({ openRecord(item.patientId) }) else null)
+        }
+        if (nowCount == 0 && state.handoff == null) item { MutedLine(stringResource(R.string.med5_ahora_vacio)) }
+
+        // 2. Próximas: the rest of today, the first three open and a labelled expander; the next days apart.
+        item(key = "s-proximas") { DaySectionHeader(stringResource(R.string.med5_proximas), plan.today.upcoming.size, ClimesaIcons.Clock) }
+        if (plan.today.upcoming.isEmpty()) item { MutedLine(stringResource(if (state.appointments.isEmpty() && plan.today.now.isEmpty()) R.string.med_agenda_hoy_vacia else R.string.med5_proximas_vacio)) }
+        val upcoming = if (showMoreToday) plan.today.upcoming else plan.today.upcoming.take(DoctorDaySections.UPCOMING_VISIBLE)
+        items(upcoming, key = { "px-${it.appointmentId}" }) { item ->
+            AgendaCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }, onRecord = if (canRecord) ({ openRecord(item.patientId) }) else null)
+        }
+        DoctorDaySections.moreTodayLabel(plan.today.upcoming.size, showMoreToday)?.let { label -> item(key = "px-mas") { RowAction(label, { showMoreToday = !showMoreToday }) } }
+        DoctorDaySections.laterDetail(plan.later)?.let { detail ->
+            item(key = "e-later") { FoldEntry(stringResource(R.string.med5_proximos_dias), detail, showLater, ClimesaIcons.Calendar) { showLater = !showLater } }
+            if (showLater) plan.later.forEach { day ->
+                item(key = "dl-${day.date}") { DayLabel(DayChipLabels.of(day.date, java.time.LocalDate.now(sanSalvador)) + " · " + DoctorDaySections.dayLabel(day.date)) }
+                items(day.appointments, key = { "dl-${it.appointmentId}" }) { item -> AgendaCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }, onRecord = if (canRecord) ({ openRecord(item.patientId) }) else null) }
+            }
+        }
+
+        // 3. Pendientes de firmar: own open consultations of any day, and the reschedule requests to decide.
+        if (state.unsigned.isNotEmpty() || state.reschedules.isNotEmpty()) {
+            item(key = "s-pend") { DaySectionHeader(stringResource(R.string.med5_pendientes), state.unsigned.size, ClimesaIcons.Pencil, detail = stringResource(R.string.med5_pendientes_ayuda).takeIf { state.unsigned.isNotEmpty() }) }
             // Row 14: two pending consultations, the rest folded (the primary one is always among the first).
             items(ConsultationAgenda.shown(state.unsigned, allUnsigned), key = { "sf-${it.id}" }) { c ->
-                val subtitle = listOfNotNull(stringResource(R.string.clin_sin_firmar_item, formatDateTime(c.startedAt)), c.reason?.let { stringResource(R.string.clin_consulta_motivo, it) }).joinToString("\n")
-                // Only the screen's primary unsigned consultation gets a button; the rest are compact rows that open on tap.
-                if (primary == ConsultationPrimary.ResumeUnsigned(c.id)) SectionCard(c.patientName) {
-                    Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    PrimaryButton(stringResource(R.string.clin_reanudar), { model.clearMessages(); model.resume(c) }, enabled = !state.saving)
-                }
-                else DataRow(title = c.patientName, subtitle = subtitle, leadingIcon = ClimesaIcons.Pencil, onClick = { if (!state.saving) { model.clearMessages(); model.resume(c) } })
+                UnsignedCard(c, primary = primary == ConsultationPrimary.ResumeUnsigned(c.id), enabled = !state.saving,
+                    onResume = { model.clearMessages(); model.resume(c) }, onRecord = if (canRecord) ({ openRecord(c.patientId) }) else null)
             }
             item { FoldToggle(state.unsigned.size, allUnsigned) { allUnsigned = !allUnsigned } }
-        }
-        if (state.reschedules.isNotEmpty()) {
-            item { Text(stringResource(R.string.clin_reprog_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-            items(ConsultationAgenda.shown(state.reschedules, allReschedules), key = { "rp-${it.id}" }) { a ->
-                SectionCard(a.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) }) {
-                    Text(stringResource(R.string.clin_reprog_detalle, formatDateTime(a.start), a.pendingReschedule?.let { formatDateTime(it.start) }.orEmpty()), style = MaterialTheme.typography.bodySmall)
-                    val decisions = listOf(sv.edu.catolica.climesa.domain.AppointmentAction.ACCEPT_RESCHEDULE, sv.edu.catolica.climesa.domain.AppointmentAction.REJECT_RESCHEDULE)
-                    AppointmentActionButtons(decisions.filter { it in a.allowedActions }, decisions.filter { it !in a.allowedActions }.mapNotNull { d -> a.blockedActions[d]?.let { d to it } }) { actions.open(a, it) }
+            if (state.reschedules.isNotEmpty()) {
+                item { DayLabel(stringResource(R.string.med5_reprogramaciones) + " (${state.reschedules.size})") }
+                items(ConsultationAgenda.shown(state.reschedules, allReschedules), key = { "rp-${it.id}" }) { a ->
+                    SectionCard(a.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) }) {
+                        Text(stringResource(R.string.clin_reprog_detalle, formatDateTime(a.start), a.pendingReschedule?.let { formatDateTime(it.start) }.orEmpty()), style = MaterialTheme.typography.bodySmall)
+                        val decisions = listOf(sv.edu.catolica.climesa.domain.AppointmentAction.ACCEPT_RESCHEDULE, sv.edu.catolica.climesa.domain.AppointmentAction.REJECT_RESCHEDULE)
+                        AppointmentActionButtons(decisions.filter { it in a.allowedActions }, decisions.filter { it !in a.allowedActions }.mapNotNull { d -> a.blockedActions[d]?.let { d to it } }) { actions.open(a, it) }
+                    }
                 }
-            }
-            item { FoldToggle(state.reschedules.size, allReschedules) { allReschedules = !allReschedules } }
-        }
-        when {
-            state.loading && state.appointments.isEmpty() -> item { LoadingState() }
-            state.error != null && state.appointments.isEmpty() -> item { ErrorState(state.error, retry) }
-            state.appointments.isEmpty() -> item { EmptyState(stringResource(R.string.clin_consulta_sin_citas), detail = stringResource(R.string.clin_consulta_sin_citas_detalle)) }
-            else -> {
-                if (state.loading) item { RefreshHint() }
-                state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                // Row 15: "Mi día" opens on today, by day; earlier and later days stay folded behind one button each.
-                val today = java.time.LocalDate.now(sanSalvador)
-                val groups = ConsultationAgenda.group(state.appointments, today)
-                if (groups.past.isNotEmpty() && !showPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, groups.past.size), { showPast = true }) }
-                val days = (if (showPast) groups.past else emptyList()) + listOfNotNull(groups.today) + (if (showLater) groups.later else emptyList())
-                if (groups.today == null) item { Text(stringResource(R.string.med_agenda_hoy_vacia), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = Spacing.sm)) }
-                days.forEach { day ->
-                    item(key = "dia-${day.date}") { Text(DayChipLabels.of(day.date, today), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                    items(day.appointments, key = { it.appointmentId }) { item -> MedicalAppointmentCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }) }
-                }
-                if (groups.later.isNotEmpty() && !showLater) item { RowAction(stringResource(R.string.med_ver_proximos_dias, groups.later.size), { showLater = true }) }
+                item { FoldToggle(state.reschedules.size, allReschedules) { allReschedules = !allReschedules } }
             }
         }
-        if (state.queue.isNotEmpty()) {
-            item { Text(stringResource(R.string.clin_fila_titulo), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-            items(state.queue, key = { "fila-${it.ticketId}" }) { ticket ->
-                QueueConsultationCard(ticket, opening = state.opening, primary = primary == ConsultationPrimary.ResumeTicket(ticket.ticketId) || primary == ConsultationPrimary.StartTicket(ticket.ticketId), onAttend = { model.attend(ticket) },
-                    canCall = canCall, canManage = canManage, busy = state.queueBusy, model = model, onAbsent = { confirmAbsent = ticket })
+
+        // Done today, then the history of earlier days: both folded behind entries that say what they hold.
+        if (plan.today.done.isNotEmpty()) {
+            item(key = "e-done") { FoldEntry(stringResource(R.string.med5_atendidas), androidx.compose.ui.res.pluralStringResource(R.plurals.med5_citas_n, plan.today.done.size, plan.today.done.size), showDone, ClimesaIcons.Check) { showDone = !showDone } }
+            if (showDone) items(plan.today.done, key = { "dn-${it.appointmentId}" }) { item -> AgendaCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }, onRecord = if (canRecord) ({ openRecord(item.patientId) }) else null) }
+        }
+        DoctorDaySections.historyDetail(plan.past)?.let { detail ->
+            item(key = "e-past") { FoldEntry(stringResource(R.string.med5_historial), detail, showPast, ClimesaIcons.Audit) { showPast = !showPast } }
+            if (showPast) plan.past.forEach { day ->
+                item(key = "dp-${day.date}") { DayLabel(DoctorDaySections.dayLabel(day.date)) }
+                items(day.appointments, key = { "dp-${it.appointmentId}" }) { item -> AgendaCard(item, onOpen = { model.clearMessages(); selected = item.appointmentId }, onRecord = if (canRecord) ({ openRecord(item.patientId) }) else null) }
             }
         }
     }
 }
 
+/** Lote 5 S11: heading of a "Mi día" section with its icon and count, and an optional line saying what it holds. */
 @Composable
-private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit) {
-    val details = listOfNotNull(
-        "${formatDateTime(item.start)} — ${formatTime(item.end)}",
-        item.reason?.let { stringResource(R.string.clin_consulta_motivo, it) },
-    ).joinToString("\n")
-    DataRow(
-        title = item.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) },
-        subtitle = details,
-        meta = stringResource(R.string.clin_consulta_cita_estado, appointmentState(item.appointmentState)),
-        leadingIcon = if (item.consultationState == "firmada") ClimesaIcons.Check else ClimesaIcons.Pencil,
-        status = { ClinicalStatusTag(item.consultationState ?: StatusCatalogClinico.NOT_STARTED) },
-        onClick = onOpen,
-        titleTrailing = if (item.categories.isEmpty()) null else ({ CategoryMarks(item.categories) }),
-    )
-}
-
-@Composable
-private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, primary: Boolean, onAttend: () -> Unit, canCall: Boolean = false, canManage: Boolean = false, busy: String? = null, model: ConsultationViewModel? = null, onAbsent: () -> Unit = {}) {
-    SectionCard(stringResource(R.string.clin_fila_numero, ticket.number), action = { OperacionStatusTag(ticket.state) }) {
+private fun DaySectionHeader(title: String, count: Int, icon: androidx.compose.ui.graphics.vector.ImageVector, detail: String? = null) {
+    Column(Modifier.fillMaxWidth().padding(top = Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-            Text(ticket.patientName, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
-            if (ticket.priority != "rutina") PriorityBadge(Priority.of(ticket.priority))
+            Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.climesa.primaryText)
+            Text(title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleLarge)
+            Text(count.toString(), Modifier.background(MaterialTheme.climesa.soft, androidx.compose.foundation.shape.RoundedCornerShape(Radius.chip)).padding(horizontal = Spacing.sm, vertical = 2.dp),
+                style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.climesa.primaryText)
         }
-        // Row 1: the queue actions the server offers on this number (iOS `rowActions`), next to the consultation button.
-        if (model != null) QueueRowActions(ticket, canCall, canManage, busy, model, onAbsent)
-        // B2: another clinician called this number (web `calledElsewhere`): informative only, no "Iniciar consulta".
-        if (ticket.calledElsewhere) {
-            Text(stringResource(R.string.clin_fila_otro_consultorio), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else {
-            val label = when {
-                opening == ticket.ticketId -> stringResource(R.string.clin_fila_abriendo)
-                ticket.consultationState == "firmada" -> stringResource(R.string.clin_fila_ver)
-                ticket.consultationId != null -> stringResource(R.string.clin_fila_retomar)
-                else -> stringResource(R.string.clin_fila_iniciar)
+        detail?.let { MutedLine(it) }
+    }
+}
+
+@Composable
+private fun DayLabel(text: String) = Text(text, Modifier.padding(top = Spacing.xs).semantics { heading() }, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+@Composable
+private fun MutedLine(text: String) = Text(text, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+
+/** A folded group (next days, done today, history): what it holds is said before opening it, never "Ver más (3)". */
+@Composable
+private fun FoldEntry(title: String, detail: String, open: Boolean, icon: androidx.compose.ui.graphics.vector.ImageVector, onToggle: () -> Unit) {
+    ClimesaClickableCard(onToggle, Modifier.semantics { stateDescription = if (open) "Abierto" else "Cerrado" }) {
+        Row(Modifier.fillMaxWidth().heightIn(min = Spacing.touch + Spacing.sm).padding(horizontal = Spacing.md, vertical = Spacing.sm + Spacing.xs), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Icon(icon, null, Modifier.size(22.dp), tint = MaterialTheme.climesa.primaryText)
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(title, style = MaterialTheme.typography.titleSmall)
+                Text(detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            if (primary) PrimaryButton(label, onAttend, enabled = opening == null) else SecondaryButton(label, onAttend, enabled = opening == null)
+            Text(stringResource(if (open) R.string.med5_ocultar else R.string.med5_mostrar), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.climesa.primaryText)
+            Icon(ClimesaIcons.Chevron, null, Modifier.size(18.dp).rotate(if (open) 270f else 90f), tint = MaterialTheme.climesa.primaryText)
         }
     }
 }
+
+/**
+ * One appointment of "Mi día" (S2/S11): time first, then the patient, what they asked for and the reason; the consultation state
+ * as a full-width strip; the actions on one line with their weight (start or continue solid, view outlined).
+ */
+@Composable
+private fun AgendaCard(item: MedicalAppointment, onOpen: () -> Unit, onRecord: (() -> Unit)?) {
+    val signed = item.consultationState == "firmada"
+    val running = item.consultationId != null && !signed
+    val actions = buildList {
+        when {
+            signed -> add(CardAction(stringResource(R.string.med5_ver_consulta), ActionRole.Neutral, onOpen, icon = ClimesaIcons.Eye))
+            running -> add(CardAction(stringResource(R.string.med5_continuar), ActionRole.Primary, onOpen, icon = ClimesaIcons.Pencil))
+            item.canStart -> add(CardAction(stringResource(R.string.med5_iniciar), ActionRole.Primary, onOpen, icon = ClimesaIcons.Steth))
+        }
+        onRecord?.let { add(CardAction(stringResource(R.string.med5_ver_expediente), ActionRole.Neutral, it, icon = ClimesaIcons.Clipboard)) }
+    }
+    val (strip, tone) = when {
+        signed -> stringResource(R.string.med5_estado_firmada) to StripTone.Success
+        running -> stringResource(R.string.med5_estado_en_curso) to StripTone.Info
+        else -> stringResource(R.string.med5_estado_por_iniciar) to StripTone.Neutral
+    }
+    ActionCard(actions, onClick = onOpen, status = { CardStatusStrip(strip, tone, detail = item.startBlockedReason.takeIf { !signed && !running && !item.canStart }) }) {
+        Text(stringResource(R.string.med5_horario, formatTime(item.start), formatTime(item.end)), style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.climesa.primaryText)
+        Text(item.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) }, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        if (item.categories.isNotEmpty()) CategoryMarks(item.categories, showNames = true)
+        item.reason?.let { Text(stringResource(R.string.med5_motivo_cita, it), style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis) }
+    }
+}
+
+/** An own consultation left unsigned: who, since when, its reason; "Reanudar" is solid on the screen's primary one. */
+@Composable
+private fun UnsignedCard(c: sv.edu.catolica.climesa.domain.UnsignedConsultation, primary: Boolean, enabled: Boolean, onResume: () -> Unit, onRecord: (() -> Unit)?) {
+    val actions = buildList {
+        add(CardAction(stringResource(R.string.med5_reanudar), if (primary) ActionRole.Primary else ActionRole.Edit, onResume, icon = ClimesaIcons.Pencil, enabled = enabled))
+        onRecord?.let { add(CardAction(stringResource(R.string.med5_ver_expediente), ActionRole.Neutral, it, icon = ClimesaIcons.Clipboard)) }
+    }
+    ActionCard(actions, status = { CardStatusStrip(stringResource(R.string.med5_estado_sin_firmar), StripTone.Warning, icon = ClimesaIcons.Alert, detail = stringResource(R.string.med5_iniciada, formatDateTime(c.startedAt))) }) {
+        Text(c.patientName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        c.reason?.let { Text(stringResource(R.string.med5_motivo_cita, it), style = MaterialTheme.typography.bodyMedium, maxLines = 3, overflow = TextOverflow.Ellipsis) }
+    }
+}
+
+/**
+ * A called or in-attention number (S11 queue rows): the code and priority first, the patient, the service and whether the
+ * patient came from an appointment (with what they asked for), the state as a strip and the queue actions by weight.
+ */
+@Composable
+private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, onAttend: () -> Unit, canCall: Boolean, canManage: Boolean, busy: String?, model: ConsultationViewModel, onAbsent: () -> Unit, onRecord: (() -> Unit)?) {
+    val undo = QueueCardActions.canUndo(ticket, canCall)
+    val again = QueueCardActions.canCallAgain(ticket, canCall)
+    val absent = QueueCardActions.canMarkAbsent(ticket)
+    val priorities = QueueCardActions.priorities(ticket, canManage)
+    val sending = busy == ticket.ticketId
+    val free = busy == null
+    val actions = buildList {
+        // B2: another clinician called this number (web `calledElsewhere`): informative only, no "Iniciar consulta".
+        if (!ticket.calledElsewhere) {
+            val label = when {
+                ticket.consultationState == "firmada" -> stringResource(R.string.clin_fila_ver)
+                ticket.consultationId != null -> stringResource(R.string.med5_continuar)
+                else -> stringResource(R.string.med5_iniciar)
+            }
+            add(CardAction(label, if (ticket.consultationState == "firmada") ActionRole.Neutral else ActionRole.Primary, onAttend, icon = ClimesaIcons.Steth, enabled = opening == null, loading = opening == ticket.ticketId))
+        }
+        if (again) add(CardAction(stringResource(R.string.med_fila_volver_llamar), ActionRole.Edit, { model.callAgain(ticket) }, icon = ClimesaIcons.Megaphone, enabled = free))
+        if (undo) add(CardAction(stringResource(R.string.med_fila_deshacer), ActionRole.Edit, { model.undoCall(ticket) }, enabled = free, loading = sending))
+        onRecord?.let { add(CardAction(stringResource(R.string.med5_ver_expediente), ActionRole.Neutral, it, icon = ClimesaIcons.Clipboard)) }
+        if (absent) add(CardAction(stringResource(R.string.med_fila_no_se_presento), ActionRole.Danger, onAbsent, enabled = free))
+    }
+    val inAttention = ticket.state == "en_atencion"
+    ActionCard(actions, status = {
+        CardStatusStrip(OperacionStatusLabel(ticket.state), if (inAttention) StripTone.Info else StripTone.Warning,
+            detail = if (ticket.calledElsewhere) stringResource(R.string.clin_fila_otro_consultorio) else null)
+    }) {
+        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Text(ticket.code, style = MaterialTheme.typography.headlineSmall.copy(fontFeatureSettings = "tnum"), color = MaterialTheme.climesa.primaryText)
+            if (ticket.priority != "rutina") PriorityBadge(Priority.of(ticket.priority))
+            Spacer(Modifier.weight(1f))
+            if (priorities.isNotEmpty()) PriorityMenu(priorities, enabled = free) { model.changePriority(ticket, it) }
+        }
+        Text(ticket.patientName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Text(QueueContext.line(ticket), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (ticket.categories.isNotEmpty()) CategoryMarks(ticket.categories, showNames = true)
+    }
+}
+
+/** Clinical priority of a number (`fila.gestionar`): a small menu next to the code, outside the card's action line. */
+@Composable
+private fun PriorityMenu(options: List<String>, enabled: Boolean, onPick: (String) -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    androidx.compose.foundation.layout.Box {
+        RowAction(stringResource(R.string.med_fila_prioridad), { menu = true }, enabled = enabled)
+        androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
+            options.forEach { p ->
+                androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.fila_prioridad_a, sv.edu.catolica.climesa.domain.QueueLabels.priority(p))) }, onClick = { menu = false; onPick(p) })
+            }
+        }
+    }
+}
+
+@Composable
+private fun OperacionStatusLabel(state: String): String = StatusCatalog.label(state)
 
 @Composable
 private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, recordError: String? = null, cie10: Cie10SearchViewModel = viewModel(), onClose: () -> Unit) {
@@ -367,37 +497,11 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     }
 }
 
-/** Row 1: undo own call, call again, no-show and priority; each only when the server and the permission allow it. */
-@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
-@Composable
-private fun QueueRowActions(ticket: QueueConsultation, canCall: Boolean, canManage: Boolean, busy: String?, model: ConsultationViewModel, onAbsent: () -> Unit) {
-    val undo = QueueCardActions.canUndo(ticket, canCall)
-    val again = QueueCardActions.canCallAgain(ticket, canCall)
-    val absent = QueueCardActions.canMarkAbsent(ticket)
-    val priorities = QueueCardActions.priorities(ticket, canManage)
-    if (!undo && !again && !absent && priorities.isEmpty()) return
-    val sending = busy == ticket.ticketId
-    var menu by remember { mutableStateOf(false) }
-    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-        if (undo) RowAction(stringResource(R.string.med_fila_deshacer), { model.undoCall(ticket) }, enabled = busy == null, loading = sending)
-        if (again) RowAction(stringResource(R.string.med_fila_volver_llamar), { model.callAgain(ticket) }, enabled = busy == null)
-        if (absent) RowAction(stringResource(R.string.med_fila_no_se_presento), onAbsent, enabled = busy == null)
-        if (priorities.isNotEmpty()) androidx.compose.foundation.layout.Box {
-            RowAction(stringResource(R.string.med_fila_prioridad), { menu = true }, enabled = busy == null)
-            androidx.compose.material3.DropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
-                priorities.forEach { p ->
-                    androidx.compose.material3.DropdownMenuItem(text = { Text(stringResource(R.string.fila_prioridad_a, sv.edu.catolica.climesa.domain.QueueLabels.priority(p))) }, onClick = { menu = false; model.changePriority(ticket, p) })
-                }
-            }
-        }
-    }
-}
-
 /** Rows 14-15: "Ver 3 más" / "Ver menos" under a list that shows its first two rows; nothing when nothing folds. */
 @Composable
 private fun FoldToggle(count: Int, expanded: Boolean, onToggle: () -> Unit) {
     if (count <= ConsultationAgenda.VISIBLE) return
-    RowAction(if (expanded) stringResource(R.string.med_ver_menos) else stringResource(R.string.med_ver_mas, count - ConsultationAgenda.VISIBLE), onToggle)
+    RowAction(if (expanded) stringResource(R.string.med_ver_menos) else stringResource(R.string.med5_mostrar_mas_lista, count - ConsultationAgenda.VISIBLE), onToggle)
 }
 
 /** One thing the consultation already has: what it is and a short detail. */

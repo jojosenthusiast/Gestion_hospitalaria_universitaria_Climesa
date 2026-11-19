@@ -27,4 +27,37 @@
         <item quantity="other">%1$d pendientes del alta</item>
     </plurals>
     <string name="med_alta_sin_pendientes">Sin pendientes del alta</string>
+    <!-- Lote 5 S11: Mi día por secciones -->
+    <string name="med5_ahora">Ahora</string>
+    <string name="med5_ahora_vacio">Nadie en tu consultorio en este momento.</string>
+    <string name="med5_proximas">Próximas de hoy</string>
+    <string name="med5_proximas_vacio">No te quedan citas por atender hoy.</string>
+    <string name="med5_pendientes">Pendientes de firmar</string>
+    <string name="med5_pendientes_ayuda">Consultas que iniciaste y aún no firmas. Fírmalas para cerrar la cita y el número de fila.</string>
+    <string name="med5_reprogramaciones">Reprogramaciones por decidir</string>
+    <string name="med5_atendidas">Atendidas hoy</string>
+    <string name="med5_proximos_dias">Próximos días</string>
+    <string name="med5_historial">Historial de días anteriores</string>
+    <string name="med5_mostrar">Mostrar</string>
+    <string name="med5_ocultar">Ocultar</string>
+    <string name="med5_mostrar_mas_lista">Mostrar %1$d más</string>
+    <string name="med5_iniciar">Iniciar consulta</string>
+    <string name="med5_continuar">Continuar consulta</string>
+    <string name="med5_ver_consulta">Ver consulta</string>
+    <string name="med5_reanudar">Reanudar</string>
+    <string name="med5_ver_expediente">Ver expediente</string>
+    <string name="med5_horario">%1$s a %2$s</string>
+    <string name="med5_motivo_cita">Motivo: %1$s</string>
+    <string name="med5_iniciada">Iniciada %1$s</string>
+    <string name="med5_estado_en_curso">Consulta en curso</string>
+    <string name="med5_estado_por_iniciar">Por iniciar</string>
+    <string name="med5_estado_firmada">Consulta firmada</string>
+    <string name="med5_estado_sin_firmar">Sin firmar</string>
+    <string name="med5_servicio">Servicio: %1$s</string>
+    <string name="med5_viene_de_cita">Viene de su cita de las %1$s</string>
+    <string name="med5_sin_cita">Llegó sin cita</string>
+    <plurals name="med5_citas_n">
+        <item quantity="one">%1$d cita</item>
+        <item quantity="other">%1$d citas</item>
+    </plurals>
 </resources>

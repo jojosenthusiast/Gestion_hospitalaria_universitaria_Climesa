@@ -51,6 +51,10 @@ data class QueueConsultation(
     /** Server `allowedActions` and reversible `undoActions` of the row: every queue button comes from them. */
     val allowedActions: List<QueueAction> = emptyList(),
     val undoActions: List<String> = emptyList(),
+    /** Lote 5 S12: what the patient asked for, when the number came from an appointment (its request categories and time). */
+    val categories: List<CategoryRef> = emptyList(),
+    val appointmentAt: String? = null,
+    val patientId: String? = null,
 ) {
     val code: String get() = "$area $number"
     /**
@@ -158,7 +162,8 @@ object ConsultationResume {
                 version = row.optInt("version", 1), priority = row.text("priority") ?: "rutina",
                 area = row.text("area") ?: QueueLabels.areaOf(row.text("service") ?: "consulta_general"),
                 allowedActions = ServerActions.allowed(row).mapNotNull(QueueAction::of).distinct(),
-                undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList())
+                undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList(),
+                categories = CategoryRequestRules.refs(row), appointmentAt = row.text("appointmentAt"), patientId = row.text("patientId"))
         } }
     }
 
@@ -176,4 +181,16 @@ object ConsultationResume {
     }
 
     private fun org.json.JSONObject.text(name: String) = if (isNull(name)) null else optString(name).takeIf { it.isNotBlank() }
+}
+
+/** Lote 5 S11/S12: one line saying what a queue number is about, for the doctor's card and the consultation context. */
+object QueueContext {
+    private val clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.of("America/El_Salvador"))
+
+    /** "Consulta general · Viene de su cita de las 09:00" or "Emergencia · Llegó sin cita". */
+    fun line(ticket: QueueConsultation): String {
+        val service = QueueLabels.service(ticket.service ?: "consulta_general")
+        val origin = ticket.appointmentAt?.let { at -> runCatching { "Viene de su cita de las ${clock.format(java.time.Instant.parse(at))}" }.getOrNull() } ?: "Llegó sin cita"
+        return "$service · $origin"
+    }
 }
