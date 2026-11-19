@@ -52,10 +52,14 @@ import sv.edu.catolica.climesa.ui.lab.ExternalRecordViewModel
 fun ClinicalHistoryScreen(
     profile: AccessProfile, own: Boolean, modifier: Modifier = Modifier, model: ClinicalHistoryViewModel = viewModel(),
     external: ExternalRecordViewModel = viewModel(),
+    /** Lote 5: opens straight on this patient (for example from a queue row or a dashboard shortcut); the search stays one tap away. */
+    startPatientId: String? = null,
+    onStartHandled: () -> Unit = {},
 ) {
     val state by model.state.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf("") }
     var selectedId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(startPatientId) { if (!own && startPatientId != null) { selectedId = startPatientId; onStartHandled() } }
     val patientId = if (own) profile.patientId else selectedId
     if (!own && selectedId == null) {
         PageList(modifier) {

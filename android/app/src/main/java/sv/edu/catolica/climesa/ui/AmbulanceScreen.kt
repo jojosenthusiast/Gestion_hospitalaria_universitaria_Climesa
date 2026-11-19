@@ -108,6 +108,9 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         }, readsStatus)
     }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
+    // Lote 5 S8: who dispatches sees the hours without crew of the next days (the endpoint needs `ambulancia.ver_estado`).
+    val readsCoverage = section == AndroidSection.DISPATCH && "ambulancia.despachar" in profile.permissions && readsStatus
+    LaunchedEffect(readsCoverage) { if (readsCoverage) model.loadCoverage() }
     // Past days of the log stay folded until opened; the choice survives rotation.
     var pastOpen by rememberSaveable { mutableStateOf(false) }
     // Inicio "Despachar": open the dispatch form of the oldest pending request (the one the unit serves next) once loaded.
@@ -269,6 +272,7 @@ private fun LazyListScope.maintenanceItem(state: AmbulanceUiState, model: Ambula
 /** A36: solicitudes por confirmar, confirmar y despachar o descartar. */
 private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: AmbulanceViewModel, permissions: Collection<String>, openFor: String? = null, onOpened: () -> Unit = {}) {
     val status = state.status ?: return
+    sv.edu.catolica.climesa.domain.AmbulanceCoverage.warning(state.coverage)?.let { text -> item(key = "cobertura") { NoticeBanner(NoticeKind.WARNING, text) } }
     item { UnitStatusCard(status, AmbulanceReadiness.blocker(status, withAction = true)) }
     status.activeService?.let { service -> item { ServiceSummary(service) } }
     item { Text(stringResource(R.string.amb_solicitudes_titulo, status.pendingRequests.size), style = MaterialTheme.typography.titleMedium) }

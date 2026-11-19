@@ -64,6 +64,8 @@ data class AmbulanceUiState(
     val notice: String? = null,
     /** G4: the milestone just tapped, held 10 s with "Deshacer" before it joins the queue (no inverse endpoint exists). */
     val pendingMilestone: PendingUndo? = null,
+    /** Lote 5 S8: crew coverage of the next days for the dispatch header; null hides the warning (404, refused or not read). */
+    val coverage: sv.edu.catolica.climesa.domain.CrewCoverage? = null,
 )
 
 enum class AmbulanceMode { STATUS, LOG, ARRIVAL, REQUEST, PARAMEDIC }
@@ -109,6 +111,18 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     private var readsStatus = false
 
     /** Abre una sección: STATUS (A36, A70, A71, A72), LOG (A74), ARRIVAL (A25, A54) o REQUEST (A09, `GET /ambulancia/solicitudes/mias`). */
+    private var coverageWanted = false
+
+    /** Lote 5 S8: reads the crew coverage for the roles that dispatch. Optional: any failure (an API without it answers 404) hides it. */
+    fun loadCoverage() {
+        coverageWanted = true
+        viewModelScope.launch {
+            val coverage = try { sv.edu.catolica.climesa.domain.AmbulanceCoverage.parse(api.request(sv.edu.catolica.climesa.domain.AmbulanceCoverage.PATH)) }
+            catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+            mutable.value = mutable.value.copy(coverage = coverage)
+        }
+    }
+
     fun open(mode: AmbulanceMode, canReadStatus: Boolean = true) {
         this.mode = mode; readsStatus = canReadStatus
         load(silent = false)
@@ -178,11 +192,15 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     fun startLive(channels: List<String>) {
         live.start(viewModelScope, channels) { signal ->
             when (signal) {
-                is RealtimeSignal.Event -> if (AmbulanceEvents.matches(signal.event)) {
-                    if (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio")) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
-                    load()
+                is RealtimeSignal.Event -> {
+                    // A published or changed shift can close or open a coverage gap.
+                    if (coverageWanted && sv.edu.catolica.climesa.domain.LiveEntities.matches(signal.event, "turno")) loadCoverage()
+                    if (AmbulanceEvents.matches(signal.event)) {
+                        if (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio")) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
+                        load()
+                    }
                 }
-                RealtimeSignal.Resync -> { load(); retryQueued(); resumeHeld(); flushMilestones() }
+                RealtimeSignal.Resync -> { if (coverageWanted) loadCoverage(); load(); retryQueued(); resumeHeld(); flushMilestones() }
                 else -> Unit
             }
         }
