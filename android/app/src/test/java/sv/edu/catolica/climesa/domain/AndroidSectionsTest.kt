@@ -53,10 +53,11 @@ class AndroidSectionsTest {
         assertFalse(AndroidSections.hasAppScreens("LAB", permissions))
     }
 
-    @Test fun asistenteYEnfermeriaComparteUnSoloCatalogoFiltradoPorPermisos() {
+    @Test fun enfermeriaAbsorbeLaEstacionDeAsistenciaFiltradaPorPermisos() {
         val permissions = AndroidSection.entries.map(AndroidSection::permission).toSet()
-        assertEquals(AndroidSections.visible("AST", permissions), AndroidSections.visible("ENF", permissions))
-        val asistente = AndroidSections.visible("AST", listOf("sesion.perfil", "fila.llamar", "signos.registrar", "turnos.ver"))
+        // Lote 5 S10: AST was retired into ENF, so it has no catalog of its own.
+        assertTrue(AndroidSections.visible("AST", permissions).isEmpty())
+        val asistente = AndroidSections.visible("ENF", listOf("sesion.perfil", "fila.llamar", "signos.registrar", "turnos.ver"))
         assertEquals(listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE), asistente)
         // "Paciente hospitalizado" opens the same screen as "Mi planta": it is not a second entry.
         assertFalse(AndroidSection.INPATIENT_CARE in AndroidSections.visible("ENF", permissions))
@@ -74,7 +75,6 @@ class AndroidSectionsTest {
         val station = listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.VITAL_SIGNS, AndroidSection.ASSISTANT_STATION, AndroidSection.WARD, AndroidSection.CLEANING, AndroidSection.SUPPLIES, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE)
         val expected = mapOf(
             "REC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
-            "AST" to station,
             "ENF" to station,
             "MED" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
             "PAR" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.SERVICE, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),

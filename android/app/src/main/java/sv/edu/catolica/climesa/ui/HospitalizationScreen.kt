@@ -130,6 +130,8 @@ data class HospitalizationState(
     val notice: String? = null,
     /** G3: "Ingresos indicados", each with the first suggested bed; one tap admits there. */
     val tray: List<IndicatedAdmission> = emptyList(),
+    /** Lote 5 S10: bed code to floor (`/camas`), for the ward's floor filter; empty when the board is not readable. */
+    val bedFloors: Map<String, Int> = emptyMap(),
 )
 
 /** G3: one indicated admission of the tray; [error] stays on its row (a failed read is never shown as "no beds"). */
@@ -155,6 +157,14 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
             try { val admissions = AdmissionParser.admissions(api.request("/admisiones")); mutable.value = mutable.value.copy(loading = false, admissions = admissions); syncTray(admissions) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = readable(e, "No se pudieron cargar las admisiones.")) }
+        }
+    }
+
+    /** Lote 5 S10: floors of the beds for the ward filter. Optional: a refused or failed read leaves the filter out. */
+    fun loadFloors() {
+        viewModelScope.launch {
+            try { mutable.update { it.copy(bedFloors = sv.edu.catolica.climesa.domain.NurseFloors.bedFloors(api.request("/camas"))) } }
+            catch (e: CancellationException) { throw e } catch (e: Exception) { }
         }
     }
 
@@ -374,10 +384,16 @@ fun HospitalizationScreen(
     onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)? = null,
     /** R7 U1 (G2): "Ingresar" from the patient record opens the admission guide with this patient chosen. */
     subject: sv.edu.catolica.climesa.domain.QuickSubject? = null,
+    /** Lote 5 S10: the ward ("Mi planta") filters by floor; the nurse's floor is the default and «Todos los pisos» is one tap away. */
+    floorFilter: Boolean = false,
     model: HospitalizationViewModel = viewModel(),
     intake: AdmissionIntakeViewModel = viewModel(),
+    shift: ShiftStatusViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
+    val readsFloors = floorFilter && "camas.ver_tablero" in profile?.permissions.orEmpty()
+    LaunchedEffect(readsFloors) { if (readsFloors) model.loadFloors() }
+    val shiftStatus by shift.status.collectAsStateWithLifecycle()
     val intakeState by intake.state.collectAsStateWithLifecycle()
     // S15: the inpatient's record opens over the ward; back returns to it.
     var recordPatient by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
@@ -411,7 +427,13 @@ fun HospitalizationScreen(
     state.notes?.let { panel -> byId(panel.admissionId)?.let { NursingNotesDialog(it, panel, state, model) } }
     val retry = { model.clearMessages(); model.load() }
     // ENF/AST + MED audit: one ward order (discharge requested, signed discharge, unstable, then bed) and a fold after N rows.
-    val ordered = HospitalizationRules.wardOrder(state.admissions)
+    val allOrdered = HospitalizationRules.wardOrder(state.admissions)
+    val floors = if (readsFloors) sv.edu.catolica.climesa.domain.NurseFloors.floorsOf(allOrdered, state.bedFloors).filter { it.level != null } else emptyList()
+    // Picked floor: null until the nurse picks one, then FLOOR_ALL or a level. Until then, the shift's floor when the ward has it.
+    var pickedFloor by rememberSaveable { mutableStateOf<Int?>(null) }
+    val defaultFloor = sv.edu.catolica.climesa.domain.NurseFloors.defaultFloor((shiftStatus?.shift ?: shiftStatus?.next)?.area, floors.map { it.level })
+    val floor = (pickedFloor ?: defaultFloor ?: FLOOR_ALL).takeIf { it != FLOOR_ALL && floors.any { f -> f.level == it } }
+    val ordered = sv.edu.catolica.climesa.domain.NurseFloors.filter(allOrdered, state.bedFloors, floor)
     var wardOpen by rememberSaveable { mutableStateOf(false) }
     PageList(modifier) {
         // One primary per screen: the first admission with a main action; "Ingresar paciente" is primary only when none has one.
@@ -436,11 +458,18 @@ fun HospitalizationScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
+                if (floors.size > 1) item(key = "pisos") {
+                    val options = listOf(Triple(FLOOR_ALL, stringResource(R.string.enf_todos_los_pisos), allOrdered.size)) + floors.map { Triple(it.level!!, sv.edu.catolica.climesa.domain.NurseFloors.label(it.level), it.patients) }
+                    ChipRow(options, floor ?: FLOOR_ALL) { pickedFloor = it }
+                }
                 foldedItems(ordered, HospitalizationRules.WARD_VISIBLE, wardOpen, { wardOpen = !wardOpen }, foldKey = "planta-fold", key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals, onRecord) }
             }
         }
     }
 }
+
+/** Lote 5 S10: the «Todos los pisos» choice of the ward floor filter (no real floor uses it). */
+private const val FLOOR_ALL = Int.MIN_VALUE
 
 /**
  * G3 "Ingresos indicados": admissions a doctor indicated from a consultation, each with the suggested bed. "Ingresar" is a

@@ -46,7 +46,7 @@ class AndroidNavigationPolicyTest {
 
     @Test fun conPocosPermisosLaBarraSeCompletaConLoQueHay() {
         val perms = listOf("sesion.perfil", "turnos.ver", "fila.llamar")
-        val nav = AndroidNavigationPolicy.compact("AST", AndroidSections.visible("AST", perms))
+        val nav = AndroidNavigationPolicy.compact("ENF", AndroidSections.visible("ENF", perms))
         assertEquals(listOf(AndroidSection.HOME, AndroidSection.ASSISTANT_STATION, AndroidSection.SHIFTS), nav.primary)
         assertEquals(listOf(AndroidSection.NOTICES, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE), nav.overflow)
     }

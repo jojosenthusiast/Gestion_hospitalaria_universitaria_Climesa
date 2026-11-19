@@ -79,8 +79,8 @@ object RoleDashboard {
 
     private val sourcesByRole: Map<String, List<DashboardSource>> = mapOf(
         "REC" to listOf(DashboardSource.BEDS, DashboardSource.QUEUE, DashboardSource.ADMISSIONS, DashboardSource.AMBULANCE, DashboardSource.APPOINTMENTS, DashboardSource.CATEGORY_REQUESTS, DashboardSource.SHIFTS),
-        "AST" to listOf(DashboardSource.QUEUE, DashboardSource.MY_POST, DashboardSource.SHIFTS),
-        "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.ARRIVALS, DashboardSource.SHIFTS),
+        // Lote 5 S10: Enfermería absorbed Asistencia, so it also reads the queue and the caller's post.
+        "ENF" to listOf(DashboardSource.BEDS, DashboardSource.ADMISSIONS, DashboardSource.STOCK, DashboardSource.ARRIVALS, DashboardSource.QUEUE, DashboardSource.MY_POST, DashboardSource.SHIFTS),
         "MED" to listOf(DashboardSource.AGENDA, DashboardSource.LAB, DashboardSource.ADMISSIONS, DashboardSource.SHIFTS),
         "PAR" to listOf(DashboardSource.AMBULANCE, DashboardSource.SHIFTS),
         "PAC" to listOf(DashboardSource.QUEUE, DashboardSource.APPOINTMENTS, DashboardSource.MY_LAB, DashboardSource.ADMISSIONS),
@@ -281,28 +281,37 @@ object RoleDashboard {
                     attention += DashboardAttention(counted(it, "solicitud de ambulancia", "solicitudes de ambulancia"), "Confirma y despacha la unidad si está disponible.", DashboardTone.WARNING, "Despachar", QuickActionRequest(AndroidSection.DISPATCH, QuickAction.DISPATCH))
                 }
             }
-            "AST" -> {
-                queueKpis()
-                queue?.let {
-                    kpis += DashboardKpi("Llamados o en atención", ((it["llamado"] ?: 0) + (it["en_atencion"] ?: 0)).toString(), DashboardTone.PROCESS, target = target(AndroidSection.ASSISTANT_STATION))
-                    kpis += DashboardKpi("Atendidos hoy", (it["atendido"] ?: 0).toString(), DashboardTone.SUCCESS)
-                }
-                shiftKpi()
-                if (waiting > 0 && QuickActions.allowed(QuickAction.CALL_NEXT, permissions) && AndroidSection.ASSISTANT_STATION in sections) {
-                    attention += DashboardAttention(counted(waiting, "número esperando", "números esperando"), "Llama al siguiente número de tu consultorio.", DashboardTone.WARNING, "Llamar siguiente", QuickActionRequest(AndroidSection.ASSISTANT_STATION, QuickAction.CALL_NEXT), covers = "En espera")
-                }
-            }
             "ENF" -> {
                 // ENF/AST audit #16: nursing does not assign beds, so "Admisiones sin cama" is not its tile.
                 admissions?.let { kpis += DashboardKpi("Hospitalizados", (it["hospitalizado"] ?: 0).toString(), DashboardTone.PROCESS, target = target(AndroidSection.WARD)) }
+                // Lote 5 S10 ("puede haber mas detalle"): unstable patients first, then patients per floor (every floor, not one).
+                data[DashboardSource.ADMISSIONS]?.let { value ->
+                    val unstable = rows(value).count { it.optString("state") in NurseFloors.IN_BED && it.optBoolean("unstable") }
+                    kpis += DashboardKpi("Pacientes inestables", unstable.toString(), if (unstable > 0) DashboardTone.DANGER else DashboardTone.SUCCESS, target = target(AndroidSection.WARD))
+                    data[DashboardSource.BEDS]?.let { beds ->
+                        val perFloor = NurseFloors.patientsByFloor(value, NurseFloors.bedFloors(beds))
+                        charts += DashboardChart("Pacientes por piso", ChartKind.BARS, perFloor.map { ChartSlice(NurseFloors.label(it.level), it.patients, DashboardTone.PROCESS) })
+                    }
+                }
                 bedKpis()
                 stock?.let { kpis += DashboardKpi("Insumos bajo mínimo", it.belowMinimum.toString(), if (it.belowMinimum > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.SUPPLIES)) }
+                // Lote 5 S10: the assistant's queue now belongs to nursing; only with the queue permissions (rule 8).
+                if (queue != null) {
+                    queueKpis()
+                    kpis += DashboardKpi("Llamados o en atención", ((queue["llamado"] ?: 0) + (queue["en_atencion"] ?: 0)).toString(), DashboardTone.PROCESS, target = target(AndroidSection.ASSISTANT_STATION))
+                    kpis += DashboardKpi("Atendidos hoy", (queue["atendido"] ?: 0).toString(), DashboardTone.SUCCESS)
+                }
+                if (waiting > 0 && QuickActions.allowed(QuickAction.CALL_NEXT, permissions) && AndroidSection.ASSISTANT_STATION in sections) {
+                    attention += DashboardAttention(counted(waiting, "número esperando", "números esperando"), "Llama al siguiente número de tu consultorio.", DashboardTone.WARNING, "Llamar siguiente", QuickActionRequest(AndroidSection.ASSISTANT_STATION, QuickAction.CALL_NEXT), covers = "En espera")
+                }
                 shiftKpi()
                 // ENF/AST audit #1: nursing reads `/ambulancia/llegada` (it has no `ambulancia.ver_estado`).
                 data[DashboardSource.ARRIVALS]?.let { AmbulanceParser.arrivals(it) }?.takeIf { AndroidSection.AMBULANCE_RECEPTION in sections }?.let { list ->
                     val arrived = list.count { it.arrived }
-                    if (arrived > 0) attention += DashboardAttention(if (arrived == 1) "Ambulancia en el hospital" else "$arrived ambulancias en el hospital", "Recibe al paciente y marca la entrega.", DashboardTone.WARNING, "Recibir", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
-                    else if (list.any { it.active }) attention += DashboardAttention("Ambulancia en camino", "Prepara la recepción del paciente.", DashboardTone.WARNING, "Ver recepción", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
+                    val coming = list.count { it.active && !it.arrived }
+                    kpis += DashboardKpi("Llegadas por ambulancia", (arrived + coming).toString(), if (arrived > 0) DashboardTone.WARNING else if (coming > 0) DashboardTone.PROCESS else DashboardTone.SUCCESS, hint = if (arrived + coming > 0) "$arrived en el hospital · $coming en camino" else null, target = target(AndroidSection.AMBULANCE_RECEPTION))
+                    if (arrived > 0) attention += DashboardAttention(if (arrived == 1) "Ambulancia en el hospital" else "$arrived ambulancias en el hospital", "Recibe al paciente y marca la entrega.", DashboardTone.WARNING, "Recibir", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION), covers = "Llegadas por ambulancia")
+                    else if (coming > 0) attention += DashboardAttention("Ambulancia en camino", "Prepara la recepción del paciente.", DashboardTone.WARNING, "Ver recepción", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION), covers = "Llegadas por ambulancia")
                 }
                 // ENF/AST audit #16: a signed discharge still holds the bed until the exit is registered.
                 val toExit = data[DashboardSource.ADMISSIONS]?.let { value -> rows(value).count { it.optString("state") == "alta_firmada" && it.optJSONArray("allowedActions")?.let { a -> (0 until a.length()).any { i -> a.optString(i) == "registrar_salida" } } == true } } ?: 0

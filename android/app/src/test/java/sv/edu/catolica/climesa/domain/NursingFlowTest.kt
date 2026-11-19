@@ -131,15 +131,15 @@ class NursingFlowTest {
 
     @Test fun elAsistenteCuentaSoloLaFilaDeSuPuesto() {
         val ast = setOf("sesion.perfil", "fila.ver", "fila.llamar", "fila.gestionar", "turnos.ver", "signos.registrar")
-        assertTrue(DashboardSource.MY_POST in RoleDashboard.sources("AST", ast))
+        assertTrue(DashboardSource.MY_POST in RoleDashboard.sources("ENF", ast))
         val queue = JSONArray()
             .put(JSONObject().put("state", "en_espera").put("service", "consulta_general"))
             .put(JSONObject().put("state", "en_espera").put("service", "emergencia"))
             .put(JSONObject().put("state", "en_espera").put("service", "emergencia"))
         val post = JSONObject().put("service", "consulta_general").put("officeId", JSONObject.NULL).put("officeCode", JSONObject.NULL).put("areaName", JSONObject.NULL)
-        val mine = RoleDashboard.build("AST", ast, mapOf(DashboardSource.QUEUE to queue, DashboardSource.MY_POST to post), now = now)
+        val mine = RoleDashboard.build("ENF", ast, mapOf(DashboardSource.QUEUE to queue, DashboardSource.MY_POST to post), now = now)
         assertEquals(1, mine.charts.first { it.title == "Fila del día" }.slices.first { it.label == "En espera" }.value)
-        val whole = RoleDashboard.build("AST", ast, mapOf(DashboardSource.QUEUE to queue), now = now)
+        val whole = RoleDashboard.build("ENF", ast, mapOf(DashboardSource.QUEUE to queue), now = now)
         assertEquals(3, whole.charts.first { it.title == "Fila del día" }.slices.first { it.label == "En espera" }.value)
     }
 }

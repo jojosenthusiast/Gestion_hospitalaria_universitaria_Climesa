@@ -47,10 +47,9 @@ object QuickActions {
             Entry("Asignar cama", AndroidSection.ADMISSION, QuickAction.ASSIGN_BED, "camas.asignar"),
             Entry("Despachar ambulancia", AndroidSection.DISPATCH, QuickAction.DISPATCH, "ambulancia.despachar"),
         ),
-        "AST" to listOf(
-            Entry("Llamar siguiente", AndroidSection.ASSISTANT_STATION, QuickAction.CALL_NEXT, "fila.llamar"),
-        ),
+        // Lote 5 S10: Enfermería absorbed Asistencia, so calling the next number is one of its shortcuts.
         "ENF" to listOf(
+            Entry("Llamar siguiente", AndroidSection.ASSISTANT_STATION, QuickAction.CALL_NEXT, "fila.llamar"),
             Entry("Mi planta", AndroidSection.WARD, null, "admision.ver"),
             Entry("Registrar consumo", AndroidSection.SUPPLIES, null, "inventario.mover"),
             Entry("Recibir ambulancia", AndroidSection.AMBULANCE_RECEPTION, null, "ambulancia.recibir_prehospital"),

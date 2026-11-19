@@ -87,9 +87,9 @@ class RoleDashboardTest {
 
     @Test fun elAsistenteLlamaAlSiguienteSoloSiPuedeLlamar() {
         val queue = rows(row("state" to "en_espera"), row("state" to "en_espera"), row("state" to "atendido"))
-        val withPermission = RoleDashboard.build("AST", everything, mapOf(DashboardSource.QUEUE to queue), now = now)
+        val withPermission = RoleDashboard.build("ENF", everything, mapOf(DashboardSource.QUEUE to queue), now = now)
         assertEquals(QuickAction.CALL_NEXT, withPermission.attention.single().request.action)
-        val without = RoleDashboard.build("AST", everything - "fila.llamar", mapOf(DashboardSource.QUEUE to queue), now = now)
+        val without = RoleDashboard.build("ENF", everything - "fila.llamar", mapOf(DashboardSource.QUEUE to queue), now = now)
         assertTrue(without.attention.isEmpty())
     }
 
@@ -159,9 +159,9 @@ class RoleDashboardTest {
     // R3 A-48: counts read as Spanish, never "número(s)".
     @Test fun losConteosNoUsanParentesisDePlural() {
         val queue = rows(row("state" to "en_espera"))
-        val one = RoleDashboard.build("AST", everything, mapOf(DashboardSource.QUEUE to queue), now = now)
+        val one = RoleDashboard.build("ENF", everything, mapOf(DashboardSource.QUEUE to queue), now = now)
         assertEquals("1 número esperando", one.attention.single().title)
-        val two = RoleDashboard.build("AST", everything, mapOf(DashboardSource.QUEUE to rows(row("state" to "en_espera"), row("state" to "en_espera"))), now = now)
+        val two = RoleDashboard.build("ENF", everything, mapOf(DashboardSource.QUEUE to rows(row("state" to "en_espera"), row("state" to "en_espera"))), now = now)
         assertEquals("2 números esperando", two.attention.single().title)
         assertTrue(two.kpis.none { it.label == "En espera" })
     }

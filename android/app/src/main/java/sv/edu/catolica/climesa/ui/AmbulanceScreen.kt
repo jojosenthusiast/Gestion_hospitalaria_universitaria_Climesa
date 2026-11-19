@@ -599,6 +599,8 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel, showFilte
 
 /** A54 y A25: reporte prehospital en vivo; el contenido clínico solo si la API lo entrega. MA-AMB-04: marcar recibido. */
 private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
+    // Lote 5 S10 ("recepcion de ambulancia no se entiende el flujo"): one line with the order of the flow before the data.
+    item(key = "recepcion-flujo") { Text(stringResource(R.string.enf_recepcion_flujo), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     // MA-AMB-04: a service that arrived without a handover stays listed while the unit is out on another one.
     if (state.arrivals.size > 1) item {
         SectionCard(stringResource(R.string.amb_por_recibir)) {

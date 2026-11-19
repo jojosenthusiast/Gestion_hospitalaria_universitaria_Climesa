@@ -164,7 +164,7 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
         page==AndroidSection.BEDS||page==AndroidSection.CLEANING->BedsScreen(account.profile,Modifier.padding(padding))
         page==AndroidSection.MY_APPOINTMENTS->PatientAppointmentsScreen(account.profile.permissions,account.profile.channels,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,linked=account.profile.patientId!=null)
         page==AndroidSection.ADMISSION||page==AndroidSection.HOSPITALIZED||page==AndroidSection.WARD->HospitalizationScreen(Modifier.padding(padding),account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled=handled,
-            onOpenVitals=openVitals)
+            onOpenVitals=openVitals,floorFilter=page==AndroidSection.WARD)
         page==AndroidSection.SUPPLIES->InventoryScreen(Modifier.padding(padding),account.profile)
         page==AndroidSection.MY_ACCESS->MyAccessScreen(Modifier.padding(padding))
         page==AndroidSection.PATIENT_QUEUE||page==AndroidSection.QUEUE||page==AndroidSection.ASSISTANT_STATION->QueueScreen(account.profile,Modifier.padding(padding),quickAction=inbox.actionFor(page),onQuickActionHandled=handled,userId=account.session.userId,onOpenVitals=openVitals)
