@@ -41,6 +41,10 @@
 .module-future { margin-left: auto; padding: 3px 6px; border-radius: 999px; background: var(--bg); color: var(--muted); font-size: 9px; font-weight: 400; font-variant-numeric: tabular-nums; }
 .module-future::before { content: "Próximo"; }
 .nav-backdrop { display: none; }
+.shift-band { padding: 9px 22px; display: flex; align-items: center; justify-content: center; gap: 9px; border-bottom: 1px solid color-mix(in srgb, var(--warning) 35%, transparent); background: var(--warning-soft); color: var(--warning); font-size: 13px; line-height: 1.4; }
+.shift-band p { margin: 0; display: flex; flex-wrap: wrap; column-gap: 12px; row-gap: 2px; }
+.shift-band strong { font-weight: 700; }
+.shift-band span { color: var(--ink); }
 .connection-band { padding: 11px 22px; display: flex; align-items: center; justify-content: center; gap: 9px; border-bottom: 1px solid currentColor; background: var(--soft); color: var(--primary-text); font-size: 13px; font-weight: 700; line-height: 1.4; }
 .connection-offline { background: var(--warning-soft); color: var(--warning); }
 .conflict-notice { display: grid; gap: 10px; justify-items: start; }

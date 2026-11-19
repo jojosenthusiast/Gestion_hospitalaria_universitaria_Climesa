@@ -33,6 +33,8 @@ export interface Api {request<T>(path:string,init?:RequestInit):Promise<T>;write
 /** `code` y `currentVersion` vienen del problem+json de la API (`codigo`, `versionActual`); faltan en errores de red o sin cuerpo. */
 export class ApiError extends Error {constructor(message:string,public status=0,public code?:string,public currentVersion?:number,public details?:Record<string,unknown>){super(message);}}
 const base=(import.meta.env.VITE_API_BASE_URL as string|undefined)?.replace(/\/$/,'')??'http://localhost:3000/api/v1';
+/** Lote 5 S9: a 403 `sin_turno_activo` without a readable reason in its body (the API normally sends one). */
+export const NO_ACTIVE_SHIFT_TEXT='No tienes un turno activo. Pide a Jefatura que publique tu turno.';
 export class HttpApi implements Api {
  private attempts=new Map<string,string>();
  /**
@@ -47,7 +49,7 @@ export class HttpApi implements Api {
   recordServerAnswer(response.status);
   if(response.status===401&&this.unauthorized&&await this.unauthorized(renewed)===true&&!renewed)return this.request<T>(path,init,true);
   const body=await response.json().catch(()=>({}));
-  if(!response.ok){throw new ApiError(body.detail??body.error?.message??body.message??'No se pudo completar la operación.',response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
+  if(!response.ok){const code=typeof body.codigo==='string'?body.codigo:undefined;throw new ApiError(body.detail??body.error?.message??body.message??(code==='sin_turno_activo'?NO_ACTIVE_SHIFT_TEXT:'No se pudo completar la operación.'),response.status,typeof body.codigo==='string'?body.codigo:undefined,typeof body.versionActual==='number'?body.versionActual:undefined,body&&typeof body==='object'?body:undefined);}
   return body as T;
  }
  async write<T>(path:string,body:unknown,method='POST'):Promise<T>{

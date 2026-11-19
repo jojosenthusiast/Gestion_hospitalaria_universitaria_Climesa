@@ -6,6 +6,7 @@ import { can,roleNames,type AccessProfile,type Api } from '../lib/api';
 import { CompactHeader,Tag } from './common';
 import { ChangePasswordForm } from './password';
 import { Dashboard } from './dashboards';
+import { ShiftStatusBanner } from './shift-status';
 /**
  * Fase 2, S3: división de código por ruta. Inicio (la primera pantalla tras el ingreso) va en el paquete principal;
  * cada otro módulo es un archivo aparte. Para que abrir un módulo no espere su descarga, el armazón descarga en
@@ -191,6 +192,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
    {navOpen&&<button className="nav-backdrop" type="button" aria-label="Cerrar panel de navegación" onClick={()=>{setNavOpen(false);toggleRef.current?.focus();}}/>}
    <div className="hospital-workspace">
     {connection!=='live'&&<div role="status" className={`connection-band connection-${connection}`}><Icon name="info" size={16}/>{connection==='offline'?'Sin conexión. No se pueden guardar cambios.':'Recuperando la conexión…'}</div>}
+    <ShiftStatusBanner api={api} version={version}/>
     {/* S3: sin `key` por ruta. Cada módulo es su propio componente y se monta solo; la caché de `useData` muestra al instante lo ya leído. */}
     <main id="main-content" className="hospital-main"><ModuleBoundary key={route} label={active?.label??'Módulo'}>{content}</ModuleBoundary></main>
     <footer className="hospital-footer"><Brand/><span>Hospital universitario CLIMESA</span><span><Icon name="lock" size={13}/>Acceso personal</span></footer>
