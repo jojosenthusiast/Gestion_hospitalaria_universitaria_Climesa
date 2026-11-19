@@ -15,8 +15,9 @@
 --      and not exists (select 1 from acceso.rol_permiso e where e.rol_codigo = 'ENF' and e.permiso_codigo = a.permiso_codigo);
 --   -- 3. Asignaciones rol-permiso de AST que se borran:
 --   select count(*) from acceso.rol_permiso where rol_codigo = 'AST';
---   -- 4. Avisos dirigidos a AST que pasan a ENF:
---   select count(*) from publico.aviso where 'AST' = any(roles);
+--   -- 4. Avisos dirigidos a AST que pasan a ENF (los retirados no cambian):
+--   select count(*) filter (where retirado_en is null) as pasan_a_enf, count(*) filter (where retirado_en is not null) as retirados_sin_cambio
+--     from publico.aviso where 'AST' = any(roles);
 --
 -- Reversa (manual, con la lista de cuentas de la pre-comprobación 1 guardada antes de aplicar):
 --   insert into acceso.rol_permiso (rol_codigo, permiso_codigo, contexto) values ('AST','pacientes.buscar','x'),
@@ -48,5 +49,7 @@ update acceso.rol set invitable = false,
  where codigo = 'AST';
 
 -- 4. Los avisos dirigidos a AST llegan a ENF.
-update publico.aviso set roles = array(select distinct r from unnest(array_replace(roles, 'AST', 'ENF')) r order by r)
- where 'AST' = any(roles);
+-- Solo avisos sin retirar: un aviso retirado no admite cambios (trigger `aviso_sin_cambios_tras_retiro`) y conserva su audiencia.
+update publico.aviso set roles = array(select distinct r from unnest(array_replace(roles, 'AST', 'ENF')) r order by r),
+       version = version + 1
+ where 'AST' = any(roles) and retirado_en is null;

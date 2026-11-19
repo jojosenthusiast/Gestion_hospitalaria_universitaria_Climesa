@@ -59,6 +59,15 @@ describe('Lote 5 S10 · el Asistente se une a Enfermería', () => {
     expect((await t.one<{ roles: string[] }>('SELECT roles FROM publico.aviso WHERE id=$1', [created.body.id])).roles).toEqual(['ENF', 'MED']);
   });
 
+  test('un aviso retirado dirigido a AST no bloquea la migración y conserva su audiencia', async () => {
+    const hasta = new Date('2026-12-03T18:00:00Z').toISOString();
+    const created = await t.call('JOP', 'POST', '/avisos', { titulo: 'Aviso retirado a asistentes', cuerpo: 'Ya no aplica para la fila.', hasta, publico: false, roles: ['AST'], nivel: 'informativo' });
+    expect(created.status).toBe(201);
+    await t.pg.query("UPDATE publico.aviso SET retirado_en=now(), retirado_por=$2, motivo_retiro='Retirado antes de la migración' WHERE id=$1", [created.body.id, userId('JOP')]);
+    await t.pg.exec(migration);
+    expect(await t.one('SELECT roles, version FROM publico.aviso WHERE id=$1', [created.body.id])).toMatchObject({ roles: ['AST'] });
+  });
+
   test('invitar con AST responde rol_no_invitable', async () => {
     const r = await t.call('ADM', 'POST', '/usuarios/invitaciones', { email: 'asistente.nueva@example.test', displayName: 'Asistente Nueva', roles: ['AST'], staffId: await t.staffOf('AST') });
     expect([r.status, r.body.codigo, r.body.detail ?? r.body.mensaje ?? r.body.message]).toEqual([400, 'rol_no_invitable', 'Ese rol ya no se asigna. Elige un rol vigente, por ejemplo Enfermería.']);
