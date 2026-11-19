@@ -77,11 +77,23 @@ export class AppointmentRequestService {
         WHERE ($1::uuid IS NULL OR s.paciente_id=$1) AND (s.estado='pendiente' OR s.creado_en > $2::timestamptz OR $1::uuid IS NOT NULL)
         ORDER BY (s.estado='pendiente') DESC, CASE WHEN s.estado='pendiente' THEN s.creado_en END ASC, s.creado_en DESC, s.id
         LIMIT 300`, [ownPatient, new Date(this.clock.now().valueOf() - 30 * 86_400_000)])).rows as RequestRow[];
+      // Lote 5, S6: whether some doctor of the request's specialties (any doctor when no active doctor has one, as the
+      // suggestion does) has a published shift in the next SUGGESTION_DAYS; reception sees the request cannot be booked.
+      const now = this.clock.now();
+      const doctors = (await c.query(`SELECT coalesce(p.especialidad,'Medicina general') AS specialty,
+          EXISTS(SELECT 1 FROM personal.turno t WHERE t.persona_id=p.id AND t.estado IN ('publicado','en_curso')
+            AND t.periodo && tstzrange($1::timestamptz,$2::timestamptz,'[)')) AS "onShift"
+        FROM personal.persona p WHERE p.tipo='medico' AND p.activo`, [now, new Date(now.valueOf() + SUGGESTION_DAYS * 86_400_000)])).rows as { specialty: string; onShift: boolean }[];
+      const staffAvailable = (specialties: string[]) => {
+        const matching = doctors.filter(d => specialties.includes(d.specialty));
+        return (matching.length ? matching : doctors).some(d => d.onShift);
+      };
       // SEG-02: aggregated read audit with every patient listed.
       await this.commands.audit(c, actor, { action: 'citas.solicitudes_leer', entity: 'solicitud_cita', permission: 'citas.ver', detail: { patientIds: [...new Set(rows.map(row => row.patientId))] } });
       return rows.map(({ specialtyOrder, appointment, createdAt, ...row }) => ({
         ...row,
         specialties: [...new Set<string>(specialtyOrder ?? [])],
+        staffAvailable: staffAvailable(specialtyOrder ?? []),
         createdAt: new Date(createdAt).toISOString(),
         appointment: appointment ? { ...appointment, start: new Date(appointment.start).toISOString(), end: new Date(appointment.end).toISOString() } : null,
         ...categoryRequestActions(row.state, { manage, ownPatient: !!actor.patientId && actor.patientId === row.patientId }),

@@ -17,8 +17,8 @@ export const PROBLEM_CODES = [
   'sin_asistencia_marcada', 'entrada_automatica', 'medico_ausente', 'tripulante_ausente',
   // Shift planning batches and week templates (Fase 2, flow F).
   'lote_con_conflictos', 'plantilla_duplicada',
-  // Lote 5: shift gating of operational commands (S9).
-  'sin_turno_activo',
+  // Lote 5: shift gating of operational commands (S9) and appointments on a day without doctors of the service (S6).
+  'sin_turno_activo', 'sin_personal_disponible',
   // Appointments, queue and consultation.
   'franja_desalineada', 'franja_ocupada', 'medico_sin_jornada', 'paciente_con_cita', 'cancelacion_fuera_de_plazo',
   'ticket_activo_existente', 'fila_max_llamados', 'consulta_ya_iniciada',

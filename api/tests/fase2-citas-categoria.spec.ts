@@ -109,7 +109,8 @@ describe('Fase 2 · solicitud de cita por categoría', () => {
     const odd = await t.call('REC', 'POST', `/citas/solicitudes-categoria/${created.id}/asignar`, { version: 1, doctorId, ...slotAt('2026-11-17T15:05:00.000Z') });
     expect(odd.body.codigo).toBe('franja_desalineada');
     const noShift = await t.call('REC', 'POST', `/citas/solicitudes-categoria/${created.id}/asignar`, { version: 1, doctorId, ...slotAt('2026-11-18T15:00:00.000Z') });
-    expect(noShift.body.codigo).toBe('medico_sin_jornada');
+    // Lote 5 S6: nobody of the service works on the 18th, so the day itself is refused.
+    expect(noShift.body.codigo).toBe('sin_personal_disponible');
     expect((await t.call('REC', 'POST', `/citas/solicitudes-categoria/${created.id}/asignar`, { version: 1, doctorId, start: slot.start, end: new Date(new Date(slot.start).valueOf() + 30 * MIN).toISOString() })).status).toBe(400);
     expect((await t.call('REC', 'POST', `/citas/solicitudes-categoria/${created.id}/asignar`, { version: 9, doctorId, ...slot })).body.codigo).toBe('version_conflicto');
 

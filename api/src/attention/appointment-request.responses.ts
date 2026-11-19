@@ -40,6 +40,7 @@ export class CategoryRequestResponse {
   @StrProp({ nullable: true }) record!: string | null;
   @ClassArrayProp(CategoryRefResponse) categories!: CategoryRefResponse[];
   @StrArrayProp({ description: 'Especialidades sugeridas por las categorías, sin repetir' }) specialties!: string[];
+  @BoolProp({ description: 'Lote 5 S6: algún médico de esas especialidades (o cualquiera, si ninguno las tiene) tiene turno publicado en los próximos 14 días; si es false, asignar responde sin_personal_disponible' }) staffAvailable!: boolean;
   @EnumProp(FRANJAS_SOLICITUD, 'FranjaSolicitudCita') franja!: string;
   @StrProp({ nullable: true }) note!: string | null;
   @UuidProp({ nullable: true }) preferredDoctorId!: string | null;

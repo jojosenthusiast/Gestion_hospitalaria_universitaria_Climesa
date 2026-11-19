@@ -26849,6 +26849,10 @@
               "type": "string"
             }
           },
+          "staffAvailable": {
+            "type": "boolean",
+            "description": "Lote 5 S6: algún médico de esas especialidades (o cualquiera, si ninguno las tiene) tiene turno publicado en los próximos 14 días; si es false, asignar responde sin_personal_disponible"
+          },
           "franja": {
             "allOf": [
               {
@@ -26918,6 +26922,7 @@
           "record",
           "categories",
           "specialties",
+          "staffAvailable",
           "franja",
           "note",
           "preferredDoctorId",
@@ -34826,6 +34831,7 @@
           "lote_con_conflictos",
           "plantilla_duplicada",
           "sin_turno_activo",
+          "sin_personal_disponible",
           "franja_desalineada",
           "franja_ocupada",
           "medico_sin_jornada",
