@@ -376,7 +376,7 @@ const lab: RoleDashboard = {
   panels: ({ d }) => {
     const days = Array.from({ length: 7 }, (_, i) => localDay(new Date(Date.now() - (6 - i) * 86400000)));
     return grid(<Panel title="Tiempo de entrega (7 días)" icon="clock">
-      <PanelState state={d.labTurnaround}>{s => <BarChart title="Tiempo promedio de entrega por día" unit="min" threshold={{ value: LAB_GOAL_MIN, label: `Meta ${LAB_GOAL_MIN} min` }} empty="Aún no hay órdenes completadas en la semana." data={days.map(day => { const v = turnaroundDay(s, day)?.valor ?? null; return { label: `${day.slice(8)}/${day.slice(5, 7)}`, value: v == null ? null : Math.round(v), tone: v == null ? undefined : (v >= LAB_GOAL_MIN * 2 ? 'urgent' : v >= LAB_GOAL_MIN ? 'warn' : 'ok') as Tone }; })} />}</PanelState>
+      <PanelState state={d.labTurnaround}>{s => <BarChart title="Tiempo promedio de entrega por día" unit="min" format={formatDuration} threshold={{ value: LAB_GOAL_MIN, label: `Meta ${LAB_GOAL_MIN} min` }} empty="Aún no hay órdenes completadas en la semana." data={days.map(day => { const v = turnaroundDay(s, day)?.valor ?? null; return { label: `${day.slice(8)}/${day.slice(5, 7)}`, value: v == null ? null : Math.round(v), tone: v == null ? undefined : (v >= LAB_GOAL_MIN * 2 ? 'urgent' : v >= LAB_GOAL_MIN ? 'warn' : 'ok') as Tone }; })} />}</PanelState>
     </Panel>);
   },
 };

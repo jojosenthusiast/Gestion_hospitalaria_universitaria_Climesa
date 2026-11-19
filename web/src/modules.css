@@ -437,6 +437,12 @@
 .chart-threshold { stroke: var(--warning); stroke-width: 1.4; stroke-dasharray: 5 4; }
 .chart-value { fill: var(--ink); font-size: 11px; font-weight: 700; }
 .chart-axis { fill: var(--muted); font-size: 10.5px; }
+/* BarChart draws at the card width (1:1), so it scrolls sideways on a very narrow card instead of shrinking its text. */
+.chart-frame { min-width: 0; overflow-x: auto; }
+.chart-frame > .chart-svg { width: auto; max-width: none; }
+.chart-break { fill: none; stroke: var(--surface); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.chart-legend-threshold { margin-top: var(--space-2); font-size: var(--text-xs); }
+.chart-swatch-line { width: 18px; height: 0; border-top: 2px dashed var(--warning); }
 .chart-ring { stroke: var(--soft); }
 .chart-center { fill: var(--ink); font-size: 7px; font-weight: 700; }
 .chart-center-label { fill: var(--muted); font-size: 2.8px; }
