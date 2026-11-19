@@ -5,6 +5,29 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.Send
 import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import kotlinx.coroutines.launch
+import sv.edu.catolica.climesa.domain.AmbulanceForms
+import sv.edu.catolica.climesa.domain.AmbulanceReadiness
+import sv.edu.catolica.climesa.domain.AmbulanceSigns
+import sv.edu.catolica.climesa.domain.AmbulanceStatus
+import sv.edu.catolica.climesa.domain.AmbulanceTimeline
+import sv.edu.catolica.climesa.domain.MaintenanceRules
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -55,10 +78,14 @@ import sv.edu.catolica.climesa.domain.AmbulancePrefill
 import sv.edu.catolica.climesa.domain.RequestDraft
 import sv.edu.catolica.climesa.domain.RequestField
 
-/** Secciones de Android de la spec 109 que resuelve [AmbulanceScreen]. A70 (Unidad) sigue en [RolePortal]. */
+/**
+ * Secciones de Android de la spec 109 que resuelve [AmbulanceScreen]. Lote 5 S8: A70 (Unidad) también vive aquí, con la
+ * misma tarjeta de unidad, la bitácora del servicio y el mantenimiento que ven Despacho y Paramédico.
+ */
 val ambulanceSections = setOf(
     AndroidSection.AMBULANCE_REQUEST, AndroidSection.DISPATCH, AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT,
     AndroidSection.UNIDENTIFIED_PATIENT, AndroidSection.LOG, AndroidSection.AMBULANCE_RECEPTION, AndroidSection.AMBULANCE_ARRIVAL,
+    AndroidSection.UNIT,
 )
 
 /**
@@ -101,8 +128,9 @@ fun AmbulanceScreen(section: AndroidSection, profile: AccessProfile, accountId: 
         else if (state.error != null) item { ErrorState(state.error, onRetry = { model.open(modeOf(section), readsStatus) }) }
         else when (section) {
             AndroidSection.AMBULANCE_REQUEST -> requestContent(state, model)
-            AndroidSection.DISPATCH -> dispatchContent(state, model, dispatchFor) { dispatchFor = null }
-            AndroidSection.LOG -> logContent(state, model, pastOpen) { pastOpen = !pastOpen }
+            AndroidSection.DISPATCH -> dispatchContent(state, model, profile.permissions, dispatchFor) { dispatchFor = null }
+            AndroidSection.UNIT -> unitContent(state, model, profile.permissions)
+            AndroidSection.LOG -> logContent(state, model, pastOpen, showFilters = !ParamedicRules.crewOnly(profile.permissions)) { pastOpen = !pastOpen }
             else -> arrivalContent(state, model)
         }
     }
@@ -196,16 +224,24 @@ private fun RequestForm(busy: Boolean, prefill: AmbulancePrefill?, model: Ambula
         filled = fields.joinToString(",") { it.name }
     }
     val names = filled.orEmpty().split(',').filter { it.isNotBlank() }.map { RequestField.valueOf(it) }
+    // Lote 5 S3: required fields marked; a failed send puts each error under its field and moves to the first one.
+    var tried by rememberSaveable { mutableStateOf(false) }
+    val errors = if (tried) AmbulanceForms.requestErrors(address, reason, phone) else emptyMap()
+    val focus = rememberFormErrorFocus()
+    val scope = rememberCoroutineScope()
     SectionCard(stringResource(R.string.amb_enviar_solicitud)) {
         if (names.isNotEmpty()) NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_prefill_aviso, names.map { stringResource(it.label()) }.joinToString(stringResource(R.string.ui_y))))
-        FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false)
-        FormField(stringResource(R.string.amb_direccion), address, { address = it.take(300) }, singleLine = false)
+        RequiredLegend()
+        FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, Modifier.errorAnchor(focus, AmbulanceForms.REASON), singleLine = false, required = true, error = errors[AmbulanceForms.REASON])
+        FormField(stringResource(R.string.amb_direccion), address, { address = it.take(300) }, Modifier.errorAnchor(focus, AmbulanceForms.ADDRESS), singleLine = false, required = true, error = errors[AmbulanceForms.ADDRESS])
         FormField(stringResource(R.string.amb_municipio), municipality, { municipality = it.take(80) })
-        FormField(stringResource(R.string.amb_telefono), phone, { phone = it.take(20) }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone))
+        FormField(stringResource(R.string.amb_telefono), phone, { phone = it.take(20) }, Modifier.errorAnchor(focus, AmbulanceForms.PHONE), keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), required = true, error = errors[AmbulanceForms.PHONE])
         error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        // G4: "Enviar" only once the reason says something; what is still missing is said next to the button.
-        if (reason.trim().length < AmbulanceRules.REASON_MIN) Text(stringResource(R.string.rec7_amb_falta_motivo), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        PrimaryButton(stringResource(R.string.amb_enviar_solicitud), { model.submitRequest(address, municipality, reason, phone) }, icon = Icons.Outlined.Send, loading = busy, enabled = reason.trim().length >= AmbulanceRules.REASON_MIN && !busy)
+        PrimaryButton(stringResource(R.string.amb_enviar_solicitud), {
+            tried = true
+            val found = AmbulanceForms.requestErrors(address, reason, phone)
+            if (found.isEmpty()) model.submitRequest(address, municipality, reason, phone) else scope.launch { focus.focusFirst(found.keys) }
+        }, icon = Icons.Outlined.Send, loading = busy, enabled = !busy)
     }
 }
 
@@ -214,43 +250,143 @@ private fun RequestField.label(): Int = when (this) {
     RequestField.PHONE -> R.string.amb_campo_telefono
 }
 
-/** Estado grande de la unidad, común a despacho y tripulación. */
-private fun LazyListScope.unitHeader(state: AmbulanceUiState) {
+/**
+ * A70 (Médico y quien vea la unidad sin despachar): la tarjeta de la unidad, el servicio en curso con su bitácora y, solo con
+ * el permiso `ambulancia.mantenimiento`, poner o quitar el mantenimiento.
+ */
+private fun LazyListScope.unitContent(state: AmbulanceUiState, model: AmbulanceViewModel, permissions: Collection<String>) {
     val status = state.status ?: return
-    item {
-        val block = status.dispatchBlock
-        val blocked = block != null
-        SectionCard(status.unit.plate, eyebrow = stringResource(R.string.op_amb_unidad), action = {
-            OperacionStatusTag(UnitStatusBadge.code(status.unit.state, blocked), label = UnitStatusBadge.label(status.unit.state, blocked, AmbulanceLabels.unitState(status.unit.state)))
-        }) {
-            // Obs 19: why it cannot be dispatched lives here, under the tag, once; and an idle unit says so plainly.
-            if (block != null) Text(UnitStatusBadge.reason(block), style = MaterialTheme.typography.bodyMedium)
-            if (status.activeService == null) Text(UnitStatusBadge.NO_SERVICE, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.climesa.primaryText)
-            Text(stringResource(if (status.paramedicOnDuty) R.string.amb_paramedico_si else R.string.amb_paramedico_no), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(stringResource(if (status.driverOnDuty) R.string.amb_motorista_si else R.string.amb_motorista_no), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            if (status.unit.state == "en_mantenimiento") {
-                if (status.unit.stateSince.isNotBlank()) Text(stringResource(R.string.amb_estado_desde, localTime(status.unit.stateSince)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                if (status.unit.stateReason.isNotBlank()) Text(stringResource(R.string.amb_estado_motivo, status.unit.stateReason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    item { UnitStatusCard(status, AmbulanceReadiness.blocker(status, withAction = false)) }
+    status.activeService?.let { service -> item { ServiceSummary(service) } }
+    maintenanceItem(state, model, permissions)
+}
+
+private fun LazyListScope.maintenanceItem(state: AmbulanceUiState, model: AmbulanceViewModel, permissions: Collection<String>) {
+    val status = state.status ?: return
+    if (MaintenanceRules.available(permissions, status.unit.state)) item { MaintenanceControl(status, state.busy, state.formError, model) }
+}
+
+/** A36: solicitudes por confirmar, confirmar y despachar o descartar. */
+private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: AmbulanceViewModel, permissions: Collection<String>, openFor: String? = null, onOpened: () -> Unit = {}) {
+    val status = state.status ?: return
+    item { UnitStatusCard(status, AmbulanceReadiness.blocker(status, withAction = true)) }
+    status.activeService?.let { service -> item { ServiceSummary(service) } }
+    item { Text(stringResource(R.string.amb_solicitudes_titulo, status.pendingRequests.size), style = MaterialTheme.typography.titleMedium) }
+    if (status.pendingRequests.isEmpty()) item { EmptyState(stringResource(R.string.amb_sin_solicitudes)) }
+    // One primary per screen: only the oldest request (the one the unit serves next) gets the filled "Confirmar y despachar".
+    val first = status.pendingRequests.firstOrNull()?.id
+    state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
+    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, state.busy, model, status.availableCrew, primary = request.id == first, error = state.formError, autoOpen = request.id == openFor, onAutoOpened = onOpened) }
+    maintenanceItem(state, model, permissions)
+}
+
+/**
+ * Lote 5 S8: the unit card every role sees. When the unit cannot be dispatched, the reason opens the card in a red (or amber,
+ * while a service runs) band, larger than body text; under it the readiness checklist with an icon and colour per line.
+ */
+@Composable
+internal fun UnitStatusCard(status: AmbulanceStatus, blocker: AmbulanceReadiness.Blocker?, showService: Boolean = true) {
+    ClimesaCard {
+        Column(Modifier.fillMaxWidth()) {
+            blocker?.let { BlockerBand(it) }
+            Column(Modifier.fillMaxWidth().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(stringResource(R.string.amb5_unidad).uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.climesa.primaryText)
+                        Text(status.unit.plate, style = MaterialTheme.typography.titleLarge)
+                    }
+                    // The band already says «No se puede despachar»; an available-but-blocked unit never reads «Disponible».
+                    if (!(blocker != null && status.unit.state == "disponible")) OperacionStatusTag(status.unit.state, label = AmbulanceLabels.unitState(status.unit.state))
+                }
+                ReadinessChecklist(AmbulanceReadiness.checklist(status).filter { showService || it.key != "service" })
+                if (status.unit.state == "en_mantenimiento") {
+                    if (status.unit.stateSince.isNotBlank()) Text(stringResource(R.string.amb_estado_desde, localTime(status.unit.stateSince)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (status.unit.stateReason.isNotBlank()) Text(stringResource(R.string.amb_estado_motivo, status.unit.stateReason), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
             }
         }
     }
 }
 
-/** A36: solicitudes por confirmar, confirmar y despachar o descartar. */
-private fun LazyListScope.dispatchContent(state: AmbulanceUiState, model: AmbulanceViewModel, openFor: String? = null, onOpened: () -> Unit = {}) {
-    unitHeader(state)
-    val status = state.status ?: return
-    status.activeService?.let { service -> item { ServiceSummary(service) } }
-    item { Text(stringResource(R.string.amb_solicitudes_titulo, status.pendingRequests.size), style = MaterialTheme.typography.titleMedium) }
-    if (status.pendingRequests.isEmpty()) item { EmptyState(stringResource(R.string.amb_sin_solicitudes)) }
-    // One primary per screen: only the oldest request (the one the unit serves next) gets the filled "Despachar".
-    val first = status.pendingRequests.firstOrNull()?.id
-    state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
-    items(status.pendingRequests, key = { it.id }) { request -> PendingRequestCard(request, status.unit.state == "disponible" && status.dispatchBlock == null, status.dispatchBlock != null, state.busy, model, status.availableCrew, primary = request.id == first, error = state.formError, autoOpen = request.id == openFor, onAutoOpened = onOpened) }
+/** The dispatch blocker: [CardStatusStrip] with the title, then the concrete reason in body-large text on the same tint. */
+@Composable
+private fun BlockerBand(blocker: AmbulanceReadiness.Blocker) {
+    val danger = blocker.tone == AmbulanceReadiness.Tone.DANGER
+    val soft = if (danger) MaterialTheme.climesa.dangerSoft else MaterialTheme.climesa.warningSoft
+    Column(Modifier.fillMaxWidth().background(soft).semantics(mergeDescendants = true) { liveRegion = LiveRegionMode.Polite }) {
+        CardStatusStrip(blocker.title, if (danger) StripTone.Danger else StripTone.Warning, icon = ClimesaIcons.Alert)
+        if (blocker.reason.isNotBlank()) Text(
+            blocker.reason, Modifier.padding(start = Spacing.md, end = Spacing.md, bottom = Spacing.sm + Spacing.xs),
+            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold), color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
 }
 
+/** Readiness lines (service, maintenance, crew): a check in green when ready, a cross in red when missing, a clock when busy. */
 @Composable
-private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, hasBlock: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, primary: Boolean, error: String?, autoOpen: Boolean = false, onAutoOpened: () -> Unit = {}) {
+internal fun ReadinessChecklist(items: List<AmbulanceReadiness.Item>) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs + 2.dp)) {
+        items.forEach { item ->
+            val (icon, tint) = when (item.state) {
+                AmbulanceReadiness.State.OK -> ClimesaIcons.Check to MaterialTheme.climesa.success
+                AmbulanceReadiness.State.MISSING -> ClimesaIcons.Close to MaterialTheme.climesa.danger
+                AmbulanceReadiness.State.BUSY -> ClimesaIcons.Clock to MaterialTheme.climesa.primaryText
+            }
+            Row(Modifier.fillMaxWidth().semantics(mergeDescendants = true) {}, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                Box(Modifier.size(24.dp).background(tint.copy(alpha = .12f), CircleShape), contentAlignment = Alignment.Center) { Icon(icon, null, Modifier.size(14.dp), tint = tint) }
+                Text(
+                    item.text, Modifier.weight(1f),
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = if (item.state == AmbulanceReadiness.State.MISSING) FontWeight.SemiBold else FontWeight.Normal),
+                    color = if (item.state == AmbulanceReadiness.State.MISSING) MaterialTheme.climesa.danger else MaterialTheme.colorScheme.onSurface,
+                )
+            }
+        }
+    }
+}
+
+/**
+ * Lote 5 S8: the bitácora of a service as its visible progress, the same for Recepción, Médico, Enfermería and Paramédico:
+ * a vertical timeline with the time, who records the step and a milestone marker (filled when done, ringed when next).
+ */
+@Composable
+internal fun ServiceTimeline(steps: List<AmbulanceTimeline.Step>, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
+        steps.forEachIndexed { index, step ->
+            val color = when {
+                step.done -> MaterialTheme.climesa.success
+                step.current -> MaterialTheme.colorScheme.primary
+                else -> MaterialTheme.climesa.controlLine
+            }
+            Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).semantics(mergeDescendants = true) {}, horizontalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
+                Column(Modifier.width(24.dp).fillMaxHeight(), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        Modifier.size(20.dp).background(if (step.done) color else MaterialTheme.colorScheme.surface, CircleShape).border(2.dp, color, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) { if (step.done) Icon(ClimesaIcons.Check, null, Modifier.size(12.dp), tint = MaterialTheme.colorScheme.surface) }
+                    if (index < steps.lastIndex) Box(Modifier.width(2.dp).weight(1f).background(if (step.done) color.copy(alpha = .5f) else MaterialTheme.climesa.line))
+                }
+                Column(Modifier.weight(1f).padding(bottom = if (index < steps.lastIndex) Spacing.sm + Spacing.xs else 0.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                        Text(
+                            step.label, Modifier.weight(1f),
+                            style = MaterialTheme.typography.bodyLarge.copy(fontWeight = if (step.done || step.current) FontWeight.SemiBold else FontWeight.Normal),
+                            color = if (step.done || step.current) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Text(step.at?.let(::clockTime) ?: if (step.current) stringResource(R.string.amb5_siguiente) else stringResource(R.string.amb_pendiente), style = MaterialTheme.typography.labelLarge.copy(fontFeatureSettings = "tnum"), color = if (step.current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                    Text(step.author, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Lote 5 S8: a request to confirm reads who asks, where and why first, then the full-width «Por confirmar» strip and the two
+ * actions on one line: «Confirmar y despachar» (main step) and «Descartar» (danger, at the right).
+ */
+@Composable
+private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean, busy: Boolean, model: AmbulanceViewModel, crewPool: List<sv.edu.catolica.climesa.domain.CrewCandidate>, primary: Boolean, error: String?, autoOpen: Boolean = false, onAutoOpened: () -> Unit = {}) {
     var dispatching by rememberSaveable(request.id) { mutableStateOf(false) }
     LaunchedEffect(autoOpen) { if (autoOpen) { if (available && !busy) dispatching = true; onAutoOpened() } }
     var discarding by rememberSaveable(request.id) { mutableStateOf(false) }
@@ -258,18 +394,25 @@ private fun PendingRequestCard(request: AmbulanceRequestRow, available: Boolean,
     // G4: a failed dispatch keeps the dialog open with the crew, type and destination chosen, and says why inside it.
     CloseWhenDone(busy, sent, error) { dispatching = false; discarding = false }
     val waiting = remember(request.createdAt) { runCatching { java.time.Duration.between(java.time.Instant.parse(request.createdAt), java.time.Instant.now()).toMinutes().coerceAtLeast(0) }.getOrDefault(0L) }
-    SectionCard(AmbulanceRules.requesterLabel(request), eyebrow = AmbulanceRules.waiting(waiting), action = { FamilyBadge(stringResource(R.string.amb_por_confirmar), StatusFamily.ESPERA) }) {
-        Text(request.reason, style = MaterialTheme.typography.bodyMedium)
-        LabeledValue(stringResource(R.string.amb_donde), request.address + if (request.municipality.isNotBlank()) " · ${request.municipality}" else "")
+    ActionCard(
+        actions = listOf(
+            CardAction(stringResource(R.string.amb_despachar), if (primary) ActionRole.Primary else ActionRole.Edit, { dispatching = true }, icon = ClimesaIcons.Ambulance, enabled = available && !busy),
+            CardAction(stringResource(R.string.amb_descartar), ActionRole.Danger, { discarding = true }, enabled = !busy),
+        ),
+        status = {
+            if (available) CardStatusStrip(stringResource(R.string.amb5_por_confirmar), StripTone.Warning, icon = ClimesaIcons.Clock, detail = AmbulanceRules.waiting(waiting))
+            else CardStatusStrip(stringResource(R.string.amb5_no_despachable_ahora), StripTone.Danger, icon = ClimesaIcons.Alert, detail = AmbulanceRules.waiting(waiting))
+        },
+    ) {
+        Text(stringResource(R.string.amb5_quien_llama).uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.climesa.primaryText)
+        Text(AmbulanceRules.requesterLabel(request), style = MaterialTheme.typography.titleMedium)
+        LabeledValue(stringResource(R.string.amb_donde), request.address + if (request.municipality.isNotBlank()) ", ${request.municipality}" else "")
+        LabeledValue(stringResource(R.string.amb_motivo), request.reason)
         LabeledValue(stringResource(R.string.amb_telefono), request.contactPhone)
         if (request.patientRecord.isNotBlank()) LabeledValue(stringResource(R.string.amb_expediente), request.patientRecord)
-        if (primary) PrimaryButton(stringResource(R.string.amb_despachar), { dispatching = true }, enabled = available && !busy)
-        else SecondaryButton(stringResource(R.string.amb_despachar), { dispatching = true }, enabled = available && !busy)
-        SecondaryButton(stringResource(R.string.amb_descartar), { discarding = true }, enabled = !busy)
-        if (!available && !hasBlock) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_unidad_no_disponible))
     }
     if (dispatching) DispatchDialog(busy, crewPool, error, onClose = { dispatching = false }) { type, priority, destination, crew -> sent.value = true; model.dispatch(request, type, priority, destination, crew) }
-    if (discarding) ReasonDialog(stringResource(R.string.amb_descartar), busy, error, onClose = { discarding = false }) { reason -> sent.value = true; model.discard(request, reason) }
+    if (discarding) ReasonDialog(stringResource(R.string.amb_descartar), stringResource(R.string.amb5_motivo_descarte), busy, error, onClose = { discarding = false }) { reason -> sent.value = true; model.discard(request, reason) }
 }
 
 @Composable
@@ -279,33 +422,82 @@ private fun DispatchDialog(busy: Boolean, crewPool: List<sv.edu.catolica.climesa
     var type by rememberSaveable { mutableStateOf(AmbulanceLabels.types.first().first) }
     var priority by rememberSaveable { mutableStateOf("naranja") }
     var destination by rememberSaveable { mutableStateOf("Hospital CLIMESA, emergencia") }
+    var tried by rememberSaveable { mutableStateOf(false) }
+    val destinationError = AmbulanceForms.destinationError(destination).takeIf { tried }
     ConfirmDialog(
-        title = stringResource(R.string.amb_despachar), confirmLabel = stringResource(R.string.amb_despachar), onConfirm = { onConfirm(type, priority, destination, crew) }, onDismiss = onClose, busy = busy, error = error,
+        title = stringResource(R.string.amb_despachar), confirmLabel = stringResource(R.string.amb_despachar),
+        onConfirm = { tried = true; if (AmbulanceForms.destinationError(destination) == null) onConfirm(type, priority, destination, crew) }, onDismiss = onClose, busy = busy, error = error,
         confirmEnabled = AmbulanceRules.crewProblem(crewPool, crew) == null,
         message = stringResource(R.string.amb_confirmado_telefono),
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                RequiredLegend()
+                RequiredLabel(stringResource(R.string.amb_tipo))
                 Choices(AmbulanceLabels.types, type) { type = it }
+                RequiredLabel(stringResource(R.string.amb_prioridad))
                 Choices(AmbulanceLabels.priorities, priority, ::triageTone) { priority = it }
-                FormField(stringResource(R.string.amb_destino), destination, { destination = it.take(300) }, singleLine = false)
-                Text(stringResource(R.string.amb_tripulacion), style = MaterialTheme.typography.titleSmall)
+                FormField(stringResource(R.string.amb_destino), destination, { destination = it.take(300) }, singleLine = false, required = true, error = destinationError)
+                RequiredLabel(stringResource(R.string.amb_tripulacion))
                 if (crewPool.isEmpty()) Text(stringResource(R.string.amb_sin_tripulacion_turno), style = MaterialTheme.typography.bodySmall)
                 crewPool.forEach { member ->
                     val label = AmbulanceLabels.crewRole(member.role) + if (member.role == "paramedico" && !member.hasAccount) " · " + stringResource(R.string.amb_sin_cuenta) else ""
                     ClimesaFilterChip(selected = member.staffId in crew, onClick = { crew = if (member.staffId in crew) crew - member.staffId else crew + member.staffId }, label = { Text("${member.name} · $label") })
                 }
-                AmbulanceRules.crewProblem(crewPool, crew)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
+                AmbulanceRules.crewProblem(crewPool, crew)?.let { FieldError(it) }
             }
         },
     )
 }
 
+/** A group label with the red required mark (choices and chips, which have no field label of their own). */
 @Composable
-private fun ReasonDialog(title: String, busy: Boolean, error: String?, onClose: () -> Unit, onConfirm: (String) -> Unit) {
+internal fun RequiredLabel(text: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = MaterialTheme.typography.titleSmall)
+        RequiredMark()
+    }
+}
+
+/** Reason of a destructive step: required, its error under the field (Lote 5 S3), checked before anything is sent. */
+@Composable
+private fun ReasonDialog(title: String, label: String, busy: Boolean, error: String?, onClose: () -> Unit, onConfirm: (String) -> Unit) {
     var reason by rememberSaveable { mutableStateOf("") }
+    var tried by rememberSaveable { mutableStateOf(false) }
     ConfirmDialog(
-        title = title, confirmLabel = title, onConfirm = { onConfirm(reason) }, onDismiss = onClose, busy = busy, destructive = true, error = error,
-        body = { FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false) },
+        title = title, confirmLabel = title, onConfirm = { tried = true; if (AmbulanceForms.reasonError(reason) == null) onConfirm(reason) }, onDismiss = onClose, busy = busy, destructive = true, error = error,
+        body = { FormField(label, reason, { reason = it.take(500) }, singleLine = false, required = true, error = AmbulanceForms.reasonError(reason).takeIf { tried }) },
+    )
+}
+
+/**
+ * Lote 5 S8: «Poner en mantenimiento» / «Quitar de mantenimiento» (edit role) with a required reason and a confirmation.
+ * Leaving maintenance needs a paramedic and a driver on shift (RN-30); without them the button stays off and says why.
+ */
+@Composable
+private fun MaintenanceControl(status: AmbulanceStatus, busy: Boolean, error: String?, model: AmbulanceViewModel) {
+    val leaving = status.unit.state == "en_mantenimiento"
+    val blocked = MaintenanceRules.leavingBlocked(status.unit.state, status.paramedicOnDuty, status.driverOnDuty)
+    var open by rememberSaveable { mutableStateOf(false) }
+    var reason by rememberSaveable { mutableStateOf("") }
+    var tried by rememberSaveable { mutableStateOf(false) }
+    val sent = remember { mutableStateOf(false) }
+    CloseWhenDone(busy, sent, error) { open = false; reason = ""; tried = false }
+    val title = stringResource(if (leaving) R.string.amb5_mant_quitar else R.string.amb5_mant_poner)
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        CardActionButton(CardAction(title, ActionRole.Edit, { model.clearMessages(); open = true }, icon = ClimesaIcons.Pencil, enabled = !blocked && !busy))
+        if (blocked) BlockedReason(stringResource(R.string.amb5_mant_requiere))
+    }
+    if (open) ConfirmDialog(
+        title = title, confirmLabel = title, busy = busy, error = error,
+        message = stringResource(if (leaving) R.string.amb5_mant_efecto_quitar else R.string.amb5_mant_efecto_poner),
+        onConfirm = { tried = true; if (MaintenanceRules.reasonError(reason) == null) { sent.value = true; model.setMaintenance(!leaving, reason) } },
+        onDismiss = { open = false },
+        body = {
+            FormField(
+                stringResource(R.string.amb5_mant_motivo), reason, { reason = it.take(MaintenanceRules.MAX_REASON) }, singleLine = false, required = true,
+                hint = stringResource(R.string.amb5_mant_motivo_pista), error = MaintenanceRules.reasonError(reason).takeIf { tried },
+            )
+        },
     )
 }
 
@@ -319,15 +511,12 @@ private fun ServiceSummary(service: AmbulanceService) {
     SectionCard(
         AmbulanceLabels.type(service.type),
         eyebrow = stringResource(R.string.unidad_servicio_activo),
-        action = { StatusTag("en_curso") },
+        action = { TriageBadge(service.priority) },
     ) {
-        TriageBadge(service.priority)
-        Text("${service.origin} → ${service.destination}", style = MaterialTheme.typography.bodyMedium)
-        HorizontalDivider()
-        listOf("salida", "en_escena", "trasladando", "en_hospital", "finalizado").forEach { type ->
-            val done = service.milestones.firstOrNull { it.type == type }
-            Text("${AmbulanceLabels.milestone(type)}: ${done?.occurredAt?.let(::localTime) ?: stringResource(R.string.amb_pendiente)}", style = MaterialTheme.typography.bodyMedium, color = if (done != null) MaterialTheme.climesa.success else MaterialTheme.colorScheme.onSurfaceVariant)
-        }
+        Text(stringResource(R.string.amb5_ruta, service.origin, service.destination), style = MaterialTheme.typography.bodyLarge)
+        HorizontalDivider(color = MaterialTheme.climesa.line)
+        Text(stringResource(R.string.amb5_bitacora_servicio), style = MaterialTheme.typography.titleSmall)
+        ServiceTimeline(AmbulanceTimeline.of(service))
     }
 }
 
@@ -343,8 +532,9 @@ internal fun NumberField(label: String, value: String, decimal: Boolean = false,
 }
 
 /** A74: servicios con su historia en una frase; búsqueda compacta y filtros en un panel plegable con chips (obs. 8 y 16). */
-private fun LazyListScope.logContent(state: AmbulanceUiState, model: AmbulanceViewModel, pastOpen: Boolean, togglePast: () -> Unit) {
-    item { LogToolbar(state.logFilters, model) }
+private fun LazyListScope.logContent(state: AmbulanceUiState, model: AmbulanceViewModel, pastOpen: Boolean, showFilters: Boolean = true, togglePast: () -> Unit) {
+    // Lote 5 S8: the crew reads its own few services; search stays, the filter panel does not.
+    item { LogToolbar(state.logFilters, model, showFilters) }
     if (state.log.isEmpty()) { item { EmptyState(stringResource(if (state.logFilters.any) R.string.amb_bitacora_sin_resultados else R.string.amb_bitacora_vacia)) }; return }
     item { Text(stringResource(R.string.amb_servicios_n, state.log.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     // Day-grouped: today open, the past days folded behind one toggle (open by itself when nothing happened today).
@@ -375,20 +565,20 @@ private fun LogCard(entry: AmbulanceLogEntry) {
     }) {
         TriageBadge(entry.priority)
         Text(AmbulanceRules.narrate(entry), style = MaterialTheme.typography.bodyMedium)
-        entry.milestones.forEach { Text("${AmbulanceLabels.milestone(it.type)}: ${localTime(it.occurredAt)}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.success) }
+        ServiceTimeline(AmbulanceTimeline.of(entry))
         Text(entry.responseMinutes?.let { stringResource(R.string.amb_respuesta_min, it) } ?: stringResource(R.string.amb_sin_llegada), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }
 
 @Composable
-private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
+private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel, showFilters: Boolean = true) {
     var open by rememberSaveable { mutableStateOf(false) }
     var query by rememberSaveable { mutableStateOf(filters.query) }
     LaunchedEffect(query) { if (query.trim() != filters.query) { kotlinx.coroutines.delay(300); model.setLogFilters(filters.copy(query = query.trim())) } }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         FormField(stringResource(R.string.amb_buscar), query, { query = it.take(80) }, hint = stringResource(R.string.amb_buscar_pista))
-        SecondaryButton(if (filters.activeCount > 0) stringResource(R.string.amb_filtros_n, filters.activeCount) else stringResource(R.string.amb_filtros), { open = !open }, icon = ClimesaIcons.Filter)
-        if (open) SectionCard(stringResource(R.string.amb_filtros)) {
+        if (showFilters) SecondaryButton(if (filters.activeCount > 0) stringResource(R.string.amb_filtros_n, filters.activeCount) else stringResource(R.string.amb_filtros), { open = !open }, icon = ClimesaIcons.Filter)
+        if (showFilters && open) SectionCard(stringResource(R.string.amb_filtros)) {
             Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.priorities, filters.priority, ::triageTone) { model.setLogFilters(filters.copy(priority = it)) }
             Text(stringResource(R.string.amb_estado_final), style = MaterialTheme.typography.labelLarge)
@@ -396,7 +586,7 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
             Text(stringResource(R.string.amb_tipo), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.types, filters.type) { model.setLogFilters(filters.copy(type = it)) }
         }
-        if (filters.any) {
+        if (showFilters && filters.any) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 AmbulanceLabels.chips(filters).forEach { (key, label) ->
                     AssistChip(onClick = { model.setLogFilters(when (key) { "priority" -> filters.copy(priority = ""); "finalState" -> filters.copy(finalState = ""); else -> filters.copy(type = "") }) }, label = { Text(label) }, trailingIcon = { androidx.compose.material3.Icon(ClimesaIcons.Close, contentDescription = null) })
@@ -425,6 +615,8 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
     val view = state.arrival
     if (view == null) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = ClimesaIcons.Building) }; return }
     item { HandoverCard(view, state.busy, model, state.formError) }
+    // Lote 5 S8: the same bitácora Despacho and the crew see, so reception knows where the ambulance is.
+    state.status?.activeService?.takeIf { it.id == view.serviceId }?.let { service -> item(key = "timeline-${service.id}") { ServiceSummary(service) } }
     if (view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = ClimesaIcons.Building) }; return }
     if (!view.clinical) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_sin_relacion)) }
     items(view.reports, key = { it.id }) { report ->
@@ -434,7 +626,7 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
             if (report.vitalSigns.isNotEmpty()) {
                 HorizontalDivider()
                 // G4: two signs per row, the value large with its unit, pressure as one reading.
-                AmbulanceLabels.readableSigns(report.vitalSigns).chunked(2).forEach { pair ->
+                AmbulanceSigns.inFull(report.vitalSigns).chunked(2).forEach { pair ->
                     androidx.compose.foundation.layout.Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                         pair.forEach { (label, value) ->
                             Column(Modifier.weight(1f)) {
@@ -478,3 +670,10 @@ private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, b
 
 private val timeFormat = java.time.format.DateTimeFormatter.ofPattern("d MMM HH:mm", java.util.Locale("es", "SV")).withZone(java.time.ZoneId.of("America/El_Salvador"))
 internal fun localTime(iso: String) = runCatching { timeFormat.format(java.time.Instant.parse(iso)) }.getOrDefault(iso)
+private val clockFormat = java.time.format.DateTimeFormatter.ofPattern("HH:mm").withZone(java.time.ZoneId.of("America/El_Salvador"))
+/** Time of a bitácora step: only «14:05» today, the day too («3 nov 14:05») otherwise. */
+internal fun clockTime(iso: String): String = runCatching {
+    val at = java.time.Instant.parse(iso)
+    val zone = java.time.ZoneId.of("America/El_Salvador")
+    if (at.atZone(zone).toLocalDate() == java.time.LocalDate.now(zone)) clockFormat.format(at) else timeFormat.format(at)
+}.getOrDefault(iso)
