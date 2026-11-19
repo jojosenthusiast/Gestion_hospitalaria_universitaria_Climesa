@@ -181,6 +181,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | GET | `/api/v1/turnos/cobertura` | `turnos.ver` |  | E | 4 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | GET | `/api/v1/turnos/catalogo` | `turnos.ver` | Todas las áreas, funciones y personal activo para filtrar y asignar turnos; sin datos personales | R | 2 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | GET | `/api/v1/turnos/mios` | `turnos.ver` | Propio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
+| GET | `/api/v1/me/turno-activo` | `sesion.perfil` | Propio; Lote 5 S9: REC AST ENF MED LAB PAR necesitan turno (margen 30 min) para comandos operativos | R | 6 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ |
 | GET | `/api/v1/turnos/especialistas` | `turnos.ver` | Médicos de turno por día y especialidad durante 7 días; sin datos de contacto (RN-17, CARGA-04) | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/turnos/{id}/entrada` | `turnos.ver` | Propio; obsoleto, una versión para apps instaladas: no cambia nada, devuelve el estado del turno ya empezado o 409 entrada_automatica antes del inicio | R | 3 | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/turnos/{id}/asistencia` | `turnos.planificar` | La entrada es automática al inicio; ausencia con tipo y motivo, corregir la hora real de entrada o deshacer una ausencia; versión y motivo (ASIS-01 a ASIS-03) | R | 3 | · | ✔ | · | · | · | · | · | · | · | · |

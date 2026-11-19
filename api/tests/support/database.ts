@@ -8,12 +8,17 @@ const {unaccent}=require('@electric-sql/pglite/contrib/unaccent');
 const {pgcrypto}=require('@electric-sql/pglite/contrib/pgcrypto');
 export const roleNames=['ADM','JOP','REC','AST','ENF','MED','LAB','PAR','DPD','PAC'];
 export const userId=(role:string)=>`00000000-0000-4000-8000-${String(roleNames.indexOf(role)+1).padStart(12,'0')}`;
-export async function createDatabase(){
+/**
+ * `shiftGate`: Lote 5 S9 refuses operational commands of shift roles without a shift. Specs about other modules run
+ * without it (their fixture accounts have no shifts); tests/turno-activo.spec.ts turns it on.
+ */
+export async function createDatabase(options:{shiftGate?:boolean}={}){
  const pg=await PGlite.create({extensions:{btree_gist,pg_trgm,unaccent,pgcrypto}});
  const root=resolve(__dirname,'../../../supabase');
  await pg.exec(readFileSync(resolve(root,'pruebas/00_simular_supabase.sql'),'utf8'));
  for(const file of readdirSync(resolve(root,'migrations')).sort())await pg.exec(readFileSync(resolve(root,'migrations',file),'utf8'));
  await pg.exec(readFileSync(resolve(root,'seed.sql'),'utf8'));
+ if(!options.shiftGate)await pg.query("DELETE FROM plataforma.politica WHERE clave='turnos.exigir_turno_activo'");
  for(const role of roleNames){
   const id=userId(role);
   await pg.query('INSERT INTO auth.users(id,email,raw_user_meta_data,raw_app_meta_data) VALUES($1,$2,$3,$4)',[id,`${role.toLowerCase()}@example.test`,{nombre:`Cuenta ficticia ${role}`},{invitado:true}]);

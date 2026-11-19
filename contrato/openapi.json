@@ -2803,6 +2803,74 @@
         "x-permiso": "turnos.ver"
       }
     },
+    "/api/v1/me/turno-activo": {
+      "get": {
+        "operationId": "OperationsController_activeShift",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ActiveShiftResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Lote 5 S9: si la cuenta necesita turno para operar, su turno vigente (con margen) y el próximo",
+        "tags": [
+          "operations"
+        ],
+        "x-permiso": "sesion.perfil"
+      }
+    },
     "/api/v1/turnos/cobertura": {
       "get": {
         "operationId": "OperationsController_coverage",
@@ -21980,6 +22048,91 @@
           "staff"
         ]
       },
+      "ShiftWindowResponse": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "area": {
+            "type": "string",
+            "nullable": true
+          },
+          "state": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoTurno"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "end",
+          "area",
+          "state"
+        ]
+      },
+      "ActiveShiftResponse": {
+        "type": "object",
+        "properties": {
+          "required": {
+            "type": "boolean",
+            "description": "La cuenta tiene un rol que trabaja por turnos (REC, AST, ENF, MED, LAB, PAR) y la regla está vigente"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Puede ejecutar comandos operativos ahora: no los necesita o tiene un turno que cubre la hora con el margen"
+          },
+          "graceMinutes": {
+            "type": "integer",
+            "description": "Minutos de margen antes del inicio y después del fin del turno"
+          },
+          "shift": {
+            "nullable": true,
+            "description": "Turno que cubre la hora actual (con el margen)",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShiftWindowResponse"
+              }
+            ]
+          },
+          "next": {
+            "nullable": true,
+            "description": "Próximo turno publicado",
+            "type": "object",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ShiftWindowResponse"
+              }
+            ]
+          },
+          "message": {
+            "type": "string",
+            "nullable": true,
+            "description": "Mensaje para mostrar cuando `required` y no `active`"
+          }
+        },
+        "required": [
+          "required",
+          "active",
+          "graceMinutes",
+          "shift",
+          "next",
+          "message"
+        ]
+      },
       "CoverageGapResponse": {
         "type": "object",
         "properties": {
@@ -34672,6 +34825,7 @@
           "tripulante_ausente",
           "lote_con_conflictos",
           "plantilla_duplicada",
+          "sin_turno_activo",
           "franja_desalineada",
           "franja_ocupada",
           "medico_sin_jornada",

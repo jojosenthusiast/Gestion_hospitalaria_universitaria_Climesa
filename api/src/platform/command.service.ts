@@ -5,6 +5,7 @@ import { DatabaseService } from './database.service';
 import { Actor } from './actor';
 import { Clock } from './clock';
 import { ProblemException } from './problem';
+import { activeShift, NO_ACTIVE_SHIFT_CODE, NO_ACTIVE_SHIFT_MESSAGE, permissionNeedsShift, shiftGateEnabled } from './shift-gate';
 
 export const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return '[' + value.map(canonical).join(',') + ']';
@@ -47,6 +48,11 @@ export class CommandService {
       const row = (await c.query('SELECT huella,estado,respuesta FROM plataforma.idempotencia WHERE alcance=$1 AND clave=$2 FOR UPDATE', [namespace,key])).rows[0];
       if (row.huella !== hash) throw new ProblemException('idempotencia_conflicto', 409, 'La clave de esta operación ya se usó con otros datos.');
       if (row.estado === 'completada') return row.respuesta as T;
+      // Lote 5, S9: after the replay (a completed command answers the same once the shift ends) and before any work.
+      const at = this.clock.now();
+      if (await shiftGateEnabled(c, at) && await permissionNeedsShift(c, actor.id, permission) && !(await activeShift(c, actor.id, at))) {
+        throw new ProblemException(NO_ACTIVE_SHIFT_CODE, 403, NO_ACTIVE_SHIFT_MESSAGE);
+      }
       const response = await work(c);
       await c.query("UPDATE plataforma.idempotencia SET estado='completada',respuesta=$3 WHERE alcance=$1 AND clave=$2", [namespace,key,response]);
       return response;
