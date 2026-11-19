@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,8 +12,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -121,7 +120,7 @@ internal fun DataRow(
                     blockedReason?.let { BlockedReason(it) }
                 }
                 status?.invoke()
-                if (onClick != null) Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)
+                if (onClick != null) Icon(ClimesaIcons.Chevron, null, tint = MaterialTheme.climesa.primaryText)
             }
             if (divider) HorizontalDivider(color = MaterialTheme.climesa.line)
         }

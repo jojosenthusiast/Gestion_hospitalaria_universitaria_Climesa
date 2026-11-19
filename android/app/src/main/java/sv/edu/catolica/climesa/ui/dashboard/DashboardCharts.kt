@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui.dashboard
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -11,12 +12,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Error
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -56,11 +51,11 @@ internal fun DashboardTone.colors(): Pair<Color, Color> {
 
 /** Shape next to the colour, so a state is never told by colour alone. */
 internal fun DashboardTone.icon(): ImageVector = when (this) {
-    DashboardTone.SUCCESS -> Icons.Default.CheckCircle
-    DashboardTone.WARNING -> Icons.Default.Warning
-    DashboardTone.DANGER -> Icons.Default.Error
-    DashboardTone.PROCESS -> Icons.Default.Schedule
-    else -> Icons.Default.Info
+    DashboardTone.SUCCESS -> ClimesaIcons.Check
+    DashboardTone.WARNING -> ClimesaIcons.Alert
+    DashboardTone.DANGER -> ClimesaIcons.Alert
+    DashboardTone.PROCESS -> ClimesaIcons.Clock
+    else -> ClimesaIcons.Info
 }
 
 /** Content description that reads the whole chart: "Ocupación de camas: Libres 4, Ocupadas 8...". */

@@ -6,14 +6,14 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /**
- * Text of the live clock in the top bar (obs 2): "14:05:09" and the full weekday "Miércoles 18 de noviembre", in hospital
- * time, like the web header clock.
+ * Text of the live clock in the top bar (obs 2): "14:05:09" and the full weekday "Miércoles, 18 de noviembre", in hospital
+ * time, like the web header clock (`Intl` es-SV long weekday, then only the first letter up).
  */
 object HospitalClockText {
     private val locale = Locale("es", "SV")
     val zone: ZoneId = ZoneId.of("America/El_Salvador")
     private val time = DateTimeFormatter.ofPattern("HH:mm:ss", locale).withZone(zone)
-    private val date = DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", locale).withZone(zone)
+    private val date = DateTimeFormatter.ofPattern("EEEE, d 'de' MMMM", locale).withZone(zone)
 
     fun time(now: Instant): String = time.format(now)
 

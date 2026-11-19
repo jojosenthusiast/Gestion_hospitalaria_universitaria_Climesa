@@ -86,7 +86,7 @@ class OwnerObservationsBatch1Test {
     @Test fun clockShowsSecondsAndTheFullWeekday() {
         val now = Instant.parse("2026-11-18T20:05:09.400Z")
         assertEquals("14:05:09", HospitalClockText.time(now))
-        assertEquals("Miércoles 18 de noviembre", HospitalClockText.date(now))
+        assertEquals("Miércoles, 18 de noviembre", HospitalClockText.date(now))
         assertEquals(600L, HospitalClockText.untilNextSecond(now.toEpochMilli()))
         assertEquals(1000L, HospitalClockText.untilNextSecond(0L))
     }

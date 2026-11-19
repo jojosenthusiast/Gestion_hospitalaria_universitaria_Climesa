@@ -1,5 +1,8 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.UploadFile
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -8,17 +11,9 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Bed
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -63,29 +58,29 @@ fun ClinicalHistoryScreen(
     if (canRecordExternal && patientId != null) state.history?.let { ExternalRecordDialog(it.patientName, externalState, external) }
     PageList(modifier) {
         if (own && profile.patientId == null) {
-            item { EmptyState(stringResource(R.string.historial_sin_vinculo), icon = Icons.Default.Lock) }
+            item { EmptyState(stringResource(R.string.historial_sin_vinculo), icon = ClimesaIcons.Lock) }
             return@PageList
         }
         if (!own && selectedId == null) {
             item { SectionCard(stringResource(R.string.historial_buscar_boton)) {
                 FormField(stringResource(R.string.historial_buscar), query, { query = it.take(100) })
-                PrimaryButton(stringResource(R.string.historial_buscar_boton), { model.search(query) }, icon = Icons.Default.Search, enabled = query.trim().length >= 2, loading = state.searching)
+                PrimaryButton(stringResource(R.string.historial_buscar_boton), { model.search(query) }, icon = ClimesaIcons.Search, enabled = query.trim().length >= 2, loading = state.searching)
             } }
             state.error?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
             if (state.candidates.isNotEmpty()) item { Text(stringResource(R.string.clin_historial_buscar_resultados), style = MaterialTheme.typography.titleLarge) }
             items(state.candidates, key = { it.id }) { candidate ->
                 // S2: a patient without a care relation is listed but does not open; the row says when it will.
-                DataRow(candidate.fullName, meta = stringResource(R.string.historial_expediente, candidate.record), leadingIcon = Icons.Default.Person, onClick = { selectedId = candidate.id }, blockedReason = candidate.blockedReason)
+                DataRow(candidate.fullName, meta = stringResource(R.string.historial_expediente, candidate.record), leadingIcon = ClimesaIcons.User, onClick = { selectedId = candidate.id }, blockedReason = candidate.blockedReason)
             }
             return@PageList
         }
-        if (!own) item { SecondaryButton(stringResource(R.string.historial_otro_paciente), { selectedId = null }, icon = Icons.Default.Search) }
+        if (!own) item { SecondaryButton(stringResource(R.string.historial_otro_paciente), { selectedId = null }, icon = ClimesaIcons.Search) }
         if (state.loading && state.history == null) item { LoadingState() }
         else if (state.error != null && state.history == null) item { ErrorState(state.error, { model.open(patientId) }) }
         else state.history?.let { history ->
             if (state.loading) item { RefreshHint() }
             item { SectionCard(history.patientName, eyebrow = stringResource(R.string.historial_expediente, history.record)) {
-                if (canRecordExternal) SecondaryButton(stringResource(R.string.extres_titulo), { patientId?.let(external::open) }, icon = Icons.Default.UploadFile)
+                if (canRecordExternal) SecondaryButton(stringResource(R.string.extres_titulo), { patientId?.let(external::open) }, icon = Icons.Outlined.UploadFile)
             } }
             externalState.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
             externalState.uploadFailure?.let { item { NoticeBanner(NoticeKind.WARNING, it) } }
@@ -97,7 +92,7 @@ fun ClinicalHistoryScreen(
             else items(history.laboratory, key = { it.id }) { OrderHistoryCard(it) }
             if (!own && history.admissions.isNotEmpty()) {
                 item { Text(stringResource(R.string.historial_hospitalizaciones), style = MaterialTheme.typography.titleLarge) }
-                items(history.admissions, key = { it.id }) { admission -> DataRow(admission.doctor, subtitle = sv.edu.catolica.climesa.domain.ClinicalHistoryParser.label(admission.date), leadingIcon = Icons.Default.Bed, status = { StatusTag(admission.state) }) }
+                items(history.admissions, key = { it.id }) { admission -> DataRow(admission.doctor, subtitle = sv.edu.catolica.climesa.domain.ClinicalHistoryParser.label(admission.date), leadingIcon = ClimesaIcons.Bed, status = { StatusTag(admission.state) }) }
             }
         }
     }

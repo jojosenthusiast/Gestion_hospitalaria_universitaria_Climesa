@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
@@ -10,11 +11,8 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Hotel
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -62,7 +60,7 @@ internal fun AdmissionIndicationEntry(item: MedicalAppointment, profile: AccessP
         canRead && !known.known && known.loading -> Text(stringResource(R.string.med_ind_revisando), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         else -> {
             known.error?.let { message -> NoticeBanner(NoticeKind.ERROR, message); RowAction(stringResource(R.string.rec7_volver_a_cargar), { existing.load(context.patientId, item.consultationId) }) }
-            SecondaryButton(stringResource(R.string.ind_abrir), { model.open(context) }, icon = Icons.Default.Hotel, enabled = enabled)
+            SecondaryButton(stringResource(R.string.ind_abrir), { model.open(context) }, icon = ClimesaIcons.Bed, enabled = enabled)
         }
     }
     AdmissionIndicationDialog(model)
@@ -79,7 +77,7 @@ internal fun AdmissionIndicationDialog(model: AdmissionIndicationViewModel) {
             shape = MaterialTheme.shapes.large,
             title = { Text(stringResource(R.string.ind_enviada_titulo), style = MaterialTheme.typography.titleLarge) },
             text = { NoticeBanner(NoticeKind.SUCCESS, stringResource(R.string.ind_enviada_detalle, context.patientName)) },
-            confirmButton = { TextButton(onClick = model::close) { Text(stringResource(R.string.ind_cerrar), style = MaterialTheme.typography.labelLarge) } },
+            confirmButton = { TextButton(shape = ButtonShape, onClick = model::close) { Text(stringResource(R.string.ind_cerrar), style = MaterialTheme.typography.labelLarge) } },
         )
         return
     }
@@ -110,14 +108,14 @@ internal fun AdmissionIndicationDialog(model: AdmissionIndicationViewModel) {
             Text(stringResource(R.string.ind_categoria), style = MaterialTheme.typography.labelLarge)
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AdmissionIndication.CATEGORIES.forEach { code ->
-                    FilterChip(selected = state.draft.category == code, onClick = { model.category(code) }, enabled = !state.busy, label = { Text(AdmissionIntake.CATEGORY_LABELS[code] ?: code) })
+                    ClimesaFilterChip(selected = state.draft.category == code, onClick = { model.category(code) }, enabled = !state.busy, label = { Text(AdmissionIntake.CATEGORY_LABELS[code] ?: code) })
                 }
             }
             fields["requestedCategory"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
             CheckRow(stringResource(R.string.ind_aislamiento), state.draft.isolation, !state.busy, model::isolation)
             if (state.draft.isolation) FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 IsolationType.entries.forEach { type ->
-                    FilterChip(selected = state.draft.isolationType == type, onClick = { model.isolationType(if (state.draft.isolationType == type) null else type) }, enabled = !state.busy, label = { Text(type.label) })
+                    ClimesaFilterChip(selected = state.draft.isolationType == type, onClick = { model.isolationType(if (state.draft.isolationType == type) null else type) }, enabled = !state.busy, label = { Text(type.label) })
                 }
             }
             fields["isolationType"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }

@@ -1,6 +1,11 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -13,13 +18,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.ErrorOutline
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -45,10 +43,10 @@ internal enum class NoticeKind { SUCCESS, ERROR, INFO, WARNING }
 internal fun NoticeBanner(kind: NoticeKind, text: String, modifier: Modifier = Modifier) {
     val c = MaterialTheme.climesa
     val (fg, bg, icon) = when (kind) {
-        NoticeKind.SUCCESS -> Triple(c.success, c.successSoft, Icons.Default.CheckCircle)
-        NoticeKind.ERROR -> Triple(c.danger, c.dangerSoft, Icons.Default.ErrorOutline)
-        NoticeKind.WARNING -> Triple(c.warning, c.warningSoft, Icons.Default.Info)
-        NoticeKind.INFO -> Triple(c.primaryText, c.soft, Icons.Default.Info)
+        NoticeKind.SUCCESS -> Triple(c.success, c.successSoft, ClimesaIcons.Check)
+        NoticeKind.ERROR -> Triple(c.danger, c.dangerSoft, ClimesaIcons.Alert)
+        NoticeKind.WARNING -> Triple(c.warning, c.warningSoft, ClimesaIcons.Info)
+        NoticeKind.INFO -> Triple(c.primaryText, c.soft, ClimesaIcons.Info)
     }
     Surface(
         modifier.fillMaxWidth().semantics { liveRegion = if (kind == NoticeKind.ERROR) LiveRegionMode.Assertive else LiveRegionMode.Polite },
@@ -63,37 +61,38 @@ internal fun NoticeBanner(kind: NoticeKind, text: String, modifier: Modifier = M
     }
 }
 
-@Composable
-private fun StateSymbol(icon: ImageVector, tint: Color = MaterialTheme.climesa.primaryText, background: Color = MaterialTheme.climesa.soft) {
-    Box(Modifier.size(64.dp).background(background, CircleShape), contentAlignment = Alignment.Center) {
-        Icon(icon, null, Modifier.size(30.dp), tint = tint)
-    }
-}
-
+/**
+ * Web `SectionState` layout (`modules.css` `.section-state-error`/`.section-state-info`): an inline box with the icon on the
+ * left, a bold title over the text in ink, and the action under the text column. [boxed] false drops the tint and border,
+ * like the web empty line (`.section-empty`).
+ */
 @Composable
 private fun StateLayout(
-    symbol: @Composable () -> Unit,
+    icon: ImageVector,
+    tint: Color,
     title: String,
     detail: String?,
     modifier: Modifier,
+    background: Color = Color.Transparent,
+    border: Color? = null,
     action: (@Composable () -> Unit)? = null,
 ) {
-    Column(
-        modifier.fillMaxWidth().padding(horizontal = Spacing.lg, vertical = Spacing.xl),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs),
-    ) {
-        symbol()
-        Text(title, style = MaterialTheme.typography.titleLarge, textAlign = TextAlign.Center)
-        detail?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center) }
-        action?.invoke()
+    val shape = RoundedCornerShape(Radius.card)
+    val box = if (border != null) Modifier.background(background, shape).border(1.dp, border, shape).padding(Spacing.md) else Modifier.padding(vertical = Spacing.sm)
+    Row(modifier.fillMaxWidth().then(box), horizontalArrangement = Arrangement.spacedBy(Space3), verticalAlignment = Alignment.Top) {
+        Icon(icon, null, Modifier.padding(top = 2.dp).size(20.dp), tint = tint)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Space1)) {
+            Text(title, style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold), color = if (border != null) tint else MaterialTheme.colorScheme.onSurface)
+            detail?.let { Text(it, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 22.sp), color = if (border != null) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.onSurfaceVariant) }
+            action?.let { Box(Modifier.padding(top = Space1)) { it() } }
+        }
     }
 }
 
 /** Nothing to show yet (design 04, "Vacío"). `action` is an optional next step, e.g. a [SecondaryButton]. */
 @Composable
-internal fun EmptyState(title: String, modifier: Modifier = Modifier, detail: String? = null, icon: ImageVector = Icons.Default.Search, action: (@Composable () -> Unit)? = null) =
-    StateLayout({ StateSymbol(icon) }, title, detail, modifier, action)
+internal fun EmptyState(title: String, modifier: Modifier = Modifier, detail: String? = null, icon: ImageVector = ClimesaIcons.Search, action: (@Composable () -> Unit)? = null) =
+    StateLayout(icon, MaterialTheme.colorScheme.onSurfaceVariant, title, detail, modifier, action = action)
 
 /**
  * S3: static placeholder that reserves a section's place while it loads (web `Skeleton`). No spinner and no shimmer;
@@ -159,20 +158,26 @@ internal fun ErrorState(
     title: String = stringResource(if (forbidden) R.string.ui_sin_acceso_titulo else R.string.ui_error_titulo),
 ) = if (forbidden) ForbiddenState(message, modifier, title)
 else StateLayout(
-    symbol = { StateSymbol(Icons.Default.ErrorOutline, MaterialTheme.climesa.danger, MaterialTheme.climesa.dangerSoft) },
+    icon = ClimesaIcons.Alert,
+    tint = MaterialTheme.climesa.danger,
     title = title,
     detail = message,
     modifier = modifier,
-    action = { SecondaryButton(stringResource(R.string.ui_reintentar), onRetry, icon = Icons.Default.Refresh) },
+    background = MaterialTheme.climesa.dangerSoft,
+    border = MaterialTheme.climesa.danger.copy(alpha = .35f).compositeOver(MaterialTheme.climesa.line),
+    action = { SecondaryButton(stringResource(R.string.ui_reintentar), onRetry, icon = ClimesaIcons.Retry, fill = false) },
 )
 
 /** S8: what a 403 shows: a calm lock, the server message (or the generic access text) and no action. */
 @Composable
 internal fun ForbiddenState(message: String?, modifier: Modifier = Modifier, title: String = stringResource(R.string.ui_sin_acceso_titulo)) = StateLayout(
-    symbol = { StateSymbol(Icons.Default.Lock) },
+    icon = ClimesaIcons.Lock,
+    tint = MaterialTheme.climesa.primaryText,
     title = title,
     detail = message?.takeIf { it.isNotBlank() } ?: stringResource(R.string.ui_sin_acceso_detalle),
     modifier = modifier,
+    background = MaterialTheme.climesa.soft,
+    border = MaterialTheme.climesa.line,
 )
 
 /** Version conflict (HTTP 409 `version_conflicto`): nothing was saved; the only way out is to reload. */
@@ -180,7 +185,7 @@ internal fun ForbiddenState(message: String?, modifier: Modifier = Modifier, tit
 internal fun ConflictBanner(onReload: () -> Unit, modifier: Modifier = Modifier, message: String? = null) {
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         NoticeBanner(NoticeKind.ERROR, listOfNotNull(message, stringResource(R.string.ui_conflicto_detalle)).joinToString(" "))
-        SecondaryButton(stringResource(R.string.ui_cerrar_recargar), onReload, icon = Icons.Default.Refresh)
+        SecondaryButton(stringResource(R.string.ui_cerrar_recargar), onReload, icon = ClimesaIcons.Retry)
     }
 }
 

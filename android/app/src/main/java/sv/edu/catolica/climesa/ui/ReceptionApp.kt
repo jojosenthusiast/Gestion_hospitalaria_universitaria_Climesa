@@ -1,6 +1,9 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.ToggleOn
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
@@ -14,10 +17,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -75,7 +74,7 @@ import java.time.format.DateTimeFormatter
         onLogout={if(!signingOut)logout()},
         showNavigation=!state.formOpen && state.selected==null,
         snackbarHost={SnackbarHost(snack)},
-        badges=noticeBadges(account,sections),
+        badges=noticeBadges(account,sections),noticeCritical=noticeBellCritical(account,sections),
         title=if(state.formOpen){stringResource(if(state.editingId==null)R.string.rec_form_registrar else R.string.rec_form_editar)}else if(state.selected!=null)stringResource(R.string.rec_ficha_titulo) else page.label,
         subtitle=if(state.formOpen)state.registry.patients.firstOrNull{it.id==state.editingId}?.fullName else state.selected?.fullName,
         navigationIcon={if(state.formOpen||state.selected!=null)BackButton({back()},enabled=!state.saving)},
@@ -83,7 +82,7 @@ import java.time.format.DateTimeFormatter
         state.error?.takeIf { page==AndroidSection.PATIENTS }?.let { error -> Surface(color=MaterialTheme.colorScheme.errorContainer) {
             Row(Modifier.padding(horizontal=12.dp),verticalAlignment=Alignment.CenterVertically) {
                 Text(error,Modifier.weight(1f).padding(vertical=10.dp),style=MaterialTheme.typography.bodyMedium)
-                if(!state.fatal) IconButton(onClick=model::clearError) { Icon(Icons.Default.Close,stringResource(R.string.ui_cerrar_aviso)) }
+                if(!state.fatal) IconButton(onClick=model::clearError) { Icon(ClimesaIcons.Close,stringResource(R.string.ui_cerrar_aviso)) }
             }
         } }
         when {
@@ -116,13 +115,13 @@ import java.time.format.DateTimeFormatter
         }
     } }
     if(discard) AlertDialog(onDismissRequest={discard=false},title={Text(stringResource(R.string.rec_salir_titulo))},text={Text(stringResource(R.string.rec_salir_detalle))},
-        confirmButton={TextButton(onClick={discard=false;model.closeForm()}) {Text(stringResource(R.string.rec_salir))}},dismissButton={TextButton(onClick={discard=false}) {Text(stringResource(R.string.rec_seguir_editando))}})
+        confirmButton={TextButton(shape = ButtonShape, onClick={discard=false;model.closeForm()}) {Text(stringResource(R.string.rec_salir))}},dismissButton={TextButton(shape = ButtonShape, onClick={discard=false}) {Text(stringResource(R.string.rec_seguir_editando))}})
 }
 @Composable private fun Patients(state:ReceptionState,model:ReceptionViewModel) {
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(Spacing.page),verticalArrangement=Arrangement.spacedBy(Spacing.md)) {
-        item { OutlinedTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text(stringResource(R.string.rec_buscar_label))},singleLine=true,leadingIcon={Icon(Icons.Default.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(Icons.Default.Close,stringResource(R.string.rec_limpiar_busqueda))}}) }
+        item { ClimesaTextField(value=state.query,onValueChange=model::query,modifier=Modifier.fillMaxWidth(),label={Text(stringResource(R.string.rec_buscar_label))},singleLine=true,leadingIcon={Icon(ClimesaIcons.Search,null)},trailingIcon={if(state.query.isNotEmpty()) IconButton(onClick={model.query("")}) {Icon(ClimesaIcons.Close,stringResource(R.string.rec_limpiar_busqueda))}}) }
         item { Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
-            if(PatientAction.SEARCH in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_buscar),Icons.Default.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
+            if(PatientAction.SEARCH in state.actions) ClimesaButton(stringResource(if(state.searching) R.string.rec_buscando else R.string.rec_buscar),ClimesaIcons.Search,model::search,enabled=!state.searching && PatientRules.normalize(state.query).replace(" ","").length>=2)
             // S0 (obs 6/10): registering is the shared create action with a fixed label; only the search button shows that it is searching.
             if(PatientAction.REGISTER in state.actions) CrudButton(CrudKind.Create,stringResource(R.string.rec_form_registrar),model::newPatient,enabled=!state.searching)
             if(PatientAction.REGISTER in state.actions && state.searchedQuery==null && PatientRules.normalize(state.query).replace(" ","").length<2) Text(stringResource(R.string.rec_registrar_sin_busqueda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
@@ -152,21 +151,21 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
     LaunchedEffect(p.version) {dialog=false;reason=""}
     LazyColumn(Modifier.fillMaxSize(),contentPadding=PaddingValues(20.dp),verticalArrangement=Arrangement.spacedBy(16.dp)) {
         item {SectionCard(p.fullName,eyebrow=stringResource(R.string.rec_expediente_n,p.record),action={StatusTag(if(p.active) "activo" else "inactivo")}) {Text(if(gaps.isEmpty()) stringResource(R.string.pac_ficha_completa) else stringResource(R.string.pac_ficha_faltan,gaps.joinToString(", ")),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}}
-        item {androidx.compose.material3.TabRow(selectedTabIndex=tab) {listOf(R.string.pac_ficha_datos,R.string.pac_ficha_cambios).forEachIndexed {i,id->androidx.compose.material3.Tab(selected=tab==i,onClick={tab=i},text={Text(stringResource(id))})}}}
+        item {SegmentedControl(listOf(R.string.pac_ficha_datos,R.string.pac_ficha_cambios).map{Segment(stringResource(it))},tab,{tab=it})}
         if(tab==0) item {ClimesaCard {Column(Modifier.fillMaxWidth().padding(20.dp),verticalArrangement=Arrangement.spacedBy(20.dp)) {
             val none=stringResource(R.string.rec_no_registrado);Value(stringResource(R.string.rec_dui),p.dui ?: stringResource(R.string.rec_sin_documento));Value(stringResource(R.string.rec_nacimiento),p.birth?.let { b -> BirthDates.format(b) + (sv.edu.catolica.climesa.domain.PatientSummary.ageText(b)?.let { " · $it" } ?: "") } ?: none);Value(stringResource(R.string.rec_sexo),p.sex.label);Value(stringResource(R.string.rec_telefono),p.phone.ifBlank {none})
         }}}
         // One primary per screen: with the hub, its first action ("Emitir número o registrar llegada") is the primary one.
         if(tab==0&&p.active&&hub.isNotEmpty()) item {ClimesaActionGroup {hub.forEachIndexed {i,(section,action)->
             val label=stringResource(when(action){QuickAction.ISSUE_NUMBER->R.string.rec_hub_emitir;QuickAction.SCHEDULE_APPOINTMENT->R.string.rec_citas_agendar;else->R.string.ing_ingresar})
-            val icon=when(action){QuickAction.ISSUE_NUMBER->Icons.Default.Campaign;QuickAction.SCHEDULE_APPOINTMENT->Icons.Default.CalendarMonth;else->Icons.Default.Bed}
+            val icon=when(action){QuickAction.ISSUE_NUMBER->ClimesaIcons.Megaphone;QuickAction.SCHEDULE_APPOINTMENT->ClimesaIcons.Calendar;else->ClimesaIcons.Bed}
             ClimesaButton(label,icon,{onHub(section,action)},enabled=!state.saving,outlined=i>0)
         }}}
         // S0: edit is the outlined pencil and inactivate the red trash, the same on every screen; reactivating stays a plain outlined action.
         if(tab==0) item {ClimesaActionGroup {if(PatientAction.EDIT in state.actions) CrudButton(CrudKind.Edit,stringResource(R.string.rec_editar_datos),{model.edit(p)})
             if(PatientAction.CHANGE_STATUS in state.actions) {
                 if(p.active) CrudButton(CrudKind.Deactivate,stringResource(R.string.rec_inactivar),{dialog=true},enabled=!state.saving)
-                else ClimesaButton(stringResource(R.string.rec_reactivar),Icons.Default.ToggleOn,{dialog=true},enabled=!state.saving,outlined=true)
+                else ClimesaButton(stringResource(R.string.rec_reactivar),Icons.Outlined.ToggleOn,{dialog=true},enabled=!state.saving,outlined=true)
             }}}
         if(tab==1) item {Text(stringResource(R.string.rec_historial),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         val events=state.registry.audit.filter {it.record==p.record}.reversed()
@@ -190,7 +189,7 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
         if(state.similar.isNotEmpty()) ClimesaCard { Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(stringResource(R.string.rec_duplicado_titulo),style=MaterialTheme.typography.titleSmall,fontWeight=FontWeight.Bold)
             state.similar.forEach { Text(it,style=MaterialTheme.typography.bodyMedium) }
-            ClimesaButton(stringResource(R.string.rec_duplicado_confirmar),Icons.Default.Add,{model.save(true)},enabled=!state.saving,outlined=true)
+            ClimesaButton(stringResource(R.string.rec_duplicado_confirmar),ClimesaIcons.Plus,{model.save(true)},enabled=!state.saving,outlined=true)
         } }
         Text(stringResource(R.string.rec_datos_personales),style=MaterialTheme.typography.titleSmall)
         PatientField(stringResource(R.string.rec_campo_nombres),d.givenNames,state.fields["givenNames"],enabled=!state.saving) {model.draft(d.copy(givenNames=it.take(80)))}
@@ -198,9 +197,9 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
         PatientField(stringResource(R.string.rec_campo_dui),d.dui,state.fields["dui"],"12345678-9",KeyboardType.Phone,!state.saving) {model.draft(d.copy(dui=it.take(10)))}
         PatientField(stringResource(R.string.rec_campo_nacimiento),d.birth,state.fields["birth"],"AAAA-MM-DD",enabled=!state.saving) {model.draft(d.copy(birth=it.take(10)))}
         Text(stringResource(R.string.rec_campo_sexo),style=MaterialTheme.typography.labelLarge)
-        Sex.entries.forEach {sex -> Row(verticalAlignment=Alignment.CenterVertically) {RadioButton(selected=d.sex==sex,onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving);TextButton(onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving) {Text(sex.label)}}}
+        Sex.entries.forEach {sex -> Row(verticalAlignment=Alignment.CenterVertically) {RadioButton(selected=d.sex==sex,onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving);TextButton(shape = ButtonShape, onClick={model.draft(d.copy(sex=sex))},enabled=!state.saving) {Text(sex.label)}}}
         PatientField(stringResource(R.string.rec_campo_telefono),d.phone,state.fields["phone"],"7000-0000",KeyboardType.Phone,!state.saving) {model.draft(d.copy(phone=it.take(9)))}
-        if(state.editingId!=null) OutlinedTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text(stringResource(R.string.rec_campo_motivo))},supportingText={Text(stringResource(R.string.rec_campo_motivo_ayuda))})
+        if(state.editingId!=null) ClimesaTextField(state.reason,model::reason,modifier=Modifier.fillMaxWidth(),enabled=!state.saving,label={Text(stringResource(R.string.rec_campo_motivo))},supportingText={Text(stringResource(R.string.rec_campo_motivo_ayuda))})
         PrimaryButton(stringResource(R.string.rec_guardar_paciente),{model.save()},loading=state.saving)
         Spacer(Modifier.height(24.dp))
     }
@@ -216,7 +215,7 @@ internal fun patientHub(permissions:Collection<String>,sections:List<AndroidSect
         item {Text(stringResource(R.string.rec_actividad_reciente),style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)}
         if(state.registry.audit.isEmpty()) item {Text(stringResource(R.string.rec_actividad_vacia))}
         items(state.registry.audit.takeLast(20).reversed()) {AuditRow(it)}
-        item {HorizontalDivider();Spacer(Modifier.height(12.dp));SecondaryButton(stringResource(R.string.cerrar_sesion),onLogout,icon=Icons.Default.Logout);Spacer(Modifier.height(8.dp));Text(stringResource(R.string.ui_cerrar_sesion_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+        item {HorizontalDivider();Spacer(Modifier.height(12.dp));SecondaryButton(stringResource(R.string.cerrar_sesion),onLogout,icon=ClimesaIcons.Logout);Spacer(Modifier.height(8.dp));Text(stringResource(R.string.ui_cerrar_sesion_ayuda),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
     }
 }
 @Composable private fun AuditRow(a:AuditEvent) {ClimesaCard {Column(Modifier.fillMaxWidth().padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {

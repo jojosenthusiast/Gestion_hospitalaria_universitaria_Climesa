@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -12,11 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,6 +70,14 @@ internal fun noticeBadges(account: AuthenticatedAccount, sections: List<sv.edu.c
     return mapOf(sv.edu.catolica.climesa.domain.AndroidSection.NOTICES to NoticeInboxRules.badge(state.inbox, state.hidden))
 }
 
+/** Whether the header bell wears the critical red (same shared inbox as [noticeBadges]). */
+@Composable
+internal fun noticeBellCritical(account: AuthenticatedAccount, sections: List<sv.edu.catolica.climesa.domain.AndroidSection>): Boolean {
+    if (sv.edu.catolica.climesa.domain.AndroidSection.NOTICES !in sections) return false
+    val state by noticeInboxModel(account).state.collectAsStateWithLifecycle()
+    return NoticeInboxRules.bellCritical(state.inbox, state.hidden)
+}
+
 /**
  * The one re-read at `proximoCambio` (a notice expires or starts, or a snoozed reminder comes back). It belongs to the
  * scaffold that shows the badge (and to Inicio for its banner) and is cancelled with it; a new `proximoCambio` replaces
@@ -118,20 +122,20 @@ internal fun CriticalNoticeBanner(account: AuthenticatedAccount, onOpenNotices: 
         verticalArrangement = Arrangement.spacedBy(Space2),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space3)) {
-            Icon(Icons.Default.Warning, null, Modifier.size(24.dp), tint = colors.critical)
+            Icon(ClimesaIcons.Alert, null, Modifier.size(24.dp), tint = colors.critical)
             NoticeLevelBadge(NoticeLevel.CRITICAL)
             if (pending.size > 1) Text(stringResource(R.string.aviso_banner_cuenta, pending.size), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(notice.title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
         if (notice.body.isNotBlank()) Text(notice.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
         state.actionError?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        PrimaryButton(stringResource(R.string.aviso_enterado), { model.acknowledge(notice.id) }, icon = Icons.Default.Check, enabled = !busy, loading = state.busyId == notice.id)
+        PrimaryButton(stringResource(R.string.aviso_enterado), { model.acknowledge(notice.id) }, icon = ClimesaIcons.Check, enabled = !busy, loading = state.busyId == notice.id)
         if (NoticeInboxRules.canSnooze(notice)) {
             SecondaryButton(stringResource(R.string.aviso_recordarme, NoticeInboxRules.hoursText(state.inbox?.reminderHours ?: 4.0)), { model.snooze(notice.id) }, enabled = !busy)
         }
-        TextButton(onClick = { model.setFilter(NoticeFilter.CRITICAL); model.clearMessages(); onOpenNotices() }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+        TextButton(shape = ButtonShape, onClick = { model.setFilter(NoticeFilter.CRITICAL); model.clearMessages(); onOpenNotices() }, modifier = Modifier.heightIn(min = Spacing.touch)) {
             Text(stringResource(R.string.aviso_ver_en_avisos))
-            Icon(Icons.Default.ChevronRight, null, Modifier.size(18.dp))
+            Icon(ClimesaIcons.Chevron, null, Modifier.size(18.dp))
         }
     }
 }
@@ -239,7 +243,7 @@ private fun NoticeRow(notice: InboxNotice, onOpen: () -> Unit) {
                 }
                 Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
-            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)
+            Icon(ClimesaIcons.Chevron, null, tint = MaterialTheme.climesa.primaryText)
         }
     }
 }
@@ -251,8 +255,8 @@ private fun NoticeDetail(notice: InboxNotice, state: NoticeInboxState, model: No
     val none = stringResource(R.string.aviso_sin_fecha)
     PageList(modifier) {
         item {
-            TextButton(onClick = { model.select(null) }, modifier = Modifier.heightIn(min = Spacing.touch)) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, null, Modifier.size(18.dp))
+            TextButton(shape = ButtonShape, onClick = { model.select(null) }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+                Icon(ClimesaIcons.Back, null, Modifier.size(18.dp))
                 Text(stringResource(R.string.aviso_volver), Modifier.padding(start = Space2))
             }
         }
@@ -284,7 +288,7 @@ private fun NoticeDetail(notice: InboxNotice, state: NoticeInboxState, model: No
                 Text(stringResource(if (notice.state == NoticeState.EXPIRED) R.string.aviso_vencido_detalle else R.string.aviso_programado_detalle), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
-            item { PrimaryButton(stringResource(R.string.aviso_enterado), { model.acknowledge(notice.id) }, icon = Icons.Default.Check, enabled = !busy, loading = state.busyId == notice.id) }
+            item { PrimaryButton(stringResource(R.string.aviso_enterado), { model.acknowledge(notice.id) }, icon = ClimesaIcons.Check, enabled = !busy, loading = state.busyId == notice.id) }
             if (NoticeInboxRules.canSnooze(notice)) item {
                 SecondaryButton(stringResource(R.string.aviso_recordarme, NoticeInboxRules.hoursText(state.inbox?.reminderHours ?: 4.0)), { model.snooze(notice.id) }, enabled = !busy)
             }

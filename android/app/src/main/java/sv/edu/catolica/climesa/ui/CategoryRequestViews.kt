@@ -1,32 +1,24 @@
 @file:OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AccessibilityNew
+import androidx.compose.material.icons.outlined.Air
+import androidx.compose.material.icons.outlined.ChildCare
+import androidx.compose.material.icons.outlined.Healing
+import androidx.compose.material.icons.outlined.Hearing
+import androidx.compose.material.icons.outlined.Memory
+import androidx.compose.material.icons.outlined.PregnantWoman
+import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.Restaurant
+import androidx.compose.material.icons.outlined.Send
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.size
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccessibilityNew
-import androidx.compose.material.icons.filled.Air
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChildCare
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Face
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.Healing
-import androidx.compose.material.icons.filled.Hearing
-import androidx.compose.material.icons.filled.LocalHospital
-import androidx.compose.material.icons.filled.MedicalServices
-import androidx.compose.material.icons.filled.Memory
-import androidx.compose.material.icons.filled.PregnantWoman
-import androidx.compose.material.icons.filled.Psychology
-import androidx.compose.material.icons.filled.Restaurant
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -63,21 +55,21 @@ import sv.edu.catolica.climesa.domain.matchesQuery
 
 /** Stable icon keys of `atencion.categoria_cita.icono` mapped to Material icons; unknown keys fall back to a generic one. */
 internal fun categoryIcon(key: String): ImageVector = when (key) {
-    "general" -> Icons.Default.LocalHospital
-    "nino" -> Icons.Default.ChildCare
-    "mujer" -> Icons.Default.PregnantWoman
-    "corazon" -> Icons.Default.Favorite
-    "hueso" -> Icons.Default.AccessibilityNew
-    "piel" -> Icons.Default.Face
-    "ojo" -> Icons.Default.Visibility
-    "oido" -> Icons.Default.Hearing
-    "mente" -> Icons.Default.Psychology
-    "neuro" -> Icons.Default.Memory
-    "digestivo" -> Icons.Default.Restaurant
-    "rinon" -> Icons.Default.WaterDrop
-    "alergia" -> Icons.Default.Air
-    "cirugia" -> Icons.Default.Healing
-    else -> Icons.Default.MedicalServices
+    "general" -> ClimesaIcons.Building
+    "nino" -> Icons.Outlined.ChildCare
+    "mujer" -> Icons.Outlined.PregnantWoman
+    "corazon" -> ClimesaIcons.Heart
+    "hueso" -> Icons.Outlined.AccessibilityNew
+    "piel" -> ClimesaIcons.User
+    "ojo" -> ClimesaIcons.Eye
+    "oido" -> Icons.Outlined.Hearing
+    "mente" -> Icons.Outlined.Psychology
+    "neuro" -> Icons.Outlined.Memory
+    "digestivo" -> Icons.Outlined.Restaurant
+    "rinon" -> ClimesaIcons.Drop
+    "alergia" -> Icons.Outlined.Air
+    "cirugia" -> Icons.Outlined.Healing
+    else -> ClimesaIcons.Steth
 }
 
 /** Strong (icon) and soft (background) colours of a category tone, taken from the existing theme tokens. */
@@ -144,10 +136,10 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
                     visible.forEach { category ->
                         val selected = category.code in state.picked
                         val full = !selected && state.picked.size >= CategoryRequestRules.MAX_CATEGORIES
-                        FilterChip(
+                        ClimesaFilterChip(
                             selected = selected, onClick = { model.toggle(category.code) }, enabled = !full,
                             label = { Text(category.name) },
-                            leadingIcon = { Icon(if (selected) Icons.Default.Check else categoryIcon(category.icon), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
+                            leadingIcon = { Icon(categoryIcon(category.icon), contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
                             modifier = Modifier.semantics { contentDescription = "${category.name}: ${category.description}" },
                         )
                     }
@@ -166,13 +158,13 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
                 when {
                     chosen != null -> Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         Column(Modifier.weight(1f)) { Text(chosen.name, style = MaterialTheme.typography.titleSmall); chosen.specialty?.let { Text(it, style = MaterialTheme.typography.bodySmall) } }
-                        TextButton(onClick = { model.preferredDoctor(null) }) { Text(stringResource(R.string.cat_medico_quitar)) }
+                        TextButton(shape = ButtonShape, onClick = { model.preferredDoctor(null) }) { Text(stringResource(R.string.cat_medico_quitar)) }
                     }
-                    !doctorOpen -> TextButton(onClick = { doctorOpen = true }) { Text(stringResource(R.string.cat_ya_tengo_medico)) }
+                    !doctorOpen -> TextButton(shape = ButtonShape, onClick = { doctorOpen = true }) { Text(stringResource(R.string.cat_ya_tengo_medico)) }
                     else -> {
                         LiveSearchField(doctorQuery, { doctorQuery = it.take(80) }, stringResource(R.string.cat_medico_preferido))
                         if (doctorQuery.isNotBlank()) doctors.filter { matchesQuery(doctorQuery, it.name, it.specialty) }.take(6).forEach { d ->
-                            TextButton(onClick = { model.preferredDoctor(d.id); doctorQuery = "" }, modifier = Modifier.fillMaxWidth()) {
+                            TextButton(shape = ButtonShape, onClick = { model.preferredDoctor(d.id); doctorQuery = "" }, modifier = Modifier.fillMaxWidth()) {
                                 Column(Modifier.fillMaxWidth()) { Text(d.name, style = MaterialTheme.typography.titleSmall); Text(d.specialty ?: "Medicina general", style = MaterialTheme.typography.bodySmall) }
                             }
                         }
@@ -180,8 +172,8 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
                 }
             }
         }
-        item { PrimaryButton(stringResource(R.string.cat_enviar), model::send, icon = Icons.Default.Send, enabled = state.canSend, loading = state.saving) }
-        item { SecondaryButton(stringResource(R.string.ui_cancelar), model::closeForm, icon = Icons.Default.Close, enabled = !state.saving) }
+        item { PrimaryButton(stringResource(R.string.cat_enviar), model::send, icon = Icons.Outlined.Send, enabled = state.canSend, loading = state.saving) }
+        item { SecondaryButton(stringResource(R.string.ui_cancelar), model::closeForm, icon = ClimesaIcons.Close, enabled = !state.saving) }
     }
 }
 
@@ -203,7 +195,7 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
         }
         pending.forEach { RequestRow(it) }
         if (resolved.isNotEmpty()) {
-            TextButton(onClick = { resolvedOpen = !resolvedOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
+            TextButton(shape = ButtonShape, onClick = { resolvedOpen = !resolvedOpen }, modifier = Modifier.heightIn(min = Spacing.touch)) {
                 Text(stringResource(if (resolvedOpen) R.string.pac_solicitudes_ocultar_resueltas else R.string.pac_solicitudes_ver_resueltas, resolved.size))
             }
             if (resolvedOpen) resolved.forEach { RequestRow(it) }
@@ -277,19 +269,19 @@ private fun AssignPanel(state: CategoryRequestsState, model: CategoryRequestsVie
                 extra = if (CategoryRequestRules.isSuggested(request, d)) ({ FamilyBadge(stringResource(R.string.cat_sugerido), null) }) else null)
         }
         val more = sv.edu.catolica.climesa.domain.DoctorChoices.hidden(byShift, doctorQuery, allDoctors)
-        if (more > 0) TextButton(onClick = { allDoctors = true }, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.cat_ver_todos_medicos, more)) }
+        if (more > 0) TextButton(shape = ButtonShape, onClick = { allDoctors = true }, modifier = Modifier.heightIn(min = Spacing.touch)) { Text(stringResource(R.string.cat_ver_todos_medicos, more)) }
         when {
             state.doctor == null -> Text(stringResource(R.string.rec_agendar_elige_medico), style = MaterialTheme.typography.bodySmall)
             state.loadingSlots -> LoadingState()
             else -> {
                 if (state.visibleSlots.isNotEmpty()) DaySlotGrid(state.visibleSlots, state.slot, model::pickSlot)
                 if (state.visibleSlots.none { it.selectable }) NoticeBanner(NoticeKind.INFO, stringResource(R.string.cat_sin_libres_franja))
-                if (request.franja != RequestFranja.ANY) TextButton(onClick = { model.wholeDay(!state.wholeDay) }) {
+                if (request.franja != RequestFranja.ANY) TextButton(shape = ButtonShape, onClick = { model.wholeDay(!state.wholeDay) }) {
                     Text(stringResource(if (state.wholeDay) R.string.cat_solo_franja else R.string.cat_ver_todo_dia))
                 }
             }
         }
-        PrimaryButton(stringResource(R.string.cat_confirmar_cita), model::assign, icon = Icons.Default.Check, enabled = state.canAssign, loading = state.saving)
-        SecondaryButton(stringResource(R.string.ui_cancelar), model::closeAssign, icon = Icons.Default.Close, enabled = !state.saving)
+        PrimaryButton(stringResource(R.string.cat_confirmar_cita), model::assign, icon = ClimesaIcons.Check, enabled = state.canAssign, loading = state.saving)
+        SecondaryButton(stringResource(R.string.ui_cancelar), model::closeAssign, icon = ClimesaIcons.Close, enabled = !state.saving)
     }
 }

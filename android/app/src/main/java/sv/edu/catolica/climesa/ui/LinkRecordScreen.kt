@@ -1,8 +1,8 @@
 package sv.edu.catolica.climesa.ui
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Send
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.automirrored.outlined.Send
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,7 +55,7 @@ fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, mode
             LinkStatus.REJECTED -> item {
                 SectionCard(stringResource(R.string.vinculo_rechazada), action = { StatusTag("rechazada") }) {
                     NoticeBanner(NoticeKind.ERROR, state.rejectionReason?.let { stringResource(R.string.u9_vinculo_motivo, it) } ?: stringResource(R.string.vinculo_rechazada_detalle))
-                    PrimaryButton(stringResource(R.string.vinculo_volver_a_pedir), { model.retry() }, icon = Icons.Default.Refresh)
+                    PrimaryButton(stringResource(R.string.vinculo_volver_a_pedir), { model.retry() }, icon = ClimesaIcons.Retry)
                 }
             }
             LinkStatus.FORM -> item {
@@ -67,7 +67,7 @@ fun LinkRecordScreen(profile: AccessProfile, modifier: Modifier = Modifier, mode
                     PrimaryButton(
                         stringResource(if (state.busy) R.string.vinculo_enviando else R.string.vinculo_enviar),
                         { model.submit(dui, birth) },
-                        icon = Icons.AutoMirrored.Filled.Send,
+                        icon = Icons.AutoMirrored.Outlined.Send,
                         enabled = dui.isNotBlank() && birth.isNotBlank(),
                         loading = state.busy,
                     )

@@ -10,7 +10,6 @@ import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,7 +37,7 @@ internal fun DemoAccountPicker(accounts: List<DemoAccount>, enabled: Boolean, on
             Text(stringResource(R.string.login_demo_banner), Modifier.fillMaxWidth().padding(12.dp), color = MaterialTheme.colorScheme.onTertiaryContainer, style = MaterialTheme.typography.bodyMedium)
         }
         ExposedDropdownMenuBox(expanded = expanded, onExpandedChange = { if (enabled) expanded = it }) {
-            OutlinedTextField(
+            ClimesaTextField(
                 value = selected,
                 onValueChange = {},
                 readOnly = true,

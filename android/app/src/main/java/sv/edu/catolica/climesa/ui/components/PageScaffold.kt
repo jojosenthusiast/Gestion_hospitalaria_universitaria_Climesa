@@ -2,7 +2,18 @@
 
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.sp
+import sv.edu.catolica.climesa.domain.NoticeInboxRules
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,10 +25,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Notifications
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,7 +44,7 @@ import sv.edu.catolica.climesa.domain.AndroidSection
 @Composable
 internal fun BrandMark(modifier: Modifier = Modifier) {
     Box(modifier.size(36.dp).background(MaterialTheme.climesa.accent, MaterialTheme.shapes.medium), contentAlignment = Alignment.Center) {
-        Icon(Icons.Default.Add, null, Modifier.size(26.dp), tint = BrandNavy)
+        Icon(ClimesaIcons.Plus, null, Modifier.size(26.dp), tint = BrandNavy)
     }
 }
 
@@ -59,22 +66,23 @@ internal fun ClimesaTopBar(
         title = {
             Column {
                 Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .82f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = TopBarMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
         actions = { actions() },
+        // Navy like the web `.hospital-header` and the iOS bar, white ink.
         colors = TopAppBarDefaults.topAppBarColors(
-            containerColor = MaterialTheme.colorScheme.primary,
-            titleContentColor = MaterialTheme.colorScheme.onPrimary,
-            navigationIconContentColor = MaterialTheme.colorScheme.onPrimary,
-            actionIconContentColor = MaterialTheme.colorScheme.onPrimary,
+            containerColor = MaterialTheme.climesa.navy,
+            titleContentColor = Color.White,
+            navigationIconContentColor = Color.White,
+            actionIconContentColor = Color.White,
         ),
     )
 }
 
 @Composable
 internal fun BackButton(onClick: () -> Unit, enabled: Boolean = true) =
-    IconButton(onClick = onClick, enabled = enabled) { Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.ui_volver)) }
+    IconButton(onClick = onClick, enabled = enabled) { Icon(ClimesaIcons.Back, stringResource(R.string.ui_volver)) }
 
 /**
  * Page scaffold for a role: [ClimesaTopBar] plus adaptive section navigation (bottom bar with core tasks and "Más" on phones,
@@ -96,6 +104,7 @@ internal fun PortalScaffold(
     showNavigation: Boolean = true,
     snackbarHost: @Composable () -> Unit = {},
     badges: Map<AndroidSection, Int> = emptyMap(),
+    noticeCritical: Boolean = false,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     AdaptiveRoleScaffold(
@@ -118,12 +127,7 @@ internal fun PortalScaffold(
                 actions = {
                     if (AndroidSection.NOTICES in sections && selected != AndroidSection.NOTICES) {
                         val unread = badges[AndroidSection.NOTICES] ?: 0
-                        androidx.compose.material3.IconButton(onClick = { onSelected(AndroidSection.NOTICES) }) {
-                            // Same "9+" cap as the navigation badges, iOS and the web.
-                            androidx.compose.material3.BadgedBox(badge = { sv.edu.catolica.climesa.domain.NoticeInboxRules.badgeText(unread)?.let { androidx.compose.material3.Badge { Text(it) } } }) {
-                                Icon(Icons.Default.Notifications, contentDescription = if (unread > 0) "Avisos, $unread sin leer" else "Avisos")
-                            }
-                        }
+                        NoticesBell(unread, noticeCritical) { onSelected(AndroidSection.NOTICES) }
                     }
                     HospitalClock()
                 },
@@ -131,6 +135,41 @@ internal fun PortalScaffold(
         },
         content = content,
     )
+}
+
+/** Muted ink on the navy bar (web `.topbar-date` #d3dbe6). */
+internal val TopBarMuted = Color(0xFFD3DBE6)
+
+/**
+ * Colours of the bell count (web `.notices-bell-count`): a white pill with primary text, and critical red with white text
+ * only while a critical notice is unread. Returns container to content.
+ */
+internal fun bellCountColors(critical: Boolean, surface: Color, primaryText: Color, criticalRed: Color): Pair<Color, Color> =
+    if (critical) criticalRed to Color.White else surface to primaryText
+
+/** Header bell: notices one tap away, with the unread count ("9+" cap, like the web and iOS). */
+@Composable
+private fun NoticesBell(unread: Int, critical: Boolean, onClick: () -> Unit) {
+    val (container, content) = bellCountColors(critical, MaterialTheme.colorScheme.surface, MaterialTheme.climesa.primaryText, MaterialTheme.system.critical)
+    IconButton(onClick = onClick, modifier = Modifier.semantics { contentDescription = if (unread > 0) "Avisos, $unread sin leer" else "Avisos" }) {
+        Box {
+            Icon(ClimesaIcons.Bell, null)
+            NoticeInboxRules.badgeText(unread)?.let { text ->
+                Text(
+                    text,
+                    Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = 9.dp, y = (-7).dp)
+                        .heightIn(min = 18.dp)
+                        .widthIn(min = 18.dp)
+                        .background(container, RoundedCornerShape(percent = 50))
+                        .padding(horizontal = 5.dp, vertical = 1.dp),
+                    color = content,
+                    style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp, letterSpacing = 0.sp, textAlign = TextAlign.Center),
+                )
+            }
+        }
+    }
 }
 
 /** Standard page body: a scrolling column with the page gutter and block gap. Use it instead of ad hoc `LazyColumn` paddings. */

@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -12,16 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Campaign
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.KeyboardDoubleArrowUp
-import androidx.compose.material.icons.filled.MonitorHeart
-import androidx.compose.material.icons.filled.Remove
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Warning
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -49,14 +40,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 internal fun StatusIcon.vector(): ImageVector = when (this) {
-    StatusIcon.SCHEDULE -> Icons.Default.Schedule
-    StatusIcon.CAMPAIGN -> Icons.Default.Campaign
-    StatusIcon.MONITOR_HEART -> Icons.Default.MonitorHeart
-    StatusIcon.CHECK -> Icons.Default.Check
-    StatusIcon.CLOSE -> Icons.Default.Close
-    StatusIcon.WARNING -> Icons.Default.Warning
-    StatusIcon.DOUBLE_ARROW_UP -> Icons.Default.KeyboardDoubleArrowUp
-    StatusIcon.DASH -> Icons.Default.Remove
+    StatusIcon.SCHEDULE -> ClimesaIcons.Clock
+    StatusIcon.CAMPAIGN -> ClimesaIcons.Megaphone
+    StatusIcon.MONITOR_HEART -> ClimesaIcons.Pulse
+    StatusIcon.CHECK -> ClimesaIcons.Check
+    StatusIcon.CLOSE -> ClimesaIcons.Close
+    StatusIcon.WARNING -> ClimesaIcons.Alert
+    StatusIcon.DOUBLE_ARROW_UP -> ClimesaIcons.ChevronsUp
+    StatusIcon.DASH -> ClimesaIcons.Minus
 }
 
 @Composable
@@ -177,7 +168,7 @@ internal fun AreaTag(code: String, modifier: Modifier = Modifier, showName: Bool
         Text(
             area.code,
             Modifier.background(strong, RoundedCornerShape(RadiusChip)).padding(horizontal = 6.dp, vertical = 2.dp),
-            style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Bold, letterSpacing = .5.sp),
+            style = CodeText.copy(fontSize = 12.sp, letterSpacing = .5.sp),
             color = MaterialTheme.system.onArea,
         )
         if (showName) Text(area.label, style = badgeTextStyle(), color = strong)
@@ -212,8 +203,8 @@ internal fun StatusLegend(modifier: Modifier = Modifier, areas: Boolean = true, 
     }
 }
 
-/** Corner of a filter chip (Material filter chips use 8 dp); the texture is drawn with the same corner. */
-private val ChipCorner = 8.dp
+/** Filter chips are pills like the web `.cl-chip`; the texture is drawn with the same (half-height) corner. */
+private val ChipShape = RoundedCornerShape(percent = 50)
 
 /**
  * Filter chip that filters by a status or priority (S7). With a [tone] it wears that badge's colour, texture and icon:
@@ -225,7 +216,7 @@ private val ChipCorner = 8.dp
 @Composable
 internal fun StatusFilterChip(selected: Boolean, onClick: () -> Unit, label: String, tone: ChipTone?, modifier: Modifier = Modifier, enabled: Boolean = true) {
     if (tone == null) {
-        FilterChip(selected, onClick, { Text(label) }, modifier, enabled = enabled)
+        ClimesaFilterChip(selected, onClick, { Text(label) }, modifier, enabled = enabled)
         return
     }
     val colors = MaterialTheme.system
@@ -233,14 +224,14 @@ internal fun StatusFilterChip(selected: Boolean, onClick: () -> Unit, label: Str
     val (strong, soft) = colors.tone(tone)
     val (fg, _) = colors.chip(tone, selected, surface)
     val ink = fg.copy(alpha = if (enabled) 1f else .38f)
-    FilterChip(
+    androidx.compose.material3.FilterChip(
         selected = selected,
         onClick = onClick,
         label = { Text(label, fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold) },
         modifier = modifier.chipPattern(tone.pattern, selected, strong, soft, surface, colors.onStatus),
         enabled = enabled,
         leadingIcon = { Icon(tone.icon.vector(), null, Modifier.size(FilterChipDefaults.IconSize)) },
-        shape = RoundedCornerShape(ChipCorner),
+        shape = ChipShape,
         colors = FilterChipDefaults.filterChipColors(
             containerColor = Color.Transparent, selectedContainerColor = Color.Transparent,
             disabledContainerColor = Color.Transparent, disabledSelectedContainerColor = Color.Transparent,
@@ -256,7 +247,7 @@ internal fun StatusFilterChip(selected: Boolean, onClick: () -> Unit, label: Str
  * tint with a border, so the selected chip still stands out). Selected: strong fill with the same texture in [on].
  */
 private fun Modifier.chipPattern(pattern: StatusPattern?, selected: Boolean, strong: Color, soft: Color, surface: Color, on: Color): Modifier = drawBehind {
-    val radius = ChipCorner.toPx()
+    val radius = size.height / 2
     val px = 1.dp.toPx()
     val corner = CornerRadius(radius)
     if (selected) {

@@ -1,16 +1,13 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Link
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Link
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -47,11 +44,11 @@ fun ReceptionLinkingScreen(channels: List<String>, canVerify: Boolean, openPatie
     CloseWhenDone(state.busyId != null, sent, state.error) { rejecting = null }
     PageList(modifier) {
         item { LinkingGuide() }
-        state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton(stringResource(R.string.ui_reintentar), { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh) } } }
+        state.error?.let { error -> item { ClimesaActionGroup { NoticeBanner(NoticeKind.ERROR, error); SecondaryButton(stringResource(R.string.ui_reintentar), { model.clearMessages(); model.load() }, icon = ClimesaIcons.Retry) } } }
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         when {
             state.loading && state.rows.isEmpty() -> item { LoadingState() }
-            state.rows.isEmpty() -> item { EmptyState(stringResource(R.string.rec_vinc_vacio), detail = stringResource(R.string.rec_vinc_vacio_detalle), icon = Icons.Default.Link) }
+            state.rows.isEmpty() -> item { EmptyState(stringResource(R.string.rec_vinc_vacio), detail = stringResource(R.string.rec_vinc_vacio_detalle), icon = Icons.Outlined.Link) }
             else -> {
                 // Web wording: "N solicitudes esperan tu revisión · M con expediente que coincide · K por revisar a mano".
                 val matching = state.rows.count { it.hasCandidate }
@@ -90,11 +87,11 @@ private fun LinkCard(row: LinkRequestRow, canVerify: Boolean, primary: Boolean, 
         row.fields.forEach { field -> LinkFieldRow(field) }
         NoticeBanner(if (row.hasCandidate) NoticeKind.SUCCESS else NoticeKind.INFO, row.guidance)
         if (canVerify) ClimesaActionGroup {
-            if (row.canApprove && primary) PrimaryButton(stringResource(R.string.rec_vinc_aprobar), onApprove, icon = Icons.Default.Check, enabled = !anyBusy, loading = busy)
-            else if (row.canApprove) SecondaryButton(stringResource(R.string.rec_vinc_aprobar), onApprove, icon = Icons.Default.Check, enabled = !anyBusy, loading = busy)
-            else SecondaryButton(stringResource(if (row.candidates > 1) R.string.rec_vinc_buscar_duplicado else R.string.rec_vinc_buscar_antes), onSearch, icon = Icons.Default.Search)
+            if (row.canApprove && primary) PrimaryButton(stringResource(R.string.rec_vinc_aprobar), onApprove, icon = ClimesaIcons.Check, enabled = !anyBusy, loading = busy)
+            else if (row.canApprove) SecondaryButton(stringResource(R.string.rec_vinc_aprobar), onApprove, icon = ClimesaIcons.Check, enabled = !anyBusy, loading = busy)
+            else SecondaryButton(stringResource(if (row.candidates > 1) R.string.rec_vinc_buscar_duplicado else R.string.rec_vinc_buscar_antes), onSearch, icon = ClimesaIcons.Search)
             // Rejecting is secondary and always asks for a reason in a confirmation (RejectDialog).
-            SecondaryButton(stringResource(R.string.rec_vinc_rechazar), onReject, icon = Icons.Default.Close, enabled = !anyBusy)
+            SecondaryButton(stringResource(R.string.rec_vinc_rechazar), onReject, icon = ClimesaIcons.Close, enabled = !anyBusy)
         }
     }
 }

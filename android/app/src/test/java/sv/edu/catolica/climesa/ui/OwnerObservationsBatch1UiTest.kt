@@ -41,10 +41,11 @@ class OwnerObservationsBatch1UiTest {
     @Test fun eachCrudVerbHasItsOwnIcon() {
         val icons = CrudKind.entries.map { it.icon().name }
         assertEquals(icons.size, icons.toSet().size)
-        assertTrue(CrudKind.Create.icon().name.contains("Add"))
-        assertTrue(CrudKind.Edit.icon().name.contains("Edit"))
-        assertTrue(CrudKind.Deactivate.icon().name.contains("Delete"))
-        assertTrue(CrudKind.View.icon().name.contains("Visibility"))
+        // Lote 4: the web `crud.css` symbols (plus, pencil, trash, eye) from the generated icon set.
+        assertEquals("Climesa.plus", CrudKind.Create.icon().name)
+        assertEquals("Climesa.pencil", CrudKind.Edit.icon().name)
+        assertEquals("Climesa.trash", CrudKind.Deactivate.icon().name)
+        assertEquals("Climesa.eye", CrudKind.View.icon().name)
     }
 
     @Test fun spinnerMovesFromTheRawFrameClock() {

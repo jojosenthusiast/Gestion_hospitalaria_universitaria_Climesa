@@ -1,6 +1,10 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Map
+import androidx.compose.material.icons.outlined.Send
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -13,24 +17,12 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.LocalHospital
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.AssistChip
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -213,7 +205,7 @@ private fun RequestForm(busy: Boolean, prefill: AmbulancePrefill?, model: Ambula
         error?.let { NoticeBanner(NoticeKind.ERROR, it) }
         // G4: "Enviar" only once the reason says something; what is still missing is said next to the button.
         if (reason.trim().length < AmbulanceRules.REASON_MIN) Text(stringResource(R.string.rec7_amb_falta_motivo), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        PrimaryButton(stringResource(R.string.amb_enviar_solicitud), { model.submitRequest(address, municipality, reason, phone) }, icon = Icons.Default.Send, loading = busy, enabled = reason.trim().length >= AmbulanceRules.REASON_MIN && !busy)
+        PrimaryButton(stringResource(R.string.amb_enviar_solicitud), { model.submitRequest(address, municipality, reason, phone) }, icon = Icons.Outlined.Send, loading = busy, enabled = reason.trim().length >= AmbulanceRules.REASON_MIN && !busy)
     }
 }
 
@@ -300,7 +292,7 @@ private fun DispatchDialog(busy: Boolean, crewPool: List<sv.edu.catolica.climesa
                 if (crewPool.isEmpty()) Text(stringResource(R.string.amb_sin_tripulacion_turno), style = MaterialTheme.typography.bodySmall)
                 crewPool.forEach { member ->
                     val label = AmbulanceLabels.crewRole(member.role) + if (member.role == "paramedico" && !member.hasAccount) " · " + stringResource(R.string.amb_sin_cuenta) else ""
-                    FilterChip(selected = member.staffId in crew, onClick = { crew = if (member.staffId in crew) crew - member.staffId else crew + member.staffId }, label = { Text("${member.name} · $label") })
+                    ClimesaFilterChip(selected = member.staffId in crew, onClick = { crew = if (member.staffId in crew) crew - member.staffId else crew + member.staffId }, label = { Text("${member.name} · $label") })
                 }
                 AmbulanceRules.crewProblem(crewPool, crew)?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             }
@@ -342,7 +334,7 @@ private fun ServiceSummary(service: AmbulanceService) {
 @Composable
 internal fun OpenMap(address: String) {
     val uri = LocalUriHandler.current
-    SecondaryButton(stringResource(R.string.amb_abrir_mapa), { runCatching { uri.openUri("geo:0,0?q=" + URLEncoder.encode(address, "UTF-8")) } }, icon = Icons.Default.Map)
+    SecondaryButton(stringResource(R.string.amb_abrir_mapa), { runCatching { uri.openUri("geo:0,0?q=" + URLEncoder.encode(address, "UTF-8")) } }, icon = Icons.Outlined.Map)
 }
 
 @Composable
@@ -395,7 +387,7 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
     LaunchedEffect(query) { if (query.trim() != filters.query) { kotlinx.coroutines.delay(300); model.setLogFilters(filters.copy(query = query.trim())) } }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         FormField(stringResource(R.string.amb_buscar), query, { query = it.take(80) }, hint = stringResource(R.string.amb_buscar_pista))
-        SecondaryButton(if (filters.activeCount > 0) stringResource(R.string.amb_filtros_n, filters.activeCount) else stringResource(R.string.amb_filtros), { open = !open }, icon = Icons.Default.FilterList)
+        SecondaryButton(if (filters.activeCount > 0) stringResource(R.string.amb_filtros_n, filters.activeCount) else stringResource(R.string.amb_filtros), { open = !open }, icon = ClimesaIcons.Filter)
         if (open) SectionCard(stringResource(R.string.amb_filtros)) {
             Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
             Choices(listOf("" to stringResource(R.string.amb_todas)) + AmbulanceLabels.priorities, filters.priority, ::triageTone) { model.setLogFilters(filters.copy(priority = it)) }
@@ -407,7 +399,7 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
         if (filters.any) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 AmbulanceLabels.chips(filters).forEach { (key, label) ->
-                    AssistChip(onClick = { model.setLogFilters(when (key) { "priority" -> filters.copy(priority = ""); "finalState" -> filters.copy(finalState = ""); else -> filters.copy(type = "") }) }, label = { Text(label) }, trailingIcon = { androidx.compose.material3.Icon(Icons.Default.Close, contentDescription = null) })
+                    AssistChip(onClick = { model.setLogFilters(when (key) { "priority" -> filters.copy(priority = ""); "finalState" -> filters.copy(finalState = ""); else -> filters.copy(type = "") }) }, label = { Text(label) }, trailingIcon = { androidx.compose.material3.Icon(ClimesaIcons.Close, contentDescription = null) })
                 }
                 SecondaryButton(stringResource(R.string.amb_quitar_filtros), { query = ""; model.setLogFilters(LogFilters()) })
             }
@@ -422,7 +414,7 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
         SectionCard(stringResource(R.string.amb_por_recibir)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 state.arrivals.forEach { candidate ->
-                    FilterChip(
+                    ClimesaFilterChip(
                         selected = candidate.serviceId == state.arrivalServiceId, onClick = { model.selectArrival(candidate.serviceId) },
                         label = { Text(stringResource(if (candidate.arrived) R.string.amb_llego_sin_entrega else R.string.amb_en_camino, localTime(candidate.dispatchedAt))) },
                     )
@@ -431,9 +423,9 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
         }
     }
     val view = state.arrival
-    if (view == null) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
+    if (view == null) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = ClimesaIcons.Building) }; return }
     item { HandoverCard(view, state.busy, model, state.formError) }
-    if (view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
+    if (view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = ClimesaIcons.Building) }; return }
     if (!view.clinical) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_sin_relacion)) }
     items(view.reports, key = { it.id }) { report ->
         SectionCard("${stringResource(R.string.amb_prioridad)} ${AmbulanceLabels.priority(report.priority)}", eyebrow = "${stringResource(R.string.amb_capturado)}: ${localTime(report.capturedAt)}") {
@@ -472,7 +464,7 @@ private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, b
                 // A54: the next step after the handover is the admission, which Recepción records with origin «Ambulancia».
                 Text(stringResource(R.string.amb_siguiente_admision), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
-            view.canReceive -> PrimaryButton(stringResource(R.string.amb_marcar_recibido), { confirming = true }, icon = Icons.Default.Check, enabled = !busy, loading = busy)
+            view.canReceive -> PrimaryButton(stringResource(R.string.amb_marcar_recibido), { confirming = true }, icon = ClimesaIcons.Check, enabled = !busy, loading = busy)
             !view.arrived -> Text(stringResource(R.string.amb_entrega_espera), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> Text(stringResource(R.string.amb_entrega_sin_permiso), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

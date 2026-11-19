@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui.lab
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -12,8 +13,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -82,7 +81,7 @@ internal fun ExternalRecordDialog(patientName: String, state: ExternalRecordStat
                         FormField(stringResource(R.string.extres_buscar_examen), query, { query = it.take(60) }, enabled = !draft.busy)
                         val matches = examMatches(state.catalog, draft.exams, query)
                         matches.forEach { exam ->
-                            DataRow(exam.name, meta = exam.code, leadingIcon = Icons.Default.Add, container = false, onClick = { model.addExam(exam.id); query = "" })
+                            DataRow(exam.name, meta = exam.code, leadingIcon = ClimesaIcons.Plus, container = false, onClick = { model.addExam(exam.id); query = "" })
                         }
                         if (query.trim().length >= 2 && matches.isEmpty()) Text(stringResource(R.string.extres_sin_coincidencias), style = MaterialTheme.typography.bodySmall)
                     }

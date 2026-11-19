@@ -2,6 +2,10 @@
 
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.MyLocation
+import androidx.compose.material.icons.outlined.Send
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import android.Manifest
 import android.annotation.SuppressLint
 import android.content.Context
@@ -19,13 +23,6 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Map
-import androidx.compose.material.icons.filled.MyLocation
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Send
-import androidx.compose.material.icons.filled.Description
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -183,8 +180,8 @@ private fun LazyListScope.activeService(
         SectionCard(stringResource(R.string.par_acciones)) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 if (service.canReport) {
-                    SecondaryButton(stringResource(R.string.par_reporte), { sheetOpen(ParamedicSheet.PREHOSPITAL) }, icon = Icons.Default.Description)
-                    SecondaryButton(stringResource(R.string.par_sin_identidad), { sheetOpen(ParamedicSheet.UNIDENTIFIED) }, icon = Icons.Default.PersonAdd)
+                    SecondaryButton(stringResource(R.string.par_reporte), { sheetOpen(ParamedicSheet.PREHOSPITAL) }, icon = ClimesaIcons.Clipboard)
+                    SecondaryButton(stringResource(R.string.par_sin_identidad), { sheetOpen(ParamedicSheet.UNIDENTIFIED) }, icon = ClimesaIcons.UserPlus)
                 }
                 if (!service.readOnly) LocationButton(state.busy, locationFix, locationFail)
                 OpenMap(service.origin)
@@ -244,12 +241,12 @@ private fun LocationButton(busy: Boolean, onFix: (Double, Double) -> Unit, onFai
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) send() else onFail() }
     SecondaryButton(stringResource(R.string.par_ubicacion), {
         if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) send() else permission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-    }, icon = Icons.Default.MyLocation, enabled = !busy)
+    }, icon = Icons.Outlined.MyLocation, enabled = !busy)
 }
 
 /** Sin servicio: la unidad ya está arriba; aquí van los últimos servicios. */
 private fun LazyListScope.idle(log: List<AmbulanceLogEntry>, onOpenLog: (() -> Unit)?) {
-    item { EmptyState(stringResource(R.string.par_titulo_libre), detail = stringResource(R.string.par_libre_detalle), icon = Icons.Default.MyLocation) }
+    item { EmptyState(stringResource(R.string.par_titulo_libre), detail = stringResource(R.string.par_libre_detalle), icon = Icons.Outlined.MyLocation) }
     item { Text(stringResource(R.string.par_ultimos), style = MaterialTheme.typography.titleMedium) }
     if (log.isEmpty()) item { Text(stringResource(R.string.par_sin_ultimos), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     else {
@@ -295,7 +292,7 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
         Text(stringResource(R.string.par_eta_titulo), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             ParamedicRules.etaChoices.forEach { minutes ->
-                FilterChip(selected = form.etaMinutes == minutes.toString(), onClick = { model.updatePrehospital(form.copy(etaMinutes = if (form.etaMinutes == minutes.toString()) "" else minutes.toString()), service?.id) }, label = { Text(stringResource(R.string.par_eta_min, minutes)) }, modifier = Modifier.heightIn(min = 48.dp))
+                ClimesaFilterChip(selected = form.etaMinutes == minutes.toString(), onClick = { model.updatePrehospital(form.copy(etaMinutes = if (form.etaMinutes == minutes.toString()) "" else minutes.toString()), service?.id) }, label = { Text(stringResource(R.string.par_eta_min, minutes)) }, modifier = Modifier.heightIn(min = 48.dp))
             }
         }
         Text(stringResource(R.string.par_signos), style = MaterialTheme.typography.labelLarge)
@@ -305,7 +302,7 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
         NumberField(stringResource(R.string.amb_spo2), form.oxygenSaturation) { model.updatePrehospital(form.copy(oxygenSaturation = it), service?.id) }
         NumberField(stringResource(R.string.amb_temperatura), form.temperature, decimal = true) { model.updatePrehospital(form.copy(temperature = it), service?.id) }
         NumberField(stringResource(R.string.amb_glasgow), form.glasgow) { model.updatePrehospital(form.copy(glasgow = it), service?.id) }
-        PrimaryButton(stringResource(R.string.amb_enviar_reporte), { sending = true; model.sendPrehospital(service.id) }, icon = Icons.Default.Send, enabled = state.queued == null, loading = state.busy)
+        PrimaryButton(stringResource(R.string.amb_enviar_reporte), { sending = true; model.sendPrehospital(service.id) }, icon = Icons.Outlined.Send, enabled = state.queued == null, loading = state.busy)
     }
 }
 
@@ -327,11 +324,11 @@ private fun UnidentifiedSheet(state: AmbulanceUiState, model: AmbulanceViewModel
         Text(stringResource(R.string.par_sexo), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             listOf("femenino" to stringResource(R.string.par_sexo_femenino), "masculino" to stringResource(R.string.par_sexo_masculino), "indeterminado" to stringResource(R.string.par_sexo_indeterminado), "no_registrado" to stringResource(R.string.rec_no_registrado)).forEach { (value, label) ->
-                FilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
+                ClimesaFilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
             }
         }
         NumberField(stringResource(R.string.amb_edad_estimada), age) { age = it.take(3) }
         FormField(stringResource(R.string.amb_senas), description, { description = it.take(500) }, singleLine = false)
-        PrimaryButton(stringResource(R.string.amb_crear_provisional), { model.registerUnidentified(sex, age, description) }, icon = Icons.Default.PersonAdd, loading = state.busy)
+        PrimaryButton(stringResource(R.string.amb_crear_provisional), { model.registerUnidentified(sex, age, description) }, icon = ClimesaIcons.UserPlus, loading = state.busy)
     }
 }

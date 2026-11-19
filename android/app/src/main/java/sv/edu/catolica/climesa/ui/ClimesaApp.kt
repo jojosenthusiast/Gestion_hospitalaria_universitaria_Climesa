@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,14 +10,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowForward
-import androidx.compose.material.icons.filled.Email
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PersonAdd
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -65,7 +58,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     }
 }
 @Composable private fun AccessPending(error:String?,retry:()->Unit,logout:()->Unit){
-    Surface { Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){CompactHeader(stringResource(R.string.app_acceso_error));Text(error?:stringResource(R.string.app_revisa_conexion),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(24.dp));ClimesaButton(stringResource(R.string.app_volver_intentar),Icons.Default.Refresh,retry);Spacer(Modifier.height(10.dp));TextButton(onClick=logout){Text(stringResource(R.string.cerrar_sesion))}} }
+    Surface { Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(24.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){CompactHeader(stringResource(R.string.app_acceso_error));Text(error?:stringResource(R.string.app_revisa_conexion),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);Spacer(Modifier.height(24.dp));ClimesaButton(stringResource(R.string.app_volver_intentar),ClimesaIcons.Retry,retry);Spacer(Modifier.height(10.dp));TextButton(shape = ButtonShape, onClick=logout){Text(stringResource(R.string.cerrar_sesion))}} }
 }
 @Composable private fun AuthorizedWorkspace(account:AuthenticatedAccount,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
     val destination=account.profile.androidDestination()
@@ -75,7 +68,7 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     val role=selectedRole.takeIf{it in roles}?:roles.firstOrNull().orEmpty()
     if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){SectionIntro("",stringResource(R.string.app_rol_sin_android));Spacer(Modifier.height(16.dp));Text(PlatformGate.message(account.profile.platforms,"android",BuildConfig.WEB_URL));Spacer(Modifier.height(24.dp));PrimaryButton(stringResource(R.string.cerrar_sesion),logout)}};return}
     Column(Modifier.fillMaxSize()){
-        if(roles.size>1){var menu by remember{mutableStateOf(false)};Surface(color=BrandNavy){Box(Modifier.fillMaxWidth().safeDrawingPadding().padding(horizontal=20.dp)){TextButton(onClick={menu=true}){Text("${RoleAccess.label(role)}  ▾",color=Color.White)};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){roles.forEach{r->DropdownMenuItem(text={Text(RoleAccess.label(r))},onClick={selectedRole=r;menu=false})}}}}}
+        if(roles.size>1){var menu by remember{mutableStateOf(false)};Surface(color=BrandNavy){Box(Modifier.fillMaxWidth().safeDrawingPadding().padding(horizontal=20.dp)){TextButton(shape = ButtonShape, onClick={menu=true}){Text("${RoleAccess.label(role)}  ▾",color=Color.White)};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){roles.forEach{r->DropdownMenuItem(text={Text(RoleAccess.label(r))},onClick={selectedRole=r;menu=false})}}}}}
         Box(Modifier.weight(1f)){if(role=="REC"){
             val reception:ReceptionViewModel=viewModel()
             DisposableEffect(account.session.userId){reception.reload();onDispose{reception.clear()}}
@@ -164,30 +157,30 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                     state.unconfirmedEmail?.let { ResendConfirmationButton(state, it, resend) }
                     state.emailNotice?.let { AuthInfoNotice(it) }
                     if (demoAccounts.isNotEmpty()) DemoAccountPicker(demoAccounts, enabled = !state.signingIn) { account -> email = account.email; password = account.password; draft.email = email; draft.password = password }
-                    OutlinedTextField(
+                    ClimesaTextField(
                         value = email,
                         onValueChange = { email = it.trimStart().take(254); draft.email = email },
                         modifier = Modifier.fillMaxWidth(),
                         enabled = !state.signingIn,
                         singleLine = true,
                         label = { Text(stringResource(R.string.login_email)) },
-                        leadingIcon = { Icon(Icons.Default.Email, contentDescription = null) },
+                        leadingIcon = { Icon(ClimesaIcons.Mail, contentDescription = null) },
                         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
                         keyboardActions = KeyboardActions(onNext = { passwordFocus.requestFocus() }),
                         isError = state.fieldErrors["email"] != null,
                         supportingText = state.fieldErrors["email"]?.let { error -> { Text(error) } },
                     )
-                    OutlinedTextField(
+                    ClimesaTextField(
                         value = password,
                         onValueChange = { password = it; draft.password = password },
                         modifier = Modifier.fillMaxWidth().focusRequester(passwordFocus),
                         enabled = !state.signingIn,
                         singleLine = true,
                         label = { Text(stringResource(R.string.login_password)) },
-                        leadingIcon = { Icon(Icons.Default.Lock, contentDescription = null) },
+                        leadingIcon = { Icon(ClimesaIcons.Lock, contentDescription = null) },
                         trailingIcon = {
                             IconButton(onClick = { showPassword = !showPassword }) {
-                                Icon(if (showPassword) Icons.Default.VisibilityOff else Icons.Default.Visibility, passwordAction)
+                                Icon(if (showPassword) ClimesaIcons.EyeOff else ClimesaIcons.Eye, passwordAction)
                             }
                         },
                         visualTransformation = if (showPassword) VisualTransformation.None else PasswordVisualTransformation(),
@@ -196,26 +189,26 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
                         isError = state.fieldErrors["password"] != null,
                         supportingText = state.fieldErrors["password"]?.let { error -> { Text(error) } },
                     )
-                    Button(onClick = submit, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
+                    Button(shape = ButtonShape, onClick = submit, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                         if (state.signingIn) {
                             Spinner(size = 20.dp, strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                             Spacer(Modifier.width(10.dp))
                             Text(stringResource(R.string.login_checking))
                         } else {
                             Text(stringResource(R.string.login_submit), Modifier.weight(1f))
-                            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                            Icon(ClimesaIcons.Arrow, contentDescription = null)
                         }
                     }
                     SlowServerHint(state.signingIn, Modifier.fillMaxWidth())
-                    TextButton(onClick = { draft.email = email; onForgot() }, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
+                    TextButton(shape = ButtonShape, onClick = { draft.email = email; onForgot() }, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
                         Text(stringResource(R.string.app_olvidaste))
                     }
                     HorizontalDivider()
-                    TextButton(onClick = onRegister, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
-                        Icon(Icons.Default.PersonAdd, contentDescription = null)
+                    TextButton(shape = ButtonShape, onClick = onRegister, enabled = !state.signingIn, modifier = Modifier.fillMaxWidth()) {
+                        Icon(ClimesaIcons.UserPlus, contentDescription = null)
                         Spacer(Modifier.width(10.dp))
                         Text(stringResource(R.string.login_register_patient), Modifier.weight(1f))
-                        Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null)
+                        Icon(ClimesaIcons.Arrow, contentDescription = null)
                     }
                 }
             }
@@ -226,17 +219,17 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
 @Composable private fun RegistrationScreen(state:AuthUiState,back:()->Unit,register:(String,String,String,String)->Unit){
     var name by rememberSaveable{mutableStateOf("")};var email by rememberSaveable{mutableStateOf("")};var password by remember{mutableStateOf("")};var confirmation by remember{mutableStateOf("")}
     Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        TextButton(onClick=back,enabled=!state.signingIn){Text(stringResource(R.string.app_volver_ingreso),color=Color.White)}
+        TextButton(shape = ButtonShape, onClick=back,enabled=!state.signingIn){Text(stringResource(R.string.app_volver_ingreso),color=Color.White)}
         Surface(color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
             Text(stringResource(R.string.app_cuenta_paciente),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.primary)
             Text(stringResource(R.string.app_crea_cuenta),style=MaterialTheme.typography.headlineMedium)
             run{
                 state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
-                OutlinedTextField(name,{name=it.take(120)},label={Text(stringResource(R.string.app_nombre_completo))},modifier=Modifier.fillMaxWidth(),singleLine=true,isError=state.fieldErrors.containsKey("name"),supportingText={state.fieldErrors["name"]?.let{Text(it)}},enabled=!state.signingIn)
-                OutlinedTextField(email,{email=it.take(254)},label={Text(stringResource(R.string.app_correo))},modifier=Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),isError=state.fieldErrors.containsKey("email"),supportingText={state.fieldErrors["email"]?.let{Text(it)}},enabled=!state.signingIn)
-                OutlinedTextField(password,{password=it},label={Text(stringResource(R.string.app_contrasena_8))},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("password"),supportingText=state.fieldErrors["password"]?.let{error->{Text(error)}},enabled=!state.signingIn)
-                OutlinedTextField(confirmation,{confirmation=it},label={Text(stringResource(R.string.app_confirmar_contrasena))},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("confirmation"),supportingText={state.fieldErrors["confirmation"]?.let{Text(it)}},enabled=!state.signingIn)
-                ClimesaButton(stringResource(if(state.signingIn)R.string.app_creando_cuenta else R.string.app_crear_cuenta),Icons.Default.PersonAdd,{register(name,email,password,confirmation)},enabled=!state.signingIn)
+                ClimesaTextField(name,{name=it.take(120)},label={Text(stringResource(R.string.app_nombre_completo))},modifier=Modifier.fillMaxWidth(),singleLine=true,isError=state.fieldErrors.containsKey("name"),supportingText={state.fieldErrors["name"]?.let{Text(it)}},enabled=!state.signingIn)
+                ClimesaTextField(email,{email=it.take(254)},label={Text(stringResource(R.string.app_correo))},modifier=Modifier.fillMaxWidth(),singleLine=true,keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email),isError=state.fieldErrors.containsKey("email"),supportingText={state.fieldErrors["email"]?.let{Text(it)}},enabled=!state.signingIn)
+                ClimesaTextField(password,{password=it},label={Text(stringResource(R.string.app_contrasena_8))},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("password"),supportingText=state.fieldErrors["password"]?.let{error->{Text(error)}},enabled=!state.signingIn)
+                ClimesaTextField(confirmation,{confirmation=it},label={Text(stringResource(R.string.app_confirmar_contrasena))},modifier=Modifier.fillMaxWidth(),singleLine=true,visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Password),isError=state.fieldErrors.containsKey("confirmation"),supportingText={state.fieldErrors["confirmation"]?.let{Text(it)}},enabled=!state.signingIn)
+                ClimesaButton(stringResource(if(state.signingIn)R.string.app_creando_cuenta else R.string.app_crear_cuenta),ClimesaIcons.UserPlus,{register(name,email,password,confirmation)},enabled=!state.signingIn)
             }
         }}
     }}
@@ -255,8 +248,8 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
 }
 @Composable private fun ResendConfirmationButton(state:AuthUiState,email:String,resend:(String)->Unit){
     val seconds=rememberSecondsLeft(state.resendAvailableAt)
-    OutlinedButton(onClick={resend(email)},enabled=!state.sendingEmail&&seconds==0L,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
-        Icon(Icons.Default.Email,contentDescription=null);Spacer(Modifier.width(10.dp))
+    OutlinedButton(shape = ButtonShape, onClick={resend(email)},enabled=!state.sendingEmail&&seconds==0L,modifier=Modifier.fillMaxWidth().heightIn(min=48.dp)){
+        Icon(ClimesaIcons.Mail,contentDescription=null);Spacer(Modifier.width(10.dp))
         Text(when{state.sendingEmail->stringResource(R.string.app_enviando_correo);seconds>0->stringResource(R.string.app_reenviar_en,seconds);else->stringResource(R.string.app_reenviar)})
     }
 }
@@ -264,7 +257,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
 @Composable private fun CheckEmailScreen(state:AuthUiState,email:String,resend:(String)->Unit,signIn:()->Unit){
     Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.Center,horizontalAlignment=Alignment.CenterHorizontally){
         Surface(Modifier.widthIn(max=560.dp).fillMaxWidth(),color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
-            Icon(Icons.Default.Email,contentDescription=null,Modifier.size(40.dp),tint=MaterialTheme.colorScheme.primary)
+            Icon(ClimesaIcons.Mail,contentDescription=null,Modifier.size(40.dp),tint=MaterialTheme.colorScheme.primary)
             Text(stringResource(R.string.app_revisa_correo),style=MaterialTheme.typography.headlineMedium)
             Text(stringResource(R.string.app_enlace_enviado),style=MaterialTheme.typography.bodyMedium)
             Text(email,style=MaterialTheme.typography.titleMedium,fontWeight=FontWeight.Bold)
@@ -272,7 +265,7 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
             state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
             state.emailNotice?.let{AuthInfoNotice(it)}
             ResendConfirmationButton(state,email,resend)
-            ClimesaButton(stringResource(R.string.app_ya_confirme),Icons.AutoMirrored.Filled.ArrowForward,signIn)
+            ClimesaButton(stringResource(R.string.app_ya_confirme),ClimesaIcons.Arrow,signIn)
         }}
     }}
 }
@@ -280,14 +273,14 @@ private fun LoginScreen(state: AuthUiState, draft: LoginDraft, signIn: (String, 
 @Composable private fun PasswordResetScreen(state:AuthUiState,initialEmail:String,send:(String)->Unit,back:()->Unit){
     var email by rememberSaveable{mutableStateOf(initialEmail)}
     Surface(color=BrandBlue){Column(Modifier.fillMaxSize().safeDrawingPadding().imePadding().verticalScroll(rememberScrollState()).padding(16.dp),verticalArrangement=Arrangement.spacedBy(12.dp)){
-        TextButton(onClick=back,enabled=!state.sendingEmail){Text(stringResource(R.string.app_volver_ingreso),color=Color.White)}
+        TextButton(shape = ButtonShape, onClick=back,enabled=!state.sendingEmail){Text(stringResource(R.string.app_volver_ingreso),color=Color.White)}
         Surface(color=MaterialTheme.colorScheme.background,shape=MaterialTheme.shapes.extraLarge,tonalElevation=6.dp){Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(14.dp)){
             Text(stringResource(R.string.app_recuperar),style=MaterialTheme.typography.headlineMedium)
             Text(stringResource(R.string.app_recuperar_detalle),style=MaterialTheme.typography.bodyMedium,color=MaterialTheme.colorScheme.onSurfaceVariant)
             state.error?.let{Text(it,color=MaterialTheme.colorScheme.error)}
             state.emailNotice?.let{AuthInfoNotice(it)}
-            OutlinedTextField(email,{email=it.trimStart().take(254)},label={Text(stringResource(R.string.app_correo))},modifier=Modifier.fillMaxWidth(),singleLine=true,leadingIcon={Icon(Icons.Default.Email,contentDescription=null)},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email,imeAction=ImeAction.Send),keyboardActions=KeyboardActions(onSend={send(email)}),isError=state.fieldErrors.containsKey("email"),supportingText=state.fieldErrors["email"]?.let{error->{Text(error)}},enabled=!state.sendingEmail)
-            ClimesaButton(stringResource(if(state.sendingEmail)R.string.app_enviando else R.string.app_enviar_enlace),Icons.Default.Email,{send(email)},enabled=!state.sendingEmail)
+            ClimesaTextField(email,{email=it.trimStart().take(254)},label={Text(stringResource(R.string.app_correo))},modifier=Modifier.fillMaxWidth(),singleLine=true,leadingIcon={Icon(ClimesaIcons.Mail,contentDescription=null)},keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.Email,imeAction=ImeAction.Send),keyboardActions=KeyboardActions(onSend={send(email)}),isError=state.fieldErrors.containsKey("email"),supportingText=state.fieldErrors["email"]?.let{error->{Text(error)}},enabled=!state.sendingEmail)
+            ClimesaButton(stringResource(if(state.sendingEmail)R.string.app_enviando else R.string.app_enviar_enlace),ClimesaIcons.Mail,{send(email)},enabled=!state.sendingEmail)
         }}
     }}
 }

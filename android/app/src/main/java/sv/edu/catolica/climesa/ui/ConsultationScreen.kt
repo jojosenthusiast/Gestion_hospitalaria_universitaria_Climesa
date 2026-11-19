@@ -1,8 +1,8 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Icon
@@ -19,16 +19,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -121,7 +116,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
                     Text(subtitle, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                     PrimaryButton(stringResource(R.string.clin_reanudar), { model.clearMessages(); model.resume(c) }, enabled = !state.saving)
                 }
-                else DataRow(title = c.patientName, subtitle = subtitle, leadingIcon = Icons.Default.EditNote, onClick = { if (!state.saving) { model.clearMessages(); model.resume(c) } })
+                else DataRow(title = c.patientName, subtitle = subtitle, leadingIcon = ClimesaIcons.Pencil, onClick = { if (!state.saving) { model.clearMessages(); model.resume(c) } })
             }
             item { FoldToggle(state.unsigned.size, allUnsigned) { allUnsigned = !allUnsigned } }
         }
@@ -176,7 +171,7 @@ private fun MedicalAppointmentCard(item: MedicalAppointment, onOpen: () -> Unit)
         title = item.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) },
         subtitle = details,
         meta = stringResource(R.string.clin_consulta_cita_estado, appointmentState(item.appointmentState)),
-        leadingIcon = if (item.consultationState == "firmada") Icons.Default.CheckCircle else Icons.Default.EditNote,
+        leadingIcon = if (item.consultationState == "firmada") ClimesaIcons.Check else ClimesaIcons.Pencil,
         status = { ClinicalStatusTag(item.consultationState ?: StatusCatalogClinico.NOT_STARTED) },
         onClick = onOpen,
         titleTrailing = if (item.categories.isEmpty()) null else ({ CategoryMarks(item.categories) }),
@@ -265,7 +260,7 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     BackHandler(enabled = !busy) { leave() }
     Column(modifier.fillMaxSize()) {
     Row(Modifier.fillMaxWidth().padding(end = Spacing.md), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        IconButton(onClick = leave, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.consulta_cerrar)) }
+        IconButton(onClick = leave, enabled = !busy) { Icon(ClimesaIcons.Back, contentDescription = stringResource(R.string.consulta_cerrar)) }
         Text(stringResource(if (signed) R.string.consulta_t_firmada else if (item.consultationId == null) R.string.consulta_t_iniciar else R.string.consulta_t_continuar), Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
     HorizontalDivider(color = MaterialTheme.climesa.line)
@@ -409,7 +404,7 @@ private fun FoldToggle(count: Int, expanded: Boolean, onToggle: () -> Unit) {
 @Composable
 private fun RecordLine(title: String, detail: String?, status: String? = null) {
     Row(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-        androidx.compose.material3.Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        androidx.compose.material3.Icon(ClimesaIcons.Check, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Column(Modifier.weight(1f)) {
             Text(title, style = MaterialTheme.typography.bodyMedium)
             detail?.takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }

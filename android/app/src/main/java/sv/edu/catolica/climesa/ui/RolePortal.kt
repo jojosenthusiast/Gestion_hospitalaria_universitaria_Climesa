@@ -1,18 +1,19 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
+import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModel
@@ -108,13 +109,16 @@ data class MaintenanceState(val busy:Boolean=false,val error:String?=null,val co
 }
 private fun sectionPath(s:AndroidSection)=when(s){AndroidSection.SHIFTS->"/turnos/mios";AndroidSection.PATIENTS->"/pacientes?limit=50";AndroidSection.UNIT->"/ambulancia";AndroidSection.MY_ROOM->"/admisiones";else->null}
 private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En servicio","en_mantenimiento" to "En mantenimiento")
+private val ClockTime=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,fontWeight=FontWeight.ExtraBold,fontSize=18.sp,lineHeight=22.sp,letterSpacing=.36.sp,fontFeatureSettings=TabularNumbers)
+private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,fontWeight=FontWeight.Normal,fontSize=13.sp,lineHeight=17.sp,fontFeatureSettings=TabularNumbers)
 /** Obs 2: live clock with seconds, ticking on each whole second, and the full weekday on a second line that ellipsizes on phones. */
 @Composable fun HospitalClock(){
     var now by remember { mutableStateOf(Instant.now()) }
     LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(sv.edu.catolica.climesa.domain.HospitalClockText.untilNextSecond(System.currentTimeMillis()))}}
     Column(Modifier.widthIn(max=168.dp).padding(end=8.dp),horizontalAlignment=Alignment.End){
-        Text(sv.edu.catolica.climesa.domain.HospitalClockText.time(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary,maxLines=1)
-        Text(sv.edu.catolica.climesa.domain.HospitalClockText.date(now),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        // Web `.topbar-clock`: time 18/800 white over the long sans date in the bar's muted ink.
+        Text(sv.edu.catolica.climesa.domain.HospitalClockText.time(now),style=ClockTime,color=Color.White,maxLines=1)
+        Text(sv.edu.catolica.climesa.domain.HospitalClockText.date(now),style=ClockDate,color=TopBarMuted,maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 @Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
@@ -148,7 +152,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(page){if(page==AndroidSection.RESULT_REVIEW)model.dismissCriticalLab()}
     PortalScaffold(
         role=role,sections=sections,selected=page,onSelected={vitalsOrigin=null;selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
-        badges=noticeBadges(account,sections),
+        badges=noticeBadges(account,sections),noticeCritical=noticeBellCritical(account,sections),
     ) {outer->
       Column(Modifier.padding(outer).fillMaxSize()){
         if(criticalLab&&AndroidSection.RESULT_REVIEW in sections)CriticalLabNotice(onReview={model.dismissCriticalLab();selectedName=AndroidSection.RESULT_REVIEW.name},onDismiss=model::dismissCriticalLab)
@@ -178,7 +182,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
             else if(data.loading&&data.data==null)item{LoadingState()}
             else if(data.error!=null&&data.data==null)item{ErrorState(data.error,{model.load(path)})}
             else if(page==AndroidSection.PATIENTS){
-                item{ClimesaActionGroup {FormField("Nombre, DUI o expediente",query,{query=it.take(100)});PrimaryButton("Buscar paciente",{model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},icon=Icons.Default.Search,enabled=query.trim().length>=2)}}
+                item{ClimesaActionGroup {FormField("Nombre, DUI o expediente",query,{query=it.take(100)});PrimaryButton("Buscar paciente",{model.load("/pacientes?query="+URLEncoder.encode(query,"UTF-8")+"&limit=50")},icon=ClimesaIcons.Search,enabled=query.trim().length>=2)}}
                 val rows=PortalParsers.patients(data.data)
                 if(rows.isEmpty())item{EmptyState("No hay coincidencias. Ajusta la búsqueda.")}
                 else items(rows){p->DataRow(p.fullName,subtitle=p.summary,meta="EXP. ${p.record}")}
@@ -202,7 +206,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
                 when{
                     room!=null->item{MyRoomCard(room)}
                     MyRoomRules.waiting(admissions,account.profile.patientId)!=null->item{NoticeBanner(NoticeKind.INFO,stringResource(R.string.pac_habitacion_espera))}
-                    discharge==null->item{EmptyState(stringResource(R.string.pac_habitacion_ninguna),detail=stringResource(R.string.pac_habitacion_ninguna_detalle),icon=Icons.Default.KingBed)}
+                    discharge==null->item{EmptyState(stringResource(R.string.pac_habitacion_ninguna),detail=stringResource(R.string.pac_habitacion_ninguna_detalle),icon=ClimesaIcons.Bed)}
                 }
                 discharge?.let{item{MyRoomDischargeCard(it)}}
             }else if(page==AndroidSection.SHIFTS){
@@ -229,8 +233,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     Column(Modifier.fillMaxWidth().padding(horizontal=Spacing.page,vertical=Spacing.sm),verticalArrangement=Arrangement.spacedBy(Spacing.xs)){
         NoticeBanner(NoticeKind.ERROR,stringResource(R.string.portal_critico_aviso))
         Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.End){
-            TextButton(onClick=onDismiss){Text(stringResource(R.string.portal_critico_cerrar))}
-            TextButton(onClick=onReview){Text(stringResource(R.string.portal_critico_revisar))}
+            TextButton(shape = ButtonShape, onClick=onDismiss){Text(stringResource(R.string.portal_critico_cerrar))}
+            TextButton(shape = ButtonShape, onClick=onReview){Text(stringResource(R.string.portal_critico_revisar))}
         }
     }
 }
@@ -261,7 +265,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:Li
     val pastCount=days.filter{it.past}.sumOf{it.shifts.size}
     for((index,day) in days.withIndex()){
         if(day.past&&days.getOrNull(index-1)?.past!=true)item(key="turnos-anteriores"){
-            TextButton(onClick=togglePast,modifier=Modifier.padding(top=Spacing.sm).heightIn(min=Spacing.touch)){Text(stringResource(if(pastOpen)R.string.turnos_ocultar_anteriores else R.string.turnos_ver_anteriores,pastCount))}
+            TextButton(shape = ButtonShape, onClick=togglePast,modifier=Modifier.padding(top=Spacing.sm).heightIn(min=Spacing.touch)){Text(stringResource(if(pastOpen)R.string.turnos_ocultar_anteriores else R.string.turnos_ver_anteriores,pastCount))}
         }
         if(day.past&&!pastOpen)continue
         item(key="dia-${day.title}"){Text(day.title,style=MaterialTheme.typography.titleSmall,modifier=Modifier.padding(top=Spacing.sm))}
