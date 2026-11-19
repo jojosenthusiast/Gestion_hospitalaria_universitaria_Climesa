@@ -176,8 +176,8 @@ describe('menú por rol con los permisos reales (escenario 1, FR-120-02)', () =>
 // Regla 8: el menú sale del catálogo (permisos.csv), no del nombre del rol. Aun los roles de móvil
 // verían exactamente lo que el catálogo les da si una cuenta suya tuviera la web habilitada.
 const menuCatalogo: Record<string, string[]> = {
-  AST: ['Pacientes', 'Edificio', 'Turnos', 'Fila del día', 'Citas'],
-  ENF: ['Pacientes', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización'],
+  // Lote 5 S10: AST is retired into ENF (no permissions of its own); ENF gains the queue and appointments of the assistant station.
+  ENF: ['Pacientes', 'Edificio', 'Turnos', 'Inventario', 'Hospitalización', 'Fila del día', 'Citas'],
   MED: ['Pacientes', 'Edificio', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos', 'Laboratorio', 'Hospitalización', 'Fila del día', 'Citas', 'Mi consultorio'],
   PAR: ['Pacientes', 'Ambulancia', 'Bitácora de ambulancia', 'Turnos'],
   PAC: ['Hospitalización', 'Fila del día', 'Citas', 'Mi historial', 'Quién vio mi expediente'],
