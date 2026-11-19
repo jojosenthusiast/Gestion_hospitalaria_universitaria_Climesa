@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.Cancel
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
@@ -90,14 +89,10 @@ fun PatientAppointmentsScreen(
     state.rescheduleTarget?.let { RescheduleRequestDialog(it, state, model) }
 
     PageList(modifier) {
-        state.error?.let { error ->
-            item {
-                ClimesaActionGroup {
-                    NoticeBanner(NoticeKind.ERROR, error)
-                    SecondaryButton("Reintentar", { model.clearMessages(); model.load() }, icon = Icons.Default.Refresh)
-                }
-            }
-        }
+        // S8: «Reintentar» only after the list itself failed to load, through the shared ErrorState (a 403 there is an info
+        // state without it). A failed command (cancel, reschedule, doctor list) is a plain notice: reloading would not fix it.
+        state.loadError?.let { error -> item { ErrorState(error, onRetry = { model.clearMessages(); model.load() }) } }
+        state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
         state.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
         requestState.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
         requestState.notice?.let { notice -> item { InlineStatus(notice, Icons.Default.Send) } }
@@ -109,7 +104,7 @@ fun PatientAppointmentsScreen(
         if (state.loading && state.appointments.isEmpty()) {
             item { LoadingState() }
         } else if (state.appointments.isEmpty()) {
-            item { EmptyState("Todavía no tienes citas registradas.") }
+            if (state.loadError == null) item { EmptyState("Todavía no tienes citas registradas.") }
         } else {
             if (state.loading) item { RefreshHint() }
             // R3 A-7: upcoming first (soonest on top); past and closed ones folded below with their count.
