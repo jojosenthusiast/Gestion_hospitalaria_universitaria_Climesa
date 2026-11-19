@@ -18,6 +18,12 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); location.hash = ''; });
 
+/** Owner obs 8: the batch tools live in one «Herramientas de planificación» menu. */
+async function planningTool(name: string) {
+  await userEvent.click(await screen.findByRole('button', { name: 'Herramientas de planificación' }));
+  await userEvent.click(screen.getByRole('menuitem', { name }));
+}
+
 const profile = (permissions: string[], staffId: string | null = null): AccessProfile => ({ id: 'u-1', user: { id: 'u-1' }, email: 'x@example.test', name: 'Rosa Enfermera Prueba', roles: ['JOP'], platforms: ['web'], permissions: permissions.map(code => ({ code, context: 'global' })), channels: [], patientId: null, staffId });
 const planner = profile(['turnos.ver', 'turnos.planificar', 'turnos.publicar', 'turnos.ver_borradores', 'personal.ver']);
 const registrations = [{ validFrom: '2026-01-01', validTo: '2026-12-31' }];
@@ -53,7 +59,7 @@ function mount(who: AccessProfile, write: (path: string, body: unknown) => unkno
 describe('R7 F1 · generar y publicar la semana', () => {
   it('«Atrás» en la vista previa vuelve al generador con todo lo llenado', async () => {
     mount(planner, path => path === '/turnos/generar' ? { items: [{ staffId: 's-2', person: 'Rosa Enfermera Prueba', areaId: 'a-1', start: iso('2026-12-07', '07:00'), end: iso('2026-12-07', '15:00'), type: 'diurno', ok: true }], huecos: [] } : {});
-    await userEvent.click(await screen.findByRole('button', { name: 'Generar rotación' }));
+    await planningTool('Generar rotación');
     let generator = await screen.findByRole('dialog', { name: 'Generar rotación' });
     await userEvent.selectOptions(within(generator).getByLabelText('Área de los turnos'), 'a-1');
     await userEvent.click(within(generator).getByLabelText('Rosa Enfermera Prueba'));
@@ -70,7 +76,7 @@ describe('R7 F1 · generar y publicar la semana', () => {
 
   it('con el filtro de un área, la confirmación dice qué áreas se publican y ofrece «Publicar todas las áreas»', async () => {
     const api = mount(planner, () => ({ from: '2026-11-30', to: '2026-12-06', published: 3, warnings: [] }));
-    await screen.findAllByText('Luis Enfermero Prueba');
+    await screen.findByRole('region', { name: /Semana del/ });
     await userEvent.click(screen.getByRole('button', { name: 'Filtros' }));
     await userEvent.click(screen.getAllByRole('button', { name: /Hospitalización/ }).find(b => b.classList.contains('shift-pill'))!);
     await userEvent.click(await screen.findByRole('button', { name: 'Publicar semana (2 borradores)' }));
@@ -93,12 +99,17 @@ describe('R7 F3 · Mis turnos', () => {
     expect(location.hash).toBe('#/turnos');
   });
 
-  it('una cuenta sin ficha no ve el hospital entero: dice que no está vinculada, sin alertas de planificación', async () => {
+  it('una cuenta sin ficha no queda en una página vacía: abre el día de hoy del hospital y lo explica', async () => {
     location.hash = '#/turnos?persona=yo';
     mount(profile(['turnos.ver', 'turnos.planificar']));
-    expect(await screen.findByText('Tu cuenta no está vinculada a una ficha')).toBeTruthy();
-    expect(screen.queryByText('Luis Enfermero Prueba')).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Cobertura mínima por área' })).toBeNull();
+    // Owner obs 3/14: who is at work today, not «no está vinculada» with nothing else.
+    const day = await screen.findByRole('group', { name: 'Hoy · miércoles 2 de diciembre' });
+    expect(screen.getByRole('button', { name: 'Día' }).getAttribute('aria-pressed')).toBe('true');
+    expect(within(day).getByText('Luis Enfermero Prueba')).toBeTruthy();
+    expect(within(day).getByText('Rosa Enfermera Prueba')).toBeTruthy();
+    expect(screen.getByText(/Tu cuenta no tiene ficha de personal/)).toBeTruthy();
+    expect(screen.queryByText('Tu cuenta no está vinculada a una ficha')).toBeNull();
+    expect(location.hash).toBe('#/turnos');
   });
 });
 
@@ -115,7 +126,7 @@ describe('Regla única de huecos · Inicio abre «Cubrir hueco»', () => {
     expect(within(dialog).getByText(/Emergencia · Enfermería/)).toBeTruthy();
     expect(location.hash).toBe('#/turnos');
     // The alert and the week list say the same count with the same words for this week.
-    expect(screen.getByText(/1 turno por cubrir esta semana\./)).toBeTruthy();
+    expect(screen.getByRole('group', { name: 'Cobertura mínima por área' }).textContent).toBe('1 turno por cubrir esta semana');
     expect(screen.getByRole('heading', { name: '1 turno por cubrir esta semana' })).toBeTruthy();
   });
 });
