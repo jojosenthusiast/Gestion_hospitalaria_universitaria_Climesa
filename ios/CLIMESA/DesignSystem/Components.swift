@@ -187,31 +187,47 @@ enum ClimesaButtonKind {
 }
 
 /// Estilo de botón de 48 pt de alto con estado de carga (`.primary-button` / `.secondary-button` de web).
+/// CRUD kinds follow web `crud.css`: 44 pt tall, 15/800 text with its icon, a 36 pt square when icon-only (inside a
+/// 44 pt touch target), and a disabled CRUD button keeps its colours at half opacity.
 struct ClimesaButtonStyle: ButtonStyle {
     var kind: ClimesaButtonKind = .primary
     var loading = false
-    /// A square 48 pt button that only shows its symbol (CRUD actions on a row); the label goes to VoiceOver.
+    /// A square button that only shows its icon (CRUD actions on a row); the label goes to VoiceOver.
     var iconOnly = false
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var isCrud: Bool {
+        switch kind {
+        case .create, .edit, .deactivate, .view: return true
+        case .primary, .secondary, .destructive: return false
+        }
+    }
+
     func makeBody(configuration: Configuration) -> some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.control)
+        let height: CGFloat = isCrud ? 44 : Spacing.control
+        let square: CGFloat = isCrud ? 36 : Spacing.control
         HStack(spacing: Spacing.s) {
             if loading { ProgressView().tint(foreground) }
-            configuration.label.font(Typo.label).lineLimit(2).multilineTextAlignment(.center)
+            configuration.label
+                .font(isCrud ? Atkinson.text(15, .extraBold, relativeTo: .subheadline) : Typo.label)
+                .lineLimit(2).multilineTextAlignment(.center)
         }
         .foregroundStyle(foreground)
-        .frame(minWidth: iconOnly ? Spacing.control : nil, maxWidth: iconOnly ? Spacing.control : CGFloat.infinity, minHeight: Spacing.control)
+        .frame(minWidth: iconOnly ? square : nil, maxWidth: iconOnly ? square : CGFloat.infinity, minHeight: iconOnly ? square : height)
         .padding(.horizontal, iconOnly ? 0 : Spacing.l)
-        .background(background, in: RoundedRectangle(cornerRadius: Radius.control))
-        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(border, lineWidth: 1))
-        .opacity(configuration.isPressed ? 0.85 : 1)
-        .scaleEffect(configuration.isPressed && !reduceMotion ? 0.99 : 1)
+        .background(background, in: shape)
+        .overlay(shape.stroke(border, lineWidth: 1))
+        .opacity(isCrud && !enabled ? 0.5 : (configuration.isPressed ? 0.85 : 1))
+        .scaleEffect(configuration.isPressed && !reduceMotion ? (isCrud ? 0.96 : 0.99) : 1)
         .animation(Motion.feedback(Motion.instant, reduceMotion: reduceMotion), value: configuration.isPressed)
+        .frame(minWidth: iconOnly ? 44 : nil, minHeight: iconOnly ? 44 : nil)
+        .contentShape(Rectangle())
     }
 
     private var foreground: Color {
-        if !enabled { return Theme.muted }
+        if !enabled && !isCrud { return Theme.muted }
         switch kind {
         case .primary, .create: return Theme.onPrimary
         case .secondary, .view: return Theme.ink
@@ -220,7 +236,7 @@ struct ClimesaButtonStyle: ButtonStyle {
         }
     }
     private var background: Color {
-        if !enabled { return Theme.disabled }
+        if !enabled && !isCrud { return Theme.disabled }
         switch kind {
         case .primary, .create: return Theme.primary
         case .secondary, .edit, .deactivate, .view: return Theme.surface
@@ -228,7 +244,7 @@ struct ClimesaButtonStyle: ButtonStyle {
         }
     }
     private var border: Color {
-        if !enabled { return Theme.disabled }
+        if !enabled && !isCrud { return Theme.disabled }
         switch kind {
         case .primary, .create: return Theme.primary
         case .secondary, .view: return Theme.controlLine
@@ -290,10 +306,12 @@ struct CrudLabel: View {
     var body: some View {
         Group {
             if iconOnly {
-                Image(systemName: kind.symbol).accessibilityLabel(Text(verbatim: label))
+                ClimesaIcon(kind.icon, size: 18).accessibilityElement().accessibilityLabel(Text(verbatim: label))
             } else {
-                Label { Text(verbatim: label) } icon: { Image(systemName: kind.symbol).accessibilityHidden(true) }
-                    .labelStyle(.titleAndIcon)
+                HStack(spacing: Spacing.s) {
+                    ClimesaIcon(kind.icon, size: 18).accessibilityHidden(true)
+                    Text(verbatim: label)
+                }
             }
         }
         .help(Text(verbatim: label))
@@ -311,13 +329,16 @@ struct ReadOnlyBadge: View {
 
     var body: some View {
         Button { open = true } label: {
-            Label { Text(verbatim: ReadOnlyCue.label) } icon: { Image(systemName: "lock.fill").accessibilityHidden(true) }
-                .labelStyle(.titleAndIcon)
-                .font(Typo.tag).foregroundStyle(Theme.muted)
-                .padding(.horizontal, Spacing.space3).padding(.vertical, Spacing.space1)
-                .background(Theme.blockedSoft, in: Capsule())
-                .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
-                .frame(minHeight: 44).contentShape(Rectangle())
+            // Web `.readonly-badge`: warning-tinted pill, ink text 14/800, lock in the warning colour, 34 pt tall.
+            HStack(spacing: 6) {
+                ClimesaIcon(.lock, size: 16).foregroundStyle(Theme.warning).accessibilityHidden(true)
+                Text(verbatim: ReadOnlyCue.label).font(Atkinson.text(14, .extraBold, relativeTo: .subheadline)).foregroundStyle(Theme.ink)
+            }
+            .padding(.horizontal, Spacing.space3)
+            .frame(minHeight: 34)
+            .background(Theme.warningSoft, in: Capsule())
+            .overlay(Capsule().stroke(Theme.warning.opacity(0.55), lineWidth: 1))
+            .frame(minHeight: 44).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(verbatim: ReadOnlyCue.label))
@@ -360,7 +381,7 @@ struct BlockedReasonLine: View {
     let text: String
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
-            Image(systemName: "info.circle").foregroundStyle(Theme.muted).accessibilityHidden(true)
+            ClimesaIcon(.info, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true).alignmentGuide(.firstTextBaseline) { $0[.bottom] - 3 }
             Text(verbatim: text).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
@@ -448,7 +469,7 @@ struct ConflictBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             HStack(alignment: .top, spacing: Spacing.m) {
-                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.danger).accessibilityHidden(true)
+                ClimesaIcon(.alert, size: 18).foregroundStyle(Theme.danger).accessibilityHidden(true)
                 Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.danger)
             }
             ClimesaButton(title: L.text("ds.reload"), kind: .secondary, action: reload)
@@ -618,7 +639,7 @@ struct StatusFilterChip: View {
         if family == nil, let priority { priorityChip(priority, text: text, shape: shape) } else {
         Button(action: action) {
             HStack(spacing: 6) {
-                if let family { Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true) }
+                if let family { ClimesaIcon(family.icon, size: 14).accessibilityHidden(true) }
                 Text(verbatim: text).lineLimit(1)
             }
             .font(selected ? Typo.label : Typo.tag)
@@ -642,7 +663,7 @@ struct StatusFilterChip: View {
         let solid = selected || priority == .emergencia
         return Button(action: action) {
             HStack(spacing: 6) {
-                Image(systemName: priority.symbol).imageScale(.small).accessibilityHidden(true)
+                ClimesaIcon(priority.icon, size: 14).accessibilityHidden(true)
                 Text(verbatim: text).lineLimit(1)
             }
             .font(selected ? Typo.label : Typo.tag)
@@ -711,10 +732,12 @@ struct CategoryMarks: View {
         if let categories, !categories.isEmpty {
             HStack(spacing: 4) {
                 ForEach(categories, id: \.code) { category in
-                    Image(systemName: CategoryRequestRules.symbol(category.icon))
-                        .font(Typo.small).foregroundStyle(Theme.primaryText)
+                    // Web `CategoryBadges`: the category glyph on its identity tone (`categoryTone`).
+                    let tone = CategoryRequestRules.tone(category.icon)
+                    ClimesaIcon(CategoryRequestRules.icon(category.icon), size: 14)
+                        .foregroundStyle(Color(tone.foreground))
                         .frame(width: 22, height: 22)
-                        .background(Theme.soft, in: RoundedRectangle(cornerRadius: Radius.chip))
+                        .background(Color(tone.background), in: Circle())
                 }
             }
             .accessibilityElement(children: .ignore)
@@ -759,7 +782,9 @@ struct StatusBadge: View {
     var body: some View {
         let style = StatusBadgeStyle.of(value, label: label)
         Group {
-            if let family = style.family { FamilyBadge(family: family, text: style.label) }
+            // R1 (web `StatusBadge`): a value that asks for attention (`alto`, `agotado`...) wears the urgent priority.
+            if let priority = style.priority { PriorityBadge(priority, label: style.label) }
+            else if let family = style.family { FamilyBadge(family: family, text: style.label) }
             else { NeutralBadge(tone: fallbackTone, text: style.label) }
         }
         .accessibilityElement(children: .ignore)
@@ -776,7 +801,7 @@ private struct FamilyBadge: View {
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
         let solid = family.pattern == .solido
         HStack(spacing: 6) {
-            Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true)
+            ClimesaIcon(family.icon, size: 14).accessibilityHidden(true)
             Text(verbatim: text).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
         .font(Typo.tag)
@@ -895,7 +920,7 @@ struct PriorityBadge: View {
         let emergency = priority == .emergencia
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
         HStack(spacing: 6) {
-            Image(systemName: priority.symbol).imageScale(.small).accessibilityHidden(true)
+            ClimesaIcon(priority.icon, size: 14).accessibilityHidden(true)
             Text(verbatim: label ?? priority.label).lineLimit(1)
         }
         .font(Typo.tag)

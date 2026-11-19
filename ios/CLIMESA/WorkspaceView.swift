@@ -69,7 +69,7 @@ struct RoleTabsView:View {
                         // Avisos one tap away on every tab (Android/web bell); the count no longer sits on Más.
                         .toolbar { ToolbarItem(placement:.topBarTrailing) { HStack(spacing:Spacing.space2) { LiveClock(); NoticesBell(model:notices) } } }
                         .refreshable { await refresh(tab) }
-                }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
+                }.tabItem { Label { Text(LocalizedStringKey(tab.titleKey)) } icon: { Image(uiImage:tab.icon.templateImage()) } }.tag(tab)
             }
         }
         .environment(live)
@@ -112,28 +112,28 @@ struct RoleTabsView:View {
     }
 }
 
-/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("9+" over nine). It turns red
-/// while an in-force critical notice is still unread.
+/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("9+" over nine). Web
+/// `.notices-bell-count`: a white pill with primary text, red only while an in-force critical notice is unread.
 struct NoticesBell:View {
     let model:NoticeInboxModel
 
     var body:some View {
         let count=NoticeRules.badge(model.inbox,hiding:model.hidden)
         let critical=NoticeRules.bellIsCritical(model.inbox,hiding:model.hidden)
+        let tone=NoticeRules.bellBadgeTone(model.inbox,hiding:model.hidden)
         NavigationLink {
             ScreenFrame(title:"section.avisos") { NoticesView() }
         } label: {
-            Image(systemName:critical ? "bell.badge.fill":"bell")
-                .font(.system(size:18,weight:.semibold))
-                .foregroundStyle(Theme.onPrimary)
+            ClimesaIcon(.bell,size:22)
+                .foregroundStyle(Color.white)
                 .frame(width:44,height:44)
                 .overlay(alignment:.topTrailing) {
-                    if let text=NoticeRules.badgeText(count) {
-                        Text(verbatim:text).font(Typo.tag).foregroundStyle(Theme.onStatus)
+                    if let text=NoticeRules.badgeText(count), let tone {
+                        Text(verbatim:text).font(Atkinson.text(11,.bold,relativeTo:.caption2).monospacedDigit())
+                            .foregroundStyle(tone == .critical ? Color.white:Theme.primaryText)
                             .padding(.horizontal,5).frame(minWidth:18,minHeight:18)
-                            .background(critical ? Theme.critical:Theme.primary,in:Capsule())
-                            .overlay(Capsule().strokeBorder(Theme.navy,lineWidth:1.5))
-                            .offset(x:2,y:2)
+                            .background(tone == .critical ? Theme.critical:Theme.surface,in:Capsule())
+                            .offset(x:-2,y:4)
                     }
                 }
                 .contentShape(Rectangle())
@@ -234,7 +234,10 @@ struct ProfileContent:View {
                     }
                 }
                 Divider().overlay(Theme.line)
-                Text(verbatim:String(format:L.text("profile.roles"),RoleNames.list(profile.roles))).font(Typo.small).foregroundStyle(Theme.ink)
+                // Web `RoleChip`: each role with its identity glyph and tone.
+                FlowLayout(spacing:Spacing.space2) { ForEach(profile.roles,id:\.self) { code in RoleChip(code:code,label:RoleNames.label(code)) } }
+                    .accessibilityElement(children:.ignore)
+                    .accessibilityLabel(Text(verbatim:String(format:L.text("profile.roles"),RoleNames.list(profile.roles))))
                 Text("auth.footer").font(Typo.small).foregroundStyle(Theme.muted)
             }
             if profile.allowedIOSRoles.count>1 {

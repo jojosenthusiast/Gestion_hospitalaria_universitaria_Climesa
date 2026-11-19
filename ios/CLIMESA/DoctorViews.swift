@@ -76,7 +76,7 @@ struct DoctorDayView: View {
                 ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.short(item.startedAt)) {
                     HStack(spacing: Spacing.s) {
                         Text("day.unsigned.resume").font(Typo.label).foregroundStyle(Theme.primaryText)
-                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                        ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                     }
                 }
                 .contentShape(Rectangle())
@@ -327,7 +327,7 @@ struct DoctorDayView: View {
                         ListRow(title: L.text("day.results.title")) {
                             HStack(spacing: Spacing.s) {
                                 Text(verbatim: "\(pendingResults)").font(Typo.label).monospacedDigit().foregroundStyle(Theme.ink)
-                                Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                             }
                         }
                         .contentShape(Rectangle())
@@ -338,11 +338,11 @@ struct DoctorDayView: View {
                     if index > 0 { Divider().overlay(Theme.line) }
                     NavigationLink { PatientSectionView(section: section, profile: profile) } label: {
                         HStack(spacing: Spacing.m) {
-                            Image(systemName: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
+                            SectionIcon(icon: section.icon, symbol: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
                             ListRow(title: L.text(section.titleKey)) {
                                 HStack(spacing: Spacing.s) {
                                     if section == .hospitalizados, let count = day.hospitalized?.value { Text(verbatim: "\(count)").font(Typo.label).foregroundStyle(Theme.ink) }
-                                    Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                    ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                                 }
                             }
                         }
@@ -582,7 +582,7 @@ struct DoctorPatientsView: View {
                                 ListRow(title: patient.fullName, meta: RecordAccess.rowMeta(patient)) {
                                     HStack(spacing: Spacing.s) {
                                         if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
-                                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                        ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                                     }
                                 }
                                 .contentShape(Rectangle())
@@ -990,7 +990,7 @@ private struct HospitalizedRow: View {
             }
             if let hint = actions.requestHint {
                 HStack(alignment: .top, spacing: Spacing.s) {
-                    Image(systemName: "bell.badge").foregroundStyle(Theme.warning).accessibilityHidden(true)
+                    ClimesaIcon(.bell, size: 18).foregroundStyle(Theme.warning).accessibilityHidden(true)
                     Text(verbatim: hint).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Spacing.s).frame(maxWidth: .infinity, alignment: .leading)
@@ -1104,7 +1104,7 @@ private struct DischargeView: View {
                             let id = line.id
                             pending.removeAll { $0.id == id }
                         } label: {
-                            Image(systemName: "minus.circle").font(Typo.heading).frame(width: 44, height: 44).contentShape(Rectangle())
+                            ClimesaIcon(.close, size: 22).frame(width: 44, height: 44).contentShape(Rectangle())
                         }
                         .foregroundStyle(Theme.muted)
                         .accessibilityLabel(Text("discharge.pending.remove"))
@@ -1112,7 +1112,7 @@ private struct DischargeView: View {
                 }
                 FieldError(text: errors["pending"] ?? submission.fieldErrors["pending"])
                 Button { pending.append(PendingLine()) } label: {
-                    Label { Text("discharge.pending.add") } icon: { Image(systemName: "plus") }
+                    Label { Text("discharge.pending.add") } icon: { ClimesaIcon(.plus, size: 18) }
                         .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
                 }
                 .foregroundStyle(Theme.primaryText)
@@ -1227,7 +1227,7 @@ struct AmbulanceArrivalView: View {
                             Task { await load() }
                         } label: {
                             ListRow(title: String(format: L.text(candidate.arrived ? "arrival.pending.arrived" : "arrival.pending.onTheWay"), ClimesaDates.display(candidate.dispatchedAt, .time))) {
-                                if candidate.serviceId == arrival.prehospital?.serviceId { Image(systemName: "checkmark").foregroundStyle(Theme.ink) }
+                                if candidate.serviceId == arrival.prehospital?.serviceId { ClimesaIcon(.check, size: 18).foregroundStyle(Theme.ink) }
                             }
                         }
                         .buttonStyle(.plain)

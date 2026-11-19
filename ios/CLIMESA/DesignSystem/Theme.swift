@@ -155,7 +155,7 @@ enum Motion {
 /// familia. `relativeTo:` respeta Dynamic Type.
 enum Atkinson {
     enum Weight: String {
-        case regular = "Regular", medium = "Medium", semibold = "SemiBold", bold = "Bold"
+        case regular = "Regular", medium = "Medium", semibold = "SemiBold", bold = "Bold", extraBold = "ExtraBold"
 
         var swiftUI: Font.Weight {
             switch self {
@@ -163,6 +163,7 @@ enum Atkinson {
             case .medium: return .medium
             case .semibold: return .semibold
             case .bold: return .bold
+            case .extraBold: return .heavy
             }
         }
 
@@ -173,6 +174,7 @@ enum Atkinson {
             case .medium: return 500
             case .semibold: return 600
             case .bold: return 700
+            case .extraBold: return 800
             }
         }
     }

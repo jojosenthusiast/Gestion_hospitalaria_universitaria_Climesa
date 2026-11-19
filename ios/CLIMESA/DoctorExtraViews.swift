@@ -274,7 +274,7 @@ private struct ExternalRecordSheet: View {
                 if matches.isEmpty { Text("record.external.noMatch").font(Typo.small).foregroundStyle(Theme.muted) }
                 ForEach(matches) { exam in
                     Button { add(exam) } label: {
-                        Label { Text(verbatim: "\(exam.name) · \(exam.code)") } icon: { Image(systemName: "plus.circle") }
+                        Label { Text(verbatim: "\(exam.name) · \(exam.code)") } icon: { ClimesaIcon(.plus, size: 18) }
                             .font(Typo.body).foregroundStyle(Theme.primaryText).frame(maxWidth: .infinity, minHeight: Spacing.control, alignment: .leading)
                     }
                     .buttonStyle(.plain)
@@ -416,7 +416,7 @@ struct AmbulanceOverviewView: View {
                 StatusTag(tag.value, label: tag.label)
             }
             if let line = AmbulanceLogRules.serviceLine(value) {
-                Label { Text(verbatim: line) } icon: { Image(systemName: "cross.case").accessibilityHidden(true) }
+                Label { Text(verbatim: line) } icon: { ClimesaIcon(.ambulance, size: 18).accessibilityHidden(true) }
                     .labelStyle(.titleAndIcon).font(Typo.label).foregroundStyle(Theme.ink)
             }
             if let crew = AmbulanceLogRules.crewNotice(value) {
@@ -426,7 +426,7 @@ struct AmbulanceOverviewView: View {
                 // A dispatch block is a warning, not a critical value: warning tone, red stays for critical. Its reason
                 // is already the header's subtitle; this line says what to do.
                 HStack(alignment: .top, spacing: Spacing.s) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning).accessibilityHidden(true)
+                    ClimesaIcon(.alert, size: 18).foregroundStyle(Theme.warning).accessibilityHidden(true)
                     Text(verbatim: AmbulanceLogRules.blockAdvice(block, canPlanShifts: account.can("turnos.planificar"))).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -460,7 +460,7 @@ struct AmbulanceOverviewView: View {
                 .onSubmit { Task { await loadLog() } }
             Button { filtersOpen.toggle() } label: {
                 HStack {
-                    Image(systemName: "line.3.horizontal.decrease.circle").accessibilityHidden(true)
+                    ClimesaIcon(.filter, size: 18).accessibilityHidden(true)
                     Text(verbatim: query.activeCount == 0 ? L.text("ambulance.log.filters") : String(format: L.text("ambulance.log.filters.active"), query.activeCount)).font(Typo.label)
                     Spacer()
                     Image(systemName: filtersOpen ? "chevron.up" : "chevron.down").accessibilityHidden(true)

@@ -153,7 +153,7 @@ struct PartError: View {
         let retryable = failure?.offersRetry ?? true
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack(alignment: .top, spacing: Spacing.s) {
-                Image(systemName: retryable ? "exclamationmark.triangle.fill" : "info.circle")
+                ClimesaIcon(retryable ? .alert : .info, size: 18)
                     .foregroundStyle(retryable ? Theme.danger : Theme.muted).accessibilityHidden(true)
                 Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             }

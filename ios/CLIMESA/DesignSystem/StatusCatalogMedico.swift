@@ -69,7 +69,7 @@ struct MedicoAlert: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.danger).accessibilityHidden(true)
+            ClimesaIcon(.alert, size: 18).foregroundStyle(Theme.danger).accessibilityHidden(true)
             Text(verbatim: text).font(Typo.small).foregroundStyle(Theme.danger)
         }
         .padding(Spacing.l).frame(maxWidth: .infinity, alignment: .leading)

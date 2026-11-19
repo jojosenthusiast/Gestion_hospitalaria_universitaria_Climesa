@@ -186,7 +186,7 @@ private struct ShortcutTile: View {
     let item: PatientHomeRules.Shortcut
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Image(systemName: item.symbol).font(Typo.heading).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+            ClimesaIcon(item.icon, size: 24).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
             Text(verbatim: item.title).font(Typo.label).foregroundStyle(Theme.ink).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
         .padding(Spacing.m)
@@ -212,7 +212,7 @@ private struct HomeCardLink<Content: View>: View {
                 HStack(spacing: Spacing.xs) {
                     Spacer()
                     Text("home.open").font(Typo.label).foregroundStyle(Theme.primaryText)
-                    Image(systemName: "chevron.right").font(Typo.small).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+                    ClimesaIcon(.chevron, size: 14).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
                 }
             }
             .contentShape(Rectangle())
@@ -337,7 +337,7 @@ private struct CalledCover: View {
     var body: some View {
         VStack(spacing: Spacing.space6) {
             Spacer()
-            Image(systemName: "bell.badge.fill").font(.system(size: 56, weight: .semibold)).foregroundStyle(Theme.onPrimary).accessibilityHidden(true)
+            ClimesaIcon(.bell, size: 56).foregroundStyle(Theme.onPrimary).accessibilityHidden(true)
             Text(verbatim: PatientTurnRules.calledTitle(office: office))
                 .font(Typo.number(40)).foregroundStyle(Theme.onPrimary).multilineTextAlignment(.center).minimumScaleFactor(0.5)
                 .accessibilityAddTraits(.isHeader)
@@ -544,7 +544,7 @@ private struct AppointmentRow: View {
             }
             switch option {
             case let .allowed(deadline):
-                Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { Image(systemName: "clock") }
+                Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { ClimesaIcon(.clock, size: 16) }
                     .font(Typo.small).foregroundStyle(Theme.muted)
             case .tooLate, .blocked:
                 // S0: the shared gate's reason (too late, or the server's own reason) instead of a silent gap.
@@ -808,7 +808,7 @@ private struct CategoryRequestSheet: View {
         let full = !selected && picked.count >= CategoryRequestRules.maxCategories
         return Button { picked = CategoryRequestRules.toggle(picked, category.code) } label: {
             HStack(spacing: Spacing.s) {
-                Image(systemName: selected ? "checkmark.circle.fill" : CategoryRequestRules.symbol(category.icon)).frame(width: 22)
+                ClimesaIcon(selected ? .check : CategoryRequestRules.icon(category.icon), size: 20).frame(width: 22)
                 Text(verbatim: category.name).font(Typo.label).multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
@@ -863,7 +863,7 @@ private struct CategoryRequestSheet: View {
 
     private func searchField(_ label: String, text: Binding<String>) -> some View {
         HStack(spacing: Spacing.s) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
+            ClimesaIcon(.search, size: 18).foregroundStyle(Theme.muted)
             TextField(label, text: text).font(Typo.body).foregroundStyle(Theme.ink).textInputAutocapitalization(.never).autocorrectionDisabled()
         }
         .padding(.horizontal, Spacing.m).frame(minHeight: Spacing.control)
@@ -965,7 +965,7 @@ struct LabOrderRow: View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: showPatient ? order.patientName : nil,
                     meta: ClimesaDates.short(order.completedAt ?? order.createdAt)) {
-                Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
             }
             HStack(spacing: Spacing.s) {
                 PatientTag(PatientLabRules.badgeValue(order), label: status)
@@ -1048,12 +1048,12 @@ struct MoreView: View {
                 NavigationLink { PatientSectionView(section: section, profile: profile) } label: {
                     SectionCard {
                         HStack(spacing: Spacing.m) {
-                            Image(systemName: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
+                            SectionIcon(icon: section.icon, symbol: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
                             Text(LocalizedStringKey(section.titleKey)).font(Typo.subheading).foregroundStyle(Theme.ink)
                             Spacer()
                             // D1: the unread count (`noLeidos`) on the Avisos entry.
                             if section == .avisos, let unread = NoticeRules.badge(notices.inbox, hiding: notices.hidden) { UnreadBadge(count: unread) }
-                            Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                            ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                         }
                     }
                 }.buttonStyle(.plain)

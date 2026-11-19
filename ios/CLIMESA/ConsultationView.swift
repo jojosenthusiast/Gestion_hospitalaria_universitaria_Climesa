@@ -254,7 +254,7 @@ struct ConsultationView: View {
             }
             if let next = step.next {
                 Button { step = next } label: {
-                    Label { Text(verbatim: String(format: L.text("consultation.step.next"), L.text(next.titleKey))) } icon: { Image(systemName: "arrow.right") }
+                    Label { Text(verbatim: String(format: L.text("consultation.step.next"), L.text(next.titleKey))) } icon: { ClimesaIcon(.arrow, size: 18) }
                         .font(Typo.label).frame(maxWidth: .infinity, minHeight: 44, alignment: .trailing).contentShape(Rectangle())
                 }
                 .foregroundStyle(Theme.primaryText)
@@ -303,7 +303,7 @@ struct ConsultationView: View {
             }
         if blocker != nil, let target = ConsultationRecordRules.stepFor(reason: reason, plan: plan) {
             Button { step = target } label: {
-                Label { Text(verbatim: String(format: L.text("consultation.sign.goTo"), L.text(target.titleKey))) } icon: { Image(systemName: "arrow.left") }
+                Label { Text(verbatim: String(format: L.text("consultation.sign.goTo"), L.text(target.titleKey))) } icon: { ClimesaIcon(.back, size: 18) }
                     .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
             }
             .foregroundStyle(Theme.primaryText)
@@ -777,7 +777,7 @@ private struct ConsultationStepBar: View {
                     let isCurrent = state == .actual
                     Button { current = step } label: {
                         HStack(spacing: Spacing.space1) {
-                            if state == .hecho { Image(systemName: "checkmark").imageScale(.small).accessibilityHidden(true) }
+                            if state == .hecho { ClimesaIcon(.check, size: 14).accessibilityHidden(true) }
                             Text(LocalizedStringKey(step.titleKey)).font(Typo.label).lineLimit(1)
                             if let count = counts[step] {
                                 Text(verbatim: "\(count)").font(Typo.caption).monospacedDigit()
@@ -819,7 +819,7 @@ private struct PrescriptionLineFields: View {
                 FormField(label: L.text("rx.medication"), text: $line.medication)
                 if removable {
                     Button(action: remove) {
-                        Image(systemName: "minus.circle").font(Typo.heading).frame(width: 44, height: 44).contentShape(Rectangle())
+                        ClimesaIcon(.close, size: 22).frame(width: 44, height: 44).contentShape(Rectangle())
                     }
                     .foregroundStyle(Theme.muted)
                     .accessibilityLabel(Text("rx.removeLine"))

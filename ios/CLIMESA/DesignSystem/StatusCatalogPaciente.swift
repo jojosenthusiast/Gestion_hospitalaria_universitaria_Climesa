@@ -40,7 +40,7 @@ struct PatientNotice: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: failure ? "exclamationmark.circle.fill" : "info.circle.fill").accessibilityHidden(true)
+            ClimesaIcon(failure ? .alert : .info, size: 18).accessibilityHidden(true)
             Text(verbatim: text).font(Typo.small).fixedSize(horizontal: false, vertical: true)
         }
         .foregroundStyle(failure ? Theme.danger : Theme.primaryText)

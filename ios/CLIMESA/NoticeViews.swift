@@ -94,7 +94,7 @@ struct CriticalNoticeBanner: View {
         if let notice = pending.first {
             let hours = NoticeRules.hoursText(model.inbox?.reminderHours ?? 4)
             HStack(alignment: .top, spacing: Spacing.m) {
-                Image(systemName: "exclamationmark.triangle.fill").font(Typo.heading)
+                ClimesaIcon(.alert, size: 22)
                     .foregroundStyle(Theme.critical).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Spacing.m) {
                     HStack(spacing: Spacing.s) {
@@ -122,7 +122,7 @@ struct CriticalNoticeBanner: View {
                     } label: {
                         HStack(spacing: Spacing.xs) {
                             Text("notices.banner.open").font(Typo.label)
-                            Image(systemName: "chevron.right").font(Typo.small).accessibilityHidden(true)
+                            ClimesaIcon(.chevron, size: 14).accessibilityHidden(true)
                         }
                         .foregroundStyle(Theme.primaryText)
                         .frame(minHeight: 44)
@@ -252,7 +252,7 @@ private struct NoticeRow: View {
                 if !meta.isEmpty { Text(verbatim: meta).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             Spacer(minLength: Spacing.s)
-            Image(systemName: "chevron.right").font(Typo.small).foregroundStyle(Theme.muted).accessibilityHidden(true)
+            ClimesaIcon(.chevron, size: 14).foregroundStyle(Theme.muted).accessibilityHidden(true)
         }
         .padding(.vertical, Spacing.m)
         .frame(minHeight: Spacing.control)
@@ -291,7 +291,7 @@ struct NoticeDetailView: View {
                 Label {
                     Text(verbatim: "\(L.text("notices.read")) · \(ClimesaDates.short(acknowledged))").font(Typo.small)
                 } icon: {
-                    Image(systemName: "envelope.open").accessibilityHidden(true)
+                    ClimesaIcon(.mail, size: 18).accessibilityHidden(true)
                 }
                 .foregroundStyle(Theme.muted)
             } else if NoticeRules.canAcknowledge(notice) {
@@ -334,7 +334,7 @@ struct NoticeLevelBadge: View {
         let critical = level == .critico
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
         HStack(spacing: 6) {
-            Image(systemName: level.symbol).imageScale(.small).accessibilityHidden(true)
+            ClimesaIcon(level.icon, size: 14).accessibilityHidden(true)
             Text(verbatim: level.label).lineLimit(1)
         }
         .font(Typo.tag)
@@ -360,7 +360,7 @@ struct InboxNoticeCard: View {
             }
         }()
         HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: notice.level == .informativo ? notice.level.symbol : "exclamationmark.triangle.fill")
+            ClimesaIcon(notice.level == .informativo ? notice.level.icon : .alert, size: 20)
                 .foregroundStyle(tone.strong).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.s) {
                 NoticeLevelBadge(level: notice.level)
