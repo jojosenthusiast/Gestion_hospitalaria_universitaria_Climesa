@@ -262,10 +262,10 @@ const rec: RoleDashboard = {
   ],
   tray: ({ d, profile }) => [
     // S8: asked appointments and requests by category both wait on Recepción: one group, one count (same as Citas).
-    { id: 'solicitudes', title: 'Solicitudes de cita', href: '#/citas', state: requestsState(d),
+    { id: 'solicitudes', title: 'Solicitudes de cita', href: '#/citas?vista=solicitudes', state: requestsState(d),
       items: [
         ...(d.apptRequests.data ?? []).filter(isPendingCategoryRequest).map(r => ({ id: `s-${r.id}`, title: r.patientName ?? 'Paciente', detail: joinParts(r.categories.map(c => c.name).join(', '), r.note, formatRelative(r.createdAt)), tone: 'warn' as Tone, href: `#/citas?asignar=${r.id}`, action: 'Asignar', tag: 'Por asignar', status: 'pendiente' })),
-        ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `${formatDate(a.start, { withYear: false })}, ${timeLabel(a.start)} · ${a.doctorName}`, tone: 'warn' as Tone, href: '#/citas', action: 'Confirmar', tag: 'Por confirmar', status: 'solicitada' })),
+        ...(d.appts.data ?? []).filter(a => a.state === 'solicitada').map(a => ({ id: `c-${a.id}`, title: a.patientName, detail: `${formatDate(a.start, { withYear: false })}, ${timeLabel(a.start)} · ${a.doctorName}`, tone: 'warn' as Tone, href: '#/citas?vista=solicitudes', action: 'Confirmar', tag: 'Por confirmar', status: 'solicitada' })),
       ] },
     indicatedAdmissions(d), noBed(d), pendingAmbulance(d, profile),
   ],
