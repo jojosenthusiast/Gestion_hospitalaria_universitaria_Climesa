@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lote 5 S13: revisar y liberar resultados con jerarquía -->
+    <string name="lab5_paciente">Paciente: %1$s</string>
+    <string name="lab5_origen">Pedido el %1$s · %2$s</string>
+    <string name="lab5_origen_consulta">desde una consulta</string>
+    <string name="lab5_origen_sin_consulta">sin consulta de origen</string>
+    <string name="lab5_resultados">Resultados (%1$d)</string>
+    <string name="lab5_ver_imagen">Ver imagen</string>
+    <string name="lab5_ver_pdf">Ver informe PDF</string>
+    <string name="lab5_ver_expediente">Ver expediente</string>
+    <string name="lab5_en_rango">Todos los resultados en rango</string>
+</resources>

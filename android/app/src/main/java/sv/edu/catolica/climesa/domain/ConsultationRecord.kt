@@ -10,7 +10,7 @@ data class RecordedDiagnosis(val id: String, val code: String, val principal: Bo
 data class RecordedMedication(val medication: String, val dose: String, val frequency: String, val duration: String)
 
 /** Row 3: one set of vital signs already taken in this consultation (`vitalSigns` of the detail), usually by the assistant. */
-data class RecordedVitals(val id: String, val takenAt: String, val text: String)
+data class RecordedVitals(val id: String, val takenAt: String, val text: String, val parts: List<Pair<String, String>> = emptyList())
 
 /** A lab order of this consultation (`GET /laboratorio/ordenes` filtered by `consultationId`). */
 data class RecordedLabOrder(val id: String, val state: String, val exams: List<String>, val examIds: Set<String>, val examCodes: Set<String>)
@@ -55,7 +55,18 @@ object ConsultationRecordRules {
             text(v, "weightKg")?.let { add("$it kg") }
             text(v, "heightCm")?.let { add("$it cm") }
         }
-        RecordedVitals(v.optString("id"), v.optString("takenAt"), parts.ifEmpty { listOf("—") }.joinToString(" · "))
+        // Lote 5 S3: the same values with their full names for the consultation screen (no "FC", "T" or "SpO₂").
+        val named = buildList {
+            val sys = int(v, "systolic"); val dia = int(v, "diastolic")
+            if (sys != null && dia != null) add("Presión arterial" to "$sys/$dia mmHg")
+            int(v, "heartRate")?.let { add("Frecuencia cardiaca" to "$it latidos por minuto") }
+            int(v, "respiratoryRate")?.let { add("Frecuencia respiratoria" to "$it respiraciones por minuto") }
+            text(v, "temperature")?.let { add("Temperatura" to "$it °C") }
+            int(v, "oxygenSaturation")?.let { add("Saturación de oxígeno" to "$it %") }
+            text(v, "weightKg")?.let { add("Peso" to "$it kg") }
+            text(v, "heightCm")?.let { add("Talla" to "$it cm") }
+        }
+        RecordedVitals(v.optString("id"), v.optString("takenAt"), parts.ifEmpty { listOf("—") }.joinToString(" · "), named)
     }.sortedByDescending { it.takenAt }
 
     /**

@@ -91,7 +91,14 @@ data class HospitalAdmission(
 data class HospitalBedSuggestion(val id: String, val version: Int, val code: String, val room: String, val category: String, val reason: String)
 
 /** A bed of `GET /camas` as the transfer picker needs it. */
-data class TransferBed(val id: String, val code: String, val room: String, val category: String, val state: String)
+data class TransferBed(val id: String, val code: String, val room: String, val category: String, val state: String, val level: Int? = null) {
+    val free get() = state == "libre"
+}
+
+/** Lote 5 S7: one room of the transfer list, "Piso 2 · Habitación 204 (Semiprivada)", with every bed of the category in it. */
+data class TransferRoom(val title: String, val beds: List<TransferBed>) {
+    val freeCount get() = beds.count { it.free }
+}
 
 /** One entry of `GET /admisiones/{id}/notas-enfermeria`, newest first. */
 data class NursingNote(val id: String, val text: String, val createdAt: String, val authorName: String?)
@@ -143,7 +150,8 @@ object AdmissionParser {
     }
 
     fun beds(value: Any?): List<TransferBed> = objects(value as? JSONArray).map { row ->
-        TransferBed(row.optString("id"), row.optString("code"), row.optString("room"), row.optString("category"), row.optString("state"))
+        TransferBed(row.optString("id"), row.optString("code"), row.optString("room"), row.optString("category"), row.optString("state"),
+            level = if (row.isNull("level") || !row.has("level")) null else row.optInt("level"))
     }
 
     fun notes(value: Any?): List<NursingNote> = objects(value as? JSONArray).map { row ->
@@ -313,6 +321,26 @@ object HospitalizationRules {
         return beds.filter { it.state == "libre" && it.category == category && it.code != admission.bed }
     }
 
+    /**
+     * Lote 5 S7: the transfer list by floor and room. Only rooms with a free bed of the patient's category appear; inside them
+     * every bed of that category shows, free or occupied, so the nurse sees the room as it is. The current bed is left out.
+     */
+    fun transferGroups(beds: List<TransferBed>, admission: HospitalAdmission): List<TransferRoom> {
+        val category = admission.bedCategory ?: admission.category
+        val same = beds.filter { it.category == category && it.code != admission.bed && it.state != "inactiva" }
+        return same.groupBy { it.level to it.room }.entries
+            .filter { (_, list) -> list.any { it.free } }
+            .sortedWith(compareBy<Map.Entry<Pair<Int?, String>, List<TransferBed>>> { it.key.first ?: Int.MAX_VALUE }.thenComparator { a, b -> BedBoard.compareNatural(a.key.second, b.key.second) })
+            .map { (key, list) -> TransferRoom(roomTitle(key.first, key.second, category), list.sortedWith { a, b -> BedBoard.compareNatural(a.code, b.code) }) }
+    }
+
+    /** "Piso 2 · Habitación 204 (Semiprivada)"; without a floor, just the room. */
+    fun roomTitle(level: Int?, room: String, category: String): String {
+        val label = AdmissionIntake.CATEGORY_LABELS[category] ?: category.replaceFirstChar { it.uppercase() }
+        val roomText = room.trim().let { if (it.startsWith("Hab", ignoreCase = true)) it else "Habitación $it" }
+        return listOfNotNull(level?.let { "Piso $it" }, "$roomText ($label)").joinToString(" · ")
+    }
+
     fun transferBody(bedId: String, admissionVersion: Int, reason: String): JSONObject =
         JSONObject().put("bedId", bedId).put("version", admissionVersion).put("reason", reason.trim())
 
@@ -333,4 +361,23 @@ object HospitalizationRules {
 
     /** Codes after which the shown list is stale and must be fetched again. */
     fun staleCode(code: String?): Boolean = code == "transicion_invalida" || code == "version_conflicto"
+}
+
+/** Lote 5 S14: where the inpatient is in the discharge flow, said on the card's status strip. */
+data class DischargeStage(val title: String, val detail: String?, val tone: Tone) {
+    enum class Tone { NEUTRAL, INFO, SUCCESS, WARNING, DANGER }
+}
+
+object DischargeFlow {
+    fun stage(row: HospitalAdmission): DischargeStage = when (row.state) {
+        "pendiente_cama" -> DischargeStage("Pendiente de cama", "Enfermería o Recepción asignan la cama.", DischargeStage.Tone.WARNING)
+        "hospitalizado" -> when {
+            row.dischargeRequestedAt != null -> DischargeStage("Alta solicitada", "Falta la firma del médico tratante.", DischargeStage.Tone.WARNING)
+            else -> DischargeStage("Hospitalizado" + (row.bed.takeIf { it.isNotBlank() }?.let { " · cama $it" } ?: ""), "Siguiente paso: firmar el alta cuando esté listo.", DischargeStage.Tone.INFO)
+        }
+        "alta_firmada" -> DischargeStage("Alta firmada", "Falta registrar la salida del paciente.", DischargeStage.Tone.SUCCESS)
+        "egresado" -> DischargeStage("Egresado", null, DischargeStage.Tone.NEUTRAL)
+        "cancelada" -> DischargeStage("Admisión cancelada", null, DischargeStage.Tone.NEUTRAL)
+        else -> DischargeStage(row.state.replace('_', ' ').replaceFirstChar { it.uppercase() }, null, DischargeStage.Tone.NEUTRAL)
+    }
 }

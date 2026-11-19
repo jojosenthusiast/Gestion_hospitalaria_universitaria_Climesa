@@ -117,3 +117,25 @@ internal fun PatientSearchPicker(
     if (hasMore) TextButton(shape = ButtonShape, onClick = onMore, enabled = !searching) { Text(stringResource(R.string.rec_agendar_mas)) }
     if (!searching && results.isEmpty() && ReceptionScheduling.canSearch(query)) Text(stringResource(R.string.rec_agendar_sin_resultados), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
+
+/**
+ * Lote 5 S15: the clinician's record search (`GET /pacientes`, with the care relation), shared by "Expediente" and every module
+ * that needs to pick a patient's record. A patient without a care relation is listed with why it does not open yet.
+ */
+@Composable
+internal fun RecordPatientSearch(
+    query: String, onQuery: (String) -> Unit, onSearch: () -> Unit, searching: Boolean,
+    candidates: List<HistoryCandidate>, error: String?, onPick: (HistoryCandidate) -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
+        SectionCard(stringResource(R.string.exp5_buscar_titulo)) {
+            FormField(stringResource(R.string.historial_buscar), query, { onQuery(it.take(100)) }, hint = stringResource(R.string.exp5_buscar_ayuda))
+            PrimaryButton(stringResource(R.string.historial_buscar_boton), onSearch, icon = sv.edu.catolica.climesa.ui.icons.ClimesaIcons.Search, enabled = query.trim().length >= 2, loading = searching)
+        }
+        error?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        if (candidates.isNotEmpty()) Text(stringResource(R.string.clin_historial_buscar_resultados) + " (${candidates.size})", style = MaterialTheme.typography.titleMedium)
+        candidates.forEach { candidate ->
+            DataRow(candidate.fullName, meta = stringResource(R.string.historial_expediente, candidate.record), leadingIcon = sv.edu.catolica.climesa.ui.icons.ClimesaIcons.User, onClick = { onPick(candidate) }, blockedReason = candidate.blockedReason)
+        }
+    }
+}

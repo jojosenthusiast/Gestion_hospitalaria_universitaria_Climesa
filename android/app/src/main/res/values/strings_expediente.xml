@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lote 5 S15: expediente integrado y exámenes maestro-detalle -->
+    <string name="exp5_titulo">Expediente</string>
+    <string name="exp5_volver">Volver</string>
+    <string name="exp5_examenes_cuenta">Exámenes de laboratorio (%1$d)</string>
+    <string name="exp5_examen_pedido">Pedido %1$s</string>
+    <string name="exp5_ver_detalle">Ver detalle del examen</string>
+    <string name="exp5_detalle_titulo">Detalle del examen</string>
+    <string name="exp5_por_que">Por qué se pidió</string>
+    <string name="exp5_origen_consulta">Consulta del %1$s</string>
+    <string name="exp5_origen_medico">Pedido por %1$s</string>
+    <string name="exp5_origen_motivo">Motivo de la consulta: %1$s</string>
+    <string name="exp5_origen_sin_consulta">Esta orden no está ligada a una consulta del expediente (por ejemplo, un resultado externo).</string>
+    <string name="exp5_origen_diagnosticos">Diagnósticos de esa consulta</string>
+    <string name="exp5_resultados">Resultados</string>
+    <string name="exp5_completado">Completado el %1$s</string>
+    <string name="exp5_revisado">Revisado y liberado por el médico</string>
+    <string name="exp5_sin_revisar">Aún sin revisar por el médico</string>
+    <string name="exp5_consultas_cuenta">Consultas (%1$d)</string>
+    <string name="exp5_buscar_titulo">Buscar paciente</string>
+    <string name="exp5_buscar_ayuda">Escribe al menos 2 letras del nombre, el DUI o el número de expediente.</string>
+</resources>

@@ -109,4 +109,22 @@
     <string name="hosp_contador_motivo">%1$s · de 10 a 500 caracteres</string>
     <string name="hosp_contador_nota">%1$s · opcional</string>
     <string name="hosp_habitacion_n">%1$s · %2$d disponibles</string>
+    <!-- Lote 5 S14/S7: hospitalización del médico -->
+    <string name="hosp5_pendientes_titulo">Pendientes después del alta</string>
+    <string name="hosp5_pendientes_detalle">Qué queda por hacer y quién responde por cada cosa.</string>
+    <string name="hosp5_pendiente_n">Pendiente %1$d</string>
+    <string name="hosp5_que_falta">Qué falta hacer</string>
+    <string name="hosp5_quien_responde">Quién responde</string>
+    <string name="hosp5_quitar_pendiente">Quitar pendiente %1$d</string>
+    <string name="hosp5_sin_pendientes">Sin pendientes. Agrega uno solo si algo queda por hacer después del alta.</string>
+    <string name="hosp5_traslado_detalle">Habitaciones con camas libres de la categoría %1$s. Elige una cama libre.</string>
+    <string name="hosp5_cama_libre">%1$s libre</string>
+    <string name="hosp5_cama_ocupada">%1$s ocupada</string>
+    <string name="hosp5_libres_n">%1$d libres</string>
+    <string name="hosp5_ver_expediente">Ver expediente</string>
+    <string name="hosp5_pendiente_cama">Quedará pendiente de cama: Enfermería o Recepción asignan la cama cuando haya una disponible.</string>
+    <string name="hosp5_servicio">Servicio</string>
+    <string name="hosp5_servicio_hosp">Hospitalización</string>
+    <string name="hosp5_urgencia">Urgencia y cuidados</string>
+    <string name="hosp5_urgencia_detalle">Marca si el paciente está inestable: se atiende primero al asignar cama.</string>
 </resources>

@@ -1,6 +1,10 @@
 @file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.SwapHoriz
@@ -87,6 +91,8 @@ data class TransferForm(
     val admissionId: String,
     val loading: Boolean = true,
     val beds: List<TransferBed> = emptyList(),
+    /** Lote 5 S7: the same beds by floor and room, with the occupied ones of those rooms for context. */
+    val rooms: List<sv.edu.catolica.climesa.domain.TransferRoom> = emptyList(),
     val loadError: String? = null,
     val bedId: String? = null,
     val reason: String = "",
@@ -268,8 +274,10 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
         mutable.update { it.copy(transfer = TransferForm(admission.id), formError = null, error = null) }
         viewModelScope.launch {
             try {
-                val beds = HospitalizationRules.transferCandidates(AdmissionParser.beds(api.request("/camas")), admission)
-                mutable.update { s -> s.copy(transfer = s.transfer?.takeIf { it.admissionId == admission.id }?.copy(loading = false, beds = beds, loadError = null)) }
+                val all = AdmissionParser.beds(api.request("/camas"))
+                val beds = HospitalizationRules.transferCandidates(all, admission)
+                val rooms = HospitalizationRules.transferGroups(all, admission)
+                mutable.update { s -> s.copy(transfer = s.transfer?.takeIf { it.admissionId == admission.id }?.copy(loading = false, beds = beds, rooms = rooms, loadError = null)) }
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 mutable.update { s -> s.copy(transfer = s.transfer?.takeIf { it.admissionId == admission.id }?.copy(loading = false, loadError = readable(e, "No se pudieron consultar las camas libres."))) }
             }
@@ -371,6 +379,10 @@ fun HospitalizationScreen(
 ) {
     val state by model.state.collectAsStateWithLifecycle(); LaunchedEffect(Unit) { model.load() }
     val intakeState by intake.state.collectAsStateWithLifecycle()
+    // S15: the inpatient's record opens over the ward; back returns to it.
+    var recordPatient by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    if (profile != null) recordPatient?.let { id -> androidx.activity.compose.BackHandler { recordPatient = null }; PatientRecordPage(profile, id, modifier) { recordPatient = null }; return }
+    val onRecord: ((String) -> Unit)? = if ("expediente.ver" in profile?.permissions.orEmpty()) ({ recordPatient = it }) else null
     // A confirmed admission reloads the list behind the guided flow.
     val createdNotice = stringResource(R.string.ing_creado)
     LaunchedEffect(intakeState.finished) { if (intakeState.finished) { model.load(silent = true); model.announce(createdNotice); intake.consumeFinished() } }
@@ -424,7 +436,7 @@ fun HospitalizationScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                foldedItems(ordered, HospitalizationRules.WARD_VISIBLE, wardOpen, { wardOpen = !wardOpen }, foldKey = "planta-fold", key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals) }
+                foldedItems(ordered, HospitalizationRules.WARD_VISIBLE, wardOpen, { wardOpen = !wardOpen }, foldKey = "planta-fold", key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals, onRecord) }
             }
         }
     }
@@ -460,15 +472,44 @@ private fun IndicatedTray(rows: List<IndicatedAdmission>, model: Hospitalization
 }
 
 /** Every button comes from the server's `allowedActions`; the main action of the state is the only primary button. */
+/**
+ * Lote 5 S14: an inpatient as one card. The strip says where the patient is in the discharge flow; the actions sit on one
+ * line by weight ("Tomar signos" and "Firmar alta" side by side); pending items after the discharge show with who answers.
+ */
 @Composable
-private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel, primary: Boolean, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)?) {
+private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel, primary: Boolean, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)?, onRecord: ((String) -> Unit)? = null) {
     val actions = row.allowedActions
     val main = HospitalizationRules.primaryAction(actions)?.takeIf { primary }
-    @Composable fun act(action: AdmissionAction, text: String, onClick: () -> Unit, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
-        if (action !in actions) return
-        if (action == main) PrimaryButton(text, onClick, icon = icon, enabled = !busy) else SecondaryButton(text, onClick, icon = icon, enabled = !busy)
+    fun role(action: AdmissionAction) = if (action == main) ActionRole.Primary else ActionRole.Edit
+    val stage = sv.edu.catolica.climesa.domain.DischargeFlow.stage(row)
+    val cardActions = buildList {
+        if (AdmissionAction.ASSIGN_BED in actions) add(CardAction(stringResource(R.string.hosp_asignar_cama), role(AdmissionAction.ASSIGN_BED), { model.open(row) }, icon = ClimesaIcons.Bed, enabled = !busy))
+        HospitalizationRules.vitalsSubject(row)?.let { subject -> onOpenVitals?.let { open -> add(CardAction(stringResource(R.string.rec7_hosp_signos), ActionRole.Edit, { open(subject) }, icon = ClimesaIcons.Pulse, enabled = !busy)) } }
+        if (AdmissionAction.SIGN_DISCHARGE in actions) add(CardAction(stringResource(R.string.hosp_firmar_alta), role(AdmissionAction.SIGN_DISCHARGE), { model.openDischarge(row) }, icon = ClimesaIcons.Check, enabled = !busy))
+        if (AdmissionAction.REGISTER_EXIT in actions) add(CardAction(stringResource(R.string.hosp_registrar_salida), role(AdmissionAction.REGISTER_EXIT), { model.openExit(row) }, enabled = !busy))
+        if (AdmissionAction.REQUEST_DISCHARGE in actions) add(CardAction(stringResource(R.string.hosp_solicitar_alta), ActionRole.Edit, { model.openReason(row, AdmissionAction.REQUEST_DISCHARGE) }, enabled = !busy))
+        if (AdmissionAction.TRANSFER in actions) add(CardAction(stringResource(R.string.hosp_trasladar), ActionRole.Edit, { model.openTransfer(row) }, icon = Icons.Outlined.SwapHoriz, enabled = !busy))
+        if (AdmissionAction.NURSING_NOTE in actions) add(CardAction(stringResource(R.string.hosp_notas), ActionRole.Neutral, { model.openNotes(row) }, icon = ClimesaIcons.Clipboard, enabled = !busy))
+        row.patientId?.let { id -> onRecord?.let { open -> add(CardAction(stringResource(R.string.hosp5_ver_expediente), ActionRole.Neutral, { open(id) }, icon = ClimesaIcons.User)) } }
+        if (AdmissionAction.REVOKE_DISCHARGE in actions) add(CardAction(stringResource(R.string.hosp_revocar_alta), ActionRole.Edit, { model.openReason(row, AdmissionAction.REVOKE_DISCHARGE) }, enabled = !busy))
+        // S0: cancelling an admission is the shared red deactivate action.
+        if (AdmissionAction.CANCEL in actions) add(CardAction(stringResource(R.string.hosp_cancelar_admision), ActionRole.Danger, { model.openReason(row, AdmissionAction.CANCEL) }, enabled = !busy))
     }
-    SectionCard(title = row.patientName, eyebrow = AdmissionIntake.CATEGORY_LABELS[row.category] ?: row.category, action = { StatusTag(row.state) }) {
+    val tone = when (stage.tone) {
+        sv.edu.catolica.climesa.domain.DischargeStage.Tone.INFO -> StripTone.Info
+        sv.edu.catolica.climesa.domain.DischargeStage.Tone.SUCCESS -> StripTone.Success
+        sv.edu.catolica.climesa.domain.DischargeStage.Tone.WARNING -> StripTone.Warning
+        sv.edu.catolica.climesa.domain.DischargeStage.Tone.DANGER -> StripTone.Danger
+        else -> StripTone.Neutral
+    }
+    ActionCard(cardActions, status = { CardStatusStrip(stage.title, tone, icon = ClimesaIcons.Bed, detail = stage.detail) }) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(row.patientName, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                Text(AdmissionIntake.CATEGORY_LABELS[row.category] ?: row.category, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            StatusTag(row.state)
+        }
         Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
             LabeledValue(stringResource(R.string.hosp_cama), if (row.bed.isBlank()) stringResource(R.string.clin_hosp_sin_cama) else row.bed, Modifier.weight(1f))
             if (row.isolation) FamilyBadge(stringResource(R.string.clin_hosp_aislamiento), null)
@@ -487,21 +528,41 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             // Row 7: what is left after the signed discharge and who answers for it (RN-11, iOS `SignedDischarge`).
             val pending = d.pending
             when {
-                !pending.isNullOrEmpty() -> pending.forEach { p -> Text(stringResource(R.string.med_alta_pendiente_item, p.description, p.responsible), style = MaterialTheme.typography.bodySmall) }
+                !pending.isNullOrEmpty() -> {
+                    PendingHeader()
+                    pending.forEach { p -> PendingLine(p.description, p.responsible) }
+                }
                 pending == null && d.pendingCount > 0 -> Text(androidx.compose.ui.res.pluralStringResource(R.plurals.med_alta_pendientes_n, d.pendingCount, d.pendingCount), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 else -> Text(stringResource(R.string.med_alta_sin_pendientes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         }
-        act(AdmissionAction.ASSIGN_BED, stringResource(R.string.hosp_asignar_cama), { model.open(row) }, ClimesaIcons.Bed)
-        act(AdmissionAction.SIGN_DISCHARGE, stringResource(R.string.hosp_firmar_alta), { model.openDischarge(row) })
-        act(AdmissionAction.REGISTER_EXIT, stringResource(R.string.hosp_registrar_salida), { model.openExit(row) })
-        if (AdmissionAction.REQUEST_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_solicitar_alta), { model.openReason(row, AdmissionAction.REQUEST_DISCHARGE) }, enabled = !busy)
-        if (AdmissionAction.TRANSFER in actions) SecondaryButton(stringResource(R.string.hosp_trasladar), { model.openTransfer(row) }, icon = Icons.Outlined.SwapHoriz, enabled = !busy)
-        if (AdmissionAction.NURSING_NOTE in actions) SecondaryButton(stringResource(R.string.hosp_notas), { model.openNotes(row) }, icon = ClimesaIcons.Clipboard, enabled = !busy)
-        HospitalizationRules.vitalsSubject(row)?.let { subject -> onOpenVitals?.let { open -> RowAction(stringResource(R.string.rec7_hosp_signos), { open(subject) }) } }
-        if (AdmissionAction.REVOKE_DISCHARGE in actions) SecondaryButton(stringResource(R.string.hosp_revocar_alta), { model.openReason(row, AdmissionAction.REVOKE_DISCHARGE) }, enabled = !busy)
-        // S0: cancelling an admission is the shared red deactivate action.
-        if (AdmissionAction.CANCEL in actions) CrudButton(CrudKind.Deactivate, stringResource(R.string.hosp_cancelar_admision), { model.openReason(row, AdmissionAction.CANCEL) }, enabled = !busy)
+    }
+}
+
+/** S14: the heading of the pending list, with its own icon so it never reads as part of the summary. */
+@Composable
+private fun PendingHeader() {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Icon(ClimesaIcons.Clipboard, null, Modifier.size(18.dp), tint = MaterialTheme.climesa.primaryText)
+        Text(stringResource(R.string.hosp5_pendientes_titulo), Modifier.semantics { heading() }, style = MaterialTheme.typography.titleSmall)
+    }
+}
+
+/** One pending item: what is left on the left, who answers for it as a chip with a person icon. */
+@Composable
+private fun PendingLine(description: String, responsible: String) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        Icon(ClimesaIcons.Check, null, Modifier.size(16.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(description, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+        AssigneeChip(responsible)
+    }
+}
+
+@Composable
+private fun AssigneeChip(name: String) {
+    Row(Modifier.background(MaterialTheme.climesa.soft, androidx.compose.foundation.shape.RoundedCornerShape(50)).padding(horizontal = Spacing.sm, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        Icon(ClimesaIcons.User, null, Modifier.size(14.dp), tint = MaterialTheme.climesa.primaryText)
+        Text(name.ifBlank { "Sin responsable" }, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.climesa.primaryText, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 
@@ -556,17 +617,22 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.drop(2).forEach { type -> ClimesaFilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
             FormField(stringResource(R.string.hosp_alta_resumen), form.summary, model::onSummary, hint = stringResource(R.string.hosp_alta_resumen_ayuda) + " " + HospitalizationRules.counter(form.summary, HospitalizationRules.SUMMARY_MAX), enabled = !state.busy, singleLine = false)
             if (form.type == DischargeType.VOLUNTARY) Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(form.voluntaryConsent, model::onVoluntaryConsent, enabled = !state.busy); Text(stringResource(R.string.hosp_alta_constancia), style = MaterialTheme.typography.bodySmall) }
-            Text(stringResource(R.string.hosp_alta_pendientes), style = MaterialTheme.typography.labelLarge)
+            // S14: pending items and who answers for them, set apart from the summary with their own heading and blocks.
+            HorizontalDivider(color = MaterialTheme.climesa.line)
+            PendingHeader()
+            Text(stringResource(R.string.hosp5_pendientes_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (form.pending.isEmpty()) Text(stringResource(R.string.hosp5_sin_pendientes), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             form.pending.forEachIndexed { index, item ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        FormField(stringResource(R.string.hosp_alta_pendiente), item.description, { model.onPending(index, item.copy(description = it)) }, enabled = !state.busy)
-                        FormField(stringResource(R.string.hosp_alta_responsable), item.responsible, { model.onPending(index, item.copy(responsible = it)) }, enabled = !state.busy)
+                Column(Modifier.fillMaxWidth().border(1.dp, MaterialTheme.climesa.line, androidx.compose.foundation.shape.RoundedCornerShape(Radius.control)).padding(Spacing.sm + Spacing.xs), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.hosp5_pendiente_n, index + 1), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                        IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(ClimesaIcons.Close, stringResource(R.string.hosp5_quitar_pendiente, index + 1)) }
                     }
-                    IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(ClimesaIcons.Close, stringResource(R.string.hosp_alta_quitar)) }
+                    FormField(stringResource(R.string.hosp5_que_falta), item.description, { model.onPending(index, item.copy(description = it)) }, enabled = !state.busy, required = true)
+                    FormField(stringResource(R.string.hosp5_quien_responde), item.responsible, { model.onPending(index, item.copy(responsible = it)) }, enabled = !state.busy, required = true)
                 }
             }
-            TextButton(shape = ButtonShape, onClick = model::addPending, enabled = !state.busy) { Text(stringResource(R.string.hosp_alta_agregar)) }
+            CardActionButton(CardAction(stringResource(R.string.hosp_alta_agregar), ActionRole.Edit, model::addPending, icon = ClimesaIcons.Plus, enabled = !state.busy), Modifier.fillMaxWidth())
         }
     }
 }
@@ -637,7 +703,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         confirmLabel = stringResource(R.string.hosp_traslado_confirmar),
         onConfirm = { model.transfer(admission) },
         onDismiss = model::closeTransfer,
-        message = stringResource(R.string.hosp_traslado_detalle, AdmissionIntake.CATEGORY_LABELS[category] ?: category),
+        message = stringResource(R.string.hosp5_traslado_detalle, AdmissionIntake.CATEGORY_LABELS[category] ?: category),
         busy = state.busy,
         confirmEnabled = form.bedId != null && HospitalizationRules.reasonError(form.reason) == null,
     ) {
@@ -648,11 +714,32 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
                 form.loading -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Spinner(size = 20.dp, strokeWidth = 2.dp); Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall) }
                 form.loadError != null -> NoticeBanner(NoticeKind.ERROR, form.loadError)
                 form.beds.isEmpty() -> NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_traslado_sin_camas))
+                // S7: by floor and room, each bed a chip that says free or occupied; only free ones can be chosen.
+                form.rooms.isNotEmpty() -> form.rooms.forEach { room -> TransferRoomBlock(room, form.bedId, !state.busy) { model.pickTransferBed(it) } }
                 else -> form.beds.forEach { bed ->
                     DataRow(title = "${bed.code} · ${bed.room}", leadingIcon = if (bed.id == form.bedId) ClimesaIcons.Check else ClimesaIcons.Bed, onClick = { model.pickTransferBed(bed.id) }, divider = true, container = false)
                 }
             }
             FormField(stringResource(R.string.hosp_traslado_motivo), form.reason, model::onTransferReason, hint = stringResource(R.string.hosp_contador_motivo, HospitalizationRules.counter(form.reason, ChangeReason.MAX)), enabled = !state.busy, singleLine = false)
+        }
+    }
+}
+
+/** S7: one room of the transfer list: "Piso 2 · Habitación 204 (Semiprivada)" and its beds as chips. */
+@Composable
+private fun TransferRoomBlock(room: sv.edu.catolica.climesa.domain.TransferRoom, selected: String?, enabled: Boolean, onPick: (String) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            Text(room.title, Modifier.weight(1f).semantics { heading() }, style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.hosp5_libres_n, room.freeCount), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.climesa.success)
+        }
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+            room.beds.forEach { bed ->
+                val chosen = bed.id == selected
+                val label = stringResource(if (bed.free) R.string.hosp5_cama_libre else R.string.hosp5_cama_ocupada, bed.code)
+                ClimesaFilterChip(selected = chosen, onClick = { onPick(bed.id) }, enabled = enabled && bed.free,
+                    label = { Text(label) }, leadingIcon = { Icon(if (chosen) ClimesaIcons.Check else ClimesaIcons.Bed, null, Modifier.size(16.dp)) })
+            }
         }
     }
 }

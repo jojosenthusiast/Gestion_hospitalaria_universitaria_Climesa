@@ -13,6 +13,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -93,32 +94,38 @@ internal fun AdmissionIndicationDialog(model: AdmissionIndicationViewModel) {
         Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
             // Locked context: what the consultation already knows is shown, never asked again.
             LabeledValue(stringResource(R.string.ind_paciente), context.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) })
+            // Lote 5 S14: the indication leaves the patient waiting for a bed; the doctor does not pick it.
+            NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp5_pendiente_cama))
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {
                 LabeledValue(stringResource(R.string.ind_origen), stringResource(R.string.ind_origen_consulta), Modifier.weight(1f))
                 LabeledValue(stringResource(R.string.ind_medico), context.doctorName.ifBlank { stringResource(R.string.ind_medico_yo) }, Modifier.weight(1f))
             }
+            LabeledValue(stringResource(R.string.hosp5_servicio), stringResource(R.string.hosp5_servicio_hosp))
             (state.error ?: state.contextError)?.let { NoticeBanner(NoticeKind.ERROR, it) }
+            RequiredLegend()
             val motive = state.draft.motive
             val short = motive.trim().length < AdmissionIntake.MOTIVE_MIN
             FormField(
-                stringResource(R.string.ind_motivo), motive, model::motive, singleLine = false, enabled = !state.busy,
+                stringResource(R.string.ind_motivo), motive, model::motive, singleLine = false, enabled = !state.busy, required = true,
                 error = fields["motive"],
                 hint = AdmissionIndication.motiveCounter(motive) + if (short) " · " + stringResource(R.string.ind_motivo_minimo, AdmissionIntake.MOTIVE_MIN) else " ✓",
             )
-            Text(stringResource(R.string.ind_categoria), style = MaterialTheme.typography.labelLarge)
+            Row { Text(stringResource(R.string.ind_categoria), style = MaterialTheme.typography.labelLarge); RequiredMark() }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 AdmissionIndication.CATEGORIES.forEach { code ->
                     ClimesaFilterChip(selected = state.draft.category == code, onClick = { model.category(code) }, enabled = !state.busy, label = { Text(AdmissionIntake.CATEGORY_LABELS[code] ?: code) })
                 }
             }
-            fields["requestedCategory"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            fields["requestedCategory"]?.let { FieldError(it) }
             CheckRow(stringResource(R.string.ind_aislamiento), state.draft.isolation, !state.busy, model::isolation)
             if (state.draft.isolation) FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 IsolationType.entries.forEach { type ->
                     ClimesaFilterChip(selected = state.draft.isolationType == type, onClick = { model.isolationType(if (state.draft.isolationType == type) null else type) }, enabled = !state.busy, label = { Text(type.label) })
                 }
             }
-            fields["isolationType"]?.let { Text(it, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
+            fields["isolationType"]?.let { FieldError(it) }
+            Text(stringResource(R.string.hosp5_urgencia), Modifier.padding(top = Spacing.xs), style = MaterialTheme.typography.labelLarge)
+            Text(stringResource(R.string.hosp5_urgencia_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             CheckRow(stringResource(R.string.ind_inestable), state.draft.unstable, !state.busy, model::unstable)
             CheckRow(stringResource(R.string.ind_posquirurgico), state.draft.postSurgical, !state.busy, model::postSurgical)
         }
