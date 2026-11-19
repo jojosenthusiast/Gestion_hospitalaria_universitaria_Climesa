@@ -1347,11 +1347,22 @@ private struct RecordLabDetail: View {
                 ListRow(title: L.text("history.lab.ordered"), meta: ClimesaDates.display(order.createdAt, .date)) {
                     PatientTag(order.state.rawValue, label: order.state.label)
                 }
-                if let summary = LabResultView.summary(order.items) {
-                    Text(verbatim: summary).font(Typo.label).foregroundStyle(Theme.warning)
+                if let row = ClinicalRecordLab.rows(history).first(where: { $0.orderId == order.id }) {
+                    Text(verbatim: ClinicalRecordLab.summary(row)).font(Typo.label).foregroundStyle(Theme.warning)
                 }
             }
-            LabOrderDetail(order: order, showValues: true, staffView: !viewerIsPatient)
+            SectionCard(title: L.text("history.laboratory")) {
+                ForEach(order.items) { item in
+                    HStack {
+                        Text(verbatim: item.name).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        if let result = item.result {
+                            Text(verbatim: PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark), unit: item.unit)).font(Typo.mono).foregroundStyle(Theme.ink)
+                            if let mark = result.mark { PatientTag(mark.rawValue, label: mark.label) }
+                        }
+                    }
+                }
+            }
         }
     }
 }
