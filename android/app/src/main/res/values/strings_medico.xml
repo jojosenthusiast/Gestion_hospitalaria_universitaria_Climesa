@@ -60,4 +60,32 @@
         <item quantity="one">%1$d cita</item>
         <item quantity="other">%1$d citas</item>
     </plurals>
+    <!-- Lote 5 S12: consulta -->
+    <string name="med5_contexto_titulo">Lo que pidió el paciente</string>
+    <string name="med5_contexto_motivo">Motivo de la cita: %1$s</string>
+    <string name="med5_contexto_sin_motivo">El paciente no escribió un motivo al pedir la cita.</string>
+    <string name="med5_contexto_categorias">Lo que marcó al pedir la cita</string>
+    <string name="med5_motivo_ayuda">Por qué consulta hoy, con sus palabras o las tuyas.</string>
+    <string name="med5_examen_ayuda">Opcional. Lo que encontraste al examinar.</string>
+    <string name="med5_plan_ayuda">Procedimientos que hiciste, indicaciones y seguimiento.</string>
+    <string name="med5_opcional_titulo">Según la consulta (opcional)</string>
+    <string name="med5_opcional_detalle">Completa solo lo que aplique a esta visita.</string>
+    <string name="med5_signos_titulo">Signos vitales</string>
+    <string name="med5_diagnostico_titulo">Diagnóstico CIE-10</string>
+    <string name="med5_receta_titulo">Receta</string>
+    <string name="med5_nota_diagnostico">Nota del diagnóstico</string>
+    <string name="med5_via">Vía de administración</string>
+    <string name="med5_frecuencia">Frecuencia (cada cuánto)</string>
+    <string name="med5_duracion">Duración del tratamiento</string>
+    <string name="med5_indicaciones">Indicaciones para el paciente</string>
+    <string name="med5_guardar_borrador">Guardar borrador</string>
+    <string name="med5_firmar">Firmar consulta</string>
+    <string name="med5_cerrar">Cerrar</string>
+    <string name="med5_autoguardado_fallo">No se pudo guardar el borrador en el servidor. Lo que escribiste sigue en este equipo y se vuelve a intentar al seguir escribiendo.</string>
+    <string name="med5_autoguardando">Guardando borrador…</string>
+    <string name="med5_sin_firmar_titulo">Tienes una consulta sin firmar de %1$s</string>
+    <string name="med5_sin_firmar_detalle">Iniciada %1$s. Lo recomendable es terminarla y firmarla antes de atender a otro paciente.</string>
+    <string name="med5_reanudarla">Reanudarla</string>
+    <string name="med5_iniciar_otra">Iniciar otra de todos modos</string>
+    <string name="med5_cancelar">Cancelar</string>
 </resources>
