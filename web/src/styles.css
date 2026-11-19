@@ -466,5 +466,5 @@ table, time, .tabular, .mono-data, .number-strip strong, .status-badge, .priorit
 .notices-bell:hover { background: rgb(255 255 255 / 0.1); }
 .notices-bell:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
 .notices-bell[aria-current="page"] { background: rgb(255 255 255 / 0.16); }
-.notices-bell-count { position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--surface, #fff); color: var(--primary-text); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
+.notices-bell-count { position: absolute; top: 4px; right: 2px; min-width: 18px; white-space: nowrap; height: 18px; padding: 0 5px; display: grid; place-items: center; border-radius: 999px; background: var(--surface, #fff); color: var(--primary-text); font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1; }
 .notices-bell.is-critical .notices-bell-count { background: var(--critical); color: #fff; }
