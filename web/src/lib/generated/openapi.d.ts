@@ -3988,6 +3988,8 @@ export interface components {
         };
         /** @enum {string} */
         CategoriaHabitacion: "vip" | "semiprivada";
+        /** @enum {string} */
+        EstadoCama: "ocupada" | "limpieza" | "bloqueada" | "reservada" | "libre";
         SpaceResponse: {
             /** Format: uuid */
             id: string;
@@ -4004,6 +4006,7 @@ export interface components {
             path: string | null;
             totalBeds: number;
             freeBeds: number;
+            bedState: components["schemas"]["EstadoCama"] | null;
         };
         SpaceDto: {
             code: string;
@@ -4020,8 +4023,6 @@ export interface components {
             version?: number;
             reason?: string;
         };
-        /** @enum {string} */
-        EstadoCama: "ocupada" | "limpieza" | "bloqueada" | "reservada" | "libre";
         BedBoardResponse: {
             /** Format: uuid */
             id: string;
