@@ -113,6 +113,23 @@ AJUSTES_CONTEXTO = [
     ("LAB", "pacientes.ver_ficha", "x", "orden"),
 ]
 
+# Lote 5 S10 (decisión del propietario 2026-11-19, «Todo el hospital»): Enfermería trabaja en todos los pisos. Cambios de contexto
+# posteriores a todas las migraciones generadas (regla 10): estas siguen emitiendo el contexto anterior y los aplica la migración
+# escrita a mano 20261129005000_enfermeria_todo_el_hospital.sql. (rol, permiso, contexto anterior, contexto actual en permisos.csv).
+AJUSTES_CONTEXTO_LOTE5 = [
+    ("ENF", "admision.ver", "area", "x"),
+    ("ENF", "pacientes.ver_ficha", "area", "x"),
+    ("ENF", "camas.ver_ocupante", "area", "x"),
+    ("ENF", "enfermeria.registrar", "area", "x"),
+]
+
+
+def permisos_historicos(permisos):
+    """permisos.csv como lo veían las migraciones generadas (ya aplicadas): deshace AJUSTES_CONTEXTO_LOTE5."""
+    ajustes = {(r, p): desde for r, p, desde, _ in AJUSTES_CONTEXTO_LOTE5}
+    return [{**p, **{r: desde for (r, perm), desde in ajustes.items() if perm == p["permiso"]}} for p in permisos]
+
+
 FLUJOS = [
     ("F01 Cuenta del paciente", "A01 Ingreso → A02 Crear cuenta → A03 Vincular expediente → (recepción A33 o W27 aprueba) → A04 Inicio del paciente"),
     ("F02 Fila del día", "Recepción A31 o W29 emite → Paciente A05 sigue su número → Asistente A40 llama → Médico A20 Mi día → A21 Consulta → Paciente A08 Historial; pantalla pública W34 muestra el llamado"),
@@ -574,6 +591,11 @@ def verificar_consistencia(permisos, endpoints, pantallas, roles):
         if e["nivel"] not in ("R", "E", "F"):
             errores.append(f"Endpoint {e['ruta']} con nivel inválido {e['nivel']}")
     por_permiso = {p["permiso"]: p for p in permisos}
+    for r, perm, desde, hasta in AJUSTES_CONTEXTO_LOTE5:
+        actual = por_permiso.get(perm, {}).get(r)
+        if actual != hasta:
+            errores.append(f"AJUSTES_CONTEXTO_LOTE5 dice {r} {perm} = {hasta} y permisos.csv dice {actual!r}")
+    por_permiso = {p["permiso"]: p for p in permisos_historicos(permisos)}
     for r, perm, _, hasta in AJUSTES_CONTEXTO:
         actual = por_permiso.get(perm, {}).get(r)
         if r == ROL_RETIRADO:
@@ -721,18 +743,19 @@ def main():
     roles, permisos = leer("roles.csv"), leer("permisos.csv")
     endpoints, pantallas = leer("endpoints.csv"), leer("pantallas.csv")
     errores = verificar_consistencia(permisos, endpoints, pantallas, roles) + verificar_politica_campos(permisos, roles)
+    hist = permisos_historicos(permisos)
     salidas = {
         SALIDA_RBAC: generar_rbac(roles, permisos, endpoints),
         SALIDA_PANTALLAS: generar_pantallas(pantallas, roles),
-        SALIDA_SQL: generar_sql(roles, permisos),
+        SALIDA_SQL: generar_sql(roles, hist),
         SALIDA_CONTEXTOS: generar_sql_contextos(),
-        SALIDA_ATRIBUTOS: generar_sql_atributos(roles, permisos),
-        SALIDA_RONDA3: generar_sql_ronda3(roles, permisos),
+        SALIDA_ATRIBUTOS: generar_sql_atributos(roles, hist),
+        SALIDA_RONDA3: generar_sql_ronda3(roles, hist),
         SALIDA_PLATAFORMAS: generar_sql_plataformas(roles),
-        SALIDA_FASE01: generar_sql_fase01(permisos),
-        SALIDA_RECURSOS: generar_sql_recursos(permisos),
-        SALIDA_FASE2: generar_sql_fase2(permisos),
-        SALIDA_AVISOS_ADM: generar_sql_avisos_adm(permisos),
+        SALIDA_FASE01: generar_sql_fase01(hist),
+        SALIDA_RECURSOS: generar_sql_recursos(hist),
+        SALIDA_FASE2: generar_sql_fase2(hist),
+        SALIDA_AVISOS_ADM: generar_sql_avisos_adm(hist),
     }
     if "--verificar" in sys.argv:
         for ruta, contenido in salidas.items():

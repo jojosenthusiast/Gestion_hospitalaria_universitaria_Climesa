@@ -9,7 +9,7 @@ usuarios.desactivar,Desactivar una cuenta,x,,,,,,,,,
 pacientes.buscar,Buscar pacientes (datos mínimos),,x,x,,x,x,x,x,,
 pacientes.registrar,Registrar paciente tras buscar,,,x,,,,,,,
 pacientes.registrar_provisional,Registrar paciente sin identidad confirmada,,,x,,x,,,x,,
-pacientes.ver_ficha,Ver datos personales del paciente,,x,x,,area,relacion,orden,relacion,,propio
+pacientes.ver_ficha,Ver datos personales del paciente,,x,x,,x,relacion,orden,relacion,,propio
 pacientes.ver_nacimiento,Ver la fecha de nacimiento exacta (rango de edad si el contexto es rango),,,x,,x,x,rango,x,,propio
 pacientes.ver_contacto,Ver DUI teléfono correo y dirección del paciente,,,x,,,x,,,,propio
 pacientes.editar_demograficos,Corregir datos personales con historial,,,x,,,,,,,
@@ -26,7 +26,7 @@ turnos.ver_borradores,Ver turnos en borrador antes de publicarlos,x,x,,,,,,,,
 espacios.ver,Ver el árbol del edificio,x,x,x,,x,x,,,,
 espacios.configurar,Crear y editar espacios y capacidades,x,,,,,,,,,
 camas.ver_tablero,Ver tablero de camas sin ocupantes,,x,x,,x,x,,,,
-camas.ver_ocupante,Ver qué paciente ocupa una cama,,x,x,,area,relacion,,,,propio
+camas.ver_ocupante,Ver qué paciente ocupa una cama,,x,x,,x,relacion,,,,propio
 camas.asignar,Asignar cama a una admisión,,x,x,,,,,,,
 camas.trasladar,Trasladar a otra cama,,x,x,,,,,,,
 camas.bloquear,Bloquear o desbloquear una cama,,x,,,,,,,,
@@ -56,10 +56,10 @@ catalogo.configurar,"Exámenes, paneles y rangos de referencia",x,,,,,,,,,
 admision.solicitar,Indicar hospitalización,,,,,,relacion,,,,
 admision.crear,Crear admisión con su origen,,x,x,,,,,,,
 admision.autorizar,Autorizar excepciones de admisión,,x,,,,,,,,
-admision.ver,Ver admisiones activas,,x,x,,area,relacion,,,,propio
+admision.ver,Ver admisiones activas,,x,x,,x,relacion,,,,propio
 admision.registrar_salida,Registrar salida física,,,x,,x,,,,,
 alta.firmar,Firmar alta médica,,,,,,relacion,,,,
-enfermeria.registrar,Notas de enfermería,,,,,area,,,,,
+enfermeria.registrar,Notas de enfermería,,,,,x,,,,,
 ambulancia.ver_estado,Ver estado de la ambulancia,,x,x,,,x,,x,,
 ambulancia.solicitar,Pedir ambulancia,,,x,,,,,,,propio
 ambulancia.despachar,Confirmar solicitudes y despachar,,x,x,,,,,,,

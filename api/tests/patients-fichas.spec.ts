@@ -57,7 +57,7 @@ describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md
  };
  const grantContexts=async()=>{await admit();await shift('ENF','P2-HOS');await ticket('2026-10-24');await shift('AST','P1-CON');await order('pendiente');};
  beforeAll(async()=>{
-  fixture=await createDatabase();
+  fixture=await createDatabase({nursingByArea:true});
   const auth={authClient:{auth:{getUser:async(token:string)=>{
    const [h,b,s]=token.split('.');
    const expected=createHmac('sha256','test-only-key').update(h+'.'+b).digest('base64url');
@@ -130,7 +130,7 @@ describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md
   await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,context]);
   try{await body();}finally{await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,original]);}
  };
- test('el catálogo da a ENF (que absorbió a AST, Lote 5 S10) el contexto area y a LAB el contexto orden; el resto conserva el suyo',async()=>{
+ test('con ENF por área (nursingByArea; desde 20261129005000 el catálogo le da x) y LAB por orden; el resto conserva el suyo',async()=>{
   expect(await contextOf('AST')).toEqual([]);
   const expected:Record<string,string>={JOP:'x',REC:'x',ENF:'area',MED:'relacion',LAB:'orden',PAR:'relacion',PAC:'propio'};
   for(const [role,context] of Object.entries(expected))expect([role,await contextOf(role)]).toEqual([role,[context]]);

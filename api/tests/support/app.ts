@@ -14,7 +14,7 @@ import { InMemoryClinicalFileStorage } from './clinical-storage';
 const issuer = 'https://gvmvmrusscsfbndnbvbr.supabase.co/auth/v1';
 
 /** Full Nest application over PGlite with a controllable clock and fictitious accounts per role. */
-export async function createTestApp(start: Date, options: { shiftGate?: boolean } = {}) {
+export async function createTestApp(start: Date, options: { shiftGate?: boolean; nursingByArea?: boolean } = {}) {
   let current = start;
   const fixture = await createDatabase(options);
   /** A role code (its fixture account) or an account id created by the spec itself. */

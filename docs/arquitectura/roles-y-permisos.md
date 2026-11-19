@@ -47,7 +47,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `pacientes.buscar` | Buscar pacientes (datos mínimos) | · | ✔ | ✔ | · | ✔ | ✔ | ✔ | ✔ | · | · |
 | `pacientes.registrar` | Registrar paciente tras buscar | · | · | ✔ | · | · | · | · | · | · | · |
 | `pacientes.registrar_provisional` | Registrar paciente sin identidad confirmada | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
-| `pacientes.ver_ficha` | Ver datos personales del paciente | · | ✔ | ✔ | · | área | relación | orden | relación | · | propio |
+| `pacientes.ver_ficha` | Ver datos personales del paciente | · | ✔ | ✔ | · | ✔ | relación | orden | relación | · | propio |
 | `pacientes.ver_nacimiento` | Ver la fecha de nacimiento exacta (rango de edad si el contexto es rango) | · | · | ✔ | · | ✔ | ✔ | rango de edad | ✔ | · | propio |
 | `pacientes.ver_contacto` | Ver DUI teléfono correo y dirección del paciente | · | · | ✔ | · | · | ✔ | · | · | · | propio |
 | `pacientes.editar_demograficos` | Corregir datos personales con historial | · | · | ✔ | · | · | · | · | · | · | · |
@@ -64,7 +64,7 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `espacios.ver` | Ver el árbol del edificio | ✔ | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
 | `espacios.configurar` | Crear y editar espacios y capacidades | ✔ | · | · | · | · | · | · | · | · | · |
 | `camas.ver_tablero` | Ver tablero de camas sin ocupantes | · | ✔ | ✔ | · | ✔ | ✔ | · | · | · | · |
-| `camas.ver_ocupante` | Ver qué paciente ocupa una cama | · | ✔ | ✔ | · | área | relación | · | · | · | propio |
+| `camas.ver_ocupante` | Ver qué paciente ocupa una cama | · | ✔ | ✔ | · | ✔ | relación | · | · | · | propio |
 | `camas.asignar` | Asignar cama a una admisión | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `camas.trasladar` | Trasladar a otra cama | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `camas.bloquear` | Bloquear o desbloquear una cama | · | ✔ | · | · | · | · | · | · | · | · |
@@ -94,10 +94,10 @@ El permiso `camas.ver_ocupante` no tiene endpoint propio: decide si el tablero d
 | `admision.solicitar` | Indicar hospitalización | · | · | · | · | · | relación | · | · | · | · |
 | `admision.crear` | Crear admisión con su origen | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | `admision.autorizar` | Autorizar excepciones de admisión | · | ✔ | · | · | · | · | · | · | · | · |
-| `admision.ver` | Ver admisiones activas | · | ✔ | ✔ | · | área | relación | · | · | · | propio |
+| `admision.ver` | Ver admisiones activas | · | ✔ | ✔ | · | ✔ | relación | · | · | · | propio |
 | `admision.registrar_salida` | Registrar salida física | · | · | ✔ | · | ✔ | · | · | · | · | · |
 | `alta.firmar` | Firmar alta médica | · | · | · | · | · | relación | · | · | · | · |
-| `enfermeria.registrar` | Notas de enfermería | · | · | · | · | área | · | · | · | · | · |
+| `enfermeria.registrar` | Notas de enfermería | · | · | · | · | ✔ | · | · | · | · | · |
 | `ambulancia.ver_estado` | Ver estado de la ambulancia | · | ✔ | ✔ | · | · | ✔ | · | ✔ | · | · |
 | `ambulancia.solicitar` | Pedir ambulancia | · | · | ✔ | · | · | · | · | · | · | propio |
 | `ambulancia.despachar` | Confirmar solicitudes y despachar | · | ✔ | ✔ | · | · | · | · | · | · | · |
@@ -158,11 +158,11 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/pacientes/busquedas` | `pacientes.buscar` | Registra la búsqueda previa que exige el alta | R | 2 | · | ✔ | ✔ | · | ✔ | ✔ | ✔ | ✔ | · | · |
 | POST | `/api/v1/pacientes` | `pacientes.registrar` | Exige búsqueda previa reciente | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/pacientes/provisionales` | `pacientes.registrar_provisional` |  | R | 4 | · | · | ✔ | · | ✔ | · | · | ✔ | · | · |
-| GET | `/api/v1/pacientes/{id}` | `pacientes.ver_ficha` | Relación de atención para MED y PAR; propio para PAC | R | 2 | · | ✔ | ✔ | · | área | relación | orden | relación | · | propio |
+| GET | `/api/v1/pacientes/{id}` | `pacientes.ver_ficha` | Relación de atención para MED y PAR; propio para PAC | R | 2 | · | ✔ | ✔ | · | ✔ | relación | orden | relación | · | propio |
 | PATCH | `/api/v1/pacientes/{id}` | `pacientes.editar_demograficos` | Versión optimista; historial | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/pacientes/{id}/estado` | `pacientes.editar_demograficos` | Nunca borra | R | 2 | · | · | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/pacientes/casos-duplicado` | `pacientes.gestionar_duplicados` |  | E | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
-| GET | `/api/v1/me/paciente` | `pacientes.ver_ficha` | Propio | R | 2 | · | ✔ | ✔ | · | área | relación | orden | relación | · | propio |
+| GET | `/api/v1/me/paciente` | `pacientes.ver_ficha` | Propio | R | 2 | · | ✔ | ✔ | · | ✔ | relación | orden | relación | · | propio |
 | PATCH | `/api/v1/me/paciente` | `pacientes.editar_propios` | Propio; solo teléfono correo y dirección; versión optimista | R | 2 | · | · | · | · | · | · | · | · | · | propio |
 
 ### Spec 103
@@ -297,7 +297,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | Método | Ruta | Permiso | Condición | Nivel | Sem. | ADM | JOP | REC | AST | ENF | MED | LAB | PAR | DPD | PAC |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | POST | `/api/v1/admisiones` | `admision.crear` | Origen cita, consulta, emergencia o ambulancia enlazado a un registro del paciente; motivo obligatorio; médico con turno; cama opcional para ingreso inmediato | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
-| GET | `/api/v1/admisiones` | `admision.ver` |  | R | 4 | · | ✔ | ✔ | · | área | relación | · | · | · | propio |
+| GET | `/api/v1/admisiones` | `admision.ver` |  | R | 4 | · | ✔ | ✔ | · | ✔ | relación | · | · | · | propio |
 | GET | `/api/v1/admisiones/origenes` | `admision.crear` | Registros recientes del paciente (cita, consulta, emergencia, ambulancia) | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/admisiones/medicos-disponibles` | `admision.crear` | Médicos con turno en el instante de ingreso; el resto con su motivo | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | GET | `/api/v1/admisiones/mapa-camas` | `admision.crear` | Camas por planta y habitación con compatibilidad (sexo, aislamiento, categoría) | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
@@ -306,11 +306,11 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/admisiones/{id}/cama` | `camas.asignar` | Exclusión en base de datos | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/autorizar` | `admision.autorizar` | Motivo | E | 4 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/ocupaciones/{id}/traslado` | `camas.trasladar` | VIP no se traslada (D-037) | R | 4 | · | ✔ | ✔ | · | · | · | · | · | · | · |
-| POST | `/api/v1/admisiones/{id}/notas-enfermeria` | `enfermeria.registrar` |  | E | 4 | · | · | · | · | área | · | · | · | · | · |
+| POST | `/api/v1/admisiones/{id}/notas-enfermeria` | `enfermeria.registrar` |  | E | 4 | · | · | · | · | ✔ | · | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/alta` | `alta.firmar` | Pendientes con responsable; inscripción vigente | R | 4 | · | · | · | · | · | relación | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/salida` | `admision.registrar_salida` | Cama pasa a limpieza | R | 4 | · | · | ✔ | · | ✔ | · | · | · | · | · |
 | POST | `/api/v1/admisiones/indicaciones` | `admision.solicitar` |  | R | 4 | · | · | · | · | · | relación | · | · | · | · |
-| GET | `/api/v1/admisiones/{id}/notas-enfermeria` | `enfermeria.registrar` | Mismo contexto de área que al escribir; lectura auditada | R | 6 | · | · | · | · | área | · | · | · | · | · |
+| GET | `/api/v1/admisiones/{id}/notas-enfermeria` | `enfermeria.registrar` | Mismo contexto de área que al escribir; lectura auditada | R | 6 | · | · | · | · | ✔ | · | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/cancelar` | `admision.crear` | Solo pendiente de cama; motivo de 10 caracteres o más | R | 6 | · | ✔ | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/anular` | `admision.autorizar` | Solo hospitalizado; ocupación cerrada como ingresado por error y cama a limpieza | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |
 | POST | `/api/v1/admisiones/{id}/tratante` | `admision.autorizar` | Médico activo con cuenta; motivo; historial en cambio_tratante | R | 6 | · | ✔ | · | · | · | · | · | · | · | · |

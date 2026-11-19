@@ -30,7 +30,7 @@ describe('Core S1/S2 — API, PostgreSQL y autorización',()=>{
   return call('REC','POST','/pacientes',{...data,searchToken:search.body.token,searchQuery:data.givenNames},key);
  };
  beforeAll(async()=>{
-  fixture=await createDatabase();
+  fixture=await createDatabase({nursingByArea:true});
   inviteProvider=jest.fn(async()=>({data:{user:{id:randomUUID()}},error:null}));
   const auth={authClient:{auth:{getUser:async(token:string)=>{
    const [h,b,s]=token.split('.');

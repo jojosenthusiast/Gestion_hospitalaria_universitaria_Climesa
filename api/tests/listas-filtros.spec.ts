@@ -33,7 +33,7 @@ describe('Listas · filtros del servidor para pacientes y personal',()=>{
  };
  const names=(body:{fullName:string}[])=>body.map(p=>p.fullName).sort();
  beforeAll(async()=>{
-  fixture=await createDatabase();
+  fixture=await createDatabase({nursingByArea:true});
   const auth={authClient:{auth:{getUser:async(token:string)=>{
    const [h,b,s]=token.split('.');
    const expected=createHmac('sha256','test-only-key').update(h+'.'+b).digest('base64url');

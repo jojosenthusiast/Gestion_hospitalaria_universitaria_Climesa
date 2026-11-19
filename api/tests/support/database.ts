@@ -11,14 +11,18 @@ export const userId=(role:string)=>`00000000-0000-4000-8000-${String(roleNames.i
 /**
  * `shiftGate`: Lote 5 S9 refuses operational commands of shift roles without a shift. Specs about other modules run
  * without it (their fixture accounts have no shifts); tests/turno-activo.spec.ts turns it on.
+ * `nursingByArea`: puts back the `area` context ENF had before 20261129005000 («Todo el hospital», Lote 5 S10), for specs
+ * that pin the shift-area rule itself; tests/enfermeria-todo-el-hospital.spec.ts covers the whole-hospital catalog.
  */
-export async function createDatabase(options:{shiftGate?:boolean}={}){
+export const NURSING_WHOLE_HOSPITAL=['admision.ver','pacientes.ver_ficha','camas.ver_ocupante','enfermeria.registrar'];
+export async function createDatabase(options:{shiftGate?:boolean;nursingByArea?:boolean}={}){
  const pg=await PGlite.create({extensions:{btree_gist,pg_trgm,unaccent,pgcrypto}});
  const root=resolve(__dirname,'../../../supabase');
  await pg.exec(readFileSync(resolve(root,'pruebas/00_simular_supabase.sql'),'utf8'));
  for(const file of readdirSync(resolve(root,'migrations')).sort())await pg.exec(readFileSync(resolve(root,'migrations',file),'utf8'));
  await pg.exec(readFileSync(resolve(root,'seed.sql'),'utf8'));
  if(!options.shiftGate)await pg.query("DELETE FROM plataforma.politica WHERE clave='turnos.exigir_turno_activo'");
+ if(options.nursingByArea)await pg.query("UPDATE acceso.rol_permiso SET contexto='area' WHERE rol_codigo='ENF' AND permiso_codigo=ANY($1::text[])",[NURSING_WHOLE_HOSPITAL]);
  for(const role of roleNames){
   const id=userId(role);
   await pg.query('INSERT INTO auth.users(id,email,raw_user_meta_data,raw_app_meta_data) VALUES($1,$2,$3,$4)',[id,`${role.toLowerCase()}@example.test`,{nombre:`Cuenta ficticia ${role}`},{invitado:true}]);
