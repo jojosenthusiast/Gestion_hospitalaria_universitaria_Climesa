@@ -65,6 +65,7 @@ import java.time.format.DateTimeFormatter
         showNavigation=!state.formOpen && state.selected==null,
         snackbarHost={SnackbarHost(snack)},
         badges=noticeBadges(account,sections),noticeCritical=noticeBellCritical(account,sections),
+        topNotice={ShiftStatusBanner(account.profile.channels)},
         title=if(state.formOpen){stringResource(if(state.editingId==null)R.string.rec_form_registrar else R.string.rec_form_editar)}else if(state.selected!=null)stringResource(R.string.rec_ficha_titulo) else page.label,
         subtitle=if(state.formOpen)state.registry.patients.firstOrNull{it.id==state.editingId}?.fullName else state.selected?.fullName,
         navigationIcon={if(state.formOpen||state.selected!=null)BackButton({back()},enabled=!state.saving)},

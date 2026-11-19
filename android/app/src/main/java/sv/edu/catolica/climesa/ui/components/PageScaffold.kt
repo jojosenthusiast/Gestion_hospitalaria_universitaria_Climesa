@@ -104,6 +104,8 @@ internal fun PortalScaffold(
     snackbarHost: @Composable () -> Unit = {},
     badges: Map<AndroidSection, Int> = emptyMap(),
     noticeCritical: Boolean = false,
+    /** Lote 5 S9: a compact app-wide notice right under the top bar (the shift state); draws nothing when empty. */
+    topNotice: (@Composable () -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit,
 ) {
     AdaptiveRoleScaffold(
@@ -132,7 +134,12 @@ internal fun PortalScaffold(
                 },
             )
         },
-        content = content,
+        content = if (topNotice == null) content else { padding ->
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                topNotice()
+                Box(Modifier.weight(1f).fillMaxWidth()) { content(PaddingValues()) }
+            }
+        },
     )
 }
 

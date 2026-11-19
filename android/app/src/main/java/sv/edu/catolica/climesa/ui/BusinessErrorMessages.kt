@@ -4,6 +4,7 @@ import sv.edu.catolica.climesa.data.ApiProblems
 import sv.edu.catolica.climesa.data.AuthRequestException
 import sv.edu.catolica.climesa.data.ForbiddenMessages
 import sv.edu.catolica.climesa.domain.BusinessErrors
+import sv.edu.catolica.climesa.domain.ShiftGate
 
 /** Spanish message of a failed write: the mapped business code first, then the API helper message (MOV-03), then [fallback]. */
 internal fun businessMessage(error: Throwable, fallback: String): String =
@@ -12,6 +13,8 @@ internal fun businessMessage(error: Throwable, fallback: String): String =
 /** Lote 5 S6: codes whose API text is the one to show (it names the day or the specialty); [NO_STAFF_TEXT] when it is not readable. */
 private fun ownMessage(error: AuthRequestException): String? = when (error.code) {
     NO_STAFF -> error.message?.takeIf { ApiProblems.readable(it) && !technical.containsMatchIn(it) } ?: NO_STAFF_TEXT
+    // Lote 5 S9: an operational write without an active shift; the API text says who publishes the shift.
+    ShiftGate.NO_ACTIVE_SHIFT -> error.message?.takeIf { ApiProblems.readable(it) && !technical.containsMatchIn(it) } ?: ShiftGate.NO_ACTIVE_SHIFT_TEXT
     else -> null
 }
 

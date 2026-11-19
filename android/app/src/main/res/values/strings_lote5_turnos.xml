@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Lote 5 S9: read-only «Mis turnos» -->
+    <string name="turnos_solo_lectura">Solo lectura: Jefatura publica y cambia tus turnos.</string>
+    <string name="turnos_hoy">Hoy</string>
+    <string name="turnos_hoy_sin_turno">Hoy no tienes turno.</string>
+    <string name="turnos_proximos">Próximos días</string>
+</resources>

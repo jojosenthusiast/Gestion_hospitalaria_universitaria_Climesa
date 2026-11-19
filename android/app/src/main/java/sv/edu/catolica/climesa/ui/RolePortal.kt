@@ -153,6 +153,7 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
     PortalScaffold(
         role=role,sections=sections,selected=page,onSelected={vitalsOrigin=null;selectedName=it.name},dark=dark,setDark=setDark,onLogout={if(!signingOut)logout()},
         badges=noticeBadges(account,sections),noticeCritical=noticeBellCritical(account,sections),
+        topNotice={ShiftStatusBanner(account.profile.channels)},
     ) {outer->
       Column(Modifier.padding(outer).fillMaxSize()){
         if(criticalLab&&AndroidSection.RESULT_REVIEW in sections)CriticalLabNotice(onReview={model.dismissCriticalLab();selectedName=AndroidSection.RESULT_REVIEW.name},onDismiss=model::dismissCriticalLab)
@@ -260,16 +261,38 @@ private val ClockDate=androidx.compose.ui.text.TextStyle(fontFamily=ClimesaSans,
  * días de hoy en adelante van primero y los anteriores debajo, bajo "Turnos anteriores".
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:List<MyShift>,pastOpen:Boolean,togglePast:()->Unit){
-    val days=MyShifts.byDay(shifts)
+    val overview=MyShifts.overview(MyShifts.byDay(shifts))
+    // Lote 5 S9 ("mi turno ... seria solo lectura"): Jefatura publishes and changes shifts, so the screen says it and offers no action.
+    item(key="turnos-lectura"){Text(stringResource(R.string.turnos_solo_lectura),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+    item(key="turnos-hoy"){TodayShiftCard(overview.today)}
+    if(overview.upcoming.isNotEmpty())item(key="turnos-proximos"){Text(stringResource(R.string.turnos_proximos),style=MaterialTheme.typography.titleMedium,modifier=Modifier.padding(top=Spacing.sm))}
+    for(day in overview.upcoming){
+        item(key="dia-${day.title}"){Text(day.title,style=MaterialTheme.typography.titleSmall,modifier=Modifier.padding(top=Spacing.xs))}
+        items(day.shifts,key={it.id.ifBlank{it.period}}){shift->MyShiftCard(shift)}
+    }
     // R3 A-8: past days fold under one closed heading with their count, like the web list (#122).
-    val pastCount=days.filter{it.past}.sumOf{it.shifts.size}
-    for((index,day) in days.withIndex()){
-        if(day.past&&days.getOrNull(index-1)?.past!=true)item(key="turnos-anteriores"){
-            TextButton(shape = ButtonShape, onClick=togglePast,modifier=Modifier.padding(top=Spacing.sm).heightIn(min=Spacing.touch)){Text(stringResource(if(pastOpen)R.string.turnos_ocultar_anteriores else R.string.turnos_ver_anteriores,pastCount))}
-        }
-        if(day.past&&!pastOpen)continue
+    if(overview.past.isNotEmpty())item(key="turnos-anteriores"){
+        TextButton(shape = ButtonShape, onClick=togglePast,modifier=Modifier.padding(top=Spacing.sm).heightIn(min=Spacing.touch)){Text(stringResource(if(pastOpen)R.string.turnos_ocultar_anteriores else R.string.turnos_ver_anteriores,overview.past.sumOf{it.shifts.size}))}
+    }
+    if(pastOpen)for(day in overview.past){
         item(key="dia-${day.title}"){Text(day.title,style=MaterialTheme.typography.titleSmall,modifier=Modifier.padding(top=Spacing.sm))}
         items(day.shifts,key={it.id.ifBlank{it.period}}){shift->MyShiftCard(shift)}
+    }
+}
+/** Today's shifts on a tinted surface so the day reads first; without a shift today it says so (never an empty gap). */
+@OptIn(ExperimentalLayoutApi::class) @Composable private fun TodayShiftCard(today:MyShiftDay?){
+    Surface(Modifier.fillMaxWidth(),color=MaterialTheme.climesa.soft,shape=MaterialTheme.shapes.medium){
+        Column(Modifier.padding(Spacing.md),verticalArrangement=Arrangement.spacedBy(Spacing.sm)){
+            Text(today?.title?:stringResource(R.string.turnos_hoy),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.climesa.primaryText)
+            if(today==null)Text(stringResource(R.string.turnos_hoy_sin_turno),style=MaterialTheme.typography.bodyMedium)
+            else today.shifts.forEach{shift->
+                Column(verticalArrangement=Arrangement.spacedBy(4.dp)){
+                    FlowRow(horizontalArrangement=Arrangement.spacedBy(Spacing.sm),verticalArrangement=Arrangement.spacedBy(Spacing.xs)) {AreaChip(shift.area);StatusTag(shift.state,label=StaffLabels.shiftState(shift.state))}
+                    Text(shift.hours,style=MaterialTheme.typography.titleLarge)
+                    MyShifts.attendanceLabel(shift)?.let{Text(it,style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                }
+            }
+        }
     }
 }
 /** La entrada se confirma sola al iniciar el turno (ASIS-01): la tarjeta solo muestra el estado y la asistencia. */
