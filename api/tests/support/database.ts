@@ -22,7 +22,9 @@ export async function createDatabase(options:{shiftGate?:boolean}={}){
  for(const role of roleNames){
   const id=userId(role);
   await pg.query('INSERT INTO auth.users(id,email,raw_user_meta_data,raw_app_meta_data) VALUES($1,$2,$3,$4)',[id,`${role.toLowerCase()}@example.test`,{nombre:`Cuenta ficticia ${role}`},{invitado:true}]);
-  await pg.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo) VALUES($1,$2)',[id,role]);
+  // Lote 5 S10: AST is retired and 20261129004000 moved its accounts to ENF. The "AST" fixture account stays as a
+  // former assistant (persona tipo asistente) that now holds ENF, so specs about the consulting-room station keep working.
+  await pg.query('INSERT INTO acceso.asignacion_rol(usuario_id,rol_codigo) VALUES($1,$2)',[id,role==='AST'?'ENF':role]);
   if(['REC','AST','ENF','MED','LAB','PAR'].includes(role)){
    const types:Record<string,string>={REC:'recepcionista',AST:'asistente',ENF:'enfermero',MED:'medico',LAB:'laboratorista',PAR:'paramedico'};
    const person=(await pg.query<{id:string}>("INSERT INTO personal.persona(nombres,apellidos,tipo,area_id) SELECT $1,'Prueba', $2,id FROM infra.espacio WHERE codigo='P1-CON' RETURNING id",[role,types[role]])).rows[0];

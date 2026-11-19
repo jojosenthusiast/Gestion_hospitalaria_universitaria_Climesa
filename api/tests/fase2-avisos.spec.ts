@@ -68,7 +68,7 @@ describe('Fase 2 · avisos con nivel, enterado y recordatorio', () => {
   });
 
   test('"Enterado" se guarda una sola vez, es idempotente, se audita y quita el destacado', async () => {
-    const notice = await publish({ titulo: 'Evacuación ala norte', publico: false, roles: ['AST'], nivel: 'critico' });
+    const notice = await publish({ titulo: 'Evacuación ala norte', publico: false, roles: ['ENF'], nivel: 'critico' });
     const before = await inbox('AST');
     const first = await t.call('AST', 'POST', `/me/avisos/${notice.id}/enterado`, {});
     expect(first.status).toBe(201);

@@ -130,8 +130,9 @@ describe('Pacientes · la misma ficha según el rol y el contexto (privacidad.md
   await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,context]);
   try{await body();}finally{await fixture.pg.query("UPDATE acceso.rol_permiso SET contexto=$2 WHERE rol_codigo=$1 AND permiso_codigo='pacientes.ver_ficha'",[role,original]);}
  };
- test('el catálogo sembrado da a AST y ENF el contexto area y a LAB el contexto orden; el resto conserva el suyo',async()=>{
-  const expected:Record<string,string>={JOP:'x',REC:'x',AST:'area',ENF:'area',MED:'relacion',LAB:'orden',PAR:'relacion',PAC:'propio'};
+ test('el catálogo da a ENF (que absorbió a AST, Lote 5 S10) el contexto area y a LAB el contexto orden; el resto conserva el suyo',async()=>{
+  expect(await contextOf('AST')).toEqual([]);
+  const expected:Record<string,string>={JOP:'x',REC:'x',ENF:'area',MED:'relacion',LAB:'orden',PAR:'relacion',PAC:'propio'};
   for(const [role,context] of Object.entries(expected))expect([role,await contextOf(role)]).toEqual([role,[context]]);
   expect(await contextOf('ADM')).toEqual([]);
   expect(await contextOf('DPD')).toEqual([]);
