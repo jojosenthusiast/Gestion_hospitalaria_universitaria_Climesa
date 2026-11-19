@@ -3,6 +3,7 @@
 package sv.edu.catolica.climesa.ui
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Map
 import androidx.compose.material.icons.outlined.MyLocation
 import androidx.compose.material.icons.outlined.Send
 import sv.edu.catolica.climesa.ui.icons.ClimesaIcons
@@ -48,7 +49,9 @@ import java.time.Instant
 import kotlinx.coroutines.delay
 import sv.edu.catolica.climesa.R
 import sv.edu.catolica.climesa.domain.AccessProfile
+import sv.edu.catolica.climesa.domain.AmbulanceForms
 import sv.edu.catolica.climesa.domain.AmbulanceLabels
+import sv.edu.catolica.climesa.domain.AmbulanceTimeline
 import sv.edu.catolica.climesa.domain.AmbulanceLogEntry
 import sv.edu.catolica.climesa.domain.AmbulanceRules
 import sv.edu.catolica.climesa.domain.AmbulanceService
@@ -111,7 +114,8 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
             state.error != null && status == null -> item { ErrorState(state.error, onRetry = { model.open(AmbulanceMode.PARAMEDIC) }) }
             status == null -> Unit
             else -> {
-                unitCard(state, canPlan)
+                // Lote 5 S8: during a service the header already names the unit; its card shows only when idle or blocked.
+                if (service == null || ParamedicRules.blocker(status.dispatchBlock, canPlan) != null) unitCard(state, canPlan)
                 if (service != null) activeService(service, state, model, now, sheetOpen = { sheet = it.name }, locationFix = model::sendLocation, locationFail = model::reportLocationUnavailable)
                 else idle(state.log, onOpenLog = onOpenSection?.let { open -> { open(AndroidSection.LOG) } })
             }
@@ -125,47 +129,24 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
     }
 }
 
-/** Estado de la unidad con el porqué del bloqueo (RN-30) y qué hacer. */
+/** Estado de la unidad con el porqué del bloqueo (RN-30) y qué hacer: la misma tarjeta que Despacho y Médico. */
 private fun LazyListScope.unitCard(state: AmbulanceUiState, canPlan: Boolean) {
     val status = state.status ?: return
-    item {
-        SectionCard(status.unit.plate, eyebrow = stringResource(R.string.op_amb_unidad), action = { OperacionStatusTag(status.unit.state, label = AmbulanceLabels.unitState(status.unit.state)) }) {
-            Text(
-                stringResource(if (status.paramedicOnDuty) R.string.par_turno_si else R.string.par_turno_no),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Text(
-                stringResource(if (status.driverOnDuty) R.string.par_motorista_si else R.string.par_motorista_no),
-                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            status.dispatchBlock?.takeIf { ParamedicRules.showsDispatchBlock(it.code) }?.let { block ->
-                NoticeBanner(NoticeKind.WARNING, stringResource(R.string.par_bloqueo_titulo) + ". " + block.message + " " + ParamedicRules.blockGuidance(block.code, canPlan))
-            }
-        }
-    }
+    item { UnitStatusCard(status, ParamedicRules.blocker(status.dispatchBlock, canPlan), showService = false) }
 }
 
+/**
+ * Lote 5 S8: less text. The service card says what, where and who; the bitácora shows the progress; the next step is the one
+ * big button under it; the rest are small actions on one line.
+ */
 private fun LazyListScope.activeService(
     service: AmbulanceService, state: AmbulanceUiState, model: AmbulanceViewModel, now: Instant,
     sheetOpen: (ParamedicSheet) -> Unit, locationFix: (Double, Double) -> Unit, locationFail: () -> Unit,
 ) {
     item {
-        val (done, total) = ParamedicRules.progress(service)
-        SectionCard(
-            AmbulanceLabels.type(service.type),
-            eyebrow = stringResource(R.string.unidad_servicio_activo),
-            action = { StatusTag("en_curso") },
-        ) {
-            TriageBadge(service.priority)
-            LabeledValue(stringResource(R.string.par_origen), service.origin)
-            LabeledValue(stringResource(R.string.par_destino), service.destination)
-            LabeledValue(stringResource(R.string.par_paciente), ParamedicRules.patientLabel(state.provisional?.record, service.hasPrehospital, service.patient))
-            LinearProgressIndicator(progress = { done / total.toFloat() }, modifier = Modifier.fillMaxWidth())
-            Text(stringResource(R.string.par_avance, done.coerceAtMost(total), total), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(
-                ParamedicRules.locationAge(service.lastLocation, now)?.let { stringResource(R.string.par_ubicacion_ultima, it.replaceFirstChar { c -> c.lowercase() }) } ?: stringResource(R.string.par_ubicacion_ninguna),
-                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+        SectionCard(AmbulanceLabels.type(service.type), action = { TriageBadge(service.priority) }) {
+            Text(stringResource(R.string.amb5_ruta, service.origin, service.destination), style = MaterialTheme.typography.bodyLarge)
+            Text(ParamedicRules.patientLabel(state.provisional?.record, service.hasPrehospital, service.patient), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
     // S5: a paramedic outside this service's crew follows it read-only; the API would refuse every write.
@@ -176,16 +157,24 @@ private fun LazyListScope.activeService(
         }
     }
     if (service.canAdvance || service.canUndo) item { NextStepButton(service, state.busy, model, state.pendingMilestone, state.formError) }
+    item { SectionCard(stringResource(R.string.amb5_bitacora_servicio)) { ServiceTimeline(AmbulanceTimeline.of(service)) } }
     item {
-        SectionCard(stringResource(R.string.par_acciones)) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                if (service.canReport) {
-                    SecondaryButton(stringResource(R.string.par_reporte), { sheetOpen(ParamedicSheet.PREHOSPITAL) }, icon = ClimesaIcons.Clipboard)
-                    SecondaryButton(stringResource(R.string.par_sin_identidad), { sheetOpen(ParamedicSheet.UNIDENTIFIED) }, icon = ClimesaIcons.UserPlus)
-                }
-                if (!service.readOnly) LocationButton(state.busy, locationFix, locationFail)
-                OpenMap(service.origin)
+        val sendLocation = rememberLocationSender(locationFix, locationFail)
+        val uri = LocalUriHandler.current
+        val actions = buildList {
+            if (service.canReport) {
+                add(CardAction(stringResource(R.string.par_reporte), ActionRole.Edit, { sheetOpen(ParamedicSheet.PREHOSPITAL) }, icon = ClimesaIcons.Clipboard))
+                add(CardAction(stringResource(R.string.par_sin_identidad), ActionRole.Edit, { sheetOpen(ParamedicSheet.UNIDENTIFIED) }, icon = ClimesaIcons.UserPlus))
             }
+            if (!service.readOnly) add(CardAction(stringResource(R.string.par5_ubicacion_corta), ActionRole.Neutral, sendLocation, icon = Icons.Outlined.MyLocation, enabled = !state.busy))
+            add(CardAction(stringResource(R.string.par5_mapa), ActionRole.Neutral, { runCatching { uri.openUri("geo:0,0?q=" + URLEncoder.encode(service.origin, "UTF-8")) } }, icon = Icons.Outlined.Map))
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            CardActionRow(actions)
+            Text(
+                ParamedicRules.locationAge(service.lastLocation, now)?.let { stringResource(R.string.par_ubicacion_ultima, it.replaceFirstChar { c -> c.lowercase() }) } ?: stringResource(R.string.par_ubicacion_ninguna),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }
@@ -208,30 +197,32 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
                 Modifier.heightIn(min = 72.dp), enabled = !busy, loading = busy,
             )
         }
-        if (service.canAdvance && ParamedicRules.canFinishEarly(service)) SecondaryButton(stringResource(R.string.amb_terminar_sin_traslado), { finishing = true }, enabled = !busy && pending == null)
+        if (service.canAdvance && ParamedicRules.canFinishEarly(service)) CardActionButton(CardAction(stringResource(R.string.amb_terminar_sin_traslado), ActionRole.Danger, { finishing = true }, enabled = !busy && pending == null), Modifier.fillMaxWidth())
     }
     if (finishing) {
         // MA-AMB-03: only the final states the API accepts for the milestones recorded so far.
         val choices = AmbulanceRules.finishOptions(service)
         var finalState by rememberSaveable(service.id, choices.size) { mutableStateOf(choices.first().first) }
         var reason by rememberSaveable { mutableStateOf("") }
+        var tried by rememberSaveable { mutableStateOf(false) }
         ConfirmDialog(
             title = stringResource(R.string.amb_terminar_sin_traslado), confirmLabel = stringResource(R.string.amb_finalizar), destructive = true, busy = busy, error = error,
-            onConfirm = { sent.value = true; model.advance(service, "finalizado", finalState, reason) }, onDismiss = { finishing = false },
+            onConfirm = { tried = true; if (AmbulanceForms.reasonError(reason) == null) { sent.value = true; model.advance(service, "finalizado", finalState, reason) } }, onDismiss = { finishing = false },
             body = {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    RequiredLabel(stringResource(R.string.amb_estado_final))
                     Choices(choices, finalState) { finalState = it }
-                    FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false)
+                    FormField(stringResource(R.string.amb_motivo), reason, { reason = it.take(500) }, singleLine = false, required = true, error = AmbulanceForms.reasonError(reason).takeIf { tried })
                 }
             },
         )
     }
 }
 
-/** Un punto GPS del teléfono; pide el permiso la primera vez. Sin GPS lo dice, no falla en silencio. */
+/** Un punto GPS del teléfono; pide el permiso la primera vez. Sin GPS lo dice, no falla en silencio. Devuelve la acción. */
 @SuppressLint("MissingPermission")
 @Composable
-private fun LocationButton(busy: Boolean, onFix: (Double, Double) -> Unit, onFail: () -> Unit) {
+private fun rememberLocationSender(onFix: (Double, Double) -> Unit, onFail: () -> Unit): () -> Unit {
     val context = LocalContext.current
     fun send() {
         val manager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
@@ -239,14 +230,14 @@ private fun LocationButton(busy: Boolean, onFix: (Double, Double) -> Unit, onFai
         if (point == null) onFail() else onFix(point.latitude, point.longitude)
     }
     val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) send() else onFail() }
-    SecondaryButton(stringResource(R.string.par_ubicacion), {
+    return {
         if (context.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED) send() else permission.launch(Manifest.permission.ACCESS_FINE_LOCATION)
-    }, icon = Icons.Outlined.MyLocation, enabled = !busy)
+    }
 }
 
 /** Sin servicio: la unidad ya está arriba; aquí van los últimos servicios. */
 private fun LazyListScope.idle(log: List<AmbulanceLogEntry>, onOpenLog: (() -> Unit)?) {
-    item { EmptyState(stringResource(R.string.par_titulo_libre), detail = stringResource(R.string.par_libre_detalle), icon = Icons.Outlined.MyLocation) }
+    item { EmptyState(stringResource(R.string.par_titulo_libre), detail = stringResource(R.string.par5_libre_detalle), icon = Icons.Outlined.MyLocation) }
     item { Text(stringResource(R.string.par_ultimos), style = MaterialTheme.typography.titleMedium) }
     if (log.isEmpty()) item { Text(stringResource(R.string.par_sin_ultimos), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     else {
@@ -274,6 +265,7 @@ private fun SheetColumn(content: @Composable () -> Unit) {
 private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel, service: AmbulanceService?, close: () -> Unit) {
     val form = state.prehospital
     var sending by remember { mutableStateOf(false) }
+    var tried by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.busy, state.formError, state.queued, sending) {
         if (sending && !state.busy) { sending = false; if (state.formError == null) close() }
     }
@@ -284,8 +276,9 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
         state.queued?.let { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)); SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryQueued() }, enabled = !state.busy) }
         state.provisional?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_provisional_vinculara, it.record)) }
         if (service == null) { Text(stringResource(R.string.unidad_sin_servicio)); return@SheetColumn }
-        FormField(stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500)), service?.id) }, singleLine = false)
-        Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
+        RequiredLegend()
+        FormField(stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500)), service?.id) }, singleLine = false, required = true, error = AmbulanceForms.reasonError(form.reason).takeIf { tried })
+        RequiredLabel(stringResource(R.string.amb_prioridad))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             AmbulanceLabels.priorities.forEach { (value, label) -> StatusFilterChip(form.priority == value, { model.updatePrehospital(form.copy(priority = value), service?.id) }, label, triageTone(value), Modifier.heightIn(min = 48.dp)) }
         }
@@ -296,13 +289,13 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
             }
         }
         Text(stringResource(R.string.par_signos), style = MaterialTheme.typography.labelLarge)
-        NumberField(stringResource(R.string.amb_fc), form.heartRate) { model.updatePrehospital(form.copy(heartRate = it), service?.id) }
-        NumberField(stringResource(R.string.amb_pas), form.systolic) { model.updatePrehospital(form.copy(systolic = it), service?.id) }
-        NumberField(stringResource(R.string.amb_pad), form.diastolic) { model.updatePrehospital(form.copy(diastolic = it), service?.id) }
-        NumberField(stringResource(R.string.amb_spo2), form.oxygenSaturation) { model.updatePrehospital(form.copy(oxygenSaturation = it), service?.id) }
-        NumberField(stringResource(R.string.amb_temperatura), form.temperature, decimal = true) { model.updatePrehospital(form.copy(temperature = it), service?.id) }
-        NumberField(stringResource(R.string.amb_glasgow), form.glasgow) { model.updatePrehospital(form.copy(glasgow = it), service?.id) }
-        PrimaryButton(stringResource(R.string.amb_enviar_reporte), { sending = true; model.sendPrehospital(service.id) }, icon = Icons.Outlined.Send, enabled = state.queued == null, loading = state.busy)
+        NumberField(stringResource(R.string.par5_frecuencia_cardiaca), form.heartRate) { model.updatePrehospital(form.copy(heartRate = it), service?.id) }
+        NumberField(stringResource(R.string.par5_presion_sistolica), form.systolic) { model.updatePrehospital(form.copy(systolic = it), service?.id) }
+        NumberField(stringResource(R.string.par5_presion_diastolica), form.diastolic) { model.updatePrehospital(form.copy(diastolic = it), service?.id) }
+        NumberField(stringResource(R.string.par5_saturacion), form.oxygenSaturation) { model.updatePrehospital(form.copy(oxygenSaturation = it), service?.id) }
+        NumberField(stringResource(R.string.par5_temperatura), form.temperature, decimal = true) { model.updatePrehospital(form.copy(temperature = it), service?.id) }
+        NumberField(stringResource(R.string.par5_glasgow), form.glasgow) { model.updatePrehospital(form.copy(glasgow = it), service?.id) }
+        PrimaryButton(stringResource(R.string.amb_enviar_reporte), { tried = true; if (AmbulanceForms.reasonError(form.reason) == null) { sending = true; model.sendPrehospital(service.id) } }, icon = Icons.Outlined.Send, enabled = state.queued == null, loading = state.busy)
     }
 }
 
@@ -312,6 +305,7 @@ private fun UnidentifiedSheet(state: AmbulanceUiState, model: AmbulanceViewModel
     var sex by rememberSaveable { mutableStateOf("no_registrado") }
     var age by rememberSaveable { mutableStateOf("") }
     var description by rememberSaveable { mutableStateOf("") }
+    var tried by rememberSaveable { mutableStateOf(false) }
     SheetColumn {
         Text(stringResource(R.string.par_sin_identidad), style = MaterialTheme.typography.titleLarge)
         val provisional = state.provisional
@@ -321,14 +315,15 @@ private fun UnidentifiedSheet(state: AmbulanceUiState, model: AmbulanceViewModel
             return@SheetColumn
         }
         state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        Text(stringResource(R.string.par_sexo), style = MaterialTheme.typography.labelLarge)
+        RequiredLegend()
+        RequiredLabel(stringResource(R.string.par_sexo))
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             listOf("femenino" to stringResource(R.string.par_sexo_femenino), "masculino" to stringResource(R.string.par_sexo_masculino), "indeterminado" to stringResource(R.string.par_sexo_indeterminado), "no_registrado" to stringResource(R.string.rec_no_registrado)).forEach { (value, label) ->
                 ClimesaFilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
             }
         }
         NumberField(stringResource(R.string.amb_edad_estimada), age) { age = it.take(3) }
-        FormField(stringResource(R.string.amb_senas), description, { description = it.take(500) }, singleLine = false)
-        PrimaryButton(stringResource(R.string.amb_crear_provisional), { model.registerUnidentified(sex, age, description) }, icon = ClimesaIcons.UserPlus, loading = state.busy)
+        FormField(stringResource(R.string.amb_senas), description, { description = it.take(500) }, singleLine = false, required = true, error = AmbulanceForms.reasonError(description)?.let { stringResource(R.string.par5_senas_error) }?.takeIf { tried })
+        PrimaryButton(stringResource(R.string.amb_crear_provisional), { tried = true; if (AmbulanceForms.reasonError(description) == null) model.registerUnidentified(sex, age, description) }, icon = ClimesaIcons.UserPlus, loading = state.busy)
     }
 }

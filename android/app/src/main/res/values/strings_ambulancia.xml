@@ -23,4 +23,21 @@
     <string name="amb_en_curso_filtro">En curso</string>
     <string name="amb_siguiente_admision">Siguiente paso: Recepción ingresa al paciente en Admisión con origen «Ambulancia».</string>
     <string name="par_abrir_bitacora">Ver la bitácora completa</string>
+    <!-- Lote 5 S8: unidad, solicitudes por confirmar, bitácora y mantenimiento. -->
+    <string name="amb5_unidad">Unidad</string>
+    <string name="amb5_bitacora_servicio">Bitácora del servicio</string>
+    <string name="amb5_por_confirmar">Por confirmar</string>
+    <string name="amb5_no_despachable_ahora">No se puede despachar ahora</string>
+    <string name="amb5_quien_llama">Quién pide</string>
+    <string name="amb5_motivo_descarte">Motivo del descarte</string>
+    <string name="amb5_mant_poner">Poner en mantenimiento</string>
+    <string name="amb5_mant_quitar">Quitar de mantenimiento</string>
+    <string name="amb5_mant_motivo">Motivo</string>
+    <string name="amb5_mant_motivo_pista">Al menos 10 caracteres</string>
+    <string name="amb5_mant_efecto_poner">La unidad no podrá despacharse mientras esté en mantenimiento.</string>
+    <string name="amb5_mant_efecto_quitar">La unidad queda Disponible para despacho.</string>
+    <string name="amb5_mant_requiere">Para quitar el mantenimiento debe haber un paramédico y un motorista con turno en curso.</string>
+    <string name="amb5_ruta">%1$s hacia %2$s</string>
+    <string name="amb5_registra">%1$s · %2$s</string>
+    <string name="amb5_siguiente">Siguiente</string>
 </resources>

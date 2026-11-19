@@ -77,6 +77,15 @@ object ParamedicRules {
      */
     fun showsDispatchBlock(code: String): Boolean = code != "en_servicio"
 
+    /** Lote 5 S8: crew that operates the unit but does not dispatch; its bitácora shows no filter panel. */
+    fun crewOnly(permissions: Collection<String>) = "ambulancia.operar" in permissions && "ambulancia.despachar" !in permissions
+
+    /** Lote 5 S8: the paramedic's unit blocker with its own title and what to do; null while the unit runs its service. */
+    fun blocker(block: DispatchBlock?, canPlanShifts: Boolean): AmbulanceReadiness.Blocker? = block?.takeIf { showsDispatchBlock(it.code) }?.let {
+        AmbulanceReadiness.Blocker(BLOCK_TITLE, listOf(it.message, blockGuidance(it.code, canPlanShifts)).filter { s -> s.isNotBlank() }.joinToString(" "), AmbulanceReadiness.Tone.DANGER)
+    }
+    const val BLOCK_TITLE = "La unidad no puede salir"
+
     /** Secciones que resuelve la pantalla del paramédico; la unidad solo cuando el rol opera la ambulancia. */
     fun handles(section: AndroidSection, permissions: Collection<String>) = when (section) {
         AndroidSection.SERVICE, AndroidSection.PREHOSPITAL_REPORT, AndroidSection.UNIDENTIFIED_PATIENT -> true

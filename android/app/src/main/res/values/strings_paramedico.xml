@@ -30,4 +30,15 @@
     <string name="par_signos">Signos vitales (opcional)</string>
     <string name="par_cerrar">Cerrar</string>
     <string name="par_sexo">Sexo observado</string>
+    <!-- Lote 5 S8: menos texto y nombres completos de los signos. -->
+    <string name="par5_libre_detalle">Cuando despacho te asigne un servicio aparece aquí.</string>
+    <string name="par5_frecuencia_cardiaca">Frecuencia cardiaca (latidos por minuto)</string>
+    <string name="par5_presion_sistolica">Presión arterial sistólica (mmHg)</string>
+    <string name="par5_presion_diastolica">Presión arterial diastólica (mmHg)</string>
+    <string name="par5_saturacion" formatted="false">Saturación de oxígeno (%)</string>
+    <string name="par5_temperatura">Temperatura (grados centígrados)</string>
+    <string name="par5_glasgow">Escala de Glasgow (3 a 15)</string>
+    <string name="par5_ubicacion_corta">Ubicación</string>
+    <string name="par5_mapa">Mapa</string>
+    <string name="par5_senas_error">Describe las señas, de al menos 5 caracteres.</string>
 </resources>
