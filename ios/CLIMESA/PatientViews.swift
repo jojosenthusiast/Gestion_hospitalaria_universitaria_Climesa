@@ -1323,7 +1323,7 @@ enum HistoryCopy {
 
 /// Lote 5 S15 · one order of the record: «Por qué se pidió» (consultation, doctor, reason, diagnoses), then its results.
 private struct RecordLabDetail: View {
-    let order: LabOrder
+    let order: ClinicalHistory.LabOrder
     let history: ClinicalHistory
     var viewerIsPatient = true
 
