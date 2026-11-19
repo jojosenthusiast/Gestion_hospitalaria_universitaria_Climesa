@@ -161,7 +161,10 @@ public enum ClimesaDates {
     /// Whole years from a `yyyy-MM-dd` birth day to `now`'s local day in El Salvador; nil when unreadable or in the future.
     public static func age(birthDay: String?, now: Date = Date()) -> Int? {
         guard let birthDay, let birth = pickerDate(day: String(birthDay.prefix(10))) else { return nil }
-        let years = calendar.dateComponents([.year], from: calendar.startOfDay(for: birth), to: calendar.startOfDay(for: now)).year
+        let born = calendar.startOfDay(for: birth), today = calendar.startOfDay(for: now)
+        // A birth date in the future is a data error, not age 0.
+        guard born <= today else { return nil }
+        let years = calendar.dateComponents([.year], from: born, to: today).year
         guard let years, years >= 0 else { return nil }
         return years
     }
