@@ -7,7 +7,10 @@ import { PoolClient } from 'pg';
  * is gated only when every role that grants the actor its permission is a shift role: a MED who is also ADM still runs
  * ADM commands off shift.
  */
-/** Minutes before the start and after the end of a shift in which the person can still work (handover, late close). */
+/**
+ * Minutes before the start and after the end of a shift in which the person can still work (handover, late close).
+ * The policy's `margen_minutos` decides it; this is the fallback when the policy has none (or an invalid one).
+ */
 export const SHIFT_GRACE_MINUTES = 30;
 /** Policy that turns the gate on and lists the shift roles; closing its `vigencia` turns the gate off without a deploy. */
 export const SHIFT_GATE_POLICY = 'turnos.exigir_turno_activo';
@@ -21,10 +24,14 @@ export type ShiftWindow = { id: string; start: Date; end: Date; area: string | n
 /** Shift states that count as worked time: published or running by the clock, or just completed (grace after the end). */
 const WORKING_STATES = ['publicado', 'en_curso', 'completado'];
 
-/** Shift roles of the policy in force at `at`; empty when the gate is off. */
-export async function shiftRoles(c: PoolClient, at: Date): Promise<string[]> {
-  const row = (await c.query<{ valor: { roles?: unknown } }>('SELECT valor FROM plataforma.politica WHERE clave=$1 AND vigencia @> $2::timestamptz', [SHIFT_GATE_POLICY, at])).rows[0];
-  return Array.isArray(row?.valor?.roles) ? (row!.valor.roles as unknown[]).filter((r): r is string => typeof r === 'string') : [];
+export type ShiftGatePolicy = { roles: string[]; graceMinutes: number };
+
+/** The policy in force at `at`: its shift roles (empty when the gate is off) and its grace minutes (`margen_minutos`). */
+export async function shiftGatePolicy(c: PoolClient, at: Date): Promise<ShiftGatePolicy> {
+  const row = (await c.query<{ valor: { roles?: unknown; margen_minutos?: unknown } }>('SELECT valor FROM plataforma.politica WHERE clave=$1 AND vigencia @> $2::timestamptz', [SHIFT_GATE_POLICY, at])).rows[0];
+  const roles = Array.isArray(row?.valor?.roles) ? (row!.valor.roles as unknown[]).filter((r): r is string => typeof r === 'string') : [];
+  const grace = row?.valor?.margen_minutos;
+  return { roles, graceMinutes: typeof grace === 'number' && Number.isInteger(grace) && grace >= 0 ? grace : SHIFT_GRACE_MINUTES };
 }
 
 /** True when the permission reaches the actor only through shift roles (so the command needs a shift). */
@@ -34,13 +41,13 @@ export async function permissionNeedsShift(c: PoolClient, userId: string, permis
   return granting.length > 0 && granting.every(r => roles.includes(r));
 }
 
-/** The actor's shift that covers `at` with the grace window, or null. */
-export async function activeShift(c: PoolClient, userId: string, at: Date): Promise<ShiftWindow | null> {
+/** The actor's shift that covers `at` with the grace window (in minutes, from the policy), or null. */
+export async function activeShift(c: PoolClient, userId: string, at: Date, graceMinutes: number): Promise<ShiftWindow | null> {
   const row = (await c.query(`SELECT t.id,lower(t.periodo) AS start,upper(t.periodo) AS "end",e.nombre AS area,t.estado AS state
       FROM acceso.usuario u JOIN personal.turno t ON t.persona_id=u.persona_personal_id LEFT JOIN infra.espacio e ON e.id=t.area_id
      WHERE u.id=$1 AND t.estado=ANY($4::text[])
        AND lower(t.periodo)-make_interval(mins=>$3::int)<=$2::timestamptz AND upper(t.periodo)+make_interval(mins=>$3::int)>$2::timestamptz
-     ORDER BY lower(t.periodo) LIMIT 1`, [userId, at, SHIFT_GRACE_MINUTES, WORKING_STATES])).rows[0];
+     ORDER BY lower(t.periodo) LIMIT 1`, [userId, at, graceMinutes, WORKING_STATES])).rows[0];
   return row ?? null;
 }
 

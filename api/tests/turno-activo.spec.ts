@@ -98,6 +98,21 @@ describe('Lote 5 S9 · comandos operativos solo con turno activo', () => {
     for (const role of ['ADM', 'JOP', 'DPD', 'PAC']) expect({ role, ...(await t.call(role, 'GET', '/me/turno-activo')).body }).toMatchObject({ role, required: false, active: true, message: null });
   });
 
+  test('el margen sale de margen_minutos de la política: con 0, 10 minutos después del fin se rechaza', async () => {
+    const policy = 'turnos.exigir_turno_activo';
+    await t.pg.query("UPDATE plataforma.politica SET valor = valor || '{\"margen_minutos\":0}'::jsonb WHERE clave=$1", [policy]);
+    try {
+      await t.shift('REC', new Date(now.valueOf() - 8 * HOUR), new Date(now.valueOf() - 10 * MINUTE));
+      const refused = await issue();
+      expect([refused.status, refused.body.codigo]).toEqual([403, 'sin_turno_activo']);
+      expect((await t.call('REC', 'GET', '/me/turno-activo')).body).toMatchObject({ required: true, active: false, graceMinutes: 0 });
+    } finally {
+      await t.pg.query("UPDATE plataforma.politica SET valor = valor || '{\"margen_minutos\":30}'::jsonb WHERE clave=$1", [policy]);
+    }
+    // Same shift with the seeded 30 minutes: 10 minutes after the end still works.
+    expect((await issue()).status).toBe(201);
+  });
+
   test('sin la política turnos.exigir_turno_activo la regla no aplica', async () => {
     const saved = await t.one('SELECT valor,vigencia::text AS vigencia,fuente,aprobado_por FROM plataforma.politica WHERE clave=$1', ['turnos.exigir_turno_activo']);
     await t.pg.query('DELETE FROM plataforma.politica WHERE clave=$1', ['turnos.exigir_turno_activo']);
