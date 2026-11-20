@@ -70,11 +70,13 @@ export function WriteError({error,onReload,reloadLabel='Cerrar y recargar'}:{err
  * Audit S12 (D16): a form-side problem (checked before sending) shows where the person is looking: it scrolls into view
  * when it appears or changes, like `WriteError`. Put it next to the control it is about, or right above the actions.
  */
-export function FormProblem({text}:{text:string|null|undefined}){
+export function FormProblem({text}:{text:string|null|undefined}){return <InViewNotice kind="error" text={text}/>;}
+/** Audit D52/D56: a confirmation after an action scrolls into view too, so it is never above the fold, out of sight. */
+export function InViewNotice({kind,text}:{kind:'success'|'error'|'info'|'warning';text:string|null|undefined}){
  const ref=useRef<HTMLDivElement>(null);
- useEffect(()=>{if(text)ref.current?.scrollIntoView?.({block:'center',behavior:'smooth'});},[text]);
+ useEffect(()=>{if(text)ref.current?.scrollIntoView?.({block:'nearest',behavior:'smooth'});},[text]);
  if(!text)return null;
- return <div ref={ref} className="write-error"><Notice kind="error">{text}</Notice></div>;}
+ return <div ref={ref} className="write-error"><Notice kind={kind}>{text}</Notice></div>;}
 function WriteErrorBody({error,onReload,reloadLabel}:{error:ApiError;onReload?:()=>void;reloadLabel:string}){
  if(onReload&&isVersionConflict(error))return <div className="conflict-notice"><Notice kind="error">{error.message} Alguien cambió este registro mientras lo tenías abierto; tus cambios no se guardaron.</Notice><button type="button" className="secondary-button" onClick={onReload}><Icon name="retry" size={18}/>{reloadLabel}</button></div>;
  return <Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>;}
