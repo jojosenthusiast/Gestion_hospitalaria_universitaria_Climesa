@@ -34,6 +34,11 @@ select pg_temp.espera_error($$insert into infra.espacio (padre_id, tipo, codigo,
 select pg_temp.espera_error($$update infra.espacio set capacidad = 1 where codigo = 'HAB-201'$$, 'capacidad_menor_que_camas');
 -- 3. Ciclo en el árbol
 select pg_temp.espera_error($$update infra.espacio set padre_id = (select id from infra.espacio where codigo = 'P2-HOS') where codigo = 'P2'$$, 'ciclo_en_arbol');
+-- 3b. Habitaciones por categoría (parcial 3 S1): 5 VIP en planta 3 y 6 semiprivadas en planta 2, sin pasar de ahí
+select pg_temp.espera_error($$insert into infra.espacio (padre_id, tipo, codigo, nombre, categoria, capacidad, nivel) select id, 'habitacion', 'VIP-306', 'VIP-306', 'vip', 1, 3 from infra.espacio where codigo = 'P3-VIP'$$, 'limite_habitaciones_vip');
+select pg_temp.espera_error($$insert into infra.espacio (padre_id, tipo, codigo, nombre, categoria, capacidad, nivel) select id, 'habitacion', 'HAB-207', 'HAB-207', 'semiprivada', 2, 2 from infra.espacio where codigo = 'P2-HOS'$$, 'limite_habitaciones_semiprivadas');
+select pg_temp.espera_error($$update infra.espacio set nivel = 2 where codigo = 'VIP-301'$$, 'habitacion_fuera_de_planta');
+select pg_temp.espera_error($$update infra.espacio set capacidad = 3 where codigo = 'HAB-202'$$, 'capacidad_de_categoria');
 -- 4. Ruta recursiva
 select case when infra.ruta((select id from infra.espacio where codigo = 'HAB-203-B')) = 'Planta 2 > Hospitalización semiprivada > HAB-203 > Cama B'
   then 'OK ruta' else 'FALLO ruta: ' || infra.ruta((select id from infra.espacio where codigo = 'HAB-203-B')) end;
