@@ -11,11 +11,16 @@ export type BedTypeCount = { category: string; label: string; free: number; tota
  * «VIP 0» instead of disappearing; a type the data brings that is not known is added after them.
  */
 export function bedTypeCounts(beds: { category?: string | null; free: boolean }[]): BedTypeCount[] {
+  return bedTypeTotals(beds.map(bed => ({ category: bed.category, free: bed.free ? 1 : 0, total: 1 })));
+}
+
+/** Same counts from rows already added up (for example `/publico/ocupacion`, one row per floor and room type). */
+export function bedTypeTotals(groups: { category?: string | null; free: number; total: number }[]): BedTypeCount[] {
   const by = new Map<string, BedTypeCount>(KNOWN.map(k => [k.key, { category: k.key, label: k.label, free: 0, total: 0 }]));
-  for (const bed of beds) {
-    const key = bed.category ?? '';
+  for (const group of groups) {
+    const key = group.category ?? '';
     const row = by.get(key) ?? { category: key, label: labelOf(key), free: 0, total: 0 };
-    row.total++; if (bed.free) row.free++;
+    row.total += group.total; row.free += group.free;
     by.set(key, row);
   }
   return [...by.values()];

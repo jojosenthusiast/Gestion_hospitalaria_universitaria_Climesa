@@ -185,6 +185,7 @@ export function LoginView({ email, password, setEmail, setPassword, busy, error,
         {(problems.email || problems.password) && <p className="sr-only" role="alert">Revisa los campos marcados.</p>}
         <SubmitButton busy={busy}>Iniciar sesión</SubmitButton>
         <a className="auth-link auth-forgot" href="/recuperar">¿Olvidaste tu contraseña?</a>
+        <a className="auth-link auth-public" href="/publico">Ver información pública del hospital</a>
         <div className="auth-help"><span>¿Primera vez aquí?</span><p>El personal ingresa con una invitación del hospital.</p><p>¿Eres paciente? Crea tu cuenta en la app CLIMESA para Android o iOS.</p></div>
       </form>
     </AuthLayout>
