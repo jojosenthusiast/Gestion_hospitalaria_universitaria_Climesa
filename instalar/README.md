@@ -1,3 +1,7 @@
-# Binarios Android
+# Binarios
 
-`anteriores/CLIMESA-0.1.0-demo.apk` es la demo local antigua, sin el core actual. El corte 0.3.0 se entrega como fuente en `android/`; no se generó una APK nueva en este entorno sin SDK Android. Compila con Android Studio/JDK 17 y SDK 35, o ejecuta el workflow Android en tu repositorio.
+Builds del 20 nov 2026 (auditoría de flujos), apuntan a producción (`https://sghu-api.onrender.com/api/v1`).
+
+- `android/CLIMESA-android-2026-11-20.apk`: Android, todos los roles. Sin cuentas de prueba embebidas; se entra con correo y contraseña.
+- `ios/CLIMESA-ios-2026-11-20-sin-firmar.ipa`: iOS (médico y paciente), sin firmar. Lo firma quien lo instala (Sideloadly + Apple ID); ver `ios/README.md`. Generado por el workflow iOS a partir de `feat/lote5-ios` con las correcciones de la auditoría.
+- `anteriores/CLIMESA-0.1.0-demo.apk`: demo local antigua, sin el core actual.
