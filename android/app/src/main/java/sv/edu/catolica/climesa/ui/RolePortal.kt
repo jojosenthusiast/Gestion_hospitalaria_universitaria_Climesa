@@ -169,7 +169,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         page==AndroidSection.MEDICAL_DAY->ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HOSPITAL_INFO->HospitalInfoScreen(Modifier.padding(padding))
         page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=!sv.edu.catolica.climesa.domain.VitalsAccess.canRecord(account.profile.permissions),userId=account.session.userId,subject=inbox.subjectFor(page),onSubjectHandled=handled,
-            onExit=vitalsOrigin?.let{origin->{selectedName=origin;vitalsOrigin=null}})
+            onExit=vitalsOrigin?.let{origin->{selectedName=origin;vitalsOrigin=null}},
+            exitLabel=vitalsOrigin?.let{origin->sections.firstOrNull{it.name==origin}?.let(::sectionShortLabel)})
         page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)->AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding))
         else->PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){

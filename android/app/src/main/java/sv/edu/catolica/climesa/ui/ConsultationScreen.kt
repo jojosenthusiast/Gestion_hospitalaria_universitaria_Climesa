@@ -100,14 +100,15 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
             onConfirm = { confirmAbsent = null; model.markAbsent(ticket) }, onDismiss = { confirmAbsent = null },
         )
     }
-    val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = state.handoff?.proposal != null && canCall,
-        canCallWaiting = state.handoff == null && canCall && state.waitingGeneral)
+    val handoff = ConsultationPrimary.shownHandoff(state.handoff, state.waitingGeneral)
+    val primary = ConsultationPrimary.pick(state.queue, state.unsigned.map { it.id }, canCallNext = handoff?.proposal != null && canCall,
+        canCallWaiting = handoff == null && canCall && state.waitingGeneral)
     PageList(modifier) {
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
-        state.handoff?.let { handoff -> item { NextPatientHandoff(handoff, canCall, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
+        handoff?.let { handoff -> item { NextPatientHandoff(handoff, canCall, state.saving, onCall = { model.callProposed() }, onDismiss = { model.dismissHandoff() }) } }
         // B4: with nobody in the office yet, calling who waits in general consultation is the day's first action.
         // QA final: with an unsigned consultation as primary, the call stays available as a secondary button (iOS parity).
-        if (ConsultationPrimary.showsCallWaiting(state.handoff != null, canCall, state.waitingGeneral, officeBusy = state.queue.any { it.calledByMe && it.state in setOf("llamado", "en_atencion") })) item {
+        if (ConsultationPrimary.showsCallWaiting(handoff != null, canCall, state.waitingGeneral, officeBusy = state.queue.any { it.calledByMe && it.state in setOf("llamado", "en_atencion") })) item {
             SectionCard(stringResource(R.string.clin_llamar_primero_titulo)) {
                 Text(stringResource(R.string.clin_llamar_primero_detalle), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val call = { model.clearMessages(); model.callWaiting() }
@@ -150,7 +151,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
                 // Row 15: "Mi día" opens on today, by day; earlier and later days stay folded behind one button each.
                 val today = java.time.LocalDate.now(sanSalvador)
-                val groups = ConsultationAgenda.group(state.appointments, today)
+                val groups = ConsultationAgenda.group(ConsultationPrimary.withoutCalled(state.appointments, state.queue), today)
                 if (groups.past.isNotEmpty() && !showPast) item { RowAction(stringResource(R.string.citas_ver_dias_anteriores, groups.past.size), { showPast = true }) }
                 val days = (if (showPast) groups.past else emptyList()) + listOfNotNull(groups.today) + (if (showLater) groups.later else emptyList())
                 if (groups.today == null) item { Text(stringResource(R.string.med_agenda_hoy_vacia), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(vertical = Spacing.sm)) }

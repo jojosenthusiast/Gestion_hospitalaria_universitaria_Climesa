@@ -115,6 +115,12 @@ object RoleDashboard {
 
     private fun states(value: Any?, key: String = "state"): Map<String, Int> = rows(value).groupingBy { it.optString(key) }.eachCount()
 
+    /**
+     * D84: "Hospitalizados" counts every active stay the ward list shows (waiting for a bed, in bed, discharge signed but
+     * not out yet), not only the `hospitalizado` state, so Inicio and the list never disagree.
+     */
+    internal fun inBed(states: Map<String, Int>): Int = states.filterKeys { it in setOf("pendiente_cama", "hospitalizado", "alta_firmada") }.values.sum()
+
     private fun text(row: JSONObject, key: String): String? = if (row.isNull(key)) null else row.optString(key).takeIf { it.isNotBlank() }
 
     private fun instant(value: String?): Instant? {
@@ -321,7 +327,7 @@ object RoleDashboard {
             }
             "ENF" -> {
                 // ENF/AST audit #16: nursing does not assign beds, so "Admisiones sin cama" is not its tile.
-                admissions?.let { kpis += DashboardKpi("Hospitalizados", (it["hospitalizado"] ?: 0).toString(), DashboardTone.PROCESS, target = target(AndroidSection.WARD)) }
+                admissions?.let { kpis += DashboardKpi("Hospitalizados", inBed(it).toString(), DashboardTone.PROCESS, target = target(AndroidSection.WARD)) }
                 bedKpis()
                 stock?.let { kpis += DashboardKpi("Insumos bajo mínimo", it.belowMinimum.toString(), if (it.belowMinimum > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.SUPPLIES)) }
                 shiftKpi()
@@ -349,7 +355,7 @@ object RoleDashboard {
                 lab?.let {
                     kpis += DashboardKpi("Resultados por revisar", it.toReview.toString(), if (it.critical > 0) DashboardTone.DANGER else if (it.toReview > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.RESULT_REVIEW))
                 }
-                admissions?.let { kpis += DashboardKpi("Hospitalizados", (it["hospitalizado"] ?: 0).toString(), DashboardTone.PROCESS, target = target(AndroidSection.HOSPITALIZED)) }
+                admissions?.let { kpis += DashboardKpi("Hospitalizados", inBed(it).toString(), DashboardTone.PROCESS, target = target(AndroidSection.HOSPITALIZED)) }
                 shiftKpi()
                 labChart("Mis exámenes por etapa")
                 lab?.takeIf { it.critical > 0 && AndroidSection.RESULT_REVIEW in sections }?.let {

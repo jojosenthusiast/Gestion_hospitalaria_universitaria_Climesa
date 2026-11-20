@@ -301,6 +301,27 @@ object HospitalizationRules {
      * For a hospitalized patient whose discharge this person cannot sign: who signs it, or why nobody can yet. Null for the
      * signer (they see "Firmar alta") and outside `hospitalizado`.
      */
+    /**
+     * D86: the critical values of the latest signs as one line ("T 39.5 °C · FC 140 lpm"), for the ward card and the discharge
+     * confirmation; null when none is critical.
+     */
+    fun criticalSignsText(alerts: List<VitalAlert>): String? = alerts.filter { it.level == VitalLevel.CRITICAL }
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString(" · ") { "${VitalReading.shortLabel(it.measure)} ${it.measure.format(it.value)} ${it.measure.unit}".trim() }
+
+    /** D86: the admissions whose latest signs are read for the ward card: patients still in a bed. */
+    fun watchesSigns(admission: HospitalAdmission): Boolean = admission.patientId != null && admission.state in setOf("hospitalizado", "alta_firmada")
+
+    /** D88: the summary rule shown under the field while typing, before the tap (the same rule [dischargeError] applies). */
+    fun summaryError(summary: String): String? = when {
+        summary.isNotBlank() && summary.trim().length < SUMMARY_MIN -> "Faltan ${SUMMARY_MIN - summary.trim().length} caracteres (mínimo $SUMMARY_MIN), o déjalo vacío."
+        summary.trim().length > SUMMARY_MAX -> "El resumen no puede pasar de $SUMMARY_MAX caracteres."
+        else -> null
+    }
+
+    /** D89: who usually answers for a discharge pending; any other text is still accepted through «Otro». */
+    val PENDING_RESPONSIBLES = listOf("Consulta general", "Enfermería", "Paciente o familia", "Farmacia", "Laboratorio", "Recepción")
+
     fun waitingDischargeHint(admission: HospitalAdmission): String? = when {
         admission.state != "hospitalizado" || AdmissionAction.SIGN_DISCHARGE in admission.allowedActions -> null
         !admission.attendingDoctorHasAccount -> "El médico tratante no tiene cuenta en la app; pide a Jefatura que reasigne el tratante."

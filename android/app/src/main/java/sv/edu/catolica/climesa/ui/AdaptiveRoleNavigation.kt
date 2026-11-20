@@ -62,6 +62,9 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 
+/** D85: the bottom-bar name of a section, for "Volver a Internados" outside the bar. */
+internal fun sectionShortLabel(section: AndroidSection): String = compactLabel(section)
+
 private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.QUEUE -> "Fila"
     AndroidSection.PATIENTS -> "Pacientes"

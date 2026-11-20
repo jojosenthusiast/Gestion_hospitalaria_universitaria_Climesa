@@ -51,6 +51,8 @@ data class QueueConsultation(
     /** Server `allowedActions` and reversible `undoActions` of the row: every queue button comes from them. */
     val allowedActions: List<QueueAction> = emptyList(),
     val undoActions: List<String> = emptyList(),
+    /** Patient of the number when the API sends it (`patientId`); used only to avoid listing the same person twice (D76). */
+    val patientId: String? = null,
 ) {
     val code: String get() = "$area $number"
     /**
@@ -93,6 +95,24 @@ sealed interface ConsultationPrimary {
          * the doctor already has a number called or in attention ([officeBusy]): the card says nobody is in the office.
          */
         fun showsCallWaiting(hasHandoff: Boolean, canCall: Boolean, waitingGeneral: Boolean, officeBusy: Boolean = false) = !hasHandoff && canCall && waitingGeneral && !officeBusy
+
+        /**
+         * D74: the signing handoff without a proposal says "Nadie espera"; when the day just read shows someone waiting, that
+         * empty handoff is dropped so the screen offers "Llamar siguiente" instead of a statement that is already false.
+         */
+        fun shownHandoff(handoff: NextProposal?, waitingGeneral: Boolean): NextProposal? = handoff?.takeUnless { it.proposal == null && waitingGeneral }
+
+        /**
+         * D76: an appointment of today whose patient is already called or in attention in the doctor's office is shown once,
+         * in "Fila del día", not again in the agenda. Matched by patient id when the queue sends it, else by the exact name.
+         */
+        fun withoutCalled(appointments: List<MedicalAppointment>, queue: List<QueueConsultation>): List<MedicalAppointment> {
+            val inOffice = queue.filter { (it.calledByMe || it.consultationId != null) && it.state in setOf("llamado", "en_atencion") }
+            if (inOffice.isEmpty()) return appointments
+            return appointments.filterNot { a ->
+                a.consultationState != "firmada" && inOffice.any { t -> if (t.patientId != null) t.patientId == a.patientId else t.patientName == a.patientName }
+            }
+        }
     }
 }
 
@@ -158,7 +178,8 @@ object ConsultationResume {
                 version = row.optInt("version", 1), priority = row.text("priority") ?: "rutina",
                 area = row.text("area") ?: QueueLabels.areaOf(row.text("service") ?: "consulta_general"),
                 allowedActions = ServerActions.allowed(row).mapNotNull(QueueAction::of).distinct(),
-                undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList())
+                undoActions = row.optJSONArray("undoActions")?.let { list -> (0 until list.length()).map { list.optString(it) } } ?: emptyList(),
+                patientId = row.text("patientId") ?: row.text("pacienteId"))
         } }
     }
 

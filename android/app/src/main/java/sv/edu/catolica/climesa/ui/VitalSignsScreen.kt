@@ -117,6 +117,8 @@ fun VitalSignsScreen(
     subject: sv.edu.catolica.climesa.domain.QuickSubject? = null, onSubjectHandled: () -> Unit = {},
     /** ENF/AST audit #18: opened from another section (the ward card); back returns there in one step. */
     onExit: (() -> Unit)? = null,
+    /** D85: name of the section [onExit] returns to, shown as a visible "Volver a …" action at the top. */
+    exitLabel: String? = null,
     model: VitalSignsViewModel = viewModel(),
 ) {
     val state by model.state.collectAsStateWithLifecycle()
@@ -127,6 +129,10 @@ fun VitalSignsScreen(
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     BackHandler(enabled = state.patientId != null || onExit != null) { model.close(); onExit?.invoke() }
     PageList(modifier) {
+        // D85: the bottom bar shows "Más" here; the way back to the section that opened Signos is one tap, on screen.
+        if (onExit != null && exitLabel != null) item(key = "volver") {
+            RowAction(stringResource(R.string.signos_volver_a, exitLabel), { model.close(); onExit() })
+        }
         if (state.patientId == null) {
             pickerItems(state, profile, model)
         } else {

@@ -160,6 +160,9 @@ object QueueRules {
     fun callNextService(tickets: List<QueueTicket>, filter: String?): String =
         filter ?: tickets.firstOrNull { it.state == "en_espera" }?.service ?: QueueLabels.services.first().first
 
+    /** D99: numbers waiting in [service]; "Llamar siguiente" for a service with none is never offered (the API answers 409). */
+    fun waitingCount(tickets: List<QueueTicket>, service: String): Int = tickets.count { it.state == "en_espera" && it.service == service }
+
     fun callNextBody(service: String, officeId: String? = null) = org.json.JSONObject().put("service", service).apply { officeId?.let { put("officeId", it) } }
 
     /**
