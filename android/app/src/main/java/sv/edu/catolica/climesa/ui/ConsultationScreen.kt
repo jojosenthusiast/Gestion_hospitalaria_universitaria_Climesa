@@ -507,7 +507,7 @@ private fun NextPatientHandoff(handoff: sv.edu.catolica.climesa.domain.NextPropo
             }
             Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge)
             Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
+        } else Text(noProposalText(handoff), style = MaterialTheme.typography.bodyMedium)
         if (proposal != null && canCall) PrimaryButton(stringResource(R.string.consulta_llamar_a, proposal.code), onCall, enabled = !busy)
         SecondaryButton(stringResource(R.string.consulta_ahora_no), onDismiss, enabled = !busy)
     }

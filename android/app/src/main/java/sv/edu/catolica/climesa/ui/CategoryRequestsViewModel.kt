@@ -53,9 +53,13 @@ data class CategoryRequestsState(
     /** The patient left "Pedir cita" with the back gesture; reopening resumes this draft. */
     val draftKept: Boolean = false,
     val notice: String? = null,
+    /** D128: the server's request limit, read when the form opens; null until it answers or from an older API. */
+    val limit: sv.edu.catolica.climesa.domain.RequestLimit? = null,
 ) {
     val visibleCategories get() = CategoryRequestRules.filter(categories, query, picked)
-    val canSend get() = !saving && CategoryRequestRules.canSend(picked, note)
+    /** D128: the limit is reached, so the form is closed before the patient fills it (S12). */
+    val blockedByLimit get() = limit?.canRequest == false
+    val canSend get() = !saving && !blockedByLimit && CategoryRequestRules.canSend(picked, note)
     /** Pending-assignment inbox: pending rows this reader may assign or reject (the server decides). */
     val inbox get() = requests.filter { it.pending && (it.allows(CategoryRequestRules.ASSIGN) || it.allows(CategoryRequestRules.REJECT)) }
     val visibleSlots get() = assigning?.let { CategoryRequestRules.slotsFor(slots, it.franja, wholeDay) } ?: emptyList()
@@ -107,9 +111,17 @@ class CategoryRequestsViewModel @Inject constructor(private val api: ApiGateway,
 
     /** Opens "Pedir cita"; after a system back ([leaveForm]) it resumes the same draft instead of starting over. */
     fun openForm() {
+        loadLimit()
         if (mutable.value.draftKept) { mutable.update { it.copy(formOpen = true, draftKept = false, error = null, notice = null) }; return }
         createIntent.reset()
         mutable.update { it.copy(formOpen = true, query = "", picked = emptyList(), franja = RequestFranja.ANY, note = "", preferredDoctorId = null, error = null, notice = null) }
+    }
+    /** D128: asks the server whether a new request would be accepted; a failure (older API) leaves the form open as before. */
+    private fun loadLimit() {
+        viewModelScope.launch {
+            val limit = try { CategoryRequestRules.limit(api.request(CategoryRequestRules.LIMIT_PATH)) } catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+            mutable.update { it.copy(limit = limit) }
+        }
     }
     fun closeForm() { if (!mutable.value.saving) mutable.update { it.copy(formOpen = false, draftKept = false, error = null) } }
 

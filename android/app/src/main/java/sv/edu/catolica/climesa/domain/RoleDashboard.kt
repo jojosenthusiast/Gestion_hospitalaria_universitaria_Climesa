@@ -426,7 +426,8 @@ object RoleDashboard {
 
     /**
      * D25/D26: arrived services first (they wait for the handover), then the ones on their way. The state line uses what
-     * `/ambulancia/llegada` sends; `priority` and `hasPrehospital` are read when the API includes them.
+     * `/ambulancia/llegada` sends; `priority`, `hasPrehospital`, `urgent` and `state` are read when the API includes them.
+     * Every ambulance is urgent (owner decision, D120): the card stays red even when an older API omits `urgent`.
      */
     fun ambulanceAlerts(list: List<ArrivalCandidate>, now: Instant): List<AmbulanceAlert> {
         val clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
@@ -434,9 +435,11 @@ object RoleDashboard {
             val since = instant(candidate.dispatchedAt)?.let { "despachada a las ${clock.format(it.atZone(zone))}" }
             val report = if (candidate.hasPrehospital) "reporte prehospital enviado" else if (candidate.arrived) null else "sin reporte prehospital aún"
             val priority = candidate.priority?.takeIf { it.isNotBlank() }
+            // D26: the on-the-way state from the last milestone ("En la escena", "En camino al hospital").
+            val where = ArrivalStates.label(candidate.state)?.takeIf { !candidate.arrived }
             AmbulanceAlert(
                 title = if (candidate.arrived) "Ambulancia en el hospital" else "Ambulancia en camino",
-                detail = listOfNotNull(priority?.let { "Prioridad ${AmbulanceLabels.priority(it)}" }, since, report).joinToString(" · ").replaceFirstChar { it.uppercase() },
+                detail = listOfNotNull("Urgente".takeIf { candidate.urgent }, where, priority?.let { "Prioridad ${AmbulanceLabels.priority(it)}" }, since, report).joinToString(" · ").replaceFirstChar { it.uppercase() },
                 priority = priority,
                 actionLabel = if (candidate.arrived) "Recibir" else "Ver reporte",
                 request = QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION),

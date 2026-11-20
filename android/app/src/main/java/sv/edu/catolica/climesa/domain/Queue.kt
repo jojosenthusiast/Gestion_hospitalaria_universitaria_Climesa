@@ -208,7 +208,9 @@ object QueueRules {
             ProposedTicket(it.optString("id"), it.optInt("numero"), ServerActions.text(it, "area") ?: json.optString("area"), ServerActions.text(it, "patientName") ?: "Paciente",
                 ServerActions.text(it, "priority") ?: "rutina", it.optInt("version", 1), it.optString("reason"), it.optString("reasonText"))
         }
-        return NextProposal(json.optString("service"), json.optString("area"), json.optString("rule"), proposal)
+        // D74: `waiting` and `noProposalReason` are optional (older API): without them the panel says nobody waits.
+        val waiting = if (json.has("waiting") && !json.isNull("waiting")) json.optInt("waiting") else null
+        return NextProposal(json.optString("service"), json.optString("area"), json.optString("rule"), proposal, waiting, ServerActions.text(json, "noProposalReason"))
     }
 }
 
@@ -226,7 +228,16 @@ data class ProposedTicket(val id: String, val number: Int, val area: String, val
     val code get() = "$area $number"
 }
 /** Who goes next in one area, by the server's documented rule (RN-FILA-SIGUIENTE). */
-data class NextProposal(val service: String, val area: String, val rule: String, val proposal: ProposedTicket?)
+data class NextProposal(
+    val service: String, val area: String, val rule: String, val proposal: ProposedTicket?,
+    /** D74: numbers waiting in the service now, with or without a proposal. */
+    val waiting: Int? = null,
+    /** D74: `sin_espera` or `citas_de_otro_medico` (people wait, but with another doctor's appointment); null with a proposal. */
+    val noProposalReason: String? = null,
+) {
+    /** D74: how many wait for another doctor when that is why nobody is proposed; null means "nobody waits". */
+    val waitingForOtherDoctor: Int? get() = if (proposal == null && noProposalReason == "citas_de_otro_medico") (waiting ?: 0).takeIf { it > 0 } else null
+}
 
 /** A board move is a request for one server action (drag is not used on mobile: the card menu offers the moves). */
 enum class QueueMove(val wire: String, val path: String, val label: String) {

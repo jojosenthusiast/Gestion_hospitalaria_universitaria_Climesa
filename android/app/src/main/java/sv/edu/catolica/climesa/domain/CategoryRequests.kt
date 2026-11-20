@@ -21,6 +21,9 @@ enum class CategoryTone { SLATE, AMBER, MAGENTA, RED, ORANGE, BLUE, TEAL, PURPLE
 
 data class AssignedAppointment(val id: String, val doctorName: String, val start: String, val end: String)
 
+/** D128: pending requests that count for the limit, the policy maximum, and whether a new one would be accepted (with the server's reason). */
+data class RequestLimit(val pending: Int, val max: Int, val canRequest: Boolean, val code: String?, val reason: String?)
+
 /** Row of `GET /citas/solicitudes-categoria`; the actions come from the server (`allowedActions`). */
 data class CategoryRequest(
     val id: String, val patientName: String, val record: String?, val categories: List<CategoryRef>, val specialties: List<String>,
@@ -42,6 +45,16 @@ object CategoryRequestRules {
     const val REJECT_MIN = 10
     const val PATH = "/citas/solicitudes-categoria"
     const val CATEGORIES_PATH = "/citas/categorias"
+    /** D128: `GET /citas/solicitudes-categoria/limite`, read when "Pedir una cita" opens. */
+    const val LIMIT_PATH = "/citas/solicitudes-categoria/limite"
+
+    /** D128: reads the limit answer; null when it is not that object (an older API without the endpoint). */
+    fun limit(value: Any?): RequestLimit? {
+        val json = value as? org.json.JSONObject ?: return null
+        if (!json.has("canRequest")) return null
+        fun text(key: String) = if (json.isNull(key)) null else json.optString(key).takeIf { it.isNotBlank() }
+        return RequestLimit(json.optInt("pending"), json.optInt("max"), json.optBoolean("canRequest", true), text("code"), text("reason"))
+    }
 
     /** State value that picks the shared family, and its label: the same pairs as the web `REQUEST_STATE`. */
     fun status(state: String): Pair<String, String> = when (state) {

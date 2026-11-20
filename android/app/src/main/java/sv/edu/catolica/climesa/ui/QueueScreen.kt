@@ -277,7 +277,7 @@ private fun NextCard(state: QueueState, service: String, canCall: Boolean, prima
             }
             Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else if (status == NextStatus.NONE) Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
+        } else if (status == NextStatus.NONE) Text(noProposalText(next), style = MaterialTheme.typography.bodyMedium)
         if (canCall) {
             OfficePicker(state.offices, office, busy, onOffice)
             val calling = state.busyKey == QueueViewModel.NEXT
@@ -286,6 +286,11 @@ private fun NextCard(state: QueueState, service: String, canCall: Boolean, prima
         }
     }
 }
+
+/** D74: why nobody is proposed: nobody waits, or those waiting have an appointment with another doctor. */
+@Composable
+internal fun noProposalText(next: sv.edu.catolica.climesa.domain.NextProposal?): String =
+    next?.waitingForOtherDoctor?.let { androidx.compose.ui.res.pluralStringResource(R.plurals.fila_citas_otro_medico, it, it) } ?: stringResource(R.string.fila_nadie_espera)
 
 /** Optional consulting room for the call ("Sin asignar" by default); hidden when there is none to choose. */
 @Composable

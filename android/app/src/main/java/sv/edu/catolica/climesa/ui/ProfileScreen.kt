@@ -24,7 +24,7 @@ import sv.edu.catolica.climesa.domain.RoleAccess
 /** Reference account summary: name, e-mail, roles and whether the backend verified the permissions. */
 @Composable
 internal fun ProfileSummaryCard(account: AuthenticatedAccount, modifier: Modifier = Modifier) {
-    SectionCard(account.profile.name.ifBlank { account.session.email }, modifier) {
+    SectionCard(account.profile.displayName.ifBlank { account.session.email }, modifier) {
         Text(account.session.email, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         HorizontalDivider(color = MaterialTheme.climesa.line)
         LabeledValue(stringResource(R.string.ui_cuenta_roles), account.profile.roles.joinToString { RoleAccess.label(it) }.ifBlank { "—" })

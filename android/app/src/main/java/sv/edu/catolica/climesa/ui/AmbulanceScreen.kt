@@ -423,9 +423,11 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
         SectionCard(stringResource(R.string.amb_por_recibir)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 state.arrivals.forEach { candidate ->
+                    // D26: on the way it says where the ambulance is (last milestone) when the API sends `state`.
+                    val stateLabel = sv.edu.catolica.climesa.domain.ArrivalStates.label(candidate.state)?.takeIf { !candidate.arrived }
                     FilterChip(
                         selected = candidate.serviceId == state.arrivalServiceId, onClick = { model.selectArrival(candidate.serviceId) },
-                        label = { Text(stringResource(if (candidate.arrived) R.string.amb_llego_sin_entrega else R.string.amb_en_camino, localTime(candidate.dispatchedAt))) },
+                        label = { Text(if (stateLabel != null) stringResource(R.string.amb_estado_servicio, localTime(candidate.dispatchedAt), stateLabel.lowercase()) else stringResource(if (candidate.arrived) R.string.amb_llego_sin_entrega else R.string.amb_en_camino, localTime(candidate.dispatchedAt))) },
                         leadingIcon = if (candidate.serviceId == state.arrivalServiceId) ({ androidx.compose.material3.Icon(Icons.Default.Check, null) }) else null,
                         modifier = Modifier.heightIn(min = 48.dp),
                     )
@@ -441,6 +443,8 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
     val chosen = state.arrivals.firstOrNull { it.serviceId == view.serviceId }
     // D25 (owner): the priority of the latest report is a large card in its triage colour, not a plain line of text.
     view.reports.firstOrNull()?.let { latest -> item(key = "priority-${view.serviceId}") { PriorityAlert(latest.priority, chosen, latest.estimatedArrival) } }
+    // D120: a reader without `expediente.ver` sees the report only for the reception; say the read is logged as urgent.
+    if (view.urgentAccess) item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_acceso_urgente)) }
     item { HandoverCard(view, chosen, state.busy, model, state.formError) }
     if (view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
     if (!view.clinical) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_sin_relacion)) }
@@ -480,7 +484,7 @@ private fun PriorityAlert(priority: String, candidate: sv.edu.catolica.climesa.d
     androidx.compose.material3.Surface(color = bg, contentColor = fg, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
             Text(stringResource(R.string.amb_prioridad_grande, AmbulanceLabels.priority(priority)), style = MaterialTheme.typography.headlineSmall)
-            val where = when { candidate == null -> null; candidate.arrived -> stringResource(R.string.amb_estado_llego); else -> stringResource(R.string.amb_estado_en_camino) }
+            val where = when { candidate == null -> null; candidate.arrived -> stringResource(R.string.amb_estado_llego); else -> sv.edu.catolica.climesa.domain.ArrivalStates.label(candidate.state) ?: stringResource(R.string.amb_estado_en_camino) }
             listOfNotNull(where, estimatedArrival?.let { stringResource(R.string.amb_llega_aprox, localTime(it)) }).takeIf { it.isNotEmpty() }?.let {
                 Text(it.joinToString(" · "), style = MaterialTheme.typography.bodyLarge)
             }
@@ -502,6 +506,8 @@ private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, c
                 Text(stringResource(R.string.amb_siguiente_admision), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             view.canReceive -> PrimaryButton(stringResource(R.string.amb_marcar_recibido), { confirming = true }, icon = Icons.Default.Check, enabled = !busy, loading = busy)
+            // S12: the server's own reason (`blockedActions`) instead of a button it would refuse.
+            view.receiveBlockedReason != null -> Text(view.receiveBlockedReason!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             !view.arrived -> Text(stringResource(R.string.amb_entrega_espera), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> Text(stringResource(R.string.amb_entrega_sin_permiso), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }

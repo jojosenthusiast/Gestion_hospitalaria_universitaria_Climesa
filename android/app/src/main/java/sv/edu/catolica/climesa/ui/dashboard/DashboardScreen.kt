@@ -107,7 +107,7 @@ fun RoleDashboardScreen(
     RefreshAt(inbox.inbox?.nextChange, notices::reload)
     val critical = NoticeInboxRules.banner(inbox.inbox, inbox.hidden).isNotEmpty()
     PageList(modifier) {
-        item { DashboardHeader(account.profile.name, RoleAccess.label(role), stringResource(helpFor(role))) }
+        item { DashboardHeader(account.profile.displayName, RoleAccess.label(role), stringResource(helpFor(role))) }
         if (critical) item(key = "aviso-critico") { CriticalNoticeBanner(account, onOpenNotices) }
         val dashboard = state.model
         when {

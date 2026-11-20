@@ -85,6 +85,8 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
     // D130: who (name when the API gives it), what and why in plain words, and one row for a burst of the same access.
     val time = if (group.count > 1) stringResource(R.string.mis_accesos_rango, MyAccessRules.time(group.earliest), MyAccessRules.time(group.latest)) else MyAccessRules.time(entry.at)
     SectionCard(entry.name?.let { "$it · ${entry.role}" } ?: entry.role, action = { Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.primaryText) }) {
+        // D120: an urgent read (ambulance reception) carries the red "Urgente" tag.
+        if (entry.urgent) PriorityBadge(Priority.URGENTE, label = stringResource(R.string.mis_accesos_urgente))
         Text(listOf(MyAccessRules.dataText(entry.dataKind), MyAccessRules.reasonText(entry.reason)).filter { it.isNotBlank() }.joinToString(" "), style = MaterialTheme.typography.bodySmall)
         if (group.count > 1) Text(stringResource(R.string.mis_accesos_veces, group.count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }

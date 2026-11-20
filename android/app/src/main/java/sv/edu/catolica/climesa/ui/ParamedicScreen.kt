@@ -157,7 +157,7 @@ private fun LazyListScope.unitCard(state: AmbulanceUiState, canPlan: Boolean, id
                 style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             status.dispatchBlock?.takeIf { ParamedicRules.showsDispatchBlock(it.code) }?.let { block ->
-                NoticeBanner(NoticeKind.WARNING, stringResource(R.string.par_bloqueo_titulo) + ". " + block.message + " " + ParamedicRules.blockGuidance(block.code, canPlan))
+                NoticeBanner(NoticeKind.WARNING, stringResource(R.string.par_bloqueo_titulo) + ". " + block.message + " " + ParamedicRules.blockGuidance(block, canPlan))
             }
             if (idle && sv.edu.catolica.climesa.domain.MaintenanceRules.available(permissions, status.unit.state)) {
                 val role: RoleViewModel = viewModel(key = "role-$accountId")
@@ -320,7 +320,7 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
     SheetColumn {
         Text(stringResource(R.string.par_reporte), style = MaterialTheme.typography.titleLarge)
         state.queued?.let { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)); SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryQueued() }, enabled = !state.busy) }
-        state.provisional?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_provisional_vinculara, it.record)) }
+        state.provisional?.let { NoticeBanner(NoticeKind.INFO, stringResource(if (it.linked) R.string.amb_provisional_vinculado else R.string.amb_provisional_vinculara, it.record)) }
         if (service == null) { Text(stringResource(R.string.unidad_sin_servicio)); return@SheetColumn }
         FormField(
             stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500)), service?.id) }, singleLine = false,
@@ -372,7 +372,7 @@ private fun UnidentifiedSheet(
         Text(stringResource(R.string.par_sin_identidad), style = MaterialTheme.typography.titleLarge)
         val provisional = state.provisional
         if (provisional != null) {
-            NoticeBanner(NoticeKind.SUCCESS, stringResource(R.string.amb_provisional_vinculara, provisional.record))
+            NoticeBanner(NoticeKind.SUCCESS, stringResource(if (provisional.linked) R.string.amb_provisional_vinculado else R.string.amb_provisional_vinculara, provisional.record))
             PrimaryButton(stringResource(R.string.par_cerrar), close)
             return@SheetColumn
         }

@@ -134,6 +134,12 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
     PageList(modifier) {
         item { SectionIntro("Paciente / Atención", stringResource(R.string.cat_pedir_cita), stringResource(R.string.cat_form_detalle)) }
         state.error?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
+        // D128 (S12): at the limit the server's reason goes on top and nothing can be filled or sent.
+        state.limit?.takeIf { state.blockedByLimit }?.let { limit ->
+            item { NoticeBanner(NoticeKind.WARNING, limit.reason ?: stringResource(R.string.cat_limite_alcanzado, limit.pending, limit.max)) }
+            item { SecondaryButton(stringResource(R.string.cat_volver), model::closeForm, icon = Icons.Default.Close) }
+            return@PageList
+        }
         item {
             SectionCard(stringResource(R.string.cat_motivo_titulo)) {
                 Text(stringResource(R.string.cat_motivo_ayuda, state.picked.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

@@ -54,6 +54,15 @@ object ParamedicRules {
         else -> "Sin paciente vinculado"
     }
 
+    /**
+     * D135: the paramedic's shift is published but marked absent (`cause = ausencia_registrada`): asking to publish it is
+     * wrong, so the server's own next step is shown (or a fixed text naming the absence when it sends none).
+     */
+    fun blockGuidance(block: DispatchBlock, canPlanShifts: Boolean): String =
+        if (block.absenceRecorded) block.action.ifBlank { ABSENCE_GUIDANCE } else blockGuidance(block.code, canPlanShifts)
+
+    const val ABSENCE_GUIDANCE = "Tienes una ausencia registrada en el turno de hoy; si vas a trabajar, pide a Jefatura de Operaciones que la retire."
+
     /** Qué hacer ante el bloqueo de la unidad (RN-30); quien planifica turnos puede arreglarlo, los demás saben a quién llamar. */
     fun blockGuidance(code: String, canPlanShifts: Boolean): String = when (code) {
         "sin_paramedico_de_turno" ->

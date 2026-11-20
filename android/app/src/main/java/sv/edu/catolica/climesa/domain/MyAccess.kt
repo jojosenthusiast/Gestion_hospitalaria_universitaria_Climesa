@@ -7,7 +7,7 @@ import java.util.Locale
 import org.json.JSONArray
 
 /** One row of "Quién vio mi expediente" (A11, FR-110-08): role, date and reason, never the staff member's name. */
-data class AccessEntry(val at: String, val role: String, val dataKind: String, val reason: String, val name: String? = null)
+data class AccessEntry(val at: String, val role: String, val dataKind: String, val reason: String, val name: String? = null, val urgent: Boolean = false)
 
 /**
  * D130: accesses that repeat the same who, what and why within [MyAccessRules.GROUP_WINDOW_MINUTES] collapse into one row,
@@ -27,7 +27,9 @@ object MyAccessRules {
             val at = row.optString("fecha").takeIf { it.isNotBlank() } ?: return@mapNotNull null
             // D130: the person's name only when the API sends it (`nombre`); otherwise the role alone.
             val name = listOf("nombre", "personal", "staffName").firstNotNullOfOrNull { k -> row.optString(k).takeIf { !row.isNull(k) && it.isNotBlank() } }
-            AccessEntry(at, row.optString("rol", "Personal del hospital"), row.optString("tipoDato"), row.optString("motivo"), name)
+            // D120: `urgente` marks the urgent read of an ambulance reception; an older API without it reads the reason.
+            val reason = row.optString("motivo")
+            AccessEntry(at, row.optString("rol", "Personal del hospital"), row.optString("tipoDato"), reason, name, row.optBoolean("urgente", false) || isUrgentReason(reason))
         }
     }
 
@@ -73,11 +75,15 @@ object MyAccessRules {
         else -> kind.replace('_', ' ').replaceFirstChar { it.uppercase(Locale("es", "SV")) }
     }
 
+    /** D120: "Recepción de ambulancia (urgente)" is the urgent read of the ambulance reception. */
+    fun isUrgentReason(reason: String) = reason.lowercase(Locale.ROOT).contains("(urgente)")
+
     /** D130: why, in plain words ("para atenderte") instead of the audit code. */
     fun reasonText(reason: String): String = when (reason.lowercase(Locale.ROOT)) {
         "atencion", "atención" -> "para atenderte"
         "emergencia" -> "por una emergencia"
         "auditoria", "auditoría" -> "por una revisión de calidad"
+        "recepción de ambulancia (urgente)", "recepcion de ambulancia (urgente)" -> "al recibirte de una ambulancia (acceso urgente)"
         "" -> ""
         else -> "motivo: " + reason.replace('_', ' ')
     }

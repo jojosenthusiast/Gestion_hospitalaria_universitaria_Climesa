@@ -36,7 +36,17 @@ import sv.edu.catolica.climesa.domain.PrehospitalForm
 import sv.edu.catolica.climesa.domain.PrehospitalView
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 
-data class ProvisionalPatient(val id: String, val record: String)
+/** D21: [linkedServiceId] is the crew's active service the API already linked the record to (`linkedServiceId`); null when not linked. */
+data class ProvisionalPatient(val id: String, val record: String, val linkedServiceId: String? = null) {
+    val linked get() = !linkedServiceId.isNullOrBlank()
+
+    companion object {
+        fun fromCreated(created: JSONObject) = ProvisionalPatient(
+            created.getString("id"), created.optString("record"),
+            created.optString("linkedServiceId").takeIf { !created.isNull("linkedServiceId") && it.isNotBlank() },
+        )
+    }
+}
 /** Reporte prehospital en cola: el mismo cuerpo y la misma clave se reenvían, aunque la app se cierre (RN-34). */
 data class QueuedPrehospital(val serviceId: String, val body: String, val key: String = java.util.UUID.randomUUID().toString())
 
@@ -83,7 +93,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         if (queued != null && mutable.value.queued == null) mutable.value = mutable.value.copy(queued = queued, notice = "Hay un reporte prehospital en cola: se enviará al reintentar.")
         restoredForm = drafts.load(id, FormDrafts.PREHOSPITAL_FORM)
         // MA-AMB-06: the provisional patient and the queued milestones survive a killed app too.
-        val provisional = drafts.load(id, FormDrafts.PROVISIONAL_PATIENT)?.let { runCatching { ProvisionalPatient(it.getString("id"), it.optString("record")) }.getOrNull() }
+        val provisional = drafts.load(id, FormDrafts.PROVISIONAL_PATIENT)?.let { runCatching { ProvisionalPatient.fromCreated(it) }.getOrNull() }
         if (provisional != null && mutable.value.provisional == null) mutable.value = mutable.value.copy(provisional = provisional)
         val milestones = drafts.load(id, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.let { items -> (0 until items.length()).mapNotNull { items.optJSONObject(it)?.let(QueuedMilestone::fromJson) } }.orEmpty()
         if (milestones.isNotEmpty() && mutable.value.queuedMilestones.isEmpty()) mutable.value = mutable.value.copy(queuedMilestones = milestones, notice = "Hay hitos en cola: se enviarán al volver la señal.")
@@ -407,16 +417,19 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     /** A73 / FR-109-12: identidad provisional con búsqueda previa; se vincula al servicio en el siguiente reporte prehospital. */
     fun registerUnidentified(sex: String, estimatedAge: String, description: String) {
         AmbulanceRules.unidentifiedError(sex, estimatedAge, description)?.let { mutable.value = mutable.value.copy(formError = it); return }
-        write(notice = "Paciente provisional registrado. Se vinculará al servicio con el reporte prehospital.") {
+        write {
             val query = "Persona sin identidad"
             val search = api.request("/pacientes/busquedas", "POST", JSONObject().put("query", query)) as JSONObject
             val body = JSONObject().put("givenNames", "").put("surnames", "").put("sex", sex).put("description", description.trim())
                 .put("searchToken", search.getString("token")).put("searchQuery", query)
                 .apply { estimatedAge.toIntOrNull()?.let { put("estimatedAge", it) } }
             val created = api.request("/pacientes/provisionales", "POST", body) as JSONObject
-            val provisional = ProvisionalPatient(created.getString("id"), created.optString("record"))
-            mutable.value = mutable.value.copy(provisional = provisional)
-            userId?.let { drafts.save(it, FormDrafts.PROVISIONAL_PATIENT, JSONObject().put("id", provisional.id).put("record", provisional.record)) }
+            val provisional = ProvisionalPatient.fromCreated(created)
+            // D21: with `linkedServiceId` the record is already linked to the service; never promise a later link.
+            val notice = if (provisional.linked) "Paciente provisional registrado y vinculado al servicio en curso."
+            else "Paciente provisional registrado. Se vinculará al servicio con el reporte prehospital."
+            mutable.value = mutable.value.copy(provisional = provisional, notice = notice)
+            userId?.let { drafts.save(it, FormDrafts.PROVISIONAL_PATIENT, JSONObject().put("id", provisional.id).put("record", provisional.record).apply { provisional.linkedServiceId?.let { s -> put("linkedServiceId", s) } }) }
         }
     }
 
