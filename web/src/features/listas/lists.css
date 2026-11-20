@@ -5,6 +5,8 @@
 .cl-search { position: relative; display: flex; align-items: center; gap: 8px; flex: 1 1 260px; max-width: 460px; min-height: 44px; padding: 0 12px; border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--muted); }
 .cl-search:focus-within { outline: 3px solid var(--outline); outline-offset: 1px; border-color: var(--primary); }
 .cl-search input { flex: 1; min-width: 0; border: 0; background: transparent; color: var(--ink); font: inherit; min-height: 40px; outline: none; }
+/* Audit D40/D106: the search has its own «Limpiar búsqueda» button; the browser's native one would be a second X. */
+.cl-search input::-webkit-search-cancel-button, .cl-search input::-webkit-search-decoration { -webkit-appearance: none; appearance: none; display: none; }
 .cl-search-clear { display: grid; place-items: center; border: 0; background: transparent; color: var(--muted); cursor: pointer; padding: 4px; border-radius: 50%; }
 .cl-sort { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 13px; font-weight: 700; }
 .cl-sort select { min-height: 44px; padding: 0 10px; border: 1px solid var(--control-line); border-radius: var(--radius-control); background: var(--surface); color: var(--ink); font: inherit; }

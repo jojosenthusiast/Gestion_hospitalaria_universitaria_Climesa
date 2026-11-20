@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Field, Icon, Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
+import { HoldCountdown } from '../components/countdown';
 import { ActionButton, StatusBadge, statusNames } from '../components/system';
 import { Segmented } from '../components/segmented';
 import { formatDate, formatDayHeading, formatRelative, formatShortDateTime, formatShortDay, plural } from '../lib/format';
@@ -31,8 +32,8 @@ type Appointment = BaseAppointment & { categories?: CategoryRef[]; allowedAction
 /** D-8: the patient's quick cancel reasons (`AppointmentCancelDto.reasonCode`). */
 type CancelCode = 'ya_no_lo_necesito' | 'no_puedo_a_esa_hora' | 'otro';
 const CANCEL_CODES: [CancelCode, string][] = [['ya_no_lo_necesito', 'Ya no lo necesito'], ['no_puedo_a_esa_hora', 'No puedo a esa hora'], ['otro', 'Otro motivo']];
-/** D-3: «No asistió» waits this long on the client before it is sent, so it can be undone. */
-export const NO_SHOW_DELAY_MS = 8000;
+/** D-3: «No asistió» waits this long on the client before it is sent, so it can be undone (audit D45: 8 s was too short). */
+export const NO_SHOW_DELAY_MS = 15000;
 type Issued = { id: string; numero: number; area?: string; service: string; ahead?: number };
 /** A-1: `GET /citas/solicitudes-categoria/{id}/sugerencia`. */
 type Suggestion = { found: boolean; doctorId: string | null; doctorName: string | null; specialty: string | null; date: string | null; start: string | null; end: string | null };
@@ -103,7 +104,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
     if (issued) { setArrived({ appointmentId: row.id, text: `Llegada registrada: ${row.patientName} tiene el número ${issued.area ?? 'CON'} ${issued.numero}${issued.ahead === undefined ? '' : issued.ahead === 0 ? ', nadie antes' : `, ${issued.ahead} antes`}.` }); data.refresh(); }
   }
   // D-3: «No asistió» is held for 8 s with «Deshacer»; only then is it sent. Leaving the page sends what is pending.
-  const [noShows, setNoShows] = useState<Record<string, true>>({});
+  const [noShows, setNoShows] = useState<Record<string, number>>({});
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const sendNoShow = useRef<(row: Appointment) => void>(() => undefined);
   // The row is read again when the hold ends: a refresh during the 8 s brings the live version (and state) to send.
@@ -121,7 +122,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   useEffect(() => () => { for (const [id, timer] of timers.current) { clearTimeout(timer); const row = pendingRows.current.get(id); if (row) sendNoShow.current(row); } }, []);
   function holdNoShow(row: Appointment) {
     pendingRows.current.set(row.id, row);
-    setNoShows(current => ({ ...current, [row.id]: true }));
+    setNoShows(current => ({ ...current, [row.id]: Date.now() + NO_SHOW_DELAY_MS }));
     timers.current.set(row.id, setTimeout(() => { pendingRows.current.delete(row.id); sendNoShow.current(row); }, NO_SHOW_DELAY_MS));
   }
   function undoNoShow(row: Appointment) {
@@ -177,7 +178,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
           {row.state === 'cancelada' && (row.cancelReasonCode || row.cancelReason) && <small>Motivo: {[CANCEL_CODES.find(([code]) => code === row.cancelReasonCode)?.[1], row.cancelReason].filter(Boolean).join(' · ')}</small>}</span>
         <StatusBadge value={shown} />
         {noShows[row.id]
-          ? <div className="row-actions ag-held" role="status"><small>Se marcará «No asistió» en unos segundos.</small><button type="button" className="row-action" onClick={() => undoNoShow(row)}><Icon name="retry" size={16} />Deshacer</button></div>
+          ? <div className="row-actions ag-held" role="status"><HoldCountdown deadline={noShows[row.id]} what="No asistió" /><button type="button" className="row-action" onClick={() => undoNoShow(row)}><Icon name="retry" size={16} />Deshacer</button></div>
           : <div className="ag-row-end">
             {row.arrival ? <span className="qb-cita" title="Número de fila de la llegada"><Icon name="check" size={14} />Llegó · CON {row.arrival.numero}</span>
               : canArrive && row.state === 'confirmada' && dayKey(row.start) === today && <button type="button" className="row-action ag-arrive" disabled={arrive.busy} aria-label={`Registrar llegada · ${row.patientName}`} onClick={() => void registerArrival(row)}>{arrive.busy ? 'Registrando…' : 'Registrar llegada'}</button>}

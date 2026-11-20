@@ -3,8 +3,9 @@ import { ExportMenu } from '../components/export-menu';
 import { SearchPicker, type PickerItem } from '../components/search-picker';
 import { StatusBadge, ActionButton, AreaTag, CrudButton, PriorityBadge, ReadOnlyBadge, type Priority } from '../components/system';
 import { Icon, Notice } from '../components/ui';
+import { HoldCountdown } from '../components/countdown';
 import { can, type AccessProfile, type Api, type Space } from '../lib/api';
-import { MOVE_PATH, SERVICE_AREA, canRemoveCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
+import { MOVE_PATH, SERVICE_AREA, canUndoCall, destinations, localTime, moveFor, type BoardColumn, type QueueMoveAction } from '../lib/queue-moves';
 import { NO_SHOW_DELAY_MS, patientPicker } from './appointments';
 import { useQuickAction } from './personal/accion';
 import { FrontDeskDialog } from './front-desk';
@@ -36,7 +37,24 @@ type MyPost = { service: string | null; area: string | null; areaName: string | 
 type Undo = { ticketId: string; label: string; version: number };
 
 const services = Object.entries(serviceNames);
-const finalNames: Record<string, string> = { atendido: 'Atendido', no_se_presento: 'No se presentó', cerrado: 'Cerrado sin atender' };
+const finalNames: Record<string, string> = { atendido: 'Atendido', no_se_presento: 'No se presentó', cerrado: 'Anulado' };
+/** Audit D44: how long a queue toast stays before it closes by itself. */
+const TOAST_MS = 8000;
+/** Audit D49: the export file carries the day it was taken (El Salvador date). */
+const dayStamp = (now: number) => new Date(now - 6 * 3_600_000).toISOString().slice(0, 10);
+/** Audit D48: a number that is no longer waiting has no running wait (the API does not send when it was called). */
+const stillWaiting = (ticket: Pick<QueueTicket, 'state'>) => ticket.state === 'en_espera' || ticket.state === 'llamado';
+/** Audit D47: a finished number exports its real outcome (Atendido, No se presentó, Anulado), not the column name. */
+const exportState = (ticket: QueueTicket) => columnOf(ticket) === 'cerrado' ? finalNames[ticket.state] ?? ticket.state : COLUMN_LABEL[columnOf(ticket)];
+/**
+ * Audit D43: once the calls run out, «Llamar de nuevo» stays on the card, disabled with its reason, so «Iniciar atención»
+ * never slides under the pointer.
+ */
+const callBlocked = (ticket: QueueTicket) => {
+  const blocked = ticket.blockedActions ?? [];
+  if (ticket.state !== 'llamado' || (ticket.allowedActions ?? []).includes('llamar') || blocked.some(item => item.action === 'llamar')) return blocked;
+  return [...blocked, { action: 'llamar' as QueueAction, reason: `Ya se llamó ${ticket.llamados} ${ticket.llamados === 1 ? 'vez' : 'veces'}${ticket.maxCalls ? ` de ${ticket.maxCalls}` : ''}.` }];
+};
 const actionPath: Record<QueueAction, string> = { llamar: 'llamar', atender: 'atender', completar: 'completar', no_se_presento: 'no-se-presento' };
 const minutesText = (minutes: number) => minutes >= 60 ? `${Math.floor(minutes / 60)} h ${String(minutes % 60).padStart(2, '0')} min` : `${minutes} min`;
 const areaOfTicket = (ticket: Pick<QueueTicket, 'area' | 'service'>) => ticket.area ?? SERVICE_AREA[ticket.service] ?? 'GEN';
@@ -54,12 +72,15 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   // Optimistic column while a move is in flight; cleared on success (the refresh brings the real state) and on error (reverts).
   const [pending, setPending] = useState<Record<string, BoardColumn>>({});
   // R7 U1: each called card keeps its own «Deshacer» (several numbers can be called in a row); the line on top says the last one.
-  const [undos, setUndos] = useState<Record<string, Undo>>({}), [lastUndo, setLastUndo] = useState<string | null>(null);
+  const [undos, setUndos] = useState<Record<string, Undo>>({});
   const [moveError, setMoveError] = useState<{ ticketId: string | null; text: string } | null>(null), [failedId, setFailedId] = useState<string | null>(null), [tick, setTick] = useState(0);
-  const [closing, setClosing] = useState<QueueTicket | null>(null);
-  const undo = lastUndo ? undos[lastUndo] ?? null : null;
-  const remember = (item: Undo) => { setUndos(current => ({ ...current, [item.ticketId]: item })); setLastUndo(item.ticketId); };
-  const forget = (ticketId: string) => { setUndos(current => { const next = { ...current }; delete next[ticketId]; return next; }); setLastUndo(current => current === ticketId ? null : current); };
+  const [closing, setClosing] = useState<QueueTicket | null>(null), [voiding, setVoiding] = useState<QueueTicket | null>(null);
+  // Audit D31/D44: every call and undo says what happened in one toast line; it closes by itself or with «Cerrar aviso»,
+  // so it never stays over the cards.
+  const [toast, setToast] = useState<{ text: string; undo?: Undo } | null>(null);
+  useEffect(() => { if (!toast) return; const timer = setTimeout(() => setToast(null), TOAST_MS); return () => clearTimeout(timer); }, [toast]);
+  const remember = (item: Undo) => { setUndos(current => ({ ...current, [item.ticketId]: item })); setToast({ text: item.label, undo: item }); };
+  const forget = (ticketId: string) => { setUndos(current => { const next = { ...current }; delete next[ticketId]; return next; }); setToast(current => current?.undo?.ticketId === ticketId ? null : current); };
   const refresh = () => { data.refresh(); setTick(value => value + 1); };
   // Quick actions: `emitir` opens the front desk (with `paciente=<id>` from the patient record, already chosen);
   // `llamar` preselects the caller's service and consulting room from the shift in progress (B-5).
@@ -79,7 +100,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
 
   // D-3, the same as «No asistió» in Citas: «No se presentó» is held 8 s with «Deshacer»; only then is it sent, with the
   // live version. Leaving the page sends what is pending.
-  const [absences, setAbsences] = useState<Record<string, true>>({});
+  const [absences, setAbsences] = useState<Record<string, number>>({});
   const absenceTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>()), heldTickets = useRef(new Map<string, QueueTicket>());
   const liveTickets = useRef<QueueTicket[]>([]);
   liveTickets.current = Array.isArray(data.data) ? data.data : [];
@@ -89,7 +110,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   useEffect(() => () => { for (const [id, timer] of absenceTimers.current) { clearTimeout(timer); const held = heldTickets.current.get(id); if (held) sendAbsence.current(held); } }, []);
   function holdAbsence(ticket: QueueTicket) {
     heldTickets.current.set(ticket.id, ticket);
-    setAbsences(current => ({ ...current, [ticket.id]: true }));
+    setAbsences(current => ({ ...current, [ticket.id]: Date.now() + NO_SHOW_DELAY_MS }));
     absenceTimers.current.set(ticket.id, setTimeout(() => sendAbsence.current(ticket), NO_SHOW_DELAY_MS));
   }
 
@@ -97,7 +118,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
     setMoveError(null); setFailedId(null);
     const result = await action.run<CallResult>(`/fila/${ticket.id}/${path}`, { version: ticket.version, ...extra }, method);
     if (result) {
-      if (path === 'llamar' && result.version) remember({ ticketId: ticket.id, label: `Llamaste ${ticketCode(ticket)}.`, version: result.version });
+      if (path === 'llamar' && result.version) remember({ ticketId: ticket.id, label: result.llamados > 1 ? `Llamaste de nuevo ${ticketCode(ticket)} (${result.llamados}${ticket.maxCalls ? ` de ${ticket.maxCalls}` : ''}).` : `Llamaste ${ticketCode(ticket)}.`, version: result.version });
       else forget(ticket.id);
       refresh();
     } else setFailedId(ticket.id);
@@ -114,15 +135,24 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
     setPending(current => { const next = { ...current }; delete next[ticket.id]; return next; });
     return done;
   }
+  /** Audit D42: undo reads the live version of the card, so it works after a refresh too, and says where the number went. */
   async function undoCall(item: Undo | null) {
     if (!item) return;
-    const done = await action.run(`/fila/${item.ticketId}/deshacer-llamado`, { version: item.version });
-    if (done) { forget(item.ticketId); refresh(); } else setFailedId(item.ticketId);
+    const ticket = liveTickets.current.find(t => t.id === item.ticketId);
+    setMoveError(null); setFailedId(null); setToast(null);
+    if (ticket && ticket.llamados <= 1) setPending(current => ({ ...current, [item.ticketId]: 'espera' }));
+    const done = await action.run<CallResult>(`/fila/${item.ticketId}/deshacer-llamado`, { version: Math.max(ticket?.version ?? 0, item.version) });
+    setPending(current => { const next = { ...current }; delete next[item.ticketId]; return next; });
+    if (done) {
+      forget(item.ticketId); refresh();
+      const code = ticket ? ticketCode(ticket) : 'el número';
+      setToast({ text: done.state === 'en_espera' ? `Se deshizo el llamado: ${code} volvió a En espera.` : `Se deshizo un llamado de ${code}: quedan ${done.llamados}.` });
+    } else setFailedId(item.ticketId);
   }
   /** B-3: the issuer voids a number issued by mistake, while the server allows it. */
   async function voidTicket(ticket: QueueTicket) {
     setMoveError(null); setFailedId(null);
-    if (await action.run(`/fila/${ticket.id}/anular`, { version: ticket.version })) refresh(); else setFailedId(ticket.id);
+    if (await action.run(`/fila/${ticket.id}/anular`, { version: ticket.version })) { setVoiding(null); setToast({ text: `Se anuló ${ticketCode(ticket)}.` }); refresh(); } else setFailedId(ticket.id);
   }
   async function changePriority(ticket: QueueTicket, priority: Priority) {
     setMoveError(null);
@@ -159,13 +189,14 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
     {summaryShown && <QueueSummary visible={loadedVisible} now={now} proposal={showNext && next.data && !Array.isArray(next.data) && next.data.service === nextService ? next.data.proposal : null}
             onCallNext={call && showNext && nextService ? () => void callNext(nextService, office) : null} callDisabled={action.busy || waitingNext === 0}
             onIssue={issue ? () => setIssueOpen(true) : null} />}
-    {undo && !action.error && <div className="qb-undo" role="status"><span>{undo.label}</span><button className="row-action" disabled={action.busy} onClick={() => void undoCall(undo)}><Icon name="retry" size={16} />Deshacer</button></div>}
+    {toast && !action.error && <div className="qb-undo" role="status"><span>{toast.text}</span>{toast.undo && undos[toast.undo.ticketId] && <button className="row-action" disabled={action.busy} onClick={() => void undoCall(toast.undo!)}><Icon name="retry" size={16} />Deshacer</button>}
+      <button type="button" className="icon-button qb-undo-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}><Icon name="close" size={16} /></button></div>}
     <section className="data-workbench" aria-label="Tablero de la fila">
       <RemoteState state={data}>{all => {
         const visible = loadedVisible;
         const shown = visible.map(t => ({ ...t, column: (pending[t.id] ?? columnOf(t)) as Column }));
         const summary = boardSummary(visible, now);
-        const exportTable = () => ({ filename: 'fila-del-dia', title: 'Fila del día', subtitle: `${visible.length} números`, columns: ['Número', 'Servicio', 'Paciente', 'Prioridad', 'Cita', 'Estado', 'Llamados', 'Emitido', 'Espera'], rows: visible.map(t => [ticketCode(t), serviceNames[t.service] ?? t.service, t.patientName ?? 'Paciente no identificado', PRIORITY_LABEL[t.priority ?? 'rutina'], t.appointmentAt ? localTime(t.appointmentAt) : 'Sin cita', COLUMN_LABEL[columnOf(t)], t.llamados, formatDateTime(t.issuedAt, { withYear: true }), minutesText(waitMinutes(t, now))]) });
+        const exportTable = () => ({ filename: `fila-del-dia-${dayStamp(now)}`, title: 'Fila del día', subtitle: `${visible.length} números`, columns: ['Número', 'Servicio', 'Paciente', 'Prioridad', 'Cita', 'Estado', 'Llamados', 'Emitido', 'Espera'], rows: visible.map(t => [ticketCode(t), serviceNames[t.service] ?? t.service, t.patientName ?? 'Paciente no identificado', PRIORITY_LABEL[t.priority ?? 'rutina'], t.appointmentAt ? localTime(t.appointmentAt) : 'Sin cita', exportState(t), t.llamados, formatDateTime(t.issuedAt, { withYear: true }), stillWaiting(t) ? minutesText(waitMinutes(t, now)) : '—']) });
         return <>
           <div className="cl-toolbar qb-toolbar">
             <LiveSearch label="Buscar en la fila" placeholder="Número o paciente" value={query} onChange={setQuery} />
@@ -180,7 +211,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
           {visible.length ? <div className="qb-board">{COLUMNS.map(column => <Lane key={column} column={column} tickets={sortColumn(shown.filter(t => t.column === column), column)} now={now} busy={action.busy} call={call} manage={manage} issue={issue}
               pendingIds={pending} averageWait={column === 'espera' ? summary.averageWait : 0} current={id => all.find(t => t.id === id) ?? null} undos={undos} held={absences} onUndoAbsence={dropAbsence}
               cardError={id => failedId === id && action.error && !isVersionConflict(action.error) ? action.error.message : moveError?.ticketId === id ? moveError.text : null}
-              onTransition={transition} onMove={async (ticket, to) => { await move(ticket, to); }} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => void voidTicket(ticket)} />)}</div>
+              onTransition={transition} onMove={async (ticket, to) => { await move(ticket, to); }} onPriority={changePriority} onUndo={item => void undoCall(item)} onVoid={ticket => setVoiding(ticket)} />)}</div>
             : <Empty title={all.length ? 'Ningún número coincide con los filtros' : 'La fila está vacía'} description={all.length ? 'Quita algún filtro para ver todos los números del día.' : 'Los números emitidos para este día aparecerán aquí.'} />}
         </>;
       }}</RemoteState>
@@ -194,6 +225,9 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
       <WriteError error={action.error} onReload={() => { setClosing(null); refresh(); }} reloadLabel="Recargar la fila" />
       <div className="dialog-actions"><button type="button" className="secondary-button" onClick={() => setClosing(null)} disabled={action.busy}>Volver</button>
         <button type="button" className="primary-button" disabled={action.busy} onClick={async () => { const ticket = (data.data ?? []).find(t => t.id === closing.id) ?? closing; if (await move(ticket, 'cerrado', true)) setClosing(null); }}>{closing.state === 'en_atencion' ? 'Completar' : 'No se presentó'}</button></div></div></Dialog>}
+    {/* Audit D30: voiding a number asks first, naming it. */}
+    {voiding && <VoidDialog code={ticketCode(voiding)} patient={voiding.patientName} busy={action.busy} error={action.error} onClose={() => setVoiding(null)}
+      onConfirm={() => void voidTicket((data.data ?? []).find(t => t.id === voiding.id) ?? voiding)} />}
   </>;
 }
 
@@ -231,14 +265,16 @@ type SummaryProposal = NonNullable<NextProposal['proposal']>;
  * On a wide screen it stays under the hospital header while the board scrolls. Buttons the account cannot use are absent.
  */
 export function QueueSummary({ visible, now, proposal, onCallNext, callDisabled, onIssue }: { visible: QueueTicket[]; now: number; proposal: SummaryProposal | null; onCallNext: (() => void) | null; callDisabled: boolean; onIssue: (() => void) | null }) {
-  const serving = visible.filter(t => t.state === 'en_atencion' || t.state === 'llamado').sort((a, b) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0] ?? null;
+  // Audit D41: «En atención» names who is in attention; a number that was only called reads «Llamado».
+  const latest = (state: string) => visible.filter(t => t.state === state).sort((a, b) => Date.parse(b.issuedAt) - Date.parse(a.issuedAt))[0] ?? null;
+  const serving = latest('en_atencion') ?? latest('llamado');
   const waiting = sortColumn(visible.filter(t => t.state === 'en_espera'), 'espera');
   const summary = boardSummary(visible, now);
   const nextArea = proposal ? proposal.area || 'GEN' : waiting[0] ? areaOfTicket(waiting[0]) : null;
   const nextNumber = proposal?.numero ?? waiting[0]?.numero ?? null;
   return <section className="qb-summary" aria-label="Resumen de atención">
     <div className="qb-summary-stats">
-      <div className="qb-summary-stat"><span className="qb-summary-label">En atención</span>
+      <div className="qb-summary-stat"><span className="qb-summary-label">{serving?.state === 'llamado' ? 'Llamado' : 'En atención'}</span>
         <span className="qb-summary-value">{serving ? <><AreaTag code={areaOfTicket(serving)} /><strong className="mono-data">{serving.numero}</strong></> : <strong className="qb-summary-none">Nadie</strong>}</span></div>
       <div className="qb-summary-stat"><span className="qb-summary-label">Sigue</span>
         <span className="qb-summary-value">{nextNumber !== null && nextArea ? <><AreaTag code={nextArea} /><strong className="mono-data">{nextNumber}</strong></> : <strong className="qb-summary-none">Nadie</strong>}
@@ -268,7 +304,7 @@ function stateText(ticket: QueueTicket, call: boolean) {
 
 const DRAG_TYPE = 'application/x-climesa-ticket';
 type LaneProps = { column: Column; tickets: (QueueTicket & { column: Column })[]; now: number; busy: boolean; call: boolean; manage: boolean; issue: boolean; pendingIds: Record<string, BoardColumn>; averageWait: number;
-  current: (id: string) => QueueTicket | null; undos: Record<string, Undo>; held: Record<string, true>; onUndoAbsence: (id: string) => void; cardError: (id: string) => string | null;
+  current: (id: string) => QueueTicket | null; undos: Record<string, Undo>; held: Record<string, number>; onUndoAbsence: (id: string) => void; cardError: (id: string) => string | null;
   onTransition: (ticket: QueueTicket, path: string) => Promise<boolean>; onMove: (ticket: QueueTicket, to: BoardColumn) => Promise<void>; onPriority: (ticket: QueueTicket, priority: Priority) => Promise<void>;
   onUndo: (item: Undo) => void; onVoid: (ticket: QueueTicket) => void };
 
@@ -297,7 +333,7 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
       {averageWait > 0 && <small className="qb-avg" title="Espera promedio de quienes esperan">prom. {formatDuration(averageWait)}</small>}</h3>
     {tickets.length ? <><ul>{shownTickets.map(ticket => {
       const allowed = ticket.allowedActions ?? [];
-      const blocked = ticket.blockedActions ?? [];
+      const blocked = call ? callBlocked(ticket) : ticket.blockedActions ?? [];
       const moves = destinations(ticket);
       const changingPriority = manage && ['en_espera', 'llamado'].includes(ticket.state);
       const area = areaOfTicket(ticket);
@@ -315,19 +351,31 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
       {cardError(ticket.id) && <p className="qb-card-error" role="alert">{cardError(ticket.id)}</p>}
       {/* R4a: a finished number shows its state once, as a badge; the others say it in the line. */}
       {column === 'cerrado'
-        ? <span className="qb-final"><small>{serviceNames[ticket.service] ?? ticket.service}</small><StatusBadge value={ticket.state} /></span>
+        ? <span className="qb-final"><small>{serviceNames[ticket.service] ?? ticket.service}</small><StatusBadge value={ticket.state} label={finalNames[ticket.state]} /></span>
         : <small>{serviceNames[ticket.service] ?? ticket.service} · {stateText(ticket, call)}</small>}
-      {held[ticket.id] ? <div className="row-actions ag-held" role="status"><small>Se marcará «No se presentó» en unos segundos.</small><button type="button" className="row-action" onClick={() => onUndoAbsence(ticket.id)}><Icon name="retry" size={16} />Deshacer</button></div>
+      {held[ticket.id] ? <div className="row-actions ag-held" role="status"><HoldCountdown deadline={held[ticket.id]} what="No se presentó" /><button type="button" className="row-action" onClick={() => onUndoAbsence(ticket.id)}><Icon name="retry" size={16} />Deshacer</button></div>
       : <div className="row-actions">
         {/* R1: only allowed actions; «No se presentó» stays visible (disabled, reason as tooltip) because it is the next step after the calls. */}
-        {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento'} disabled={busy} onClick={() => void (name === 'no_se_presento' ? onMove(ticket, 'cerrado') : onTransition(ticket, actionPath[name]))}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
+        {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento' || (name === 'llamar' && ticket.state === 'llamado')} disabled={busy} onClick={() => void (name === 'no_se_presento' ? onMove(ticket, 'cerrado') : onTransition(ticket, actionPath[name]))}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
-        {undos[ticket.id] && ticket.state === 'llamado' && <button type="button" className="row-action" disabled={busy} onClick={() => onUndo(undos[ticket.id])}><Icon name="retry" size={16} />Deshacer llamado</button>}
-        <QueueCardMenu label={`Más acciones de ${ticketCode(ticket)}`} disabled={busy} items={cardMenuItems(ticket, { moves, priorities: changingPriority, removeCall: call && canRemoveCall(ticket), canVoid: voidable(ticket, issue, now),
-          onMove: to => void onMove(ticket, to), onPriority: p => void onPriority(ticket, p), onRemoveCall: () => void onTransition(ticket, 'deshacer-llamado'), onVoid: () => onVoid(ticket) })} />
+        {/* Audit D42: «Deshacer llamado» stays on every called card the server lets this account undo, not only right after the call. */}
+        {call && ticket.state === 'llamado' && (canUndoCall(ticket) || !!undos[ticket.id]) && <button type="button" className="row-action" disabled={busy}
+          title={ticket.llamados > 1 ? `Quita el último llamado; quedan ${ticket.llamados - 1}.` : 'El número vuelve a En espera.'}
+          onClick={() => onUndo(undos[ticket.id] ?? { ticketId: ticket.id, label: '', version: ticket.version })}><Icon name="retry" size={16} />Deshacer llamado</button>}
+        <QueueCardMenu label={`Más acciones de ${ticketCode(ticket)}`} disabled={busy} items={cardMenuItems(ticket, { moves, priorities: changingPriority, canVoid: voidable(ticket, issue, now),
+          onMove: to => void onMove(ticket, to), onPriority: p => void onPriority(ticket, p), onVoid: () => onVoid(ticket) })} />
       </div>}
       </li>;
     })}</ul>{shownTickets.length < tickets.length && <button type="button" className="cl-link-button qb-more" onClick={() => setUnfolded(true)}>Ver {tickets.length - shownTickets.length} más</button>}</> : <p className="muted">Nadie por ahora.</p>}</section>;
+}
+
+/** Audit D30: voiding cannot be undone, so it asks first and names the number and the patient. */
+export function VoidDialog({ code, patient, busy, error, onClose, onConfirm }: { code: string; patient?: string | null; busy: boolean; error: Remote<unknown>['error']; onClose: () => void; onConfirm: () => void }) {
+  return <Dialog title="Anular número" onClose={onClose} busy={busy}><div className="module-form">
+    <p>¿Anular <strong>{code} · {patient || 'Paciente no identificado'}</strong>? El número sale de la fila como «Anulado» y no se puede deshacer.</p>
+    <WriteError error={error} />
+    <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Volver</button>
+      <button type="button" className="primary-button" disabled={busy} onClick={onConfirm}>{busy ? 'Anulando…' : 'Anular número'}</button></div></div></Dialog>;
 }
 
 /** B-3: «Anular» while the server says this reader issued it and the 10 minutes have not passed. */
@@ -338,12 +386,11 @@ const voidable = (ticket: QueueTicket, issue: boolean, now: number) => issue && 
  * the card («Llamar», «Iniciar atención», «Completar», «No se presentó») is not repeated here, so the menu only offers
  * what the card does not show: back to waiting, remove one call, void, and the priority.
  */
-function cardMenuItems(ticket: QueueTicket, options: { moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; removeCall: boolean; canVoid: boolean;
-  onMove: (to: BoardColumn) => void; onPriority: (priority: Priority) => void; onRemoveCall: () => void; onVoid: () => void }): CardMenuItem[] {
+function cardMenuItems(ticket: QueueTicket, options: { moves: { to: BoardColumn; action: QueueMoveAction }[]; priorities: boolean; canVoid: boolean;
+  onMove: (to: BoardColumn) => void; onPriority: (priority: Priority) => void; onVoid: () => void }): CardMenuItem[] {
   const onCard = new Set<string>(ACTION_ORDER.filter(name => (ticket.allowedActions ?? []).includes(name)));
   const items: CardMenuItem[] = options.moves.filter(item => !onCard.has(item.action))
     .map(item => ({ key: `mover:${item.to}`, label: `Mover a ${COLUMN_LABEL[item.to as Column]}`, onSelect: () => options.onMove(item.to) }));
-  if (options.removeCall) items.push({ key: 'quitar-llamado', label: `Quitar un llamado (van ${ticket.llamados})`, onSelect: options.onRemoveCall });
   if (options.canVoid) items.push({ key: 'anular', label: 'Anular número (emitido por error)', onSelect: options.onVoid });
   if (options.priorities) for (const p of (['emergencia', 'urgente', 'rutina'] as Priority[]).filter(p => p !== (ticket.priority ?? 'rutina')))
     items.push({ key: `prioridad:${p}`, label: `Cambiar a ${PRIORITY_LABEL[p]}`, group: 'Prioridad', onSelect: () => options.onPriority(p) });

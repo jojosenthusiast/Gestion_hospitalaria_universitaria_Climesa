@@ -132,16 +132,14 @@ describe('Fila del día · tablero (S9)', () => {
     expect(api.write).toHaveBeenCalledWith('/fila', { service: 'consulta_general', patientId: 'p-1', priority: 'urgente' }, 'POST');
   });
 
-  it('con 2 o más llamados no se arrastra a "En espera": el menú ofrece "Quitar un llamado"', async () => {
+  it('con 2 o más llamados no se arrastra a "En espera": la tarjeta ofrece "Deshacer llamado" (D42)', async () => {
     const twice = { state: 'llamado', llamados: 2, allowedActions: ['atender'], undoActions: ['deshacer_llamado'] };
     expect(moveFor(twice, 'espera')).toMatchObject({ allowed: false, action: null });
     expect(destinations(twice).map(d => d.to)).toEqual(['atencion']);
     expect(moveFor({ ...twice, llamados: 1 }, 'espera')).toEqual({ action: 'deshacer_llamado', allowed: true });
     const api = montar(['fila.ver', 'fila.llamar'], [ticket({ state: 'llamado', llamados: 2, allowedActions: ['atender'], undoActions: ['deshacer_llamado'] })]);
-    await userEvent.click(await screen.findByRole('button', { name: 'Más acciones de CON 7' }));
-    const menu = screen.getByRole('menu');
-    expect(within(menu).queryByRole('menuitem', { name: /En espera/ })).toBeNull();
-    await userEvent.click(within(menu).getByRole('menuitem', { name: 'Quitar un llamado (van 2)' }));
+    expect(screen.queryByRole('menuitem', { name: /Quitar un llamado/ })).toBeNull();
+    await userEvent.click(await screen.findByRole('button', { name: /Deshacer llamado/ }));
     await vi.waitFor(() => expect(api.write).toHaveBeenCalledWith('/fila/t-7/deshacer-llamado', { version: 2 }, 'POST'));
   });
 
