@@ -203,6 +203,8 @@ export class PatientsService {
    */
   private async linkToCrewService(c:PoolClient,actor:Actor,patientId:string):Promise<string|null> {
     if(!actor.staffId)return null;
+    // Same lock order as every ambulance command (unit first, then service) so this link never deadlocks with them.
+    await c.query('SELECT id FROM ambulancia.unidad LIMIT 1 FOR UPDATE');
     const services=(await c.query<{id:string}>(`SELECT s.id FROM ambulancia.servicio s JOIN ambulancia.tripulacion t ON t.servicio_id=s.id
       WHERE t.persona_id=$1 AND s.finalizado_en IS NULL AND s.paciente_id IS NULL FOR UPDATE OF s`,[actor.staffId])).rows;
     if(services.length!==1)return null;
