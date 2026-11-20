@@ -135,7 +135,7 @@
     <string name="consulta_mi_consultorio">Mi consultorio</string>
     <string name="consulta_t_firmada">Consulta firmada</string>
     <string name="consulta_t_iniciar">Iniciar consulta</string>
-    <string name="consulta_t_continuar">Continuar consulta</string>
+    <string name="consulta_t_continuar">Consulta en curso</string>
     <string name="consulta_paciente">Paciente</string>
     <string name="consulta_numero">Número</string>
     <string name="consulta_cita">Cita</string>

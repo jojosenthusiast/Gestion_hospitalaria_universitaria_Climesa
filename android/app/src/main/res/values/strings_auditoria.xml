@@ -15,4 +15,6 @@
     <string name="amb_estado_en_camino">En camino</string>
     <string name="amb_llega_aprox">llega aprox. %1$s</string>
     <string name="amb_recibir_servicio">Servicio despachado el %1$s.</string>
+    <string name="consulta_firmar_detalle_sin_cita">Primero se guardan tus notas y después se firma. Una consulta firmada ya no se puede modificar y el número de fila se cierra.</string>
+    <string name="consulta_conteo_cero">Sin registrar</string>
 </resources>

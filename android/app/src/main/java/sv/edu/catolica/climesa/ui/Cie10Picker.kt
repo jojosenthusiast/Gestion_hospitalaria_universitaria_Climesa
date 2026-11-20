@@ -1,6 +1,7 @@
 package sv.edu.catolica.climesa.ui
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -48,7 +49,10 @@ internal fun Cie10Picker(code: String, description: String, enabled: Boolean, re
         }
         return
     }
-    Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+    // D80: the suggestions scroll into view above the keyboard as they arrive, instead of waiting for it to close.
+    val requester = androidx.compose.runtime.remember { androidx.compose.foundation.relocation.BringIntoViewRequester() }
+    LaunchedEffect(state.results, state.searched) { if (state.results.isNotEmpty() || state.searched) runCatching { requester.bringIntoView() } }
+    Column(Modifier.bringIntoViewRequester(requester), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
         FormField(stringResource(R.string.u9_cie10_buscar), query, { query = it.take(60); model.query(query) }, hint = stringResource(R.string.u9_cie10_ayuda), enabled = enabled)
         Column(Modifier.semantics { liveRegion = LiveRegionMode.Polite }) {
             when {

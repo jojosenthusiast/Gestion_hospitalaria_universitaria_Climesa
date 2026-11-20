@@ -2,6 +2,9 @@
 
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -134,6 +137,10 @@ internal fun PortalScaffold(
         content = content,
     )
 }
+
+/** Whether the soft keyboard is open (its bottom inset is not zero). */
+@Composable
+internal fun imeVisible(): Boolean = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
 
 /** Standard page body: a scrolling column with the page gutter and block gap. Use it instead of ad hoc `LazyColumn` paddings. */
 @Composable

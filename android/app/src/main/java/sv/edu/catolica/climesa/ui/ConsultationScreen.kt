@@ -9,6 +9,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
@@ -23,6 +25,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -58,6 +61,8 @@ import sv.edu.catolica.climesa.domain.DraftStatus
 import sv.edu.catolica.climesa.domain.QueueConsultation
 import sv.edu.catolica.climesa.domain.ConsultationAgenda
 import sv.edu.catolica.climesa.domain.QueueCardActions
+import sv.edu.catolica.climesa.domain.VitalMeasure
+import sv.edu.catolica.climesa.domain.VitalsRules
 
 private val sanSalvador = ZoneId.of("America/El_Salvador")
 
@@ -83,7 +88,7 @@ fun ConsultationScreen(profile: AccessProfile? = null, modifier: Modifier = Modi
     LaunchedEffect(state.resumed?.key) { state.resumed?.let { selected = it.key } }
     val selectedItem = state.appointments.firstOrNull { it.key == selected } ?: state.resumed?.takeIf { it.key == selected }
     // R3 A-3: the consultation is its own full screen (web `consultations.tsx`), not a dialog; system back leaves it.
-    selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, record = state.record?.takeIf { it.consultationId == item.consultationId }, stepNotice = state.stepNotice, recordError = state.recordError, onClose = { selected = null; model.closeResumed() }); return }
+    selectedItem?.let { item -> ConsultationPage(item, profile, state.saving, state.error, state.labCatalog, state.labCatalogLoading, model, modifier, record = state.record?.takeIf { it.consultationId == item.consultationId }, stepNotice = state.stepNotice, recordError = state.recordError, notice = state.notice, onClose = { selected = null; model.closeResumed() }); return }
     val retry = { model.clearMessages(); model.load() }
     // S13: one primary action for the whole screen (call next, resume own patient, resume unsigned, or start a called number).
     val canCall = "fila.llamar" in permissions
@@ -208,7 +213,7 @@ private fun QueueConsultationCard(ticket: QueueConsultation, opening: String?, p
 }
 
 @Composable
-private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, recordError: String? = null, cie10: Cie10SearchViewModel = viewModel(), onClose: () -> Unit) {
+private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, busy: Boolean, error: String?, labCatalog: List<LabExam>, labCatalogLoading: Boolean, model: ConsultationViewModel, modifier: Modifier, record: ConsultationRecord?, stepNotice: Pair<RecordSection, String>?, recordError: String? = null, cie10: Cie10SearchViewModel = viewModel(), notice: String? = null, onClose: () -> Unit) {
     // B4: what this consultation already has is listed under each step, so nothing is registered twice.
     LaunchedEffect(item.consultationId) { item.consultationId?.let { model.loadRecord(it, withLabOrders = "resultados.ver" in profile?.permissions.orEmpty()) } }
     val draftId = item.consultationId?.takeIf { item.consultationState != "firmada" }
@@ -257,12 +262,33 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
     // spans both writes so the button cannot send twice.
     if (confirmSign) ConfirmDialog(
         title = stringResource(R.string.consulta_firmar_titulo), confirmLabel = stringResource(R.string.consulta_firmar), busy = busy,
-        message = ConsultationRecordRules.signSummary(record) + "\n" + stringResource(R.string.consulta_firmar_detalle), dismissLabel = stringResource(R.string.borrador_seguir),
-        onConfirm = { signSent.value = true; model.sign(item, reason, physicalExam, plan, onClose) }, onDismiss = { confirmSign = false },
-        body = if (error != null) ({ NoticeBanner(NoticeKind.ERROR, error) }) else null,
+        message = stringResource(if (item.appointmentId.isNotBlank()) R.string.consulta_firmar_detalle else R.string.consulta_firmar_detalle_sin_cita), dismissLabel = stringResource(R.string.borrador_seguir),
+        onConfirm = { signSent.value = true; model.sign(item, reason, physicalExam, plan, onClose) }, onDismiss = { confirmSign = false }, error = error,
+        // D35/S5 (owner): never blocks, but each zero count (diagnoses, medications, exams) stands out in amber.
+        body = { SignCounts(ConsultationRecordRules.signCounts(record)) },
     )
     if (confirmLeave) ConfirmDialog(title = stringResource(R.string.borrador_salir_titulo), confirmLabel = stringResource(R.string.borrador_salir), onConfirm = { confirmLeave = false; onClose() }, onDismiss = { confirmLeave = false }, message = stringResource(R.string.borrador_salir_mensaje), dismissLabel = stringResource(R.string.borrador_seguir), destructive = true)
     BackHandler(enabled = !busy) { leave() }
+    val imeOpen = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+    val actionBar: @Composable () -> Unit = {
+        Column(Modifier.fillMaxWidth()) {
+            // D82: "Guardar borrador" and the other page writes confirm right next to the buttons that made them.
+            notice?.let { Text(it, Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.xs), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.success) }
+            Row(
+                Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm, androidx.compose.ui.Alignment.End),
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+            ) {
+                if (!signed && item.consultationId != null) RowAction(stringResource(R.string.consulta_guardar_borrador), { model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank())
+                if (!signed && item.consultationId == null && item.canStart) PrimaryButton(stringResource(R.string.consulta_t_iniciar), { model.start(item, reason) }, enabled = reason.trim().isNotBlank(), loading = busy, fill = false)
+                else if (!signed && item.consultationId != null) {
+                    // B4 / S7: a disabled "Firmar" says why under it, with the shared blocked line.
+                    PrimaryButton(stringResource(R.string.consulta_firmar), { confirmSign = true }, enabled = !busy, fill = false, blockedReason = ConsultationRecordRules.signBlocker(reason.trim(), plan.trim()))
+                }
+                else RowAction(stringResource(R.string.consulta_cerrar), leave, enabled = !busy)
+            }
+        }
+    }
     Column(modifier.fillMaxSize()) {
     Row(Modifier.fillMaxWidth().padding(end = Spacing.md), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
         IconButton(onClick = leave, enabled = !busy) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = stringResource(R.string.consulta_cerrar)) }
@@ -292,9 +318,12 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
         FormField(stringResource(R.string.consulta_examen), physicalExam, { physicalExam = it.take(10000) }, enabled = !signed, singleLine = false)
         if (item.consultationId != null && "signos.registrar" in permissions) {
             Text(stringResource(R.string.clin_consulta_signos), style = MaterialTheme.typography.titleSmall)
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_pa_sis), systolic, { systolic = it }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_pa_dia), diastolic, { diastolic = it }, Modifier.weight(1f)) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_fc), heartRate, { heartRate = it }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_temp), temperature, { temperature = it }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_sat), oxygenSaturation, { oxygenSaturation = it }, Modifier.weight(1f)) }
-            SecondaryButton(stringResource(R.string.consulta_registrar_signos), { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) { systolic = ""; diastolic = ""; heartRate = ""; temperature = ""; oxygenSaturation = "" } }, enabled = !busy && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() })
+            // D78/D89: digits only, the API range checked under each field, and the normal range as its hint (as in Internados).
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { VitalField(VitalMeasure.SYSTOLIC, stringResource(R.string.consulta_pa_sis), systolic, { systolic = it }, Modifier.weight(1f)); VitalField(VitalMeasure.DIASTOLIC, stringResource(R.string.consulta_pa_dia), diastolic, { diastolic = it }, Modifier.weight(1f)) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { VitalField(VitalMeasure.HEART_RATE, stringResource(R.string.consulta_fc), heartRate, { heartRate = it }, Modifier.weight(1f)); VitalField(VitalMeasure.TEMPERATURE, stringResource(R.string.consulta_temp), temperature, { temperature = it }, Modifier.weight(1f)) }
+            VitalField(VitalMeasure.OXYGEN, stringResource(R.string.consulta_sat), oxygenSaturation, { oxygenSaturation = it })
+            val vitalsInvalid = listOf(VitalMeasure.SYSTOLIC to systolic, VitalMeasure.DIASTOLIC to diastolic, VitalMeasure.HEART_RATE to heartRate, VitalMeasure.TEMPERATURE to temperature, VitalMeasure.OXYGEN to oxygenSaturation).any { (m, v) -> VitalsRules.fieldError(m, v) != null }
+            SecondaryButton(stringResource(R.string.consulta_registrar_signos), { model.signs(item, systolic, diastolic, heartRate, temperature, oxygenSaturation) { systolic = ""; diastolic = ""; heartRate = ""; temperature = ""; oxygenSaturation = "" } }, enabled = !busy && !vitalsInvalid && listOf(systolic, diastolic, heartRate, temperature, oxygenSaturation).any { it.isNotBlank() })
             StepNotice(stepNotice, RecordSection.SIGNS)
         }
         // #6: the record could not be read: said at the top of what it lists, with the retry, never as empty lists.
@@ -334,7 +363,6 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             Text(stringResource(R.string.rec7_consulta_examenes, orders.sumOf { it.exams.size }), style = MaterialTheme.typography.titleSmall)
             if (record != null && !record.labOrdersKnown && recordError != null) RecordLoadError(recordError) { model.loadRecord(item.consultationId) }
             orders.forEach { o -> RecordLine(o.exams.joinToString(), null, status = o.state) }
-            StepNotice(stepNotice, RecordSection.LAB)
             if (signed) return@Column
             if (labCatalog.isEmpty()) Text(stringResource(if (labCatalogLoading) R.string.lab_orden_cargando else R.string.lab_orden_sin_catalogo), style = MaterialTheme.typography.bodySmall)
             val panelLabel = stringResource(R.string.lab_orden_panel)
@@ -350,26 +378,51 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
             val blocked = model.labOrderBlocker(item.consultationId)
             blocked?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
             SecondaryButton(stringResource(R.string.lab_orden_emitir), { model.orderLab(item, chosen, labUrgent) { labExams = ""; labUrgent = false } }, enabled = !busy && chosen.isNotEmpty() && blocked == null)
+            // D81: the confirmation of the order sits right under its button (the selection is cleared on success).
+            StepNotice(stepNotice, RecordSection.LAB)
         }
         if (item.consultationId != null && !signed) Text(stringResource(R.string.consulta_paso4), style = MaterialTheme.typography.titleSmall)
+        // D79 (owner): while the keyboard is open the actions are the last thing of the form, never a bar floating over the
+        // keyboard with a gap under it or covering the field being typed.
+        if (imeOpen) actionBar()
     }
     // Fixed action bar: always reachable at the bottom of a long consultation. One primary: "Iniciar consulta" before it
     // exists, then "Firmar". Saving the draft is secondary.
-    HorizontalDivider(color = MaterialTheme.climesa.line)
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = Spacing.md, vertical = Spacing.sm),
-        horizontalArrangement = Arrangement.spacedBy(Spacing.sm, androidx.compose.ui.Alignment.End),
-        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-    ) {
-        if (!signed && item.consultationId != null) RowAction(stringResource(R.string.consulta_guardar_borrador), { model.save(item, reason, physicalExam, plan) }, enabled = !busy && reason.trim().isNotBlank())
-        if (!signed && item.consultationId == null && item.canStart) PrimaryButton(stringResource(R.string.consulta_t_iniciar), { model.start(item, reason) }, enabled = reason.trim().isNotBlank(), loading = busy, fill = false)
-        else if (!signed && item.consultationId != null) {
-            // B4 / S7: a disabled "Firmar" says why under it, with the shared blocked line.
-            PrimaryButton(stringResource(R.string.consulta_firmar), { confirmSign = true }, enabled = !busy, fill = false, blockedReason = ConsultationRecordRules.signBlocker(reason.trim(), plan.trim()))
+    if (!imeOpen) {
+        HorizontalDivider(color = MaterialTheme.climesa.line)
+        actionBar()
+    }
+    }
+}
+/** D35: the counts the signature closes; a zero is an amber chip with a warning icon, the rest plain text. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun SignCounts(counts: List<ConsultationRecordRules.SignCount>) {
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.xs), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+        counts.forEach { count ->
+            val c = MaterialTheme.climesa
+            androidx.compose.material3.Surface(
+                color = if (count.empty) c.warningSoft else MaterialTheme.colorScheme.surfaceVariant,
+                contentColor = if (count.empty) c.warning else MaterialTheme.colorScheme.onSurface,
+                shape = MaterialTheme.shapes.small,
+            ) {
+                Row(Modifier.padding(horizontal = Spacing.sm, vertical = Spacing.xs), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                    if (count.empty) Icon(Icons.Default.Warning, contentDescription = stringResource(R.string.consulta_conteo_cero))
+                    Text(count.text, style = MaterialTheme.typography.labelLarge)
+                }
+            }
         }
-        else RowAction(stringResource(R.string.consulta_cerrar), leave, enabled = !busy)
     }
-    }
+}
+
+/** One vital sign of the consultation: sanitized while typing, its API range as the error and its normal range as the hint. */
+@Composable
+private fun VitalField(measure: VitalMeasure, label: String, value: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
+    FormField(
+        label, value, { onChange(VitalsRules.sanitize(measure, it)) }, modifier,
+        error = VitalsRules.fieldError(measure, value), hint = measure.referenceText(),
+        keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = if (measure.decimals) androidx.compose.ui.text.input.KeyboardType.Decimal else androidx.compose.ui.text.input.KeyboardType.Number),
+    )
 }
 
 /** Row 1: undo own call, call again, no-show and priority; each only when the server and the permission allow it. */

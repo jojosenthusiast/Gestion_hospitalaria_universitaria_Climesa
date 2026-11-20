@@ -185,7 +185,9 @@ private fun CompactRoleScaffold(
         topBar = topBar,
         snackbarHost = snackbarHost,
         bottomBar = {
-            if (showNavigation) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+            // D79/D101: while the keyboard is open the bottom bar steps aside, so a form never has the bar (and a blank gap)
+            // between its last field and the keyboard. Only the bar slot changes; the screen keeps its state.
+            if (showNavigation && !imeVisible()) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 navigation.primary.forEach { section ->
                     NavigationBarItem(
                         selected = selected == section,
