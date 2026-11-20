@@ -190,7 +190,8 @@ private struct VitalsEntrySheet: View {
     }
 
     private func binding(_ measure: VitalEntryMeasure) -> Binding<String> {
-        Binding(get: { values[measure] ?? "" }, set: { values[measure] = String($0.prefix(6)) })
+        // D78: digits only (one decimal separator where the measure takes it), at most six characters.
+        Binding(get: { values[measure] ?? "" }, set: { values[measure] = VitalsEntryRules.sanitize(measure, $0) })
     }
 
     private func save() async {

@@ -17,6 +17,14 @@ final class AuditFlowsTests: XCTestCase {
         XCTAssertEqual(ConsultationRecordRules.signCounts(diagnoses: 2, medications: 0, exams: nil).map(\.text), ["2 diagnósticos", "0 medicamentos"])
     }
 
+    // MARK: D68 · banner confirmations
+
+    func testBannerActionsConfirmWithTheHours() {
+        XCTAssertEqual(NoticeRules.snoozedText(4), "Listo: te lo recordamos en 4 h.")
+        XCTAssertEqual(NoticeRules.snoozedText(1.5), "Listo: te lo recordamos en 1,5 h.")
+        XCTAssertEqual(NoticeRules.acknowledgedText, "Listo: diste «Enterado».")
+    }
+
     // MARK: D71 · critical release
 
     private func order(mark: String, value: Double) throws -> LabOrder {
@@ -32,6 +40,7 @@ final class AuditFlowsTests: XCTestCase {
         let normal = try order(mark: "normal", value: 13.5)
         XCTAssertTrue(ReleaseRules.criticalLines(normal).isEmpty)
         XCTAssertTrue(ReleaseRules.canRelease(normal, acknowledged: false))
+        XCTAssertEqual(ReleaseRules.criticalBlocked, "Marca la casilla de arriba para liberar un resultado con valor crítico.")
     }
 
     // MARK: D74 · who goes next

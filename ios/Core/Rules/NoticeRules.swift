@@ -197,6 +197,12 @@ public enum NoticeRules {
         return String(format: "%.1f", hours).replacingOccurrences(of: ".", with: ",")
     }
 
+    /// D68: the answer to «Enterado» on the Inicio banner, shown there (not later in Avisos).
+    public static let acknowledgedText = "Listo: diste «Enterado»."
+
+    /// D68: the answer to «Recordarme en N h», with the hours so it says when the notice comes back.
+    public static func snoozedText(_ hours: Double) -> String { "Listo: te lo recordamos en \(hoursText(hours)) h." }
+
     /// Mensaje en español de un «Enterado» o «Recordarme» rechazado. Tras el error la bandeja se vuelve a leer.
     public static func actionMessage(_ error: Error) -> String {
         switch (error as? APIFailure)?.code {

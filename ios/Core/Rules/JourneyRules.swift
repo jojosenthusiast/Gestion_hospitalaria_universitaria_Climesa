@@ -707,6 +707,8 @@ public enum ReleaseRules {
 
     /// D71: the tick a critical release waits for.
     public static let criticalAcknowledgement = "Ya atendí al paciente o avisé del valor crítico."
+    /// D71: why «Revisar y liberar» waits, said under the button.
+    public static let criticalBlocked = "Marca la casilla de arriba para liberar un resultado con valor crítico."
 
     /// D71: a critical result is released only after the doctor ticks that the patient was attended or warned.
     public static func canRelease(_ order: LabOrder, acknowledged: Bool) -> Bool {

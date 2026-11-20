@@ -39,7 +39,8 @@ struct PatientHomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
+            // D68: the banner also stays to confirm «Enterado» or «Recordarme» where they were asked.
+            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty || notices.bannerDone != nil { CriticalNoticeBanner(model: notices) }
             if !linked { linkCard }
             if requestSent { PatientNotice(text: L.text("appointments.category.sent")) }
             LoadState(loader: loader, retry: load) { home in

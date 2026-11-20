@@ -187,6 +187,9 @@ public enum DischargeRules {
 
     /// D89: who usually answers for a discharge pending; any other text is still accepted through «Otro».
     public static let pendingResponsibles = ["Consulta general", "Enfermería", "Paciente o familia", "Farmacia", "Laboratorio", "Recepción"]
+    public static let otherResponsible = "Otro"
+    public static let otherResponsibleField = "Quién responde (otro)"
+    public static let pickResponsible = "Elige quién responde"
 
     /// D89: a pending line with only one of its two fields says so under it, before the tap.
     public static func pendingLineError(description: String, responsible: String) -> String? {
