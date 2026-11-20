@@ -96,7 +96,7 @@ public enum ShiftAttendanceRules {
     }
 }
 
-/// Filtro por estado de los exámenes del paciente (Pendiente / En proceso / Completado).
+/// Filtro por estado de los exámenes del paciente (Pendiente / En Proceso / Completado).
 public enum LabFilter: String, CaseIterable, Sendable, Hashable {
     case all, pendiente, enProceso, completado
 

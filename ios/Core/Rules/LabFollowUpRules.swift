@@ -243,7 +243,7 @@ public enum LabWorkGroup: String, Sendable, CaseIterable {
 
     public var label: String {
         switch self {
-        case .enProceso: return "En proceso"
+        case .enProceso: return "En Proceso"
         case .muestra: return "Por tomar muestra"
         case .externa: return "Externas: esperan el informe"
         case .porRevisar: return "Esperan revisión médica"

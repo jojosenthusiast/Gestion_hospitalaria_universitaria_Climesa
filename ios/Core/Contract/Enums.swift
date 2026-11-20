@@ -92,7 +92,7 @@ public enum LabOrderState: String, ContractEnum {
     public var label: String {
         switch self {
         case .pendiente: return "Pendiente"
-        case .enProceso: return "En proceso"
+        case .enProceso: return "En Proceso"
         case .completado: return "Completado"
         case .cancelado: return "Cancelado"
         case .desconocido: return "Sin estado"

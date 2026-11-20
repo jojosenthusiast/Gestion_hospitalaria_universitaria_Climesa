@@ -21,7 +21,7 @@ public enum StatusCatalog {
         "no_asistio": "No asistió", "desactivado": "Desactivado", "pendiente_cama": "Pendiente de cama",
         "hospitalizado": "Hospitalizado", "alta_firmada": "Alta firmada", "egresado": "Egresado", "exito": "Correcto",
         "denegado": "Denegado", "fallido": "Fallido", "en_espera": "En espera", "llamado": "Llamado",
-        "en_atencion": "En atención", "no_se_presento": "No se presentó", "en_proceso": "En proceso", "abierta": "Abierta",
+        "en_atencion": "En atención", "no_se_presento": "No se presentó", "en_proceso": "En Proceso", "abierta": "Abierta",
         "bajo_minimo": "Bajo mínimo", "vencido": "Vencido", "normal": "Normal", "alto": "Alto", "bajo": "Bajo",
         "critico_alto": "Crítico alto", "critico_bajo": "Crítico bajo", "sin_rango": "Sin rango",
         "disponible": "Disponible", "en_servicio": "En servicio", "en_mantenimiento": "En mantenimiento",
