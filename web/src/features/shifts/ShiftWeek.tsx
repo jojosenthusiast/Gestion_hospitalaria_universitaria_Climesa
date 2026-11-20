@@ -33,6 +33,20 @@ export type CalendarPlanning = {
 
 const DAY_MS = 24 * 3_600_000;
 const roleCounts = (roles: RoleCount[]) => roles.map(r => `${roleIdentity(r.role).label} ${r.count}`).join(' · ');
+
+/** A band's roles at a glance: one coloured bar split by role, then one row per role with its count. */
+function BandRoles({ roles, total }: { roles: RoleCount[]; total: number }) {
+  return <>
+    <span className="shift-band-bar" aria-hidden="true">
+      {roles.map(r => <span key={r.role} className={`identity-tone-${roleIdentity(r.role).tone}`} style={{ flexGrow: r.count }} />)}
+    </span>
+    <ul className="shift-band-roles" aria-label={`${total === 1 ? '1 turno' : `${total} turnos`}: ${roleCounts(roles)}`}>
+      {roles.map(r => { const id = roleIdentity(r.role); return <li key={r.role} className={`identity-tone-${id.tone}`}>
+        <span className="shift-band-dot" aria-hidden="true" /><span className="shift-band-role">{id.label}</span><span className="shift-band-n">{r.count}</span>
+      </li>; })}
+    </ul>
+  </>;
+}
 const MAX_GAP_LINES = 3;
 
 /**
@@ -65,7 +79,7 @@ export function WeekSummary({ days, today, shifts, gaps, typeOf, onOpenDay, onCr
         {summary.bands.length > 0 && <ul className="shift-bands" aria-label="Turnos por franja">
           {summary.bands.map(b => { const band = BANDS.find(x => x.id === b.band)!; return <li key={b.band} className={`shift-band is-${b.band}`}>
             <span className="shift-band-name" title={band.hours}>{band.name}</span><strong className="shift-band-count">{b.count}</strong>
-            <span className="shift-band-roles">{roleCounts(b.roles)}</span>
+            <BandRoles roles={b.roles} total={b.count} />
           </li>; })}
         </ul>}
         {holes.length > 0 && <ul className="shift-summary-gaps" aria-label="Huecos de cobertura">

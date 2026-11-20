@@ -127,7 +127,7 @@ describe('turnos · 30 turnos en un día (obs. 8)', () => {
     const semana = await screen.findByRole('region', { name: /Semana del 16 al 22 de noviembre/ });
     const hoy = within(semana).getByRole('group', { name: /Hoy, miércoles, 18 de noviembre/ });
     expect(within(hoy).getByText('30 turnos')).toBeTruthy();
-    const franjas = within(within(hoy).getByRole('list', { name: 'Turnos por franja' })).getAllByRole('listitem');
+    const franjas = within(within(hoy).getByRole('list', { name: 'Turnos por franja' })).getAllByRole('listitem').filter(li => li.classList.contains('shift-band'));
     expect(franjas.map(li => li.querySelector('.shift-band-name')?.textContent)).toEqual(['Mañana', 'Tarde', 'Noche', 'Guardia']);
     expect(franjas.map(li => li.querySelector('.shift-band-count')?.textContent)).toEqual(['12', '6', '6', '6']);
     expect(within(hoy).getByRole('img', { name: /Hueco de cobertura de 03:00 a 05:00: Emergencia · Medicina \(1 de 2\)/ })).toBeTruthy();

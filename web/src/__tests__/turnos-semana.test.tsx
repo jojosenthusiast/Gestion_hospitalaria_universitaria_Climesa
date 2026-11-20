@@ -105,8 +105,11 @@ describe('turnos · vista semanal', () => {
     expect(screen.getByRole('button', { name: 'Semana' }).getAttribute('aria-pressed')).toBe('true');
     const hoy = within(semana).getByRole('group', { name: /Hoy, martes, 10 de noviembre/ });
     expect(within(hoy).getByText('2 turnos')).toBeTruthy();
-    const franjas = within(within(hoy).getByRole('list', { name: 'Turnos por franja' })).getAllByRole('listitem').map(li => li.textContent);
-    expect(franjas).toEqual(['Mañana1Enfermería 1', 'Guardia1Médico 1']);
+    const bandas = within(within(hoy).getByRole('list', { name: 'Turnos por franja' })).getAllByRole('listitem').filter(li => li.classList.contains('shift-band'));
+    expect(bandas.map(li => `${li.querySelector('.shift-band-name')?.textContent} ${li.querySelector('.shift-band-count')?.textContent}`)).toEqual(['Mañana 1', 'Guardia 1']);
+    // Cada franja desglosa sus roles en filas (rol y cantidad), no en una línea corrida.
+    expect(within(bandas[0]).getByRole('list', { name: '1 turno: Enfermería 1' })).toBeTruthy();
+    expect(within(bandas[1]).getByRole('list', { name: '1 turno: Médico 1' })).toBeTruthy();
     const manana = within(semana).getByRole('group', { name: /Mañana, miércoles, 11 de noviembre/ });
     expect(within(manana).getByText('1 viene de ayer')).toBeTruthy();
     // El hueco de cobertura se ve en su día y hora.
