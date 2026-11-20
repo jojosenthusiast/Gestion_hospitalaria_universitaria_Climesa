@@ -98,7 +98,7 @@ describe('inicio por rol', () => {
     const atencion = await screen.findByRole('region', { name: 'Muestras por tomar' });
     expect(await within(atencion).findByText('Marta Ficticia')).toBeTruthy();
     expect(within(atencion).getByRole('link', { name: /Tomar muestra/ }).getAttribute('href')).toBe('#/laboratorio?orden=o1&accion=muestra');
-    expect(await screen.findByRole('region', { name: 'Inventario bajo el mínimo' })).toBeTruthy();
+    expect(await screen.findByRole('region', { name: 'Inventario por reponer o vencer' })).toBeTruthy();
     expect(await screen.findByText('Reactivo ficticio')).toBeTruthy();
   });
 
