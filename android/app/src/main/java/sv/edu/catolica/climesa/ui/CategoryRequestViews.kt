@@ -168,7 +168,7 @@ internal fun CategoryRequestForm(state: CategoryRequestsState, model: CategoryRe
                         Column(Modifier.weight(1f)) { Text(chosen.name, style = MaterialTheme.typography.titleSmall); chosen.specialty?.let { Text(it, style = MaterialTheme.typography.bodySmall) } }
                         TextButton(onClick = { model.preferredDoctor(null) }) { Text(stringResource(R.string.cat_medico_quitar)) }
                     }
-                    !doctorOpen -> TextButton(onClick = { doctorOpen = true }) { Text(stringResource(R.string.cat_ya_tengo_medico)) }
+                    !doctorOpen -> TextButton(onClick = { doctorOpen = true }) { Text(stringResource(R.string.cat_buscar_medico)) } // D127: the link no longer repeats the title
                     else -> {
                         LiveSearchField(doctorQuery, { doctorQuery = it.take(80) }, stringResource(R.string.cat_medico_preferido))
                         if (doctorQuery.isNotBlank()) doctors.filter { matchesQuery(doctorQuery, it.name, it.specialty) }.take(6).forEach { d ->

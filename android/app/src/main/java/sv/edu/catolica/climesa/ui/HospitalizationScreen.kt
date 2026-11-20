@@ -678,7 +678,8 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             panel.saved?.let { NoticeBanner(NoticeKind.SUCCESS, it) }
-            FormField(stringResource(R.string.hosp_nota_nueva), panel.text, model::onNoteText, hint = HospitalizationRules.counter(panel.text, HospitalizationRules.NOTE_MAX), enabled = !state.busy, singleLine = false)
+            // D98: an empty note says why "Guardar nota" is off, right under the field.
+            FormField(stringResource(R.string.hosp_nota_nueva), panel.text, model::onNoteText, hint = if (panel.text.isBlank()) stringResource(R.string.hosp_nota_vacia) else HospitalizationRules.counter(panel.text, HospitalizationRules.NOTE_MAX), enabled = !state.busy, singleLine = false)
             when {
                 panel.loading && panel.notes.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Spinner(size = 20.dp, strokeWidth = 2.dp); Text(stringResource(R.string.ui_cargando_titulo), style = MaterialTheme.typography.bodySmall) }
                 panel.loadError != null -> { NoticeBanner(NoticeKind.ERROR, panel.loadError); TextButton(onClick = model::retryNotes) { Text(stringResource(R.string.ui_reintentar)) } }
