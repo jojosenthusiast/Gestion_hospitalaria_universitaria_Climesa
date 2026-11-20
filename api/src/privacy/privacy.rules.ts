@@ -12,5 +12,11 @@ const entityLabels: Record<string, string> = {
 };
 export const entityLabel = (entity: string) => entityLabels[entity] ?? entity.replace(/_/g, ' ');
 
+/**
+ * Audit `motivo` of an urgent ambulance reception by Recepción (owner decision on audit D120): its scoped read of the
+ * prehospital report and the reception itself. "Quién vio mi expediente" shows it as is and flags the row urgent.
+ */
+export const URGENT_RECEPTION_REASON = 'Recepción de ambulancia (urgente)';
+
 /** Audit `motivo` of rows written by the retired exceptional-access module; kept to classify historical rows. */
 export const EXCEPTIONAL_REASON = 'acceso_excepcional';

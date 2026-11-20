@@ -199,3 +199,4 @@ spec,metodo,ruta,permiso,contexto,nivel,semana,descripcion
 105,POST,/api/v1/citas/solicitudes-categoria/{id}/cancelar,citas.cancelar,PAC solo propias y pendientes,R,5,Paciente retira su solicitud por categoría
 105,GET,/api/v1/citas/solicitudes-categoria/{id}/sugerencia,citas.agendar,Hasta 14 días; médico preferido o de las especialidades sugeridas,R,5,Primer día con hueco en la franja pedida
 101,GET,/api/v1/me/vinculacion,cuenta.vincular,Solo su cuenta,R,5,Estado de la vinculación de la cuenta y su última solicitud
+105,GET,/api/v1/citas/solicitudes-categoria/limite,citas.solicitar,PAC propio,R,5,El paciente sabe si puede pedir otra cita antes del formulario

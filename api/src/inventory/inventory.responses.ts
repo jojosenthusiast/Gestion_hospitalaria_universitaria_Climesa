@@ -99,7 +99,8 @@ export class WarehouseStockResponse {
   @UuidProp() warehouseId!: string;
   @StrProp() warehouseCode!: string;
   @StrProp() warehouseName!: string;
-  @NumProp() quantity!: number;
+  @NumProp({ description: 'Existencia utilizable: sin lotes vencidos (auditoría D111)' }) quantity!: number;
+  @NumProp({ description: 'Unidades de lotes vencidos en la bodega, aparte; se dan de baja con una merma' }) expired!: number;
 }
 
 export class ArticleMovementResponse {

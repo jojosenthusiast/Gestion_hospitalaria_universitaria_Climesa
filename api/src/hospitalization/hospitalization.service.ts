@@ -162,7 +162,10 @@ export class HospitalizationService {
       return rows.map(({ dischargeType, dischargeSignedAt, dischargeSignedBy, dischargePending, dischargeSignedByName, dischargeSummary, dischargeDiagnoses, followUpAt, followUpState, followUpDoctorName, followUpSpecialty, related, nursingArea, ...row }) => {
         // D-031: without a care relationship (global context: Recepción, Jefatura) the discharge is operational only;
         // its type and pending descriptions are clinical. Non-global readers only see rows through a care context.
-        const clinical = !global || (!!ownDoctor && (row.attendingDoctorId === actor.staffId || related === true));
+        // Audit D90: nursing is clinical staff (privacidad.md, "enfermería del área"); with the nursing context on this
+        // admission (ENF works the whole hospital since 20261129005000) it sees the discharge detail too.
+        const nursingClinical = nursing.includes('x') || nursingArea === true;
+        const clinical = !global || (!!ownDoctor && (row.attendingDoctorId === actor.staffId || related === true)) || nursingClinical;
         const pending = ((dischargePending ?? []) as Array<{ descripcion: string; responsable: string }>).map(item => ({ description: item.descripcion, responsible: item.responsable }));
         return {
           ...row,

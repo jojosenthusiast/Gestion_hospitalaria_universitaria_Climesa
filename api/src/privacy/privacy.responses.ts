@@ -57,5 +57,6 @@ export class MyAccessResponse {
   @DateTimeProp() fecha!: string;
   @StrProp() rol!: string;
   @StrProp() tipoDato!: string;
-  @StrProp({ description: '"atención"; las filas del módulo retirado de acceso excepcional conservan "acceso excepcional"' }) motivo!: string;
+  @StrProp({ description: '"atención"; "Recepción de ambulancia (urgente)" para la recepción de una ambulancia por Recepción (auditoría D120); las filas del módulo retirado de acceso excepcional conservan "acceso excepcional"' }) motivo!: string;
+  @BoolProp({ description: 'Auditoría D120: true en los accesos urgentes de la recepción de una ambulancia' }) urgente!: boolean;
 }

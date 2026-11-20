@@ -108,9 +108,10 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect((await t.call('PAR', 'POST', `/ambulancia/servicios/${service.id}/prehospital`, { reason: 'Dolor torácico, llegada', priority: 'roja', capturedAt: at('10:00').toISOString() })).status).toBe(201);
     view = (await t.call('ENF', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body;
     expect(view).toMatchObject({ arrived: true, handover: null, allowedActions: ['recibir'] });
-    // Recepción ve el reporte sin contenido clínico y no recibe al paciente.
-    expect((await t.call('REC', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body.allowedActions).toEqual([]);
-    expect((await t.call('REC', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {})).status).toBe(403);
+    // Auditoría 2026-11-20 (D120, decisión del dueño): con la recepción abierta Recepción lee el reporte como acceso urgente y recibe.
+    const recView = (await t.call('REC', 'GET', `/ambulancia/servicios/${service.id}/prehospital`)).body;
+    expect(recView).toMatchObject({ clinical: true, urgentAccess: true, allowedActions: ['recibir'], blockedActions: [] });
+    expect(recView.reports.map((report: { reason?: string }) => report.reason)).toContain('Dolor torácico, llegada');
     const received = await t.call('ENF', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {});
     expect(received.status).toBe(201);
     expect(received.body).toMatchObject({ serviceId: service.id, receivedAt: at('10:00').toISOString(), receivedByName: 'ENF Prueba' });
@@ -185,8 +186,9 @@ describe('Ambulancia · fase 1 (MA-AMB-02 a MA-AMB-05)', () => {
     expect((await t.call('ENF', 'POST', `/ambulancia/servicios/${service.id}/recepcion`, {})).status).toBe(403);
     await attendance("UPDATE personal.turno SET estado='publicado',ausencia_tipo=NULL,asistencia_motivo=NULL WHERE persona_id=$1");
     expect((await read('ENF')).reports[0].reason).toBe('Fractura de cadera probable');
-    // Jefatura conserva la vista operativa.
-    expect(await read('JOP')).toMatchObject({ clinical: false, priority: 'roja' });
+    // Auditoría D120 (decisión del dueño): quien recibe sin expediente.ver (Recepción, Jefatura) lee el reporte de la
+    // recepción abierta como acceso urgente y auditado; fuera de la recepción conserva la vista operativa.
+    expect(await read('JOP')).toMatchObject({ clinical: true, urgentAccess: true, priority: 'roja' });
     // Con relación de atención con el paciente, Medicina ve lo clínico y recibe.
     await t.pg.query("INSERT INTO atencion.relacion_atencion(paciente_id,profesional_id,origen,origen_id,vigencia) VALUES($1,$2,'consulta',gen_random_uuid(),tstzrange($3::timestamptz,NULL))", [stranger, await t.staffOf('MED'), at('08:00')]);
     view = await read('MED');

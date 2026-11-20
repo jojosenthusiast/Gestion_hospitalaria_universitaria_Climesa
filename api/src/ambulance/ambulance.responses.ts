@@ -78,6 +78,14 @@ export class DispatchBlockResponse {
   @EnumProp(['en_servicio', 'en_mantenimiento', 'sin_paramedico_de_turno', 'sin_motorista_de_turno', 'sin_tripulacion_de_turno'] as const, 'MotivoBloqueoDespacho') code!: string;
   @StrProp() message!: string;
   @StrProp({ description: 'Qué hacer para poder despachar' }) action!: string;
+  @EnumProp(['ausencia_registrada'] as const, 'CausaBloqueoDespacho', { optional: true, description: 'Auditoría D135: ausencia_registrada cuando el turno del paramédico está publicado pero marcado ausente; el cliente no debe pedir publicar el turno' }) cause?: string;
+}
+
+/** S12: an action the reader cannot take yet, with the problem code the command would answer and its reason. */
+export class PrehospitalBlockedActionResponse {
+  @EnumProp(['recibir'], 'AccionPrehospital') action!: string;
+  @EnumProp(['sin_contexto_recepcion', 'entrega_registrada', 'sin_llegada_hospital', 'servicio_cerrado'] as const, 'MotivoBloqueoRecepcion') code!: string;
+  @StrProp() reason!: string;
 }
 
 export class AmbulanceStatusResponse {
@@ -98,6 +106,10 @@ export class ArrivalCandidateResponse {
   @DateTimeProp() dispatchedAt!: string;
   @BoolProp({ description: 'Sin finalizar' }) active!: boolean;
   @BoolProp({ description: 'Con el hito en_hospital' }) arrived!: boolean;
+  @BoolProp({ description: 'Auditoría D120 (decisión del dueño): siempre true; la llegada de una ambulancia se muestra como urgente' }) urgent!: boolean;
+  @EnumProp(PRIORIDAD_AMBULANCIA, 'PrioridadAmbulancia', { description: 'Auditoría D25: prioridad del despacho' }) priority!: string;
+  @BoolProp({ description: 'Auditoría D26: la tripulación ya envió reporte prehospital' }) hasPrehospital!: boolean;
+  @EnumProp(['despachado', 'salida', 'en_escena', 'trasladando', 'en_hospital', 'finalizado'] as const, 'EstadoLlegadaAmbulancia', { description: 'Auditoría D26: último hito registrado; despachado antes del primero' }) state!: string;
 }
 
 /** MA-AMB-04: servicios por recibir: primero los que llegaron sin entrega (hasta 24 h después de finalizar), después el activo. */
@@ -186,6 +198,8 @@ export class HandoverInfoResponse {
 export class PrehospitalViewResponse {
   @UuidProp() serviceId!: string;
   @IntProp({ description: 'Versión del servicio; la entrega al hospital la envía' }) version!: number;
+  @BoolProp({ description: 'Auditoría D120 (decisión del dueño): siempre true; la recepción de una ambulancia se muestra como urgente' }) urgent!: boolean;
+  @BoolProp({ description: 'Auditoría D120: true cuando quien lee no tiene expediente.ver (Recepción) y ve el reporte por estar abierta la recepción; la lectura queda en "Quién vio mi expediente" como urgente' }) urgentAccess!: boolean;
   @BoolProp() active!: boolean;
   @BoolProp({ description: 'La ambulancia registró la llegada al hospital' }) arrived!: boolean;
   @EnumProp(PRIORIDAD_AMBULANCIA, 'PrioridadAmbulancia') priority!: string;
@@ -193,12 +207,14 @@ export class PrehospitalViewResponse {
   @BoolProp() clinical!: boolean;
   @ClassArrayProp(PrehospitalReportResponse) reports!: PrehospitalReportResponse[];
   @ClassProp(HandoverInfoResponse, { nullable: true, description: 'Entrega del paciente al hospital; null si aún no se registra' }) handover!: HandoverInfoResponse | null;
-  @EnumArrayProp(['recibir'], 'AccionPrehospital', { description: 'recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)' }) allowedActions!: string[];
+  @EnumArrayProp(['recibir'], 'AccionPrehospital', { description: 'recibir: el actor puede marcar recibido al paciente (quien tiene ambulancia.recibir_prehospital, después de la llegada; auditoría D120)' }) allowedActions!: string[];
+  @ClassArrayProp(PrehospitalBlockedActionResponse, { description: 'Acciones que aún no se pueden hacer, con el código y el motivo que daría el comando (S12)' }) blockedActions!: PrehospitalBlockedActionResponse[];
 }
 
 export class HandoverResponse {
   @UuidProp() serviceId!: string;
   @IntProp() version!: number;
+  @BoolProp({ description: 'Auditoría D120 (decisión del dueño): siempre true; la recepción de una ambulancia es urgente' }) urgent!: boolean;
   @DateTimeProp() receivedAt!: string;
   @StrProp({ nullable: true }) receivedByName!: string | null;
   @BoolProp({ optional: true, description: 'R7 D-7: true cuando la recepción cerró el servicio (hito `finalizado`, estado `completado`) y la unidad volvió a Disponible.' }) serviceClosed?: boolean;

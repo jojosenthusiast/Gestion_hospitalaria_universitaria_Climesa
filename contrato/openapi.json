@@ -9380,6 +9380,74 @@
         "x-permiso": "citas.solicitar"
       }
     },
+    "/api/v1/citas/solicitudes-categoria/limite": {
+      "get": {
+        "operationId": "AppointmentRequestController_limit",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RequestLimitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Datos no válidos (`validacion`, `idempotency_key_invalida`, ...)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sesión requerida (`no_autenticado`)",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Sin permiso (`sin_permiso`) o regla de acceso",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "default": {
+            "description": "Otro error (422, 429, 5xx) con el mismo cuerpo problem+json",
+            "content": {
+              "application/problem+json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Auditoría D128: si el paciente puede pedir otra cita ahora (solicitudes pendientes contra el máximo), antes de llenar el formulario",
+        "tags": [
+          "attention"
+        ],
+        "x-permiso": "citas.solicitar"
+      }
+    },
     "/api/v1/citas/solicitudes-categoria/{id}/sugerencia": {
       "get": {
         "operationId": "AppointmentRequestController_suggestion",
@@ -20730,6 +20798,11 @@
           },
           "version": {
             "type": "integer"
+          },
+          "linkedServiceId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Auditoría D21: servicio de ambulancia activo de la tripulación al que quedó vinculado el expediente provisional; ausente si no se vinculó"
           }
         },
         "required": [
@@ -20972,7 +21045,18 @@
           },
           "name": {
             "type": "string",
-            "nullable": true
+            "nullable": true,
+            "description": "Nombre a mostrar; en una cuenta de paciente sin ficha de personal es el nombre del expediente vinculado (auditoría D129)"
+          },
+          "patientName": {
+            "type": "string",
+            "nullable": true,
+            "description": "Nombre del expediente vinculado (patientId); null sin vinculación"
+          },
+          "patientRecord": {
+            "type": "string",
+            "nullable": true,
+            "description": "Número de expediente vinculado; null sin vinculación"
           },
           "roles": {
             "description": "Códigos de rol",
@@ -21027,6 +21111,8 @@
           "id",
           "email",
           "name",
+          "patientName",
+          "patientRecord",
           "roles",
           "platforms",
           "rolePlatforms",
@@ -24816,6 +24902,14 @@
           "GEN"
         ]
       },
+      "MotivoSinPropuesta": {
+        "type": "string",
+        "enum": [
+          "sin_espera",
+          "citas_de_otro_medico"
+        ],
+        "description": "Por qué no hay propuesta: nadie espera, o quienes esperan tienen cita con otro médico dentro de su ventana; null con propuesta"
+      },
       "PrioridadFila": {
         "type": "string",
         "enum": [
@@ -24924,9 +25018,22 @@
             "type": "string",
             "description": "Regla documentada RN-FILA-SIGUIENTE"
           },
+          "waiting": {
+            "type": "integer",
+            "description": "Auditoría D74: números en espera en el servicio ahora, haya o no propuesta"
+          },
+          "noProposalReason": {
+            "nullable": true,
+            "description": "Por qué no hay propuesta: nadie espera, o quienes esperan tienen cita con otro médico dentro de su ventana; null con propuesta",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MotivoSinPropuesta"
+              }
+            ]
+          },
           "proposal": {
             "nullable": true,
-            "description": "null cuando nadie espera",
+            "description": "null sin propuesta; ver noProposalReason",
             "type": "object",
             "allOf": [
               {
@@ -24939,6 +25046,8 @@
           "service",
           "area",
           "rule",
+          "waiting",
+          "noProposalReason",
           "proposal"
         ]
       },
@@ -25086,6 +25195,12 @@
             "type": "string",
             "format": "date-time"
           },
+          "calledAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Auditoría D48: hora del primer llamado; la espera se mide de issuedAt a calledAt. null si no se ha llamado"
+          },
           "area": {
             "description": "Código del área del servicio; el número cuenta desde 1 por área y día",
             "allOf": [
@@ -25215,6 +25330,7 @@
           "llamados",
           "version",
           "issuedAt",
+          "calledAt",
           "area",
           "priority",
           "appointmentAt",
@@ -27051,6 +27167,48 @@
           "version",
           "allowedActions",
           "blockedActions"
+        ]
+      },
+      "MotivoLimiteSolicitud": {
+        "type": "string",
+        "enum": [
+          "solicitudes_pendientes_max"
+        ]
+      },
+      "RequestLimitResponse": {
+        "type": "object",
+        "properties": {
+          "pending": {
+            "type": "integer",
+            "description": "Solicitudes pendientes que cuentan para el límite"
+          },
+          "max": {
+            "type": "integer",
+            "description": "Máximo de la política citas.solicitudes_pendientes_max"
+          },
+          "canRequest": {
+            "type": "boolean",
+            "description": "false: el cliente deshabilita \"Pedir una cita\" y muestra reason"
+          },
+          "code": {
+            "nullable": true,
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MotivoLimiteSolicitud"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": [
+          "pending",
+          "max",
+          "canRequest",
+          "code",
+          "reason"
         ]
       },
       "CategoryRequestCreateDto": {
@@ -30912,14 +31070,20 @@
             "type": "string"
           },
           "quantity": {
-            "type": "number"
+            "type": "number",
+            "description": "Existencia utilizable: sin lotes vencidos (auditoría D111)"
+          },
+          "expired": {
+            "type": "number",
+            "description": "Unidades de lotes vencidos en la bodega, aparte; se dan de baja con una merma"
           }
         },
         "required": [
           "warehouseId",
           "warehouseCode",
           "warehouseName",
-          "quantity"
+          "quantity",
+          "expired"
         ]
       },
       "ArticleMovementResponse": {
@@ -31750,14 +31914,19 @@
           },
           "motivo": {
             "type": "string",
-            "description": "\"atención\"; las filas del módulo retirado de acceso excepcional conservan \"acceso excepcional\""
+            "description": "\"atención\"; \"Recepción de ambulancia (urgente)\" para la recepción de una ambulancia por Recepción (auditoría D120); las filas del módulo retirado de acceso excepcional conservan \"acceso excepcional\""
+          },
+          "urgente": {
+            "type": "boolean",
+            "description": "Auditoría D120: true en los accesos urgentes de la recepción de una ambulancia"
           }
         },
         "required": [
           "fecha",
           "rol",
           "tipoDato",
-          "motivo"
+          "motivo",
+          "urgente"
         ]
       },
       "EstadoVinculacion": {
@@ -33661,6 +33830,13 @@
           "sin_tripulacion_de_turno"
         ]
       },
+      "CausaBloqueoDespacho": {
+        "type": "string",
+        "enum": [
+          "ausencia_registrada"
+        ],
+        "description": "Auditoría D135: ausencia_registrada cuando el turno del paramédico está publicado pero marcado ausente; el cliente no debe pedir publicar el turno"
+      },
       "DispatchBlockResponse": {
         "type": "object",
         "properties": {
@@ -33677,6 +33853,14 @@
           "action": {
             "type": "string",
             "description": "Qué hacer para poder despachar"
+          },
+          "cause": {
+            "description": "Auditoría D135: ausencia_registrada cuando el turno del paramédico está publicado pero marcado ausente; el cliente no debe pedir publicar el turno",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CausaBloqueoDespacho"
+              }
+            ]
           }
         },
         "required": [
@@ -34634,6 +34818,18 @@
           "patientLinked"
         ]
       },
+      "EstadoLlegadaAmbulancia": {
+        "type": "string",
+        "enum": [
+          "despachado",
+          "salida",
+          "en_escena",
+          "trasladando",
+          "en_hospital",
+          "finalizado"
+        ],
+        "description": "Auditoría D26: último hito registrado; despachado antes del primero"
+      },
       "ArrivalCandidateResponse": {
         "type": "object",
         "properties": {
@@ -34652,13 +34848,41 @@
           "arrived": {
             "type": "boolean",
             "description": "Con el hito en_hospital"
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Auditoría D120 (decisión del dueño): siempre true; la llegada de una ambulancia se muestra como urgente"
+          },
+          "priority": {
+            "description": "Auditoría D25: prioridad del despacho",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PrioridadAmbulancia"
+              }
+            ]
+          },
+          "hasPrehospital": {
+            "type": "boolean",
+            "description": "Auditoría D26: la tripulación ya envió reporte prehospital"
+          },
+          "state": {
+            "description": "Auditoría D26: último hito registrado; despachado antes del primero",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/EstadoLlegadaAmbulancia"
+              }
+            ]
           }
         },
         "required": [
           "serviceId",
           "dispatchedAt",
           "active",
-          "arrived"
+          "arrived",
+          "urgent",
+          "priority",
+          "hasPrehospital",
+          "state"
         ]
       },
       "ArrivalServiceResponse": {
@@ -34750,7 +34974,43 @@
         "enum": [
           "recibir"
         ],
-        "description": "recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)"
+        "description": "recibir: el actor puede marcar recibido al paciente (quien tiene ambulancia.recibir_prehospital, después de la llegada; auditoría D120)"
+      },
+      "MotivoBloqueoRecepcion": {
+        "type": "string",
+        "enum": [
+          "sin_contexto_recepcion",
+          "entrega_registrada",
+          "sin_llegada_hospital",
+          "servicio_cerrado"
+        ]
+      },
+      "PrehospitalBlockedActionResponse": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/AccionPrehospital"
+              }
+            ]
+          },
+          "code": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/MotivoBloqueoRecepcion"
+              }
+            ]
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "code",
+          "reason"
+        ]
       },
       "PrehospitalViewResponse": {
         "type": "object",
@@ -34762,6 +35022,14 @@
           "version": {
             "type": "integer",
             "description": "Versión del servicio; la entrega al hospital la envía"
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Auditoría D120 (decisión del dueño): siempre true; la recepción de una ambulancia se muestra como urgente"
+          },
+          "urgentAccess": {
+            "type": "boolean",
+            "description": "Auditoría D120: true cuando quien lee no tiene expediente.ver (Recepción) y ve el reporte por estar abierta la recepción; la lectura queda en \"Quién vio mi expediente\" como urgente"
           },
           "active": {
             "type": "boolean"
@@ -34801,15 +35069,24 @@
           },
           "allowedActions": {
             "type": "array",
-            "description": "recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)",
+            "description": "recibir: el actor puede marcar recibido al paciente (quien tiene ambulancia.recibir_prehospital, después de la llegada; auditoría D120)",
             "items": {
               "$ref": "#/components/schemas/AccionPrehospital"
+            }
+          },
+          "blockedActions": {
+            "description": "Acciones que aún no se pueden hacer, con el código y el motivo que daría el comando (S12)",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/PrehospitalBlockedActionResponse"
             }
           }
         },
         "required": [
           "serviceId",
           "version",
+          "urgent",
+          "urgentAccess",
           "active",
           "arrived",
           "priority",
@@ -34817,7 +35094,8 @@
           "clinical",
           "reports",
           "handover",
-          "allowedActions"
+          "allowedActions",
+          "blockedActions"
         ]
       },
       "HandoverResponse": {
@@ -34829,6 +35107,10 @@
           },
           "version": {
             "type": "integer"
+          },
+          "urgent": {
+            "type": "boolean",
+            "description": "Auditoría D120 (decisión del dueño): siempre true; la recepción de una ambulancia es urgente"
           },
           "receivedAt": {
             "type": "string",
@@ -34854,6 +35136,7 @@
         "required": [
           "serviceId",
           "version",
+          "urgent",
           "receivedAt",
           "receivedByName"
         ]
@@ -35071,6 +35354,7 @@
           "fila_llamados_insuficientes",
           "fila_sin_espera",
           "solicitudes_pendientes_max",
+          "consulta_sin_firmar",
           "solicitud_cita_resuelta",
           "cuenta_no_verificada",
           "cuenta_ya_vinculada",
@@ -35089,6 +35373,7 @@
           "jerarquia_administrador",
           "trabajo_abierto",
           "existencia_insuficiente",
+          "lote_vencido",
           "aviso_con_datos_personales",
           "aviso_retirado",
           "aviso_vencido",

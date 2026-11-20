@@ -188,7 +188,8 @@ describe('Ambulancia · solicitud, despacho único y servicio hasta finalizar (H
     // El paciente que pidió desde la app sigue el despacho y los hitos por su canal propio (FR-109-16).
     const unitEvents = await t.events('ambulancia.estado_cambiado', (await unit()).id);
     expect(unitEvents.at(-1)).toEqual(expect.arrayContaining(['ambulancia', `usuario:${userId('PAC')}`]));
-    expect(unitEvents.at(-1)!.filter((c: string) => c.startsWith('usuario:'))).toEqual([`usuario:${userId('PAC')}`]);
+    // Audit D116: besides the requester, only the dispatched crew's own account (PAR) hears the dispatch by user channel.
+    expect(unitEvents.at(-1)!.filter((c: string) => c.startsWith('usuario:')).sort()).toEqual([`usuario:${userId('PAC')}`, `usuario:${userId('PAR')}`].sort());
     const key = randomUUID();
     const body = { reason: 'Dolor torácico', priority: 'amarilla', capturedAt: at('08:40').toISOString(), estimatedArrival: at('09:10').toISOString(), vitalSigns: { heartRate: 96, temperature: 37.2 } };
     const sent = await t.call('PAR', 'POST', `/ambulancia/servicios/${service.body.id}/prehospital`, body, key);

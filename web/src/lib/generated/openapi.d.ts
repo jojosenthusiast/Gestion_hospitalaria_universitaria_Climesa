@@ -1429,6 +1429,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/citas/solicitudes-categoria/limite": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Auditoría D128: si el paciente puede pedir otra cita ahora (solicitudes pendientes contra el máximo), antes de llenar el formulario */
+        get: operations["AppointmentRequestController_limit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/citas/solicitudes-categoria/{id}/sugerencia": {
         parameters: {
             query?: never;
@@ -3292,6 +3309,11 @@ export interface components {
             /** @description Número de expediente */
             record: string;
             version: number;
+            /**
+             * Format: uuid
+             * @description Auditoría D21: servicio de ambulancia activo de la tripulación al que quedó vinculado el expediente provisional; ausente si no se vinculó
+             */
+            linkedServiceId?: string;
         };
         PatientUpdateDto: {
             givenNames: string;
@@ -3353,7 +3375,12 @@ export interface components {
             /** Format: uuid */
             id: string;
             email: string;
+            /** @description Nombre a mostrar; en una cuenta de paciente sin ficha de personal es el nombre del expediente vinculado (auditoría D129) */
             name: string | null;
+            /** @description Nombre del expediente vinculado (patientId); null sin vinculación */
+            patientName: string | null;
+            /** @description Número de expediente vinculado; null sin vinculación */
+            patientRecord: string | null;
             /** @description Códigos de rol */
             roles: string[];
             /** @description Plataformas permitidas en minúscula */
@@ -4485,6 +4512,11 @@ export interface components {
         ServicioFila: "consulta_general" | "emergencia" | "laboratorio" | "admisiones";
         /** @enum {string} */
         AreaFila: "CON" | "EMG" | "LAB" | "REC" | "GEN";
+        /**
+         * @description Por qué no hay propuesta: nadie espera, o quienes esperan tienen cita con otro médico dentro de su ventana; null con propuesta
+         * @enum {string}
+         */
+        MotivoSinPropuesta: "sin_espera" | "citas_de_otro_medico";
         /** @enum {string} */
         PrioridadFila: "emergencia" | "urgente" | "rutina";
         /** @enum {string} */
@@ -4511,7 +4543,11 @@ export interface components {
             area: components["schemas"]["AreaFila"];
             /** @description Regla documentada RN-FILA-SIGUIENTE */
             rule: string;
-            /** @description null cuando nadie espera */
+            /** @description Auditoría D74: números en espera en el servicio ahora, haya o no propuesta */
+            waiting: number;
+            /** @description Por qué no hay propuesta: nadie espera, o quienes esperan tienen cita con otro médico dentro de su ventana; null con propuesta */
+            noProposalReason: components["schemas"]["MotivoSinPropuesta"] | null;
+            /** @description null sin propuesta; ver noProposalReason */
             proposal: components["schemas"]["QueueProposalResponse"] | null;
         };
         ConsultationSignResponse: {
@@ -4564,6 +4600,11 @@ export interface components {
             version: number;
             /** Format: date-time */
             issuedAt: string;
+            /**
+             * Format: date-time
+             * @description Auditoría D48: hora del primer llamado; la espera se mide de issuedAt a calledAt. null si no se ha llamado
+             */
+            calledAt: string | null;
             /** @description Código del área del servicio; el número cuenta desde 1 por área y día */
             area: components["schemas"]["AreaFila"];
             priority: components["schemas"]["PrioridadFila"];
@@ -5127,6 +5168,18 @@ export interface components {
             /** @description Acciones que el servidor acepta ahora para quien lee */
             allowedActions: components["schemas"]["AccionSolicitudCita"][];
             blockedActions: components["schemas"]["BlockedCategoryRequestActionResponse"][];
+        };
+        /** @enum {string} */
+        MotivoLimiteSolicitud: "solicitudes_pendientes_max";
+        RequestLimitResponse: {
+            /** @description Solicitudes pendientes que cuentan para el límite */
+            pending: number;
+            /** @description Máximo de la política citas.solicitudes_pendientes_max */
+            max: number;
+            /** @description false: el cliente deshabilita "Pedir una cita" y muestra reason */
+            canRequest: boolean;
+            code: components["schemas"]["MotivoLimiteSolicitud"] | null;
+            reason: string | null;
         };
         CategoryRequestCreateDto: {
             /** @description Códigos de `GET /citas/categorias` (una a tres) */
@@ -6255,7 +6308,10 @@ export interface components {
             warehouseId: string;
             warehouseCode: string;
             warehouseName: string;
+            /** @description Existencia utilizable: sin lotes vencidos (auditoría D111) */
             quantity: number;
+            /** @description Unidades de lotes vencidos en la bodega, aparte; se dan de baja con una merma */
+            expired: number;
         };
         ArticleMovementResponse: {
             /** Format: uuid */
@@ -6501,8 +6557,10 @@ export interface components {
             fecha: string;
             rol: string;
             tipoDato: string;
-            /** @description "atención"; las filas del módulo retirado de acceso excepcional conservan "acceso excepcional" */
+            /** @description "atención"; "Recepción de ambulancia (urgente)" para la recepción de una ambulancia por Recepción (auditoría D120); las filas del módulo retirado de acceso excepcional conservan "acceso excepcional" */
             motivo: string;
+            /** @description Auditoría D120: true en los accesos urgentes de la recepción de una ambulancia */
+            urgente: boolean;
         };
         /** @enum {string} */
         EstadoVinculacion: "pendiente" | "aprobada" | "rechazada";
@@ -7101,11 +7159,18 @@ export interface components {
         };
         /** @enum {string} */
         MotivoBloqueoDespacho: "en_servicio" | "en_mantenimiento" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno";
+        /**
+         * @description Auditoría D135: ausencia_registrada cuando el turno del paramédico está publicado pero marcado ausente; el cliente no debe pedir publicar el turno
+         * @enum {string}
+         */
+        CausaBloqueoDespacho: "ausencia_registrada";
         DispatchBlockResponse: {
             code: components["schemas"]["MotivoBloqueoDespacho"];
             message: string;
             /** @description Qué hacer para poder despachar */
             action: string;
+            /** @description Auditoría D135: ausencia_registrada cuando el turno del paramédico está publicado pero marcado ausente; el cliente no debe pedir publicar el turno */
+            cause?: components["schemas"]["CausaBloqueoDespacho"];
         };
         /** @enum {string} */
         CanalSolicitudAmbulancia: "app_paciente" | "telefono";
@@ -7373,6 +7438,11 @@ export interface components {
             version: number;
             patientLinked: boolean;
         };
+        /**
+         * @description Auditoría D26: último hito registrado; despachado antes del primero
+         * @enum {string}
+         */
+        EstadoLlegadaAmbulancia: "despachado" | "salida" | "en_escena" | "trasladando" | "en_hospital" | "finalizado";
         ArrivalCandidateResponse: {
             /** Format: uuid */
             serviceId: string;
@@ -7382,6 +7452,14 @@ export interface components {
             active: boolean;
             /** @description Con el hito en_hospital */
             arrived: boolean;
+            /** @description Auditoría D120 (decisión del dueño): siempre true; la llegada de una ambulancia se muestra como urgente */
+            urgent: boolean;
+            /** @description Auditoría D25: prioridad del despacho */
+            priority: components["schemas"]["PrioridadAmbulancia"];
+            /** @description Auditoría D26: la tripulación ya envió reporte prehospital */
+            hasPrehospital: boolean;
+            /** @description Auditoría D26: último hito registrado; despachado antes del primero */
+            state: components["schemas"]["EstadoLlegadaAmbulancia"];
         };
         ArrivalServiceResponse: {
             /**
@@ -7415,15 +7493,26 @@ export interface components {
             receivedByName: string | null;
         };
         /**
-         * @description recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada)
+         * @description recibir: el actor puede marcar recibido al paciente (quien tiene ambulancia.recibir_prehospital, después de la llegada; auditoría D120)
          * @enum {string}
          */
         AccionPrehospital: "recibir";
+        /** @enum {string} */
+        MotivoBloqueoRecepcion: "sin_contexto_recepcion" | "entrega_registrada" | "sin_llegada_hospital" | "servicio_cerrado";
+        PrehospitalBlockedActionResponse: {
+            action: components["schemas"]["AccionPrehospital"];
+            code: components["schemas"]["MotivoBloqueoRecepcion"];
+            reason: string;
+        };
         PrehospitalViewResponse: {
             /** Format: uuid */
             serviceId: string;
             /** @description Versión del servicio; la entrega al hospital la envía */
             version: number;
+            /** @description Auditoría D120 (decisión del dueño): siempre true; la recepción de una ambulancia se muestra como urgente */
+            urgent: boolean;
+            /** @description Auditoría D120: true cuando quien lee no tiene expediente.ver (Recepción) y ve el reporte por estar abierta la recepción; la lectura queda en "Quién vio mi expediente" como urgente */
+            urgentAccess: boolean;
             active: boolean;
             /** @description La ambulancia registró la llegada al hospital */
             arrived: boolean;
@@ -7433,13 +7522,17 @@ export interface components {
             reports: components["schemas"]["PrehospitalReportResponse"][];
             /** @description Entrega del paciente al hospital; null si aún no se registra */
             handover: components["schemas"]["HandoverInfoResponse"] | null;
-            /** @description recibir: el actor puede marcar recibido al paciente (personal clínico, después de la llegada) */
+            /** @description recibir: el actor puede marcar recibido al paciente (quien tiene ambulancia.recibir_prehospital, después de la llegada; auditoría D120) */
             allowedActions: components["schemas"]["AccionPrehospital"][];
+            /** @description Acciones que aún no se pueden hacer, con el código y el motivo que daría el comando (S12) */
+            blockedActions: components["schemas"]["PrehospitalBlockedActionResponse"][];
         };
         HandoverResponse: {
             /** Format: uuid */
             serviceId: string;
             version: number;
+            /** @description Auditoría D120 (decisión del dueño): siempre true; la recepción de una ambulancia es urgente */
+            urgent: boolean;
             /** Format: date-time */
             receivedAt: string;
             receivedByName: string | null;
@@ -7491,7 +7584,7 @@ export interface components {
          * @description Código estable del error (snake_case).
          * @enum {string}
          */
-        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "sin_turno_activo" | "sin_personal_disponible" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "vinculacion_automatica" | "correo_en_uso" | "correo_de_otra_cuenta" | "correo_lo_gestiona_recepcion" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "hito_no_deshacible" | "sin_consulta" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
+        CodigoProblema: "validacion" | "no_autenticado" | "sin_permiso" | "no_encontrado" | "conflicto" | "limite_excedido" | "no_disponible" | "error_interno" | "error" | "idempotency_key_invalida" | "idempotencia_conflicto" | "version_conflicto" | "dui_duplicado" | "posible_duplicado" | "politica_no_vigente" | "demasiadas_solicitudes" | "transicion_invalida" | "ultimo_administrador" | "capacidad_excedida" | "capacidad_menor_que_camas" | "ciclo_en_arbol" | "consulta_firmada" | "personal_en_descanso" | "personal_jornada_ocupada" | "horas_semanales_excedidas" | "inscripcion_no_vigente" | "capacidad_bajo_ocupacion" | "turno_iniciado" | "turno_con_citas" | "descanso_insuficiente" | "carga_semanal_excedida" | "dias_seguidos_excedidos" | "tripulante_en_servicio" | "sin_asistencia_marcada" | "entrada_automatica" | "medico_ausente" | "tripulante_ausente" | "lote_con_conflictos" | "plantilla_duplicada" | "sin_turno_activo" | "sin_personal_disponible" | "franja_desalineada" | "franja_ocupada" | "medico_sin_jornada" | "paciente_con_cita" | "cancelacion_fuera_de_plazo" | "ticket_activo_existente" | "fila_max_llamados" | "consulta_ya_iniciada" | "cita_con_consulta" | "cita_fuera_de_dia" | "fila_llamados_insuficientes" | "fila_sin_espera" | "solicitudes_pendientes_max" | "consulta_sin_firmar" | "solicitud_cita_resuelta" | "cuenta_no_verificada" | "cuenta_ya_vinculada" | "expediente_ya_vinculado" | "paciente_ya_vinculado" | "sin_vinculacion" | "vinculacion_pendiente" | "vinculacion_resuelta" | "sin_expediente" | "vinculacion_automatica" | "correo_en_uso" | "correo_de_otra_cuenta" | "correo_lo_gestiona_recepcion" | "rol_no_invitable" | "invitacion_no_pendiente" | "jerarquia_administrador" | "trabajo_abierto" | "existencia_insuficiente" | "lote_vencido" | "aviso_con_datos_personales" | "aviso_retirado" | "aviso_vencido" | "indicador_desconocido" | "examen_con_resultados" | "orden_no_externa" | "cita_no_coincide" | "propuesta_resuelta" | "adjunto_tipo_invalido" | "adjunto_muy_grande" | "adjunto_sin_archivo" | "adjunto_ya_almacenado" | "adjunto_no_coincide" | "ambulancia_ya_despachada" | "estado_final_invalido" | "hito_fuera_de_orden" | "servicio_cerrado" | "servicio_finalizado" | "sin_paramedico_de_turno" | "sin_motorista_de_turno" | "sin_tripulacion_de_turno" | "tripulante_sin_turno" | "hito_hora_invalida" | "hito_no_deshacible" | "sin_consulta" | "sin_servicio_activo" | "solicitud_resuelta" | "unidad_en_mantenimiento" | "unidad_en_servicio" | "sin_llegada_hospital" | "entrega_registrada";
         Problem: {
             /** @example urn:sghu:error:version_conflicto */
             type: string;
@@ -14115,6 +14208,61 @@ export interface operations {
             };
             /** @description Conflicto de negocio, de versión (`version_conflicto`) o de idempotencia (`idempotencia_conflicto`) */
             409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Otro error (422, 429, 5xx) con el mismo cuerpo problem+json */
+            default: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+        };
+    };
+    AppointmentRequestController_limit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RequestLimitResponse"];
+                };
+            };
+            /** @description Datos no válidos (`validacion`, `idempotency_key_invalida`, ...) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sesión requerida (`no_autenticado`) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/problem+json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Sin permiso (`sin_permiso`) o regla de acceso */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };

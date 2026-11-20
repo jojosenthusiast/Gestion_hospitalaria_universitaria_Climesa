@@ -23,13 +23,15 @@ export const PROBLEM_CODES = [
   'franja_desalineada', 'franja_ocupada', 'medico_sin_jornada', 'paciente_con_cita', 'cancelacion_fuera_de_plazo',
   'ticket_activo_existente', 'fila_max_llamados', 'consulta_ya_iniciada',
   'cita_con_consulta', 'cita_fuera_de_dia', 'fila_llamados_insuficientes', 'fila_sin_espera', 'solicitudes_pendientes_max',
+  // Audit 2026-11-20 D46: a general-consultation number closes only with a signed consultation.
+  'consulta_sin_firmar',
   // Category appointment requests (Fase 2 flow A, 20261125002000).
   'solicitud_cita_resuelta',
   // Accounts, privacy and patients.
   'cuenta_no_verificada', 'cuenta_ya_vinculada', 'expediente_ya_vinculado', 'paciente_ya_vinculado', 'sin_vinculacion', 'vinculacion_pendiente', 'vinculacion_resuelta',
   'sin_expediente', 'vinculacion_automatica', 'correo_en_uso', 'correo_de_otra_cuenta', 'correo_lo_gestiona_recepcion', 'rol_no_invitable', 'invitacion_no_pendiente', 'jerarquia_administrador', 'trabajo_abierto',
   // Inventory, public information and metrics.
-  'existencia_insuficiente', 'aviso_con_datos_personales', 'aviso_retirado', 'aviso_vencido', 'indicador_desconocido',
+  'existencia_insuficiente', 'lote_vencido', 'aviso_con_datos_personales', 'aviso_retirado', 'aviso_vencido', 'indicador_desconocido',
   // Laboratory catalog (MA-LAB-06).
   'examen_con_resultados',
   // Laboratory follow-up, external orders and proposed appointments (Fase 2, S10).

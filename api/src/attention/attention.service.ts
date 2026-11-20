@@ -327,12 +327,22 @@ export class AttentionService {
    */
   async assertPendingLimit(c: PoolClient, patientId: string) {
     await c.query(`SELECT pg_advisory_xact_lock(hashtext('citas.solicitudes:' || $1::text))`, [patientId]);
+    const limit = await this.pendingLimit(c, patientId);
+    if (!limit.canRequest) throw new ProblemException('solicitudes_pendientes_max', 409, limit.reason!);
+  }
+
+  /**
+   * Audit D128 / S12: the same count `assertPendingLimit` checks, read before the patient fills the form, so the app
+   * disables "Pedir una cita" with the reason instead of rejecting after the patient acted.
+   */
+  async pendingLimit(c: PoolClient, patientId: string) {
     const { maximo } = await this.policies.value<{ maximo: number }>(c, 'citas.solicitudes_pendientes_max', this.clock.now());
     const pending = Number((await c.query(`SELECT
         (SELECT count(*) FROM atencion.cita WHERE paciente_id=$1 AND estado='solicitada' AND lower(horario)>$2::timestamptz)
         + (SELECT count(*) FROM atencion.solicitud_cita WHERE paciente_id=$1 AND estado='pendiente'
             AND creado_en > $2::timestamptz - make_interval(days => $3)) AS n`, [patientId, this.clock.now(), CATEGORY_REQUEST_COUNT_DAYS])).rows[0].n);
-    if (pending >= maximo) throw new ProblemException('solicitudes_pendientes_max', 409, `Ya tienes ${pending} solicitudes pendientes; reprograma o cancela una antes de pedir otra.`);
+    const canRequest = pending < maximo;
+    return { pending, max: maximo, canRequest, code: canRequest ? null : 'solicitudes_pendientes_max', reason: canRequest ? null : `Ya tienes ${pending} solicitudes pendientes; reprograma o cancela una antes de pedir otra.` };
   }
 
   /** Throws when the doctor is not an active doctor (shared with the category request's preferred doctor). */

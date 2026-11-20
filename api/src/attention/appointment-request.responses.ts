@@ -5,6 +5,15 @@ import { CATEGORY_REQUEST_ACTIONS } from './appointment-request.rules';
 
 // ---- Solicitudes de cita por categoría (appointment-request.controller.ts, Fase 2 flujo A) ----
 
+/** Audit D128: the pending-request limit, read before the patient fills the form. */
+export class RequestLimitResponse {
+  @IntProp({ description: 'Solicitudes pendientes que cuentan para el límite' }) pending!: number;
+  @IntProp({ description: 'Máximo de la política citas.solicitudes_pendientes_max' }) max!: number;
+  @BoolProp({ description: 'false: el cliente deshabilita "Pedir una cita" y muestra reason' }) canRequest!: boolean;
+  @EnumProp(['solicitudes_pendientes_max'] as const, 'MotivoLimiteSolicitud', { nullable: true }) code!: string | null;
+  @StrProp({ nullable: true }) reason!: string | null;
+}
+
 export class AppointmentCategoryResponse {
   @StrProp() code!: string;
   @StrProp() name!: string;

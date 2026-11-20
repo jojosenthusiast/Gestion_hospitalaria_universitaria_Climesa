@@ -3,7 +3,7 @@ import { ApiBearerAuth, ApiCreatedResponse, ApiOkResponse, ApiOperation, ApiTags
 import { PermissionGuard, RequirePermission, SupabaseAuthGuard } from '../auth';
 import { ActorRequest } from '../platform/actor';
 import { CategoryRequestAssignDto, CategoryRequestCancelDto, CategoryRequestCreateDto, CategoryRequestRejectDto } from './appointment-request.dto';
-import { AppointmentCategoryResponse, CategoryRequestCommandResponse, CategoryRequestResponse, CategoryRequestSuggestionResponse } from './appointment-request.responses';
+import { AppointmentCategoryResponse, CategoryRequestCommandResponse, CategoryRequestResponse, CategoryRequestSuggestionResponse, RequestLimitResponse } from './appointment-request.responses';
 import { AppointmentRequestService } from './appointment-request.service';
 
 /** Fase 2, flow A (S8): appointment requests by category, without a doctor; reception assigns doctor and time. */
@@ -16,6 +16,9 @@ export class AppointmentRequestController {
 
   @Get('solicitudes-categoria') @RequirePermission('citas.ver') @ApiOperation({ summary: 'Bandeja de solicitudes por categoría: recepción ve las pendientes (más antiguas primero) y las resueltas en 30 días; el paciente solo las suyas' }) @ApiOkResponse({ type: [CategoryRequestResponse] })
   list(@Req() r: ActorRequest) { return this.requests.list(r.actor); }
+
+  @Get('solicitudes-categoria/limite') @RequirePermission('citas.solicitar') @ApiOperation({ summary: 'Auditoría D128: si el paciente puede pedir otra cita ahora (solicitudes pendientes contra el máximo), antes de llenar el formulario' }) @ApiOkResponse({ type: RequestLimitResponse })
+  limit(@Req() r: ActorRequest) { return this.requests.requestLimit(r.actor); }
 
   @Post('solicitudes-categoria') @RequirePermission('citas.solicitar') @ApiOperation({ summary: 'Pedir una cita por motivo (una a tres categorías), franja preferida y nota, sin elegir médico' }) @ApiCreatedResponse({ type: CategoryRequestCommandResponse })
   create(@Req() r: ActorRequest, @Body() d: CategoryRequestCreateDto, @Headers('idempotency-key') key?: string) { return this.requests.create(r.actor, d, key); }

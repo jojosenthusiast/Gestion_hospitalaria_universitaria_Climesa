@@ -15,7 +15,8 @@ describe('Fase 0 · módulos clínicos (API-01, REQ-08)', () => {
 
   test('fila (E2E-01): emitir, llamar, atender y completar con los permisos de fila', async () => {
     const patientId = await t.patient();
-    const issued = await t.call('REC', 'POST', '/fila', { service: 'consulta_general', patientId });
+    // Audit D46: a general-consultation number closes only by signing the consultation; the counter completes the others.
+    const issued = await t.call('REC', 'POST', '/fila', { service: 'laboratorio', patientId });
     expect(issued.status).toBe(201);
     expect(issued.body.numero).toBeGreaterThan(0);
     const called = await t.call('AST', 'POST', `/fila/${issued.body.id}/llamar`, { version: issued.body.version });
