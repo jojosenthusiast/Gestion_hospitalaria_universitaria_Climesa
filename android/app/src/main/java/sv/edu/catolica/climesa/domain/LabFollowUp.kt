@@ -110,6 +110,8 @@ object LabFollowUpRules {
 data class LabInboxRow(
     val orderId: String, val patientName: String, val record: String?, val critical: Boolean, val orderVersion: Int?, val orderActions: List<String>,
     val keyValues: List<String>, val details: List<String>, val followUpIds: List<String>,
+    /** D71: the values that come from a critical item. */
+    val criticalValues: List<String> = emptyList(),
 ) {
     /** "Revisar y liberar" needs the order version and the API's `revisar` action; an older API sends neither. */
     val canRelease get() = orderVersion != null && "revisar" in orderActions
@@ -126,7 +128,8 @@ object LabInbox {
     fun rows(items: List<LabFollowUp>): List<LabInboxRow> = items.groupBy { it.orderId }.map { (orderId, group) ->
         val first = group.first()
         LabInboxRow(orderId, first.patientName, first.record, group.any { it.critical }, group.firstNotNullOfOrNull { it.orderVersion },
-            group.flatMap { it.orderActions }.distinct(), group.flatMap { it.values }.distinct(), group.map { it.detail }.filter { it.isNotBlank() }.distinct(), group.map { it.id })
+            group.flatMap { it.orderActions }.distinct(), group.flatMap { it.values }.distinct(), group.map { it.detail }.filter { it.isNotBlank() }.distinct(), group.map { it.id },
+            group.filter { it.critical }.flatMap { it.values }.distinct())
     }.sortedWith(compareBy<LabInboxRow>({ if (it.critical) 0 else 1 }, { row -> items.indexOfFirst { it.orderId == row.orderId } }))
 
     fun releasePath(orderId: String) = "/laboratorio/ordenes/$orderId/revisar"

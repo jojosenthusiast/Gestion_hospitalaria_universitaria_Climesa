@@ -100,12 +100,14 @@ internal fun NoticeLevelBadge(level: NoticeLevel, modifier: Modifier = Modifier)
  * role or area, without "Enterado" and not snoozed). It stays until "Enterado"; "Recordarme en N h" sets it aside and it
  * comes back when the API says so in `proximoCambio` or by an `aviso` event.
  */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 internal fun CriticalNoticeBanner(account: AuthenticatedAccount, onOpenNotices: () -> Unit, modifier: Modifier = Modifier) {
     val model = noticeInboxModel(account)
     val state by model.state.collectAsStateWithLifecycle()
     val pending = NoticeInboxRules.banner(state.inbox, state.hidden)
-    val notice = pending.firstOrNull() ?: return
+    // D68: the answer to "Enterado" or "Recordarme" stays where it was asked, even when the banner goes away with it.
+    val notice = pending.firstOrNull() ?: run { state.bannerDone?.let { NoticeBanner(NoticeKind.SUCCESS, it, modifier) }; return }
     val colors = MaterialTheme.system
     val shape = RoundedCornerShape(RadiusCard)
     val inner = RoundedCornerShape((RadiusCard - 3.dp).coerceAtLeast(2.dp))
@@ -123,11 +125,15 @@ internal fun CriticalNoticeBanner(account: AuthenticatedAccount, onOpenNotices: 
             if (pending.size > 1) Text(stringResource(R.string.aviso_banner_cuenta, pending.size), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Text(notice.title, Modifier.semantics { heading() }, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurface)
-        if (notice.body.isNotBlank()) Text(notice.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface)
+        // D66: the banner stays compact (three lines of text, actions side by side); the full text is in Avisos.
+        if (notice.body.isNotBlank()) Text(notice.body, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface, maxLines = 3, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        state.bannerDone?.let { NoticeBanner(NoticeKind.SUCCESS, it) }
         state.actionError?.let { NoticeBanner(NoticeKind.ERROR, it) }
-        PrimaryButton(stringResource(R.string.aviso_enterado), { model.acknowledge(notice.id) }, icon = Icons.Default.Check, enabled = !busy, loading = state.busyId == notice.id)
-        if (NoticeInboxRules.canSnooze(notice)) {
-            SecondaryButton(stringResource(R.string.aviso_recordarme, NoticeInboxRules.hoursText(state.inbox?.reminderHours ?: 4.0)), { model.snooze(notice.id) }, enabled = !busy)
+        androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(Space2), verticalArrangement = Arrangement.spacedBy(Space2)) {
+            PrimaryButton(stringResource(R.string.aviso_enterado), { model.acknowledge(notice.id, fromBanner = true) }, icon = Icons.Default.Check, enabled = !busy, loading = state.busyId == notice.id, fill = false)
+            if (NoticeInboxRules.canSnooze(notice)) {
+                SecondaryButton(stringResource(R.string.aviso_recordarme, NoticeInboxRules.hoursText(state.inbox?.reminderHours ?: 4.0)), { model.snooze(notice.id, fromBanner = true) }, enabled = !busy, fill = false)
+            }
         }
         TextButton(onClick = { model.setFilter(NoticeFilter.CRITICAL); model.clearMessages(); onOpenNotices() }, modifier = Modifier.heightIn(min = Spacing.touch)) {
             Text(stringResource(R.string.aviso_ver_en_avisos))

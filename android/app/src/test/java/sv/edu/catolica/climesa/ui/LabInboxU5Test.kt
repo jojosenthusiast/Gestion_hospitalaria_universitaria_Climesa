@@ -63,9 +63,12 @@ class LabInboxU5Test {
         val target = vm.reviewTarget()!!
         assertEquals("Ana Ficticia", target.patientName)
         assertTrue(target.lines.contains("Hemoglobina 7.1 g/dL · Crítico bajo"))
+        // D71: a critical result is not released until the doctor ticks that the patient was attended or warned.
+        vm.release(); runCurrent()
+        assertTrue(api.calls.none { it.first == "/laboratorio/ordenes/o2/revisar" })
         // The rows of that order leave only once the API answers.
         api.responses["/laboratorio/pendientes"] = JSONArray().put(inbox.getJSONObject(0))
-        vm.release(); runCurrent()
+        vm.setReviewCriticalAck(true); vm.release(); runCurrent()
         val body = api.calls.single { it.first == "/laboratorio/ordenes/o2/revisar" }.third!!
         assertEquals(5, body.getInt("version"))
         assertFalse("the default keeps the released body", body.has("followUp"))
@@ -84,7 +87,7 @@ class LabInboxU5Test {
         vm.openReview("o2")
         vm.setReviewFollowUp(false)
         vm.setReviewNote("  Tome hierro y vuelva en un mes.  ")
-        vm.release(); runCurrent()
+        vm.setReviewCriticalAck(true); vm.release(); runCurrent()
         val body = api.calls.single { it.first == "/laboratorio/ordenes/o2/revisar" }.third!!
         assertEquals(false, body.getBoolean("followUp"))
         assertEquals("Tome hierro y vuelva en un mes.", body.getString("patientNote"))
@@ -98,7 +101,7 @@ class LabInboxU5Test {
         val vm = LaboratoryViewModel(api, quiet, NoDocuments)
         vm.loadFollowUps(); runCurrent()
         vm.openReview("o2")
-        vm.release(); runCurrent()
+        vm.setReviewCriticalAck(true); vm.release(); runCurrent()
         assertEquals("o2", vm.state.value.reviewOrderId)
         assertTrue(vm.state.value.error != null)
         assertEquals("the inbox keeps the order", listOf("o2", "o1"), LabInbox.rows(vm.state.value.followUps).map { it.orderId })

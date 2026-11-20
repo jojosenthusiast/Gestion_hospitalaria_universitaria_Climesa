@@ -144,13 +144,27 @@ internal fun imeVisible(): Boolean = WindowInsets.ime.getBottom(androidx.compose
 
 /** Standard page body: a scrolling column with the page gutter and block gap. Use it instead of ad hoc `LazyColumn` paddings. */
 @Composable
-internal fun PageList(modifier: Modifier = Modifier, content: LazyListScope.() -> Unit) {
+internal fun PageList(
+    modifier: Modifier = Modifier,
+    state: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
+    content: LazyListScope.() -> Unit,
+) {
     LazyColumn(
         modifier.fillMaxSize(),
+        state = state,
         contentPadding = PaddingValues(horizontal = Spacing.page, vertical = Spacing.lg - Spacing.xs),
         verticalArrangement = Arrangement.spacedBy(Spacing.block),
         content = content,
     )
+}
+
+/**
+ * D72: a confirmation that appears at the top of a [PageList] is brought into view. A lazy list keeps its first visible row
+ * in place, so a message inserted above it would otherwise stay out of sight while the row it talks about disappears.
+ */
+@Composable
+internal fun ScrollToTopOn(message: String?, state: androidx.compose.foundation.lazy.LazyListState) {
+    androidx.compose.runtime.LaunchedEffect(message) { if (message != null) state.animateScrollToItem(0) }
 }
 
 /** Fills the width with the gutter when a screen is not a list. */
