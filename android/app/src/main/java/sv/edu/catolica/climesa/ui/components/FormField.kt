@@ -37,7 +37,8 @@ internal fun FormField(
         enabled = enabled,
         singleLine = singleLine,
         isError = error != null,
-        keyboardOptions = keyboardOptions,
+        // D18: single-line fields offer "Siguiente" on the keyboard, so a form is filled without closing it between fields.
+        keyboardOptions = if (singleLine && keyboardOptions.imeAction == androidx.compose.ui.text.input.ImeAction.Default) keyboardOptions.copy(imeAction = androidx.compose.ui.text.input.ImeAction.Next) else keyboardOptions,
         visualTransformation = visualTransformation,
         shape = MaterialTheme.shapes.small,
         supportingText = when {

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- API contract fields of the 2026-11-20 audit (D21, D26, D74, D120, D128) -->
+    <string name="amb_estado_servicio">Despachado %1$s · %2$s</string>
+    <string name="amb_urgente">Urgente</string>
+    <string name="amb_acceso_urgente">Acceso urgente: ves el reporte porque la recepción de la ambulancia está abierta. La lectura queda registrada como urgente.</string>
+    <string name="amb_provisional_vinculado">Paciente provisional %1$s vinculado al servicio en curso.</string>
+    <plurals name="fila_citas_otro_medico">
+        <item quantity="one">%1$d persona espera, pero tiene cita con otro médico dentro de su horario. Por ahora nadie pasa contigo.</item>
+        <item quantity="other">%1$d personas esperan, pero tienen cita con otro médico dentro de su horario. Por ahora nadie pasa contigo.</item>
+    </plurals>
+    <string name="cat_limite_alcanzado">Ya tienes %1$d de %2$d solicitudes pendientes. Espera a que Recepción las atienda antes de pedir otra.</string>
+    <string name="cat_volver">Volver a mis citas</string>
+    <string name="mis_accesos_urgente">Urgente</string>
+</resources>

@@ -225,7 +225,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.detailItems(state: In
                     FormField(stringResource(R.string.inv_numero_lote), draft.lotNumber, { v -> model.editMovement { it.copy(lotNumber = v) } }, error = err("lotNumber"), hint = stringResource(R.string.inv_lote_existente), enabled = !state.busy)
                     FormField(stringResource(R.string.inv_vencimiento), draft.expiresAt, { v -> model.editMovement { it.copy(expiresAt = v) } }, error = err("expiresAt"), hint = stringResource(R.string.inv_vacio_no_vence), enabled = !state.busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
                 }
-                FormField(stringResource(R.string.inv_cantidad), draft.quantity, { v -> model.editMovement { it.copy(quantity = v) } }, error = err("quantity"), enabled = !state.busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                FormField(stringResource(R.string.inv_cantidad), draft.quantity, { v -> model.editMovement { it.copy(quantity = v.filter { c -> c.isDigit() || c == '.' || c == ',' }.take(9)) } } /* D100: digits only */, error = err("quantity"), enabled = !state.busy, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     hint = state.chosenLotQuantity?.let { stringResource(R.string.inv_disponible_lote, trimNumber(it)) } ?: if (draft.kind == MovementKind.ADJUSTMENT) stringResource(R.string.inv_ajuste_ayuda) else null)
                 FormField(stringResource(R.string.inv_motivo), draft.reason, { v -> model.editMovement { it.copy(reason = v) } }, error = err("reason"), enabled = !state.busy, singleLine = false)
                 state.dialogError?.let { NoticeBanner(NoticeKind.ERROR, it) }

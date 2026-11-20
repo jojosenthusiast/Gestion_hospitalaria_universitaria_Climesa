@@ -192,6 +192,9 @@ object NoticeInboxRules {
     fun hoursText(hours: Double): String =
         if (hours == Math.rint(hours)) hours.toLong().toString() else String.format(Locale.US, "%.1f", hours).replace('.', ',')
 
+    /** D68: confirmation of "Recordarme en N h", with the hour count so it says when the notice comes back. */
+    fun snoozedText(hours: Double): String = "Listo: te lo recordamos en ${hoursText(hours)} h."
+
     /** Spanish text for the business code of a rejected "Enterado" or "Recordarme"; null for any other code. */
     fun actionMessage(code: String?): String? = when (code) {
         "no_encontrado" -> "Este aviso ya no está disponible para tu cuenta. La lista se actualizó."

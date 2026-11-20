@@ -346,15 +346,15 @@ internal fun OpenMap(address: String) {
 }
 
 @Composable
-internal fun NumberField(label: String, value: String, decimal: Boolean = false, onChange: (String) -> Unit) {
-    FormField(label, value, { onChange(it.filter { c -> c.isDigit() || (decimal && (c == '.' || c == ',')) }.take(6)) }, keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number))
+internal fun NumberField(label: String, value: String, decimal: Boolean = false, error: String? = null, hint: String? = null, onChange: (String) -> Unit) {
+    FormField(label, value, { onChange(it.filter { c -> c.isDigit() || (decimal && (c == '.' || c == ',')) }.take(6)) }, error = error, hint = hint, keyboardOptions = KeyboardOptions(keyboardType = if (decimal) KeyboardType.Decimal else KeyboardType.Number))
 }
 
 /** A74: servicios con su historia en una frase; búsqueda compacta y filtros en un panel plegable con chips (obs. 8 y 16). */
 private fun LazyListScope.logContent(state: AmbulanceUiState, model: AmbulanceViewModel, pastOpen: Boolean, togglePast: () -> Unit) {
     item { LogToolbar(state.logFilters, model) }
     if (state.log.isEmpty()) { item { EmptyState(stringResource(if (state.logFilters.any) R.string.amb_bitacora_sin_resultados else R.string.amb_bitacora_vacia)) }; return }
-    item { Text(stringResource(R.string.amb_servicios_n, state.log.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+    item { Text(androidx.compose.ui.res.pluralStringResource(R.plurals.amb_servicios_n, state.log.size, state.log.size), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     // Day-grouped: today open, the past days folded behind one toggle (open by itself when nothing happened today).
     val today = java.time.LocalDate.now(java.time.ZoneId.of("America/El_Salvador"))
     val days = AmbulanceRules.logDays(state.log)
@@ -418,21 +418,34 @@ private fun LogToolbar(filters: LogFilters, model: AmbulanceViewModel) {
 /** A54 y A25: reporte prehospital en vivo; el contenido clínico solo si la API lo entrega. MA-AMB-04: marcar recibido. */
 private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: AmbulanceViewModel) {
     // MA-AMB-04: a service that arrived without a handover stays listed while the unit is out on another one.
-    if (state.arrivals.size > 1) item {
+    // D24/D27: the list is always visible, even with one service, and says which one is open; nothing switches by itself.
+    if (state.arrivals.isNotEmpty()) item {
         SectionCard(stringResource(R.string.amb_por_recibir)) {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 state.arrivals.forEach { candidate ->
+                    // D26: on the way it says where the ambulance is (last milestone) when the API sends `state`.
+                    val stateLabel = sv.edu.catolica.climesa.domain.ArrivalStates.label(candidate.state)?.takeIf { !candidate.arrived }
                     FilterChip(
                         selected = candidate.serviceId == state.arrivalServiceId, onClick = { model.selectArrival(candidate.serviceId) },
-                        label = { Text(stringResource(if (candidate.arrived) R.string.amb_llego_sin_entrega else R.string.amb_en_camino, localTime(candidate.dispatchedAt))) },
+                        label = { Text(if (stateLabel != null) stringResource(R.string.amb_estado_servicio, localTime(candidate.dispatchedAt), stateLabel.lowercase()) else stringResource(if (candidate.arrived) R.string.amb_llego_sin_entrega else R.string.amb_en_camino, localTime(candidate.dispatchedAt))) },
+                        leadingIcon = if (candidate.serviceId == state.arrivalServiceId) ({ androidx.compose.material3.Icon(Icons.Default.Check, null) }) else null,
+                        modifier = Modifier.heightIn(min = 48.dp),
                     )
                 }
             }
         }
     }
     val view = state.arrival
-    if (view == null) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
-    item { HandoverCard(view, state.busy, model, state.formError) }
+    if (view == null) {
+        item { EmptyState(stringResource(if (state.arrivals.isEmpty()) R.string.amb_sin_ambulancias else R.string.amb_elige_servicio), icon = Icons.Default.LocalHospital) }
+        return
+    }
+    val chosen = state.arrivals.firstOrNull { it.serviceId == view.serviceId }
+    // D25 (owner): the priority of the latest report is a large card in its triage colour, not a plain line of text.
+    view.reports.firstOrNull()?.let { latest -> item(key = "priority-${view.serviceId}") { PriorityAlert(latest.priority, chosen, latest.estimatedArrival) } }
+    // D120: a reader without `expediente.ver` sees the report only for the reception; say the read is logged as urgent.
+    if (view.urgentAccess) item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_acceso_urgente)) }
+    item { HandoverCard(view, chosen, state.busy, model, state.formError) }
     if (view.reports.isEmpty()) { item { EmptyState(stringResource(R.string.amb_sin_reporte), icon = Icons.Default.LocalHospital) }; return }
     if (!view.clinical) item { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_sin_relacion)) }
     items(view.reports, key = { it.id }) { report ->
@@ -460,7 +473,27 @@ private fun LazyListScope.arrivalContent(state: AmbulanceUiState, model: Ambulan
 
 /** MA-AMB-04: who received the patient, or the single "Marcar recibido" action when the API allows it. */
 @Composable
-private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, busy: Boolean, model: AmbulanceViewModel, error: String?) {
+private fun PriorityAlert(priority: String, candidate: sv.edu.catolica.climesa.domain.ArrivalCandidate?, estimatedArrival: String?) {
+    val c = MaterialTheme.climesa
+    // Red (white text) for roja and naranja; amber and green keep dark text on their soft colour for contrast.
+    val (bg, fg) = when (priority) {
+        "roja", "naranja" -> c.danger to androidx.compose.ui.graphics.Color.White
+        "amarilla" -> c.warningSoft to MaterialTheme.colorScheme.onSurface
+        else -> c.successSoft to MaterialTheme.colorScheme.onSurface
+    }
+    androidx.compose.material3.Surface(color = bg, contentColor = fg, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            Text(stringResource(R.string.amb_prioridad_grande, AmbulanceLabels.priority(priority)), style = MaterialTheme.typography.headlineSmall)
+            val where = when { candidate == null -> null; candidate.arrived -> stringResource(R.string.amb_estado_llego); else -> sv.edu.catolica.climesa.domain.ArrivalStates.label(candidate.state) ?: stringResource(R.string.amb_estado_en_camino) }
+            listOfNotNull(where, estimatedArrival?.let { stringResource(R.string.amb_llega_aprox, localTime(it)) }).takeIf { it.isNotEmpty() }?.let {
+                Text(it.joinToString(" · "), style = MaterialTheme.typography.bodyLarge)
+            }
+        }
+    }
+}
+
+@Composable
+private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, candidate: sv.edu.catolica.climesa.domain.ArrivalCandidate?, busy: Boolean, model: AmbulanceViewModel, error: String?) {
     var confirming by rememberSaveable(view.serviceId) { mutableStateOf(false) }
     val sent = remember(view.serviceId) { mutableStateOf(false) }
     CloseWhenDone(busy, sent, error) { confirming = false }
@@ -473,13 +506,20 @@ private fun HandoverCard(view: sv.edu.catolica.climesa.domain.PrehospitalView, b
                 Text(stringResource(R.string.amb_siguiente_admision), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             view.canReceive -> PrimaryButton(stringResource(R.string.amb_marcar_recibido), { confirming = true }, icon = Icons.Default.Check, enabled = !busy, loading = busy)
+            // S12: the server's own reason (`blockedActions`) instead of a button it would refuse.
+            view.receiveBlockedReason != null -> Text(view.receiveBlockedReason!!, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             !view.arrived -> Text(stringResource(R.string.amb_entrega_espera), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             else -> Text(stringResource(R.string.amb_entrega_sin_permiso), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
     if (confirming) ConfirmDialog(
         title = stringResource(R.string.amb_marcar_recibido), confirmLabel = stringResource(R.string.amb_marcar_recibido), busy = busy, error = error,
-        message = stringResource(R.string.amb_marcar_recibido_detalle),
+        // D121: the dialog names the service being received (dispatch time, priority, reason), so the wrong one is not marked.
+        message = listOfNotNull(
+            candidate?.let { stringResource(R.string.amb_recibir_servicio, localTime(it.dispatchedAt)) },
+            view.reports.firstOrNull()?.let { r -> listOfNotNull(stringResource(R.string.amb_prioridad) + " " + AmbulanceLabels.priority(r.priority), r.reason?.takeIf { it.isNotBlank() }).joinToString(" · ") },
+            stringResource(R.string.amb_marcar_recibido_detalle),
+        ).joinToString("\n"),
         onConfirm = { sent.value = true; model.receivePatient() }, onDismiss = { confirming = false },
     )
 }

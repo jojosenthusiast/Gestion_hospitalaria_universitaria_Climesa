@@ -36,7 +36,17 @@ import sv.edu.catolica.climesa.domain.PrehospitalForm
 import sv.edu.catolica.climesa.domain.PrehospitalView
 import sv.edu.catolica.climesa.domain.RealtimeSignal
 
-data class ProvisionalPatient(val id: String, val record: String)
+/** D21: [linkedServiceId] is the crew's active service the API already linked the record to (`linkedServiceId`); null when not linked. */
+data class ProvisionalPatient(val id: String, val record: String, val linkedServiceId: String? = null) {
+    val linked get() = !linkedServiceId.isNullOrBlank()
+
+    companion object {
+        fun fromCreated(created: JSONObject) = ProvisionalPatient(
+            created.getString("id"), created.optString("record"),
+            created.optString("linkedServiceId").takeIf { !created.isNull("linkedServiceId") && it.isNotBlank() },
+        )
+    }
+}
 /** Reporte prehospital en cola: el mismo cuerpo y la misma clave se reenvían, aunque la app se cierre (RN-34). */
 data class QueuedPrehospital(val serviceId: String, val body: String, val key: String = java.util.UUID.randomUUID().toString())
 
@@ -83,7 +93,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         if (queued != null && mutable.value.queued == null) mutable.value = mutable.value.copy(queued = queued, notice = "Hay un reporte prehospital en cola: se enviará al reintentar.")
         restoredForm = drafts.load(id, FormDrafts.PREHOSPITAL_FORM)
         // MA-AMB-06: the provisional patient and the queued milestones survive a killed app too.
-        val provisional = drafts.load(id, FormDrafts.PROVISIONAL_PATIENT)?.let { runCatching { ProvisionalPatient(it.getString("id"), it.optString("record")) }.getOrNull() }
+        val provisional = drafts.load(id, FormDrafts.PROVISIONAL_PATIENT)?.let { runCatching { ProvisionalPatient.fromCreated(it) }.getOrNull() }
         if (provisional != null && mutable.value.provisional == null) mutable.value = mutable.value.copy(provisional = provisional)
         val milestones = drafts.load(id, FormDrafts.MILESTONE_QUEUE)?.optJSONArray("items")?.let { items -> (0 until items.length()).mapNotNull { items.optJSONObject(it)?.let(QueuedMilestone::fromJson) } }.orEmpty()
         if (milestones.isNotEmpty() && mutable.value.queuedMilestones.isEmpty()) mutable.value = mutable.value.copy(queuedMilestones = milestones, notice = "Hay hitos en cola: se enviarán al volver la señal.")
@@ -95,10 +105,16 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     private var restoredForm: JSONObject? = null
 
     /** Restores the saved prehospital form of [serviceId] once, when the sheet opens with an empty form. */
-    fun restorePrehospital(serviceId: String) {
-        val form = sv.edu.catolica.climesa.domain.FormDrafts.prehospital(restoredForm, serviceId) ?: return
-        restoredForm = null
-        if (sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(mutable.value.prehospital)) mutable.value = mutable.value.copy(prehospital = form)
+    fun restorePrehospital(serviceId: String, servicePriority: String? = null) {
+        sv.edu.catolica.climesa.domain.FormDrafts.prehospital(restoredForm, serviceId)?.let { form ->
+            restoredForm = null
+            if (sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(mutable.value.prehospital)) mutable.value = mutable.value.copy(prehospital = form)
+        }
+        // D17: an untouched report starts with the priority dispatch gave the service, not the form default.
+        val current = mutable.value.prehospital
+        if (servicePriority != null && servicePriority in AmbulanceLabels.priorities.map { it.first } &&
+            sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(current) && current.priority == PrehospitalForm().priority
+        ) mutable.value = mutable.value.copy(prehospital = current.copy(priority = servicePriority))
     }
 
     private val mutable = MutableStateFlow(AmbulanceUiState())
@@ -160,8 +176,9 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         if (readsStatus) api.request("/ambulancia").let { r -> mutable.value = mutable.value.copy(status = AmbulanceParser.status(r)) }
         val arrivals = AmbulanceParser.arrivals(api.request("/ambulancia/llegada"))
         val chosen = mutable.value.arrivalServiceId
-        // The chosen one while it is still listed; else the first; with nothing listed, the last one shown (its handover stays visible).
-        val id = chosen?.takeIf { c -> arrivals.any { it.serviceId == c } } ?: arrivals.firstOrNull()?.serviceId ?: chosen
+        // D27: the chosen one stays on screen even after it was received and left the list (its handover shows who received
+        // it); the screen never jumps by itself to another service. Without a choice yet, the first of the list.
+        val id = chosen ?: arrivals.firstOrNull()?.serviceId
         mutable.value = mutable.value.copy(arrivals = arrivals, arrivalServiceId = id)
         val view = id?.let { AmbulanceParser.prehospital(api.request("/ambulancia/servicios/$it/prehospital")) }
         mutable.value = mutable.value.copy(loading = false, arrival = view)
@@ -179,7 +196,8 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         live.start(viewModelScope, channels) { signal ->
             when (signal) {
                 is RealtimeSignal.Event -> if (AmbulanceEvents.matches(signal.event)) {
-                    if (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio")) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
+                    // D27: an event only picks the service when none is chosen; it never switches away from the one being read.
+                    if (mutable.value.arrivalServiceId == null && (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio"))) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
                     load()
                 }
                 RealtimeSignal.Resync -> { load(); retryQueued(); resumeHeld(); flushMilestones() }
@@ -268,7 +286,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     var clock: () -> Long = { System.currentTimeMillis() }
     private val holds = mutableMapOf<String, Job>()
 
-    private fun pendingOf(item: QueuedMilestone) = PendingUndo(item.serviceId, "Registrando «${AmbulanceLabels.milestone(item.type)}» a las ${localClock(runCatching { Instant.parse(item.occurredAt) }.getOrDefault(Instant.now()))}…")
+    private fun pendingOf(item: QueuedMilestone) = PendingUndo(item.serviceId, until = item.holdUntil, label = "Registrando «${AmbulanceLabels.milestone(item.type)}» a las ${localClock(runCatching { Instant.parse(item.occurredAt) }.getOrDefault(Instant.now()))}…")
 
     private fun hold(item: QueuedMilestone, wait: Long, notice: String? = null) {
         mutable.value = mutable.value.copy(pendingMilestone = pendingOf(item))
@@ -399,16 +417,19 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     /** A73 / FR-109-12: identidad provisional con búsqueda previa; se vincula al servicio en el siguiente reporte prehospital. */
     fun registerUnidentified(sex: String, estimatedAge: String, description: String) {
         AmbulanceRules.unidentifiedError(sex, estimatedAge, description)?.let { mutable.value = mutable.value.copy(formError = it); return }
-        write(notice = "Paciente provisional registrado. Se vinculará al servicio con el reporte prehospital.") {
+        write {
             val query = "Persona sin identidad"
             val search = api.request("/pacientes/busquedas", "POST", JSONObject().put("query", query)) as JSONObject
             val body = JSONObject().put("givenNames", "").put("surnames", "").put("sex", sex).put("description", description.trim())
                 .put("searchToken", search.getString("token")).put("searchQuery", query)
                 .apply { estimatedAge.toIntOrNull()?.let { put("estimatedAge", it) } }
             val created = api.request("/pacientes/provisionales", "POST", body) as JSONObject
-            val provisional = ProvisionalPatient(created.getString("id"), created.optString("record"))
-            mutable.value = mutable.value.copy(provisional = provisional)
-            userId?.let { drafts.save(it, FormDrafts.PROVISIONAL_PATIENT, JSONObject().put("id", provisional.id).put("record", provisional.record)) }
+            val provisional = ProvisionalPatient.fromCreated(created)
+            // D21: with `linkedServiceId` the record is already linked to the service; never promise a later link.
+            val notice = if (provisional.linked) "Paciente provisional registrado y vinculado al servicio en curso."
+            else "Paciente provisional registrado. Se vinculará al servicio con el reporte prehospital."
+            mutable.value = mutable.value.copy(provisional = provisional, notice = notice)
+            userId?.let { drafts.save(it, FormDrafts.PROVISIONAL_PATIENT, JSONObject().put("id", provisional.id).put("record", provisional.record).apply { provisional.linkedServiceId?.let { s -> put("linkedServiceId", s) } }) }
         }
     }
 
@@ -450,5 +471,5 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         }
     }
 
-    companion object { const val MILESTONE_UNDO_MS = 10_000L }
+    companion object { /** D117: long enough to reach "Deshacer" with gloves on. */ const val MILESTONE_UNDO_MS = 15_000L }
 }

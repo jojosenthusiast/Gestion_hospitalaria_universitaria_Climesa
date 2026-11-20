@@ -198,6 +198,7 @@ private fun RescheduleRequestDialog(appointment: PatientAppointment, state: Pati
         date = state.rescheduleDate, onDate = model::selectRescheduleDate, loading = state.loadingRescheduleSlots, slots = state.rescheduleSlots,
         slot = state.rescheduleSlot, onSlot = model::pickRescheduleSlot, error = state.error, busy = state.saving,
         confirmLabel = stringResource(R.string.rec7_enviar_solicitud), onConfirm = model::reschedule, onDismiss = model::closeReschedule,
+        ownStart = appointment.start,
     )
 }
 

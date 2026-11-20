@@ -22,7 +22,16 @@ data class AccessProfile(
     val staffId: String? = null,
     /** Contexts of each permission (`permissions[].context` of `/auth/me`): `x`, `area`, `relacion`, `propio`... */
     val permissionContexts: Map<String, List<String>> = emptyMap(),
-)
+    /** D129: name and number of the linked record (`patientName`, `patientRecord` of `/auth/me`); null without a link or from an older API. */
+    val patientName: String? = null,
+    val patientRecord: String? = null,
+) {
+    /**
+     * D129: name to greet. An account without a staff record is a patient: its linked record's name wins (the API now sends it
+     * as `name` too); a staff member keeps their own name.
+     */
+    val displayName: String get() = patientName?.takeIf { staffId == null } ?: name.ifBlank { patientName.orEmpty() }
+}
 
 data class AuthenticatedAccount(
     val session: AuthSession,

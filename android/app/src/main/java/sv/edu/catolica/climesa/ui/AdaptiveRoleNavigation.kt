@@ -62,6 +62,9 @@ import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 
+/** D85: the bottom-bar name of a section, for "Volver a Internados" outside the bar. */
+internal fun sectionShortLabel(section: AndroidSection): String = compactLabel(section)
+
 private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.QUEUE -> "Fila"
     AndroidSection.PATIENTS -> "Pacientes"
@@ -86,6 +89,9 @@ private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.UNIT -> "Unidad"
     AndroidSection.PREHOSPITAL_REPORT -> "Reporte"
     AndroidSection.UNIDENTIFIED_PATIENT -> "Paciente"
+    // D132: one short word survives the largest font size in the bar.
+    AndroidSection.SHIFTS -> "Turnos"
+    AndroidSection.LOG -> "Bitácora"
     else -> section.label
 }
 
@@ -182,7 +188,9 @@ private fun CompactRoleScaffold(
         topBar = topBar,
         snackbarHost = snackbarHost,
         bottomBar = {
-            if (showNavigation) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
+            // D79/D101: while the keyboard is open the bottom bar steps aside, so a form never has the bar (and a blank gap)
+            // between its last field and the keyboard. Only the bar slot changes; the screen keeps its state.
+            if (showNavigation && !imeVisible()) NavigationBar(containerColor = MaterialTheme.colorScheme.surface, tonalElevation = 0.dp) {
                 navigation.primary.forEach { section ->
                     NavigationBarItem(
                         selected = selected == section,

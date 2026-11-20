@@ -56,11 +56,15 @@ internal enum class StatusFamily(val label: String, val icon: StatusIcon, val pa
             // web `familyOfValue` and iOS `StatusFamily.byValue`.
             listOf(
                 "en_espera", "solicitada", "pendiente", "pendiente_cama", "borrador", "publicado", "reservada", "provisional",
-                "confirmada", "reprogramada",
+                "reprogramada",
             ).forEach { put(it, ESPERA) }
+            // D124: a confirmed appointment is settled (check), not pending like a request (striped clock).
+            put("confirmada", LISTO)
             // Only a called number uses the megaphone; work in progress (`en_proceso`) is in attention, like the web.
             put("llamado", LLAMADO)
-            listOf("en_atencion", "en_proceso", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "limpieza", "requiere_atencion").forEach { put(it, ATENCION) }
+            listOf("en_atencion", "en_proceso", "en_curso", "ocupada", "hospitalizado", "en_servicio", "abierta", "requiere_atencion").forEach { put(it, ATENCION) }
+            // D96: a bed being cleaned waits (clock), it is not in use like an occupied one (pulse).
+            put("limpieza", ESPERA)
             listOf("atendida", "atendido", "ok", "completado", "firmada", "alta_firmada", "egresado", "libre", "disponible", "activo", "exito", "normal", "aprobada").forEach { put(it, LISTO) }
             listOf(
                 "cancelado", "cancelada", "no_asistio", "no_se_presento", "cerrado", "rechazada", "vencida", "bloqueada",

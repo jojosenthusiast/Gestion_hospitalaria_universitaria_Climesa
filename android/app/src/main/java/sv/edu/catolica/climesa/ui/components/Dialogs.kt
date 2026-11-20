@@ -1,5 +1,6 @@
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
@@ -57,17 +58,23 @@ internal fun ConfirmDialog(
         containerColor = MaterialTheme.colorScheme.surface,
         title = { Text(title, style = MaterialTheme.typography.titleLarge) },
         text = if (message != null || body != null || shownError != null) ({
-            androidx.compose.foundation.layout.Column(verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
+            // D101: the body scrolls inside the dialog, so the keyboard (the dialog window resizes for it) never pushes the
+            // confirm button out of reach; a focused field scrolls itself into view.
+            androidx.compose.foundation.layout.Column(
+                androidx.compose.ui.Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(Spacing.sm + Spacing.xs),
+            ) {
                 message?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 body?.invoke()
                 shownError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             }
         }) else null,
         confirmButton = {
-            TextButton(
+            // D87: the action is a filled button (red when destructive), never a text link that looks like "Cancelar".
+            androidx.compose.material3.Button(
                 onClick = { if (onDone != null) submission.confirm(); onConfirm() },
                 enabled = confirmEnabled && !busy,
-                colors = if (destructive) ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error) else ButtonDefaults.textButtonColors(),
+                colors = if (destructive) ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error, contentColor = MaterialTheme.colorScheme.onError) else ButtonDefaults.buttonColors(),
             ) { Text(if (busy) stringResource(R.string.ui_un_momento) else confirmLabel, style = MaterialTheme.typography.labelLarge) }
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) } },

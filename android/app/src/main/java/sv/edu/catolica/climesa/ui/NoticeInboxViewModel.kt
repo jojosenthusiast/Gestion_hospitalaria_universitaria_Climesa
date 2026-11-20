@@ -37,6 +37,8 @@ data class NoticeInboxState(
     val busyId: String? = null,
     val actionError: String? = null,
     val done: String? = null,
+    /** D68: the confirmation of an action taken on the Inicio banner, shown there and not later in Avisos. */
+    val bannerDone: String? = null,
     val hidden: Set<String> = emptySet(),
     val filter: NoticeFilter = NoticeFilter.ALL,
     val selectedId: String? = null,
@@ -76,21 +78,25 @@ class NoticeInboxViewModel @Inject constructor(private val api: ApiGateway, real
 
     fun setFilter(filter: NoticeFilter) { mutable.value = mutable.value.copy(filter = filter, selectedId = null) }
     fun select(id: String?) { mutable.value = mutable.value.copy(selectedId = id, actionError = null, done = null) }
-    fun clearMessages() { mutable.value = mutable.value.copy(actionError = null, done = null) }
+    fun clearMessages() { mutable.value = mutable.value.copy(actionError = null, done = null, bannerDone = null) }
 
     fun visible(): List<InboxNotice> = NoticeInboxRules.filter(mutable.value.inbox?.notices.orEmpty(), mutable.value.filter)
     fun banner(): List<InboxNotice> = NoticeInboxRules.banner(mutable.value.inbox, mutable.value.hidden)
 
-    fun acknowledge(id: String) = send(id, NoticeInboxRules.acknowledgePath(id), "Listo: diste «Enterado».")
-    fun snooze(id: String) = send(id, NoticeInboxRules.snoozePath(id), "Te lo recordamos más tarde.")
+    fun acknowledge(id: String, fromBanner: Boolean = false) = send(id, NoticeInboxRules.acknowledgePath(id), "Listo: diste «Enterado».", fromBanner)
+    fun snooze(id: String, fromBanner: Boolean = false) =
+        send(id, NoticeInboxRules.snoozePath(id), NoticeInboxRules.snoozedText(mutable.value.inbox?.reminderHours ?: 4.0), fromBanner)
 
-    private fun send(id: String, path: String, done: String) {
+    private fun send(id: String, path: String, done: String, fromBanner: Boolean) {
         if (mutable.value.busyId != null) return
-        mutable.value = mutable.value.copy(busyId = id, actionError = null, done = null)
+        mutable.value = mutable.value.copy(busyId = id, actionError = null, done = null, bannerDone = null)
         viewModelScope.launch {
             try {
                 api.request(path, "POST", JSONObject())
-                mutable.value = mutable.value.copy(busyId = null, hidden = mutable.value.hidden + id, done = done)
+                mutable.value = mutable.value.copy(
+                    busyId = null, hidden = mutable.value.hidden + id,
+                    done = done.takeUnless { fromBanner }, bannerDone = done.takeIf { fromBanner },
+                )
             } catch (e: CancellationException) { throw e } catch (e: Exception) {
                 mutable.value = mutable.value.copy(busyId = null, actionError = noticeActionMessage(e))
             }

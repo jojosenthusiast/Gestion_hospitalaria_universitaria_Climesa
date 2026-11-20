@@ -130,6 +130,8 @@ data class HospitalizationState(
     val notice: String? = null,
     /** G3: "Ingresos indicados", each with the first suggested bed; one tap admits there. */
     val tray: List<IndicatedAdmission> = emptyList(),
+    /** D86: alerts of the latest signs per admission id; missing while unread or when the read failed. */
+    val signAlerts: Map<String, List<sv.edu.catolica.climesa.domain.VitalAlert>> = emptyMap(),
 )
 
 /** G3: one indicated admission of the tray; [error] stays on its row (a failed read is never shown as "no beds"). */
@@ -152,9 +154,23 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
         if (!silent) mutable.value = mutable.value.copy(loading = true, error = null)
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
-            try { val admissions = AdmissionParser.admissions(api.request("/admisiones")); mutable.value = mutable.value.copy(loading = false, admissions = admissions); syncTray(admissions) }
+            try { val admissions = AdmissionParser.admissions(api.request("/admisiones")); mutable.value = mutable.value.copy(loading = false, admissions = admissions); syncTray(admissions); readSigns(admissions) }
             catch (e: CancellationException) { throw e }
             catch (e: Exception) { if (!silent) mutable.value = mutable.value.copy(loading = false, error = readable(e, "No se pudieron cargar las admisiones.")) }
+        }
+    }
+
+    /**
+     * D86: the latest signs of each patient in a bed, so the card shows a critical value just recorded and the discharge
+     * warns about it. Best effort: a failed read leaves that card as it was.
+     */
+    private fun readSigns(admissions: List<HospitalAdmission>) {
+        admissions.filter(HospitalizationRules::watchesSigns).forEach { row ->
+            viewModelScope.launch {
+                val alerts = try { sv.edu.catolica.climesa.domain.VitalsParser.history(api.request("/pacientes/${row.patientId}/signos?limit=5"))?.alerts() }
+                catch (e: CancellationException) { throw e } catch (e: Exception) { null }
+                if (alerts != null) mutable.update { it.copy(signAlerts = it.signAlerts + (row.id to alerts)) }
+            }
         }
     }
 
@@ -430,7 +446,7 @@ fun HospitalizationScreen(
             else -> {
                 if (state.loading) item { RefreshHint() }
                 state.error?.let { error -> item { NoticeBanner(NoticeKind.ERROR, error) } }
-                foldedItems(ordered, HospitalizationRules.WARD_VISIBLE, wardOpen, { wardOpen = !wardOpen }, foldKey = "planta-fold", key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals) }
+                foldedItems(ordered, HospitalizationRules.WARD_VISIBLE, wardOpen, { wardOpen = !wardOpen }, foldKey = "planta-fold", key = { it.id }) { row -> AdmissionCard(row, state.busy, model, primary = row.id == primaryRow, onOpenVitals, state.signAlerts[row.id]) }
             }
         }
     }
@@ -467,7 +483,7 @@ private fun IndicatedTray(rows: List<IndicatedAdmission>, model: Hospitalization
 
 /** Every button comes from the server's `allowedActions`; the main action of the state is the only primary button. */
 @Composable
-private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel, primary: Boolean, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)?) {
+private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: HospitalizationViewModel, primary: Boolean, onOpenVitals: ((sv.edu.catolica.climesa.domain.QuickSubject) -> Unit)?, signAlerts: List<sv.edu.catolica.climesa.domain.VitalAlert>? = null) {
     val actions = row.allowedActions
     val main = HospitalizationRules.primaryAction(actions)?.takeIf { primary }
     @Composable fun act(action: AdmissionAction, text: String, onClick: () -> Unit, icon: androidx.compose.ui.graphics.vector.ImageVector? = null) {
@@ -480,6 +496,8 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             if (row.isolation) FamilyBadge(stringResource(R.string.clin_hosp_aislamiento), null)
         }
         row.attendingDoctorName?.let { LabeledValue(stringResource(R.string.hosp_tratante), it) }
+        // D86: a critical value of the latest signs shows on the card as soon as it is recorded.
+        HospitalizationRules.criticalSignsText(signAlerts.orEmpty())?.let { CriticalPill(stringResource(R.string.hosp_signos_criticos, it)) }
         // Row 20: the request shows to everyone who sees the row, not only to who can sign (iOS `requestHint`).
         row.dischargeRequestedAt?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_alta_solicitada, localTime(it))) }
         HospitalizationRules.waitingDischargeHint(row)?.let { NoticeBanner(if (row.attendingDoctorHasAccount) NoticeKind.INFO else NoticeKind.WARNING, it) }
@@ -521,7 +539,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         busy = state.busy,
         confirmEnabled = suggestion != null,
     ) {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             if (state.loadingSuggestions) Text(stringResource(R.string.clin_hosp_buscando_camas), style = MaterialTheme.typography.bodySmall)
             else if (state.suggestions.isEmpty() && state.formError == null) Text(stringResource(R.string.hosp_sin_camas_compatibles), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -551,23 +569,28 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         onConfirm = { model.signDischarge(admission) },
         onDismiss = model::closeDischarge,
         busy = state.busy,
+        destructive = true,
         confirmEnabled = HospitalizationRules.dischargeError(form.type, form.summary, form.pending, form.voluntaryConsent) == null,
     ) {
-        Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
+            // D86: signing is irreversible; a critical value of the latest signs is said before, not found after.
+            HospitalizationRules.criticalSignsText(state.signAlerts[admission.id].orEmpty())?.let { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.hosp_alta_signos_criticos, it)) }
             admission.dischargeRequestedAt?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.hosp_alta_solicitada, localTime(it))) }
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             Text(stringResource(R.string.hosp_alta_tipo), style = MaterialTheme.typography.labelLarge)
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.take(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) { DischargeType.entries.drop(2).forEach { type -> FilterChip(selected = form.type == type, onClick = { model.onDischargeType(type) }, label = { Text(type.label) }, enabled = !state.busy) } }
-            FormField(stringResource(R.string.hosp_alta_resumen), form.summary, model::onSummary, hint = stringResource(R.string.hosp_alta_resumen_ayuda) + " " + HospitalizationRules.counter(form.summary, HospitalizationRules.SUMMARY_MAX), enabled = !state.busy, singleLine = false)
+            // D88: the length rule shows under the field while typing, so a disabled "Firmar alta" is never a mystery.
+            FormField(stringResource(R.string.hosp_alta_resumen), form.summary, model::onSummary, hint = stringResource(R.string.hosp_alta_resumen_ayuda) + " " + HospitalizationRules.counter(form.summary, HospitalizationRules.SUMMARY_MAX), error = HospitalizationRules.summaryError(form.summary), enabled = !state.busy, singleLine = false)
             if (form.type == DischargeType.VOLUNTARY) Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(form.voluntaryConsent, model::onVoluntaryConsent, enabled = !state.busy); Text(stringResource(R.string.hosp_alta_constancia), style = MaterialTheme.typography.bodySmall) }
             Text(stringResource(R.string.hosp_alta_pendientes), style = MaterialTheme.typography.labelLarge)
             form.pending.forEachIndexed { index, item ->
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         FormField(stringResource(R.string.hosp_alta_pendiente), item.description, { model.onPending(index, item.copy(description = it)) }, enabled = !state.busy)
-                        FormField(stringResource(R.string.hosp_alta_responsable), item.responsible, { model.onPending(index, item.copy(responsible = it)) }, enabled = !state.busy)
+                        ResponsiblePicker(item.responsible, !state.busy) { model.onPending(index, item.copy(responsible = it)) }
+                        if (item.description.isNotBlank() != item.responsible.isNotBlank()) Text(stringResource(R.string.hosp_alta_pendiente_incompleto), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
                     IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(Icons.Default.Close, stringResource(R.string.hosp_alta_quitar)) }
                 }
@@ -575,6 +598,19 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             TextButton(onClick = model::addPending, enabled = !state.busy) { Text(stringResource(R.string.hosp_alta_agregar)) }
         }
     }
+}
+
+/** D89: "Quién responde" is a choice of the usual teams, with «Otro» for a name or team that is not listed. */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable private fun ResponsiblePicker(value: String, enabled: Boolean, onChange: (String) -> Unit) {
+    val options = HospitalizationRules.PENDING_RESPONSIBLES
+    var other by rememberSaveable { mutableStateOf(value.isNotBlank() && value !in options) }
+    Text(stringResource(R.string.hosp_alta_responsable), style = MaterialTheme.typography.labelMedium)
+    androidx.compose.foundation.layout.FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        options.forEach { option -> FilterChip(selected = !other && value == option, onClick = { other = false; onChange(option) }, label = { Text(option) }, enabled = enabled) }
+        FilterChip(selected = other, onClick = { other = true; if (value in options) onChange("") }, label = { Text(stringResource(R.string.hosp_alta_responsable_otro)) }, enabled = enabled)
+    }
+    if (other) FormField(stringResource(R.string.hosp_alta_responsable_otro_campo), value, onChange, enabled = enabled)
 }
 
 /** MA-HOS-03 (partial): the exit shows what the discharge left pending and who answers for it. */
@@ -588,7 +624,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         busy = state.busy,
         confirmEnabled = ChangeReason.error(state.exitReason) == null,
     ) {
-        Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
             admission.discharge?.let { d ->
                 if (d.specialHandling) NoticeBanner(NoticeKind.WARNING, stringResource(R.string.hosp_salida_tramite_especial))
@@ -647,7 +683,7 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         busy = state.busy,
         confirmEnabled = form.bedId != null && HospitalizationRules.reasonError(form.reason) == null,
     ) {
-        Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             when {
@@ -674,11 +710,12 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
         busy = state.busy,
         confirmEnabled = HospitalizationRules.noteError(panel.text) == null,
     ) {
-        Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(Modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(admission.patientName, style = MaterialTheme.typography.titleSmall)
             state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
             panel.saved?.let { NoticeBanner(NoticeKind.SUCCESS, it) }
-            FormField(stringResource(R.string.hosp_nota_nueva), panel.text, model::onNoteText, hint = HospitalizationRules.counter(panel.text, HospitalizationRules.NOTE_MAX), enabled = !state.busy, singleLine = false)
+            // D98: an empty note says why "Guardar nota" is off, right under the field.
+            FormField(stringResource(R.string.hosp_nota_nueva), panel.text, model::onNoteText, hint = if (panel.text.isBlank()) stringResource(R.string.hosp_nota_vacia) else HospitalizationRules.counter(panel.text, HospitalizationRules.NOTE_MAX), enabled = !state.busy, singleLine = false)
             when {
                 panel.loading && panel.notes.isEmpty() -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) { Spinner(size = 20.dp, strokeWidth = 2.dp); Text(stringResource(R.string.ui_cargando_titulo), style = MaterialTheme.typography.bodySmall) }
                 panel.loadError != null -> { NoticeBanner(NoticeKind.ERROR, panel.loadError); TextButton(onClick = model::retryNotes) { Text(stringResource(R.string.ui_reintentar)) } }

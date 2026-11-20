@@ -31,6 +31,8 @@ data class AmbulanceService(
     val allowedActions: List<String>? = null,
     /** Linked patient, sent only to the assigned crew and dispatch; null for everyone else or when no patient is linked. */
     val patient: ServicePatient? = null,
+    /** Municipality of the call (D22: the map needs it to find the right street). */
+    val municipality: String = "",
 ) {
     val canAdvance get() = allowedActions == null || "hito" in allowedActions
     val canUndo get() = allowedActions == null || "deshacer_hito" in allowedActions
@@ -50,7 +52,13 @@ data class AmbulanceRequestRow(
     val requesterName: String = "", val callerName: String = "", val patientRecord: String = "",
 )
 /** Por qué no se puede despachar ahora y qué hacer; la calcula la API (RN-29, RN-30). */
-data class DispatchBlock(val code: String, val message: String, val action: String)
+data class DispatchBlock(
+    val code: String, val message: String, val action: String,
+    /** D135: optional `cause`; `ausencia_registrada` means the shift is published but marked absent, so never ask to publish it. */
+    val cause: String? = null,
+) {
+    val absenceRecorded get() = cause == "ausencia_registrada"
+}
 /** `driverOnDuty` (RN-30): an older API without the key counts as covered, so it never raises a false alarm. */
 data class AmbulanceStatus(val unit: AmbulanceUnit, val activeService: AmbulanceService?, val paramedicOnDuty: Boolean, val pendingRequests: List<AmbulanceRequestRow>, val dispatchBlock: DispatchBlock? = null, val driverOnDuty: Boolean = true, val availableCrew: List<CrewCandidate> = emptyList())
 /** Servicio de la bitácora: sin nombre del paciente, solo su expediente enmascarado. */
@@ -71,12 +79,39 @@ data class Handover(val receivedAt: String, val receivedByName: String)
 data class PrehospitalView(
     val serviceId: String, val active: Boolean, val clinical: Boolean, val reports: List<PrehospitalEntry>,
     val version: Int = 1, val arrived: Boolean = false, val handover: Handover? = null, val allowedActions: List<String> = emptyList(),
+    /** D120: actions the server would refuse now, with its code and reason (S12: say why instead of offering them). */
+    val blockedActions: List<BlockedAction> = emptyList(),
+    val urgent: Boolean = false,
+    /** D120: the reader sees the report only because the reception is open; the read is logged as urgent. */
+    val urgentAccess: Boolean = false,
 ) {
     val canReceive get() = "recibir" in allowedActions
+    /** Why "Marcar recibido" is not offered, from `blockedActions`; null when allowed or when an older API sends none. */
+    val receiveBlockedReason get() = if (canReceive) null else blockedActions.firstOrNull { it.action == "recibir" }?.reason?.takeIf { it.isNotBlank() }
 }
+data class BlockedAction(val action: String, val code: String, val reason: String)
 
 /** MA-AMB-04: a service the hospital receives or waits for (`GET /ambulancia/llegada`), without clinical data. */
-data class ArrivalCandidate(val serviceId: String, val dispatchedAt: String, val active: Boolean, val arrived: Boolean)
+data class ArrivalCandidate(
+    val serviceId: String, val dispatchedAt: String, val active: Boolean, val arrived: Boolean,
+    /** Optional in `/ambulancia/llegada` (D25/D26): triage priority and whether the crew already sent the report. */
+    val priority: String? = null, val hasPrehospital: Boolean = false,
+    /** D120/D26: always true in the new API (an ambulance is urgent); `state` is the last milestone, `despachado` before any. */
+    val urgent: Boolean = false, val state: String? = null,
+)
+
+/** D26: words for the `state` of `/ambulancia/llegada`. */
+object ArrivalStates {
+    fun label(state: String?): String? = when (state) {
+        "despachado" -> "Despachada"
+        "salida" -> "Saliendo hacia la escena"
+        "en_escena" -> "En la escena"
+        "trasladando" -> "En camino al hospital"
+        "en_hospital" -> "En el hospital"
+        "finalizado" -> "Servicio finalizado"
+        else -> null
+    }
+}
 
 /** MA-AMB-05: progress of the service dispatched for the patient's own request (no crew, no location). */
 data class OwnRequestService(val dispatchedAt: String, val milestones: List<AmbulanceMilestone>, val finalState: String?)
@@ -334,7 +369,43 @@ object AmbulanceRules {
         form.etaMinutes.isNotBlank() && form.etaMinutes.toIntOrNull()?.let { it in 0..600 } != true -> "La hora estimada va en minutos, de 0 a 600."
         listOf(form.heartRate, form.systolic, form.diastolic, form.oxygenSaturation, form.glasgow).any { it.isNotBlank() && it.toIntOrNull() == null } -> "Los signos vitales van en números enteros."
         form.temperature.isNotBlank() && form.temperature.replace(',', '.').toDoubleOrNull() == null -> "La temperatura va en grados, por ejemplo 37.5."
-        else -> null
+        else -> signErrors(form).values.firstOrNull()
+    }
+
+    /**
+     * D19/D119: ranges of `VitalSignsDto` in the API (`ambulance.dto.ts`), checked on the phone so each field says what is
+     * wrong next to itself instead of the server answering with a technical field name. Keys are the form field names.
+     */
+    private val signRanges = linkedMapOf(
+        "heartRate" to Triple(20.0, 250.0, "La frecuencia cardiaca va de 20 a 250 lpm."),
+        "systolic" to Triple(40.0, 300.0, "La presión sistólica va de 40 a 300 mmHg."),
+        "diastolic" to Triple(20.0, 200.0, "La presión diastólica va de 20 a 200 mmHg."),
+        "oxygenSaturation" to Triple(50.0, 100.0, "La saturación de oxígeno va de 50 a 100 %."),
+        "temperature" to Triple(30.0, 45.0, "La temperatura va de 30 a 45 °C."),
+        "glasgow" to Triple(3.0, 15.0, "La escala de Glasgow va de 3 a 15."),
+    )
+
+    /** Out-of-range vital signs of [form], by field; blank fields are optional and never an error. */
+    fun signErrors(form: PrehospitalForm): Map<String, String> {
+        val values = mapOf(
+            "heartRate" to form.heartRate, "systolic" to form.systolic, "diastolic" to form.diastolic,
+            "oxygenSaturation" to form.oxygenSaturation, "temperature" to form.temperature, "glasgow" to form.glasgow,
+        )
+        return signRanges.mapNotNull { (field, range) ->
+            val raw = values[field].orEmpty().trim()
+            if (raw.isEmpty()) return@mapNotNull null
+            val number = raw.replace(',', '.').toDoubleOrNull()
+            if (number == null || number < range.first || number > range.second) field to range.third else null
+        }.toMap()
+    }
+
+    /** D22: what the map searches: the address plus its municipality and country, unless the address already names them. */
+    fun mapQuery(address: String, municipality: String): String {
+        val parts = mutableListOf(address.trim())
+        val town = municipality.trim()
+        if (town.isNotEmpty() && !address.contains(town, ignoreCase = true)) parts += town
+        if (!address.contains("El Salvador", ignoreCase = true)) parts += "El Salvador"
+        return parts.filter { it.isNotEmpty() }.joinToString(", ")
     }
 
     /** Cuerpo de `POST /ambulancia/servicios/{id}/prehospital`; `capturedAt` es la hora del teléfono (puede enviarse tarde). */
@@ -381,12 +452,13 @@ object AmbulanceParser {
                 strings(s.optJSONArray("finalStates")),
                 s.optJSONArray("allowedActions")?.let(::strings),
                 s.optJSONObject("patient")?.let { p -> ServicePatient(p.text("record"), p.text("fullName")) }?.takeIf { it.record.isNotBlank() },
+                s.text("municipality"),
             )
         }
         val pending = objects(root.optJSONArray("pendingRequests")).map {
             AmbulanceRequestRow(it.text("id"), it.text("channel"), it.text("address"), it.text("municipality"), it.text("reason"), it.text("contactPhone"), it.text("createdAt"), it.optInt("version", 1), it.text("requesterName"), it.text("callerName"), it.text("patientRecord"))
         }
-        val block = root.optJSONObject("dispatchBlock")?.let { DispatchBlock(it.text("code"), it.text("message"), it.text("action")) }
+        val block = root.optJSONObject("dispatchBlock")?.let { DispatchBlock(it.text("code"), it.text("message"), it.text("action"), it.text("cause").ifBlank { null }) }
         val crew = objects(root.optJSONArray("availableCrew")).map { CrewCandidate(it.text("staffId"), it.text("role"), it.text("name"), it.optBoolean("hasAccount")) }
         return AmbulanceStatus(AmbulanceUnit(unit.text("id"), unit.text("plate"), unit.text("state"), unit.optInt("version", 1), unit.text("stateReason"), unit.text("stateSince")), service, root.optBoolean("paramedicOnDuty"), pending, block, root.optBoolean("driverOnDuty", true), crew)
     }
@@ -410,12 +482,14 @@ object AmbulanceParser {
             )
         }
         val handover = root.optJSONObject("handover")?.let { Handover(it.text("receivedAt"), it.text("receivedByName")) }
-        return PrehospitalView(root.text("serviceId"), root.optBoolean("active"), root.optBoolean("clinical"), reports, root.optInt("version", 1), root.optBoolean("arrived"), handover, strings(root.optJSONArray("allowedActions")))
+        return PrehospitalView(root.text("serviceId"), root.optBoolean("active"), root.optBoolean("clinical"), reports, root.optInt("version", 1), root.optBoolean("arrived"), handover, strings(root.optJSONArray("allowedActions")),
+            objects(root.optJSONArray("blockedActions")).map { BlockedAction(it.text("action"), it.text("code"), it.text("reason")) },
+            root.optBoolean("urgent"), root.optBoolean("urgentAccess"))
     }
 
     /** Arrived-but-unreceived services first, then the one on its way (the server's order). */
     fun arrivals(value: Any?): List<ArrivalCandidate> = objects((value as? JSONObject)?.optJSONArray("services")).map {
-        ArrivalCandidate(it.text("serviceId"), it.text("dispatchedAt"), it.optBoolean("active"), it.optBoolean("arrived"))
+        ArrivalCandidate(it.text("serviceId"), it.text("dispatchedAt"), it.optBoolean("active"), it.optBoolean("arrived"), it.text("priority").ifBlank { null }, it.optBoolean("hasPrehospital"), it.optBoolean("urgent"), it.text("state").ifBlank { null })
     }.filter { it.serviceId.isNotBlank() }
 
     fun ownRequests(value: Any?): List<OwnAmbulanceRequest> = objects(value as? JSONArray).map {

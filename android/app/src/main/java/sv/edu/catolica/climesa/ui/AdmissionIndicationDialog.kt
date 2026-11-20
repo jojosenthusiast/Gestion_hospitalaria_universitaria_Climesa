@@ -92,7 +92,7 @@ internal fun AdmissionIndicationDialog(model: AdmissionIndicationViewModel) {
         busy = state.busy,
         confirmEnabled = state.contextError == null,
     ) {
-        Column(Modifier.heightIn(max = 520.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
+        Column(Modifier, verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
             // Locked context: what the consultation already knows is shown, never asked again.
             LabeledValue(stringResource(R.string.ind_paciente), context.patientName.ifBlank { stringResource(R.string.clin_consulta_sin_nombre) })
             Row(horizontalArrangement = Arrangement.spacedBy(Spacing.lg)) {

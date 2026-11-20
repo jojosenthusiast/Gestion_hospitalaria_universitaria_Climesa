@@ -41,6 +41,16 @@ object LabFlow {
         return stepLabels.mapIndexed { index, label -> LabStep(label, when { index < current -> LabStepStatus.DONE; index == current -> LabStepStatus.CURRENT; else -> LabStepStatus.PENDING }) }
     }
 
+    /**
+     * D70: how the step happening now reads in "Paso N de 6: …". It names what is awaited ("Revisión del médico"), never the
+     * past participle of the step ("Revisada"), which read as already done.
+     */
+    fun currentLabel(index: Int): String = when (index) {
+        1 -> "Toma de muestra"
+        4 -> "Revisión del médico"
+        else -> stepLabels.getOrElse(index) { "" }
+    }
+
     fun missingResults(order: LaboratoryOrder) = order.items.count { it.result == null }
 
     /** A lab technician amended a result of the completed order and the doctor has not reviewed it again yet. */

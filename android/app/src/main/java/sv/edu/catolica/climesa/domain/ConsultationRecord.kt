@@ -77,15 +77,24 @@ object ConsultationRecordRules {
         }
 
     /** "2 diagnósticos · 1 medicamento · 3 exámenes": what the signature closes. */
-    fun signSummary(record: ConsultationRecord?): String {
+    fun signSummary(record: ConsultationRecord?): String = signCounts(record).joinToString(" · ") { it.text }
+
+    /** One count of the signature summary; [empty] marks a zero the dialog highlights in amber (D35, owner). */
+    data class SignCount(val text: String, val empty: Boolean)
+
+    /** D35 (owner): signing is never blocked by zero counts, but each zero is flagged so the doctor notices it. */
+    fun signCounts(record: ConsultationRecord?): List<SignCount> {
         val r = record ?: ConsultationRecord("")
         val exams = r.labOrders.filter { it.state != "cancelado" }.sumOf { it.exams.size }
         return listOf(
-            plural(r.diagnoses.size, "diagnóstico", "diagnósticos"),
-            plural(r.medications.size, "medicamento", "medicamentos"),
-            plural(exams, "examen", "exámenes"),
-        ).joinToString(" · ")
+            SignCount(plural(r.diagnoses.size, "diagnóstico", "diagnósticos"), r.diagnoses.isEmpty()),
+            SignCount(plural(r.medications.size, "medicamento", "medicamentos"), r.medications.isEmpty()),
+            SignCount(plural(exams, "examen", "exámenes"), exams == 0),
+        )
     }
+
+    /** D35: the success line says "cita atendida" only when the consultation came from an appointment. */
+    fun signedNotice(fromAppointment: Boolean) = if (fromAppointment) "Consulta firmada y cita marcada como atendida." else "Consulta firmada."
 
     /**
      * Preconditions S7: why «Firmar consulta» is disabled, said under it (same texts as iOS); null when it can be signed.

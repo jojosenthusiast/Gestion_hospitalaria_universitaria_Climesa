@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Auditoría de flujos 2026-11-20 (Android). -->
+    <string name="par_deshacer_segundos">Deshacer (%1$d s)</string>
+    <string name="par_motivo_corto">Indica el motivo, de al menos 5 caracteres.</string>
+    <string name="par_edad_rango">La edad estimada va de 0 a 120 años.</string>
+    <string name="hoja_descartar_titulo">¿Descartar lo escrito?</string>
+    <string name="hoja_descartar_detalle">Si cierras ahora se pierde lo que escribiste en este formulario.</string>
+    <string name="hoja_descartar">Descartar</string>
+    <string name="hoja_seguir">Seguir editando</string>
+    <string name="amb_sin_ambulancias">No hay ambulancias en camino ni por recibir.</string>
+    <string name="amb_elige_servicio">Elige arriba el servicio que vas a recibir.</string>
+    <string name="amb_prioridad_grande">Prioridad %1$s</string>
+    <string name="amb_estado_llego">Ya está en el hospital</string>
+    <string name="amb_estado_en_camino">En camino</string>
+    <string name="amb_llega_aprox">llega aprox. %1$s</string>
+    <string name="amb_recibir_servicio">Servicio despachado el %1$s.</string>
+    <string name="consulta_firmar_detalle_sin_cita">Primero se guardan tus notas y después se firma. Una consulta firmada ya no se puede modificar y el número de fila se cierra.</string>
+    <string name="consulta_conteo_cero">Sin registrar</string>
+    <string name="hosp_nota_vacia">Escribe la nota para poder guardarla.</string>
+    <string name="lab_revisar_critico_check">Ya atendí al paciente o avisé del valor crítico.</string>
+    <string name="signos_volver_a">Volver a %1$s</string>
+    <string name="hosp_alta_pendiente_incompleto">Completa la descripción y quién responde, o quita el pendiente.</string>
+    <string name="hosp_alta_responsable_otro">Otro</string>
+    <string name="hosp_alta_responsable_otro_campo">Quién responde (otro)</string>
+    <string name="hosp_alta_signos_criticos">Los últimos signos tienen valores críticos: %1$s. Revísalos antes de firmar el alta.</string>
+    <string name="hosp_signos_criticos">Signos críticos: %1$s</string>
+    <string name="camas_dialogo_cama">Cama %1$s · %2$s</string>
+    <string name="camas_nota_opcional">Nota (opcional)</string>
+    <string name="camas_nota_opcional_ayuda">Puedes dejarla vacía.</string>
+    <string name="camas_verifica_enfermeria">Falta que Enfermería verifique la limpieza.</string>
+    <string name="camas_verifica_otra_persona">Limpiaste esta cama: la verifica otra persona de Enfermería.</string>
+    <string name="fila_servicio_en_espera">%1$s (%2$d en espera)</string>
+    <string name="fila_servicio_sin_espera">Nadie espera en %1$s. Elige otro servicio o espera a que Recepción emita un número.</string>
+    <string name="mis_accesos_rango">%1$s a %2$s</string>
+    <string name="mis_accesos_veces">%1$d accesos seguidos</string>
+</resources>

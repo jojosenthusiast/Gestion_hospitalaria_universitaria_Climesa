@@ -18,7 +18,10 @@ import sv.edu.catolica.climesa.data.NoDraftStore
 import sv.edu.catolica.climesa.data.RequestIntent
 
 /** An action waiting in its undo window: [key] names what it acts on (a ticket, an appointment), [label] is what the row says. */
-data class PendingUndo(val key: String, val label: String)
+data class PendingUndo(val key: String, val label: String, /** Epoch ms when the undo window closes; 0 = no countdown. */ val until: Long = 0L)
+
+/** Whole seconds left in an undo window that closes at [until] (epoch ms), never negative; rounds up so "1 s" is the last. */
+internal fun undoSecondsLeft(until: Long, now: Long): Long = if (until <= now) 0L else (until - now + 999) / 1000
 
 /**
  * A deferred `POST`, stored from the tap until the server confirms it or the person undoes it. [id] is its idempotency

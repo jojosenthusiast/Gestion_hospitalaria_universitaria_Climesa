@@ -2,6 +2,9 @@
 
 package sv.edu.catolica.climesa.ui
 
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,7 +61,9 @@ internal fun ClimesaTopBar(
         navigationIcon = navigationIcon,
         title = {
             Column {
-                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // D67: a long section name ("Resultados por revisar") steps down a size and may wrap instead of being cut.
+                val long = title.length > 18
+                Text(title, style = if (long) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = if (long && subtitle.isNullOrBlank()) 2 else 1, overflow = TextOverflow.Ellipsis)
                 if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .82f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },
@@ -133,15 +138,33 @@ internal fun PortalScaffold(
     )
 }
 
+/** Whether the soft keyboard is open (its bottom inset is not zero). */
+@Composable
+internal fun imeVisible(): Boolean = WindowInsets.ime.getBottom(androidx.compose.ui.platform.LocalDensity.current) > 0
+
 /** Standard page body: a scrolling column with the page gutter and block gap. Use it instead of ad hoc `LazyColumn` paddings. */
 @Composable
-internal fun PageList(modifier: Modifier = Modifier, content: LazyListScope.() -> Unit) {
+internal fun PageList(
+    modifier: Modifier = Modifier,
+    state: androidx.compose.foundation.lazy.LazyListState = androidx.compose.foundation.lazy.rememberLazyListState(),
+    content: LazyListScope.() -> Unit,
+) {
     LazyColumn(
         modifier.fillMaxSize(),
+        state = state,
         contentPadding = PaddingValues(horizontal = Spacing.page, vertical = Spacing.lg - Spacing.xs),
         verticalArrangement = Arrangement.spacedBy(Spacing.block),
         content = content,
     )
+}
+
+/**
+ * D72: a confirmation that appears at the top of a [PageList] is brought into view. A lazy list keeps its first visible row
+ * in place, so a message inserted above it would otherwise stay out of sight while the row it talks about disappears.
+ */
+@Composable
+internal fun ScrollToTopOn(message: String?, state: androidx.compose.foundation.lazy.LazyListState) {
+    androidx.compose.runtime.LaunchedEffect(message) { if (message != null) state.animateScrollToItem(0) }
 }
 
 /** Fills the width with the gutter when a screen is not a list. */

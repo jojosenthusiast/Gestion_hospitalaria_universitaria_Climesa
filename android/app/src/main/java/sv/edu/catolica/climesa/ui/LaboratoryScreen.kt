@@ -119,7 +119,9 @@ fun LaboratoryScreen(
     }
     LaunchedEffect(profile.channels) { model.startLive(profile.channels) }
     val retry = { model.clearMessages(); model.load() }
-    PageList(modifier) {
+    val listState = androidx.compose.foundation.lazy.rememberLazyListState()
+    ScrollToTopOn(state.notice, listState)
+    PageList(modifier, listState) {
         state.notice?.let { notice -> item { NoticeBanner(NoticeKind.SUCCESS, notice) } }
         // RN-25 / R3 A-29: critical values stay first in the inbox (with their critical pill); the portal keeps the one
         // persistent notice, so no second red banner here.
@@ -238,10 +240,9 @@ private fun FollowUpInbox(items: List<LabFollowUp>, busy: String?, busyOrders: S
         val first = rows.firstOrNull { it.canRelease }?.orderId
         rows.forEach { row ->
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    Text(row.patientName, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                    if (row.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ESPERA)
-                }
+                // D69: the state pill goes above the name, so the full name keeps the whole width and is never cut.
+                if (row.critical) CriticalPill(stringResource(R.string.lab_critico)) else FamilyBadge(stringResource(R.string.lab_pendiente_observacion), StatusFamily.ESPERA)
+                Text(row.patientName, style = MaterialTheme.typography.titleSmall)
                 row.record?.let { Text(stringResource(R.string.lab_expediente, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 row.keyValues.take(3).forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
                 if (row.keyValues.isEmpty()) row.details.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
@@ -344,12 +345,20 @@ private fun ReviewOrderDialog(target: LabReviewTarget, state: LaboratoryState, m
         onConfirm = model::release,
         onDismiss = model::dismissReview,
         busy = busy,
+        // D71: with a critical value the release waits for the explicit tick below.
+        confirmEnabled = target.canRelease(state.reviewCriticalAck),
         error = state.error,
         onDone = model::dismissReview,
         body = {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
-                target.lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
-                if (target.critical) Text(stringResource(R.string.lab_revisar_critico), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                target.lines.forEach { line ->
+                    val critical = line in target.criticalLines
+                    Text(line, style = MaterialTheme.typography.bodyMedium, color = if (critical) MaterialTheme.colorScheme.error else androidx.compose.ui.graphics.Color.Unspecified, fontWeight = if (critical) androidx.compose.ui.text.font.FontWeight.SemiBold else null)
+                }
+                if (target.critical) {
+                    Text(stringResource(R.string.lab_revisar_critico), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
+                    CheckRow(stringResource(R.string.lab_revisar_critico_check), state.reviewCriticalAck, !busy, model::setReviewCriticalAck)
+                }
                 // C1: on release the API proposes the follow-up appointment unless the doctor turns it off here.
                 CheckRow(stringResource(R.string.u5_lab_proponer_seguimiento), state.reviewFollowUp, !busy, model::setReviewFollowUp)
                 FormField(stringResource(R.string.u5_lab_nota_paciente), state.reviewNote, model::setReviewNote, singleLine = false, hint = stringResource(R.string.u5_lab_nota_ayuda))
@@ -540,7 +549,7 @@ private fun LabStepper(order: LaboratoryOrder, ownView: Boolean) {
             }
         }
         Text(
-            if (current >= 0) stringResource(R.string.lab_paso_actual, current + 1, steps.size, steps[current].label) else stringResource(R.string.lab_paso_completo),
+            if (current >= 0) stringResource(R.string.lab_paso_actual, current + 1, steps.size, LabFlow.currentLabel(current)) else stringResource(R.string.lab_paso_completo),
             style = MaterialTheme.typography.labelLarge,
         )
         Text(LabFlow.nextStep(order, ownView), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

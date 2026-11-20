@@ -114,7 +114,7 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
     LaunchedEffect(Unit){while(isActive){now=Instant.now();delay(sv.edu.catolica.climesa.domain.HospitalClockText.untilNextSecond(System.currentTimeMillis()))}}
     Column(Modifier.widthIn(max=168.dp).padding(end=8.dp),horizontalAlignment=Alignment.End){
         Text(sv.edu.catolica.climesa.domain.HospitalClockText.time(now),style=MaterialTheme.typography.labelLarge.copy(fontFeatureSettings="tnum"),color=MaterialTheme.colorScheme.onPrimary,maxLines=1)
-        Text(sv.edu.catolica.climesa.domain.HospitalClockText.date(now),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+        Text(sv.edu.catolica.climesa.domain.HospitalClockText.shortDate(now),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onPrimary.copy(alpha=.78f),maxLines=1,overflow=androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 @Composable fun RolePortal(account:AuthenticatedAccount,role:String,dark:Boolean,setDark:(Boolean)->Unit,signingOut:Boolean,logout:()->Unit){
@@ -169,7 +169,8 @@ private val unitStates=mapOf("disponible" to "Disponible","en_servicio" to "En s
         page==AndroidSection.MEDICAL_DAY->ConsultationScreen(account.profile,Modifier.padding(padding),userId=account.session.userId)
         page==AndroidSection.HOSPITAL_INFO->HospitalInfoScreen(Modifier.padding(padding))
         page==AndroidSection.VITAL_SIGNS->VitalSignsScreen(account.profile,Modifier.padding(padding),readOnly=!sv.edu.catolica.climesa.domain.VitalsAccess.canRecord(account.profile.permissions),userId=account.session.userId,subject=inbox.subjectFor(page),onSubjectHandled=handled,
-            onExit=vitalsOrigin?.let{origin->{selectedName=origin;vitalsOrigin=null}})
+            onExit=vitalsOrigin?.let{origin->{selectedName=origin;vitalsOrigin=null}},
+            exitLabel=vitalsOrigin?.let{origin->sections.firstOrNull{it.name==origin}?.let(::sectionShortLabel)})
         page in ambulanceSections||ParamedicRules.handles(page,account.profile.permissions)->AmbulanceScreen(page,account.profile,account.session.userId,Modifier.padding(padding))
         else->PageList(Modifier.padding(padding)){
             if(page==AndroidSection.PROFILE){
@@ -276,12 +277,12 @@ private fun androidx.compose.foundation.lazy.LazyListScope.myShiftDays(shifts:Li
     }
 }
 /** Entrar o salir de mantenimiento; el motivo y el diálogo sobreviven al giro de pantalla. */
-@Composable private fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean,driverOnDuty:Boolean){
+@Composable internal fun MaintenanceControl(model:RoleViewModel,unitState:String,version:Int,paramedicOnDuty:Boolean,driverOnDuty:Boolean,onSaved:()->Unit={}){
     val leaving=unitState=="en_mantenimiento";val blocked=MaintenanceRules.leavingBlocked(unitState,paramedicOnDuty,driverOnDuty)
     val state by model.maintenance.collectAsStateWithLifecycle()
     var open by rememberSaveable{mutableStateOf(false)};var reason by rememberSaveable{mutableStateOf("")}
     val title=stringResource(if(leaving)R.string.mantenimiento_sacar else R.string.mantenimiento_poner)
-    LaunchedEffect(state.saved){if(state.saved){open=false;reason="";model.resetMaintenance()}}
+    LaunchedEffect(state.saved){if(state.saved){open=false;reason="";model.resetMaintenance();onSaved()}}
     Column(verticalArrangement=Arrangement.spacedBy(10.dp)){
         Text(stringResource(R.string.mantenimiento_titulo),style=MaterialTheme.typography.labelSmall,color=MaterialTheme.colorScheme.onSurfaceVariant)
         if(blocked)Text(stringResource(when(MaintenanceRules.missingCrew(paramedicOnDuty,driverOnDuty)){"sin_motorista_de_turno"->R.string.mantenimiento_requiere_motorista;"sin_tripulacion_de_turno"->R.string.mantenimiento_requiere_tripulacion;else->R.string.mantenimiento_requiere_paramedico}),style=MaterialTheme.typography.bodySmall)

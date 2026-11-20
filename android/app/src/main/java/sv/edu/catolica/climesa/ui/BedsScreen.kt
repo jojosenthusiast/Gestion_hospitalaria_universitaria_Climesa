@@ -55,8 +55,10 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
                 if (actionable.isNotEmpty()) {
                     item { Text(stringResource(R.string.camas_por_atender, actionable.size), style = MaterialTheme.typography.titleMedium) }
                     items(actionable, key = { "a-" + it.id }) { bed ->
-                        SectionCard(bed.code, eyebrow = bed.room, action = { OperacionStatusTag(bed.state, label = BedRules.stateLabel(bed.state)) }) {
+                        val (code, label) = BedRules.tag(bed)
+                        SectionCard(bed.code, eyebrow = bed.room, action = { OperacionStatusTag(code, label = label) }) {
                             bed.occupant?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                            VerifyHint(bed)
                             BedRules.availableActions(bed, state.permissions).forEach { action -> SecondaryButton(stringResource(action.labelRes()), { model.select(bed, action) }) }
                         }
                     }
@@ -72,8 +74,14 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
                         SectionCard(floor.level?.let { stringResource(R.string.ing_cama_planta, it) } ?: stringResource(R.string.ing_cama_sin_planta)) {
                             floor.rooms.forEach { room ->
                                 Text(stringResource(R.string.ing_cama_habitacion, room.room, room.beds.size), style = MaterialTheme.typography.titleSmall)
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                                    room.beds.forEach { bed -> BedTile(bed, BedRules.availableActions(bed, state.permissions)) { action -> model.select(bed, action) } }
+                                // D95: the tiles share the whole width in equal columns instead of leaving a gap on the right.
+                                BoxWithConstraints(Modifier.fillMaxWidth()) {
+                                    val gap = Spacing.sm
+                                    val columns = ((maxWidth + gap) / (132.dp + gap)).toInt().coerceAtLeast(2)
+                                    val tile = (maxWidth - gap * (columns - 1)) / columns
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(gap), verticalArrangement = Arrangement.spacedBy(gap), maxItemsInEachRow = columns) {
+                                        room.beds.forEach { bed -> BedTile(bed, BedRules.availableActions(bed, state.permissions), tile) { action -> model.select(bed, action) } }
+                                    }
                                 }
                             }
                         }
@@ -83,8 +91,11 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
         }
     }
     state.pending?.let { pending ->
+        val target = state.beds.firstOrNull { it.id == pending.bedId }
         ConfirmDialog(
             title = stringResource(pending.action.labelRes()),
+            // D91: the dialog names the bed it acts on.
+            message = target?.let { stringResource(R.string.camas_dialogo_cama, it.code, it.room) },
             confirmLabel = stringResource(R.string.camas_confirmar),
             onConfirm = model::confirm,
             onDismiss = model::cancel,
@@ -92,7 +103,8 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
             busy = state.submitting,
             body = {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    FormField(stringResource(R.string.camas_motivo), state.reason, model::onReason, error = state.reasonError, hint = stringResource(R.string.op_camas_motivo_ayuda), enabled = !state.submitting, singleLine = false)
+                    val optional = BedRules.reasonOptional(pending.action)
+                    FormField(stringResource(if (optional) R.string.camas_nota_opcional else R.string.camas_motivo), state.reason, model::onReason, error = state.reasonError, hint = stringResource(if (optional) R.string.camas_nota_opcional_ayuda else R.string.op_camas_motivo_ayuda), enabled = !state.submitting, singleLine = false)
                     state.actionError?.let { NoticeBanner(NoticeKind.ERROR, it) }
                 }
             },
@@ -100,19 +112,27 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
     }
 }
 
+/** D93: who acts next on a cleaned bed: this person (when allowed) or another nurse, since who cleaned it cannot verify it. */
+@Composable
+private fun VerifyHint(bed: Bed) {
+    if (!BedRules.awaitsVerification(bed)) return
+    Text(stringResource(if (bed.cleanedByCurrentUser) R.string.camas_verifica_otra_persona else R.string.camas_verifica_enfermeria), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
 /**
  * One bed of the map, coloured by its state family (the same colours as its status tag) with the code, the state and the
  * occupant. A bed with actions opens them from the tile; the rest is read-only.
  */
 @Composable
-private fun BedTile(bed: Bed, actions: List<BedAction>, onAction: (BedAction) -> Unit) {
-    val family = StatusFamily.resolve(bed.state, OperacionStatus.tone(bed.state))
+private fun BedTile(bed: Bed, actions: List<BedAction>, width: androidx.compose.ui.unit.Dp, onAction: (BedAction) -> Unit) {
+    val (code, label) = BedRules.tag(bed)
+    val family = StatusFamily.resolve(code, OperacionStatus.tone(code))
     val (strong, soft) = family?.let { MaterialTheme.system.status(it) } ?: (MaterialTheme.climesa.line to MaterialTheme.colorScheme.surface)
     var open by remember { mutableStateOf(false) }
     val shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
     Box {
         Column(
-            Modifier.width(148.dp).heightIn(min = Spacing.touch)
+            Modifier.width(width).heightIn(min = Spacing.touch)
                 .background(soft, shape).border(androidx.compose.foundation.BorderStroke(1.dp, strong), shape)
                 .then(if (actions.isEmpty()) Modifier else Modifier.clickable { open = true })
                 .padding(Spacing.sm),
@@ -120,11 +140,13 @@ private fun BedTile(bed: Bed, actions: List<BedAction>, onAction: (BedAction) ->
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Icon(Icons.Default.Bed, null, Modifier.size(18.dp), tint = strong)
-                Text(bed.code, style = MaterialTheme.typography.titleSmall, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                // D94: the full code always shows; a long one wraps instead of being cut.
+                Text(bed.code, style = MaterialTheme.typography.titleSmall, modifier = Modifier.weight(1f))
                 if (actions.isNotEmpty()) Icon(Icons.Default.MoreVert, stringResource(R.string.camas_acciones_de, bed.code), Modifier.size(18.dp))
             }
-            OperacionStatusTag(bed.state, label = BedRules.stateLabel(bed.state))
+            OperacionStatusTag(code, label = label)
             bed.occupant?.let { Text(it, style = MaterialTheme.typography.bodySmall, maxLines = 2, overflow = TextOverflow.Ellipsis) }
+            VerifyHint(bed)
         }
         DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
             actions.forEach { action -> DropdownMenuItem(text = { Text(stringResource(action.labelRes())) }, onClick = { open = false; onAction(action) }) }

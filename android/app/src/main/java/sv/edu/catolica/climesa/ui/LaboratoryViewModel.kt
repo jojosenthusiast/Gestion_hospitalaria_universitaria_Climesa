@@ -45,15 +45,26 @@ internal object LabReviewSummary {
         else -> 3
     }
 
-    fun lines(order: LaboratoryOrder): List<String> = order.items.sortedBy { rank(it.result?.mark) }.map { item ->
+    private fun line(item: sv.edu.catolica.climesa.domain.LaboratoryItem): String {
         val value = item.result?.let { LaboratoryLabels.valueAndMark(it, item.unit) } ?: "Sin resultado"
-        "${item.name}: $value"
+        return "${item.name}: $value"
     }
+
+    fun lines(order: LaboratoryOrder): List<String> = order.items.sortedBy { rank(it.result?.mark) }.map(::line)
     fun critical(order: LaboratoryOrder): Boolean = order.items.any { it.result?.mark?.startsWith("critico") == true }
+
+    /** D71: the lines with a critical value, painted red in the confirmation. */
+    fun criticalLines(order: LaboratoryOrder): Set<String> = order.items.filter { it.result?.mark?.startsWith("critico") == true }.map(::line).toSet()
 }
 
-/** C1: the order a release confirmation summarizes; [lines] are what the patient will read. */
-data class LabReviewTarget(val orderId: String, val patientName: String, val version: Int, val lines: List<String>, val critical: Boolean)
+/**
+ * C1: the order a release confirmation summarizes; [lines] are what the patient will read and [criticalLines] the ones with a
+ * critical value (D71).
+ */
+data class LabReviewTarget(val orderId: String, val patientName: String, val version: Int, val lines: List<String>, val critical: Boolean, val criticalLines: Set<String> = emptySet()) {
+    /** D71: a critical result is released only after the doctor ticks that the patient was attended or warned. */
+    fun canRelease(criticalAcknowledged: Boolean) = !critical || criticalAcknowledged
+}
 
 /** [cancelOrderId] is the order whose cancel dialog is open; the reason lives here so a rotation keeps it. */
 data class LaboratoryState(
@@ -68,7 +79,7 @@ data class LaboratoryState(
     /** C1: a failed inbox read, shown above the inbox (the list itself keeps what it had). */
     val followUpsError: String? = null,
     /** C1: the release confirmation's choices: propose the follow-up appointment (default on) and an optional note for the patient. */
-    val reviewFollowUp: Boolean = true, val reviewNote: String = "",
+    val reviewFollowUp: Boolean = true, val reviewNote: String = "", val reviewCriticalAck: Boolean = false,
     /** S10: dialogs of the external path; their drafts live here so a rotation keeps them. */
     val external: ExternalDraft? = null, val externalLoad: ExternalLoadDraft? = null,
     /** T07c: the values were saved but the file did not upload; the dialog says so until the person closes it. */
@@ -312,22 +323,23 @@ class LaboratoryViewModel @Inject constructor(
     }
 
     /** Opens the confirmation that says what the patient will see; nothing is sent until [review]. */
-    fun openReview(orderId: String) { mutable.value = mutable.value.copy(reviewOrderId = orderId, reviewFollowUp = true, reviewNote = "", error = null, notice = null) }
+    fun openReview(orderId: String) { mutable.value = mutable.value.copy(reviewOrderId = orderId, reviewFollowUp = true, reviewNote = "", reviewCriticalAck = false, error = null, notice = null) }
     fun dismissReview() { val s = mutable.value; if (s.reviewOrderId !in s.busyIds) mutable.value = s.copy(reviewOrderId = null) }
     fun setReviewFollowUp(on: Boolean) { mutable.value = mutable.value.copy(reviewFollowUp = on) }
+    fun setReviewCriticalAck(on: Boolean) { mutable.value = mutable.value.copy(reviewCriticalAck = on) }
     fun setReviewNote(note: String) { mutable.value = mutable.value.copy(reviewNote = note.take(LabInbox.NOTE_MAX)) }
 
     /** C1: what the release confirmation summarizes: the loaded order when there is one, otherwise the inbox row. */
     fun reviewTarget(): LabReviewTarget? {
         val s = mutable.value
         val id = s.reviewOrderId ?: return null
-        s.orders.firstOrNull { it.id == id }?.let { return LabReviewTarget(it.id, it.patientName, it.version, LabReviewSummary.lines(it), LabReviewSummary.critical(it)) }
+        s.orders.firstOrNull { it.id == id }?.let { return LabReviewTarget(it.id, it.patientName, it.version, LabReviewSummary.lines(it), LabReviewSummary.critical(it), LabReviewSummary.criticalLines(it)) }
         val row = LabInbox.rows(s.followUps).firstOrNull { it.orderId == id && it.canRelease } ?: return null
-        return LabReviewTarget(row.orderId, row.patientName, row.orderVersion!!, row.keyValues.ifEmpty { row.details }, row.critical)
+        return LabReviewTarget(row.orderId, row.patientName, row.orderVersion!!, row.keyValues.ifEmpty { row.details }, row.critical, row.criticalValues.toSet())
     }
 
     /** "Revisar y liberar" from the confirmation; the dialog stays open with the error when the API refuses. */
-    fun release() { reviewTarget()?.let(::send) }
+    fun release() { reviewTarget()?.takeIf { it.canRelease(mutable.value.reviewCriticalAck) }?.let(::send) }
 
     fun review(order: LaboratoryOrder) = send(LabReviewTarget(order.id, order.patientName, order.version, LabReviewSummary.lines(order), LabReviewSummary.critical(order)))
 
@@ -335,7 +347,7 @@ class LaboratoryViewModel @Inject constructor(
         val s = mutable.value
         mutate(target.orderId, LabInbox.releasePath(target.orderId), LabInbox.releaseBody(target.version, s.reviewFollowUp, s.reviewNote), { answer -> LabInbox.releasedNotice(target.patientName, answer) }) {
             // The released order leaves "por revisar" at once; the reload that follows brings its new state.
-            it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != target.orderId }, followUps = it.followUps.filterNot { f -> f.orderId == target.orderId }, reviewFollowUp = true, reviewNote = "",
+            it.copy(reviewOrderId = it.reviewOrderId.takeIf { id -> id != target.orderId }, followUps = it.followUps.filterNot { f -> f.orderId == target.orderId }, reviewFollowUp = true, reviewNote = "", reviewCriticalAck = false,
                 orders = it.orders.map { o -> if (o.id == target.orderId) o.copy(reviewed = true, allowedActions = o.allowedActions - LabOrderAction.REVIEW.wire) else o })
         }
     }

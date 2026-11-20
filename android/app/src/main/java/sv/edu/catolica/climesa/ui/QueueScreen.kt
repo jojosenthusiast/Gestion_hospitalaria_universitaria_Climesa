@@ -127,6 +127,8 @@ fun QueueScreen(
         message = { stringResource(R.string.fila_llamar_siguiente_mensaje, QueueLabels.service(it)) },
         onClose = { callNextOpen = false; model.clearMessages() }, onSubmit = { chosen, _ -> model.callNext(chosen, office) { callNextOpen = false } },
         error = state.error,
+        // D99: a service with nobody waiting cannot be called; the dialog says so before the tap.
+        waitingIn = { QueueRules.waitingCount(state.tickets, it) },
         extra = { OfficePicker(state.offices, office, state.busy) { office = it } },
     )
     // B1: the counter is its own screen (no dialog): find the patient, pick service and priority, "Emitir". The number shows
@@ -275,7 +277,7 @@ private fun NextCard(state: QueueState, service: String, canCall: Boolean, prima
             }
             Text(proposal.patientName, style = MaterialTheme.typography.bodyLarge, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(proposal.reasonText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        } else if (status == NextStatus.NONE) Text(stringResource(R.string.fila_nadie_espera), style = MaterialTheme.typography.bodyMedium)
+        } else if (status == NextStatus.NONE) Text(noProposalText(next), style = MaterialTheme.typography.bodyMedium)
         if (canCall) {
             OfficePicker(state.offices, office, busy, onOffice)
             val calling = state.busyKey == QueueViewModel.NEXT
@@ -284,6 +286,11 @@ private fun NextCard(state: QueueState, service: String, canCall: Boolean, prima
         }
     }
 }
+
+/** D74: why nobody is proposed: nobody waits, or those waiting have an appointment with another doctor. */
+@Composable
+internal fun noProposalText(next: sv.edu.catolica.climesa.domain.NextProposal?): String =
+    next?.waitingForOtherDoctor?.let { androidx.compose.ui.res.pluralStringResource(R.plurals.fila_citas_otro_medico, it, it) } ?: stringResource(R.string.fila_nadie_espera)
 
 /** Optional consulting room for the call ("Sin asignar" by default); hidden when there is none to choose. */
 @Composable
@@ -531,7 +538,7 @@ internal fun IssuePanel(state: QueueState, model: QueueViewModel, modifier: Modi
 @Composable
 private fun QueueServiceDialog(
     title: String, confirmLabel: String, initial: String, busy: Boolean, message: @Composable (String) -> String, onClose: () -> Unit, withPriority: Boolean = false,
-    confirmEnabled: Boolean = true, error: String? = null, extra: @Composable () -> Unit = {}, onSubmit: (String, String) -> Unit,
+    confirmEnabled: Boolean = true, error: String? = null, waitingIn: ((String) -> Int)? = null, extra: @Composable () -> Unit = {}, onSubmit: (String, String) -> Unit,
 ) {
     var service by rememberSaveable { mutableStateOf(initial) }
     var priority by rememberSaveable { mutableStateOf("rutina") }
@@ -542,17 +549,18 @@ private fun QueueServiceDialog(
         onDismiss = onClose,
         busy = busy,
         message = message(service),
-        confirmEnabled = confirmEnabled,
+        confirmEnabled = confirmEnabled && (waitingIn == null || waitingIn(service) > 0),
         body = {
             error?.let { NoticeBanner(NoticeKind.ERROR, it) }
-            Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column() {
                 extra()
                 QueueLabels.services.forEach { (value, label) ->
                     Row(Modifier.fillMaxWidth().heightIn(min = Spacing.touch).selectable(selected = service == value, role = Role.RadioButton, onClick = { service = value }), verticalAlignment = Alignment.CenterVertically) {
                         RadioButton(selected = service == value, onClick = null)
-                        Text(label, Modifier.padding(start = Spacing.sm))
+                        Text(waitingIn?.let { stringResource(R.string.fila_servicio_en_espera, label, it(value)) } ?: label, Modifier.padding(start = Spacing.sm))
                     }
                 }
+                if (waitingIn != null && waitingIn(service) == 0) BlockedReason(stringResource(R.string.fila_servicio_sin_espera, QueueLabels.service(service)))
                 if (withPriority) {
                     Text(stringResource(R.string.fila_prioridad), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm))
                     listOf("rutina", "urgente", "emergencia").forEach { value ->

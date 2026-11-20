@@ -67,7 +67,7 @@ internal fun ExternalRecordDialog(patientName: String, state: ExternalRecordStat
         dismissLabel = stringResource(R.string.lab_cancelar_volver),
         busy = draft.busy,
         body = {
-            Column(Modifier.heightIn(max = 420.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Column(Modifier, verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 draft.error?.let { NoticeBanner(NoticeKind.ERROR, it) }
                 FormField(stringResource(R.string.extres_lugar), draft.place, model::setPlace, enabled = !draft.busy, hint = stringResource(R.string.extres_lugar_ayuda))
                 Text(stringResource(R.string.extres_examenes), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)

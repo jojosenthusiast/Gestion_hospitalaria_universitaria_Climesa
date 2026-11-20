@@ -234,7 +234,8 @@ class ConsultationViewModel @Inject constructor(private val api: ApiGateway, rea
                 val signed = api.request("/consultas/${item.consultationId}/firmar", "POST", JSONObject().put("version", nextVersion))
                 item.consultationId?.let(::clearDraft)
                 val handoff = (signed as? JSONObject)?.opt("nextProposal")?.let(QueueRules::parseNext)
-                mutable.value = mutable.value.copy(saving = false, notice = "Consulta firmada y cita marcada como atendida.", handoff = handoff)
+                // D35: only a consultation that came from an appointment marks one as attended.
+                mutable.value = mutable.value.copy(saving = false, notice = sv.edu.catolica.climesa.domain.ConsultationRecordRules.signedNotice(item.appointmentId.isNotBlank()), handoff = handoff)
                 load(silent = true); onDone()
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) { mutable.value = mutable.value.copy(saving = false, error = message(e)) }
