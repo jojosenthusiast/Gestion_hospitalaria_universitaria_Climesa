@@ -102,3 +102,12 @@ Las cantidades de citas y turnos cambian un poco con el día y la hora en que se
 - La auditoría (`plataforma.auditoria`) es de solo inserción y encadenada: los eventos sobre pacientes demo se quedan.
 - Los números de fila ya emitidos no se reutilizan: la numeración de hoy queda con huecos.
 - La vinculación de una cuenta de prueba a una persona demo se deshace (solo la que hizo la semilla); la cuenta no se borra.
+
+## Turno de noche de prueba
+
+`turno-noche.sql` agrega una segunda cuenta de prueba por rol de trabajo (`prueba.noche.rec`, `.enf`, `.med`, `.lab`, `.par` en `@climesa.com`) con turno de 22:00 a 06:00 durante 14 noches. Cada cuenta es copia de la cuenta de prueba de día de su rol y entra con la misma contraseña; el archivo no lleva contraseñas. Es idempotente; tras recargar la demo, vuelve a ejecutarlo:
+
+```sh
+psql "$DEMO_DATABASE_URL" -1 -v ON_ERROR_STOP=1 -f tools/demo/turno-noche.sql
+```
+

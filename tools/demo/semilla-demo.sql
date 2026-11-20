@@ -1929,7 +1929,7 @@ on conflict do nothing;
 insert into publico.aviso (id, titulo, cuerpo, vigencia, publicado_por, prioridad, publico, roles) values
   (pg_temp.did('0090', 5), 'Simulacro de evacuación',
      '[DEMO] Aviso interno para el personal clínico: simulacro de evacuación mañana a las 10:00 a. m.',
-     tstzrange(now() - interval '1 hour', now() + interval '3 days', '[)'), pg_temp.actor('ADM'), 'urgente', false, array['ENF','MED','AST','LAB']),
+     tstzrange(now() - interval '1 hour', now() + interval '3 days', '[)'), pg_temp.actor('ADM'), 'urgente', false, array['ENF','MED','LAB']),
   (pg_temp.did('0090', 6), 'Cierre mensual de inventario',
      '[DEMO] Aviso interno para Administración y Jefatura: el cierre mensual del inventario es el viernes.',
      tstzrange(now() - interval '1 hour', now() + interval '8 days', '[)'), pg_temp.actor('ADM'), 'atencion', false, array['ADM','JOP'])
@@ -1938,7 +1938,7 @@ on conflict do nothing;
 insert into publico.aviso (id, titulo, cuerpo, vigencia, publicado_por, prioridad, publico, roles) values
   (pg_temp.did('0090', 7), 'Corte de agua programado',
      '[DEMO] Aviso público y para el personal de enfermería: corte de agua el sábado de 6:00 a. m. a 12:00 m.; se usan las cisternas.',
-     tstzrange(now() - interval '1 hour', now() + interval '2 days', '[)'), pg_temp.actor('ADM'), 'urgente', true, array['JOP','ENF','AST']),
+     tstzrange(now() - interval '1 hour', now() + interval '2 days', '[)'), pg_temp.actor('ADM'), 'urgente', true, array['JOP','ENF']),
   (pg_temp.did('0090', 8), 'Actualización del sistema esta noche',
      '[DEMO] Aviso crítico interno: el sistema estará en mantenimiento de 11:00 p. m. a 1:00 a. m.; respalda lo pendiente antes.',
      tstzrange(now() - interval '30 minutes', now() + interval '1 day', '[)'), pg_temp.actor('ADM'), 'critico', false, array['ADM','JOP']),
@@ -1953,7 +1953,7 @@ insert into publico.aviso (id, titulo, cuerpo, vigencia, publicado_por, priorida
      tstzrange(now() - interval '1 day', now() + interval '12 days', '[)'), pg_temp.actor('ADM'), 'atencion', true, array['LAB','MED']),
   (pg_temp.did('0090', 12), 'Vacunación de influenza para el personal',
      '[DEMO] Aviso interno para todo el personal clínico y administrativo: vacunación en la sala de espera de 8:00 a. m. a 12:00 m.',
-     tstzrange(now() - interval '3 days', now() + interval '6 days', '[)'), pg_temp.actor('ADM'), 'atencion', false, array['ADM','JOP','REC','AST','ENF','MED','LAB','PAR']),
+     tstzrange(now() - interval '3 days', now() + interval '6 days', '[)'), pg_temp.actor('ADM'), 'atencion', false, array['ADM','JOP','REC','ENF','MED','LAB','PAR']),
   (pg_temp.did('0090', 13), 'Ruta alterna por obras en la Panamericana',
      '[DEMO] Aviso público y para despacho y paramédicos: usar la ruta alterna por la calle principal; la unidad avisa si hay retraso.',
      tstzrange(now() - interval '2 hours', now() + interval '4 days', '[)'), pg_temp.actor('ADM'), 'urgente', true, array['PAR','REC','JOP']),
@@ -2060,7 +2060,7 @@ on conflict do nothing;
 insert into acceso.asignacion_rol (usuario_id, rol_codigo, asignado_por)
 select pg_temp.did('0010', v.n), v.rol, case when v.n >= 16 then (select usuario_id from cuentas where rol = 'ADM') end
 from (values (8, 'PAC'), (9, 'PAC'), (10, 'PAC'), (11, 'PAC'), (12, 'PAC'), (13, 'PAC'), (14, 'PAC'), (15, 'PAC'),
-             (16, 'AST'), (17, 'REC'), (18, 'ENF'), (19, 'MED'), (20, 'LAB'), (21, 'PAR')) v(n, rol)
+             (16, 'ENF'), (17, 'REC'), (18, 'ENF'), (19, 'MED'), (20, 'LAB'), (21, 'PAR')) v(n, rol)
 on conflict do nothing;
 
 -- Las tres cuentas aprobadas ya apuntan a su expediente.
@@ -2093,7 +2093,7 @@ insert into acceso.invitacion (id, usuario_id, correo, nombre_mostrar, rol_codig
 select pg_temp.did('0012', v.n), pg_temp.did('0010', v.u), 'demo.invitado' || v.clave || '@example.test', '[DEMO] ' || v.nombre, v.rol,
        c.usuario_id, v.estado, now() - v.hace, now() - v.hace
 from (values
-  (4, 16, '4', 'Invitación enviada a asistente',     'AST', 'enviada',   interval '3 hours'),
+  (4, 16, '4', 'Invitación enviada a enfermería',    'ENF', 'enviada',   interval '3 hours'),
   (5, 17, '5', 'Invitación enviada a recepción',     'REC', 'enviada',   interval '2 days'),
   (6, 18, '6', 'Invitación expirada de enfermería',  'ENF', 'expirada',  interval '15 days'),
   (7, 19, '7', 'Invitación aceptada de médico',      'MED', 'aceptada',  interval '9 days'),
