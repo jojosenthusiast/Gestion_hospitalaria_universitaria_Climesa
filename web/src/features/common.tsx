@@ -66,6 +66,15 @@ export function WriteError({error,onReload,reloadLabel='Cerrar y recargar'}:{err
  useEffect(()=>{if(error)ref.current?.scrollIntoView?.({block:'center',behavior:'smooth'});},[error]);
  if(!error)return null;
  return <div ref={ref} className="write-error"><WriteErrorBody error={error} onReload={onReload} reloadLabel={reloadLabel}/></div>;}
+/**
+ * Audit S12 (D16): a form-side problem (checked before sending) shows where the person is looking: it scrolls into view
+ * when it appears or changes, like `WriteError`. Put it next to the control it is about, or right above the actions.
+ */
+export function FormProblem({text}:{text:string|null|undefined}){
+ const ref=useRef<HTMLDivElement>(null);
+ useEffect(()=>{if(text)ref.current?.scrollIntoView?.({block:'center',behavior:'smooth'});},[text]);
+ if(!text)return null;
+ return <div ref={ref} className="write-error"><Notice kind="error">{text}</Notice></div>;}
 function WriteErrorBody({error,onReload,reloadLabel}:{error:ApiError;onReload?:()=>void;reloadLabel:string}){
  if(onReload&&isVersionConflict(error))return <div className="conflict-notice"><Notice kind="error">{error.message} Alguien cambió este registro mientras lo tenías abierto; tus cambios no se guardaron.</Notice><button type="button" className="secondary-button" onClick={onReload}><Icon name="retry" size={18}/>{reloadLabel}</button></div>;
  return <Notice kind="error">{isVersionConflict(error)?`${error.message} Conservamos lo que escribiste; cierra y vuelve a abrir el registro para cargar su estado actual.`:error.message}</Notice>;}
