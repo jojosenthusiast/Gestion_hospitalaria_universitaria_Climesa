@@ -53,7 +53,7 @@ describe('Laboratorio · flujo C en pantalla', () => {
   it('muestra la lista agrupada; las liberadas empiezan plegadas y se abren a pedido', async () => {
     montar([order('a', 'Ana En Proceso', 'en_proceso'), order('b', 'Beto Pendiente', 'pendiente'), order('c', 'Carla Liberada', 'completado', { reviewedAt: '2026-11-13T17:00:00Z', items: [item({ value: 13, mark: 'normal', version: 1 })] })]);
     const lista = await screen.findByRole('list', { name: 'Órdenes de laboratorio' });
-    expect(within(lista).getAllByRole('heading').map(h => h.textContent)).toEqual(['En proceso', 'Por tomar muestra', 'Liberadas']);
+    expect(within(lista).getAllByRole('heading').map(h => h.textContent)).toEqual(['En Proceso', 'Por tomar muestra', 'Liberadas']);
     expect(within(lista).queryByText('Carla Liberada')).toBeNull();
     await userEvent.click(within(lista).getByRole('button', { name: 'Mostrar liberadas' }));
     expect(within(lista).getByText('Carla Liberada')).toBeTruthy();

@@ -36,7 +36,7 @@ const allowsExternal = (order: LabOrder, action: ExternalAction) => (order.exter
 const isNumeric = (item: LabItem) => item.resultType ? item.resultType === 'numerico' : !!item.unit;
 
 /** Pasos que recorre una orden, en orden. Cada uno se marca solo con lo que la orden ya registró. */
-export const LAB_STEPS = ['Solicitada', 'Muestra tomada', 'En proceso', 'Completada', 'Revisada por médico', 'Visible al paciente'] as const;
+export const LAB_STEPS = ['Solicitada', 'Muestra tomada', 'En Proceso', 'Completada', 'Revisada por médico', 'Visible al paciente'] as const;
 /** An external order takes no sample here: its second step is the report that comes back. */
 export const labSteps = (order: Pick<LabOrder, 'external'>) => order.external ? LAB_STEPS.map((label, i) => i === 1 ? 'Informe recibido' : label) : [...LAB_STEPS];
 

@@ -6,7 +6,7 @@ export type WorkOrder = {
 };
 
 export type Stage = 'pendiente' | 'en_proceso' | 'por_revisar' | 'liberada' | 'cancelada';
-export const STAGE_LABEL: Record<Stage, string> = { pendiente: 'Pendiente', en_proceso: 'En proceso', por_revisar: 'Por revisar', liberada: 'Liberada', cancelada: 'Cancelada' };
+export const STAGE_LABEL: Record<Stage, string> = { pendiente: 'Pendiente', en_proceso: 'En Proceso', por_revisar: 'Por revisar', liberada: 'Liberada', cancelada: 'Cancelada' };
 /** Un solo tono por etapa; la misma paleta se usa en chips, borde de la fila y filtros. */
 export const STAGE_TONE: Record<Stage, string> = { pendiente: 'warning', en_proceso: 'info', por_revisar: 'review', liberada: 'success', cancelada: 'muted' };
 

@@ -75,7 +75,7 @@ describe('Laboratorio · tarjeta de orden', () => {
     const lista = await screen.findByRole('list', { name: 'Órdenes de laboratorio' });
     await userEvent.click(within(lista).getByRole('button', { name: /Ulises Urgente/ }));
     const detail = await screen.findByRole('complementary', { name: /Detalle de la orden de Ulises Urgente/ });
-    expect(within(detail.querySelector('header')!).getAllByText('En proceso')).toHaveLength(1);
+    expect(within(detail.querySelector('header')!).getAllByText('En Proceso')).toHaveLength(1);
   });
 });
 
