@@ -72,7 +72,7 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
                     }
                     if (day.older && !olderOpen) continue
                     item(key = "dia-${day.date}") { Text(ShortDay.of(day.date, today), style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(top = Spacing.sm)) }
-                    items(day.entries) { entry -> AccessCard(entry) }
+                    items(MyAccessRules.collapse(day.entries)) { group -> AccessCard(group) }
                 }
             }
         }
@@ -80,8 +80,12 @@ class MyAccessViewModel @Inject constructor(private val api: ApiGateway) : ViewM
     }
 }
 
-@Composable private fun AccessCard(entry: AccessEntry) {
-    SectionCard(entry.role, action = { Text(MyAccessRules.time(entry.at), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.primaryText) }) {
-        Text(stringResource(R.string.mis_accesos_detalle, entry.dataKind, entry.reason), style = MaterialTheme.typography.bodySmall)
+@Composable private fun AccessCard(group: sv.edu.catolica.climesa.domain.AccessGroup) {
+    val entry = group.entry
+    // D130: who (name when the API gives it), what and why in plain words, and one row for a burst of the same access.
+    val time = if (group.count > 1) stringResource(R.string.mis_accesos_rango, MyAccessRules.time(group.earliest), MyAccessRules.time(group.latest)) else MyAccessRules.time(entry.at)
+    SectionCard(entry.name?.let { "$it · ${entry.role}" } ?: entry.role, action = { Text(time, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.climesa.primaryText) }) {
+        Text(listOf(MyAccessRules.dataText(entry.dataKind), MyAccessRules.reasonText(entry.reason)).filter { it.isNotBlank() }.joinToString(" "), style = MaterialTheme.typography.bodySmall)
+        if (group.count > 1) Text(stringResource(R.string.mis_accesos_veces, group.count), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
     }
 }

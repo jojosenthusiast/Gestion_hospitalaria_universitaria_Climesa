@@ -108,7 +108,7 @@ class BedsViewModel @Inject constructor(
         mutable.update { it.copy(submitting = true, actionError = null) }
         viewModelScope.launch {
             try {
-                repository.act(bed.id, pending.action, bed.version, current.reason)
+                repository.act(bed.id, pending.action, bed.version, BedRules.reasonToSend(pending.action, current.reason))
                 mutable.update { it.copy(submitting = false, pending = null, reason = "", message = pending.action.successMessage) }
                 reload()
             } catch (e: Exception) {

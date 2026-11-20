@@ -42,7 +42,10 @@ internal object DayChipLabels {
 @Composable
 internal fun DayChips(selected: LocalDate, onSelect: (LocalDate) -> Unit, enabled: Boolean = true, days: List<LocalDate> = DayChipLabels.week()) {
     val shown = if (selected in days) days else listOf(selected) + days
-    LazyRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+    // D126: the chosen day is scrolled fully into view, never left cut at the edge.
+    val list = androidx.compose.foundation.lazy.rememberLazyListState()
+    androidx.compose.runtime.LaunchedEffect(selected) { shown.indexOf(selected).takeIf { it >= 0 }?.let { list.animateScrollToItem(it) } }
+    LazyRow(state = list, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         items(shown, key = { it.toString() }) { day ->
             FilterChip(selected = day == selected, onClick = { onSelect(day) }, enabled = enabled, label = { Text(DayChipLabels.of(day)) })
         }
@@ -79,6 +82,8 @@ internal fun RescheduleSheet(
     confirmLabel: String,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
+    /** D126: start of the appointment being moved; its slot reads «Tu cita», not «Ocupado». */
+    ownStart: String? = null,
 ) {
     val sheet = rememberModalBottomSheetState(skipPartiallyExpanded = true, confirmValueChange = { !busy })
     ModalBottomSheet(onDismissRequest = { if (!busy) onDismiss() }, sheetState = sheet) {
@@ -92,7 +97,7 @@ internal fun RescheduleSheet(
             when {
                 loading -> LoadingState()
                 slots.none { it.selectable } -> Text(stringResource(R.string.cita_sin_franjas), style = MaterialTheme.typography.bodySmall)
-                else -> DaySlotGrid(slots, slot, onSlot)
+                else -> DaySlotGrid(slots, slot, onSlot, ownStart = ownStart)
             }
             error?.let { NoticeBanner(NoticeKind.ERROR, it) }
             PrimaryButton(confirmLabel, onConfirm, enabled = slot?.selectable == true && !busy, loading = busy)

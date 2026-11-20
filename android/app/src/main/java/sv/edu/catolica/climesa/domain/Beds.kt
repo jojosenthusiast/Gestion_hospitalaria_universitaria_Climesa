@@ -112,7 +112,22 @@ object BedRules {
         return ordered.partition { rank(it) < 2 }
     }
 
+    /** D92: finishing a cleaning does not ask for a reason; a blank one is sent as [CLEANING_DONE_REASON]. */
+    fun reasonOptional(action: BedAction) = action == BedAction.COMPLETE_CLEANING
+
+    /** The API still requires a reason of 10 characters to finish a cleaning; this is what a blank one sends. */
+    const val CLEANING_DONE_REASON = "Limpieza terminada; lista para verificar."
+
+    fun reasonToSend(action: BedAction, reason: String): String = if (reasonOptional(action) && reason.isBlank()) CLEANING_DONE_REASON else reason
+
+    /** D93: a cleaned bed waiting for its check (`limpieza` with the cleaning completed); it reads apart from one being cleaned. */
+    fun awaitsVerification(bed: Bed) = bed.state == "limpieza" && bed.cleaningPending && bed.cleaningCompleted
+
+    /** Status code and label of a bed for its tag: a cleaned bed waiting for its check is not "En limpieza" (D93). */
+    fun tag(bed: Bed): Pair<String, String> = if (awaitsVerification(bed)) "completado" to "Limpia, por verificar" else bed.state to stateLabel(bed.state)
+
     fun validateReason(action: BedAction, reason: String): String? = when {
+        reasonOptional(action) && reason.isBlank() -> null
         reason.trim().length < action.minReason -> "Escribe al menos ${action.minReason} caracteres."
         reason.trim().length > MAX_REASON -> "Usa como máximo $MAX_REASON caracteres."
         else -> null

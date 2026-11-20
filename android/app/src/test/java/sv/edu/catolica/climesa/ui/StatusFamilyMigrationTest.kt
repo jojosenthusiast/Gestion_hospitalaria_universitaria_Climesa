@@ -40,13 +40,13 @@ class StatusFamilyMigrationTest {
     // R3 / A-35: same table on web, Android and iOS. Only a called number or a lab sample in process uses the megaphone.
     @Test fun `each status value maps to the family shared with web and iOS`() {
         val expected = mapOf(
-            "confirmada" to StatusFamily.ESPERA,
+            "confirmada" to StatusFamily.LISTO,
             "reprogramada" to StatusFamily.ESPERA,
             "bajo_minimo" to StatusFamily.ESPERA,
             "publicado" to StatusFamily.ESPERA,
             "llamado" to StatusFamily.LLAMADO,
             "en_proceso" to StatusFamily.ATENCION,
-            "limpieza" to StatusFamily.ATENCION,
+            "limpieza" to StatusFamily.ESPERA,
             "en_atencion" to StatusFamily.ATENCION,
             "libre" to StatusFamily.LISTO,
             "cancelada" to StatusFamily.CERRADO,

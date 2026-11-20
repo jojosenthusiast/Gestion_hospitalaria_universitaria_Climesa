@@ -194,8 +194,15 @@ internal fun MyCategoryRequests(requests: List<CategoryRequest>, busy: Boolean, 
     val (pending, resolved) = requests.partition { it.pending }
     SectionCard(stringResource(R.string.cat_mis_solicitudes)) {
         @Composable fun RequestRow(r: CategoryRequest) {
-            Column {
-                DataRow(r.categoryNames, subtitle = listOfNotNull(r.franja.label, r.note).joinToString(" · "), leadingIcon = categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), status = { RequestStateTag(r.state) }, container = false)
+            // D123: the state goes on its own line over the full-width text, so a long state never squeezes the reasons
+            // into a narrow column (same fix as the reception card, D61).
+            Column(Modifier.fillMaxWidth().padding(vertical = Spacing.xs), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                    Icon(categoryIcon(r.categories.firstOrNull()?.icon.orEmpty()), null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    RequestStateTag(r.state)
+                }
+                Text(r.categoryNames, style = MaterialTheme.typography.titleSmall)
+                listOfNotNull(r.franja.label, r.note).joinToString(" · ").takeIf { it.isNotBlank() }?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 r.appointment?.let { Text(stringResource(R.string.cat_asignada_detalle, it.doctorName, formatShort(it.start)), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary) }
                 r.rejectionReason?.takeIf { it.isNotBlank() }?.let { Text(stringResource(R.string.pac_motivo_rechazo, it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 if (r.allows(CategoryRequestRules.CANCEL)) CrudButton(CrudKind.Deactivate, stringResource(R.string.cat_retirar), { confirm = r.id }, enabled = !busy, fill = false)
