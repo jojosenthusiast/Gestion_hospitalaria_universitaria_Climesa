@@ -166,14 +166,14 @@ export const STATUS_FAMILIES: { id: StatusFamilyId; label: string; icon: IconNam
   { id: 'critico', label: 'Crítico', icon: 'alert', pattern: 'doble' },
 ];
 const familyOfValue: Record<string, StatusFamilyId> = {
-  // R1 (shared with iOS and Android): a confirmed or rescheduled appointment waits for its time, and stock below the
+  // R1 (shared with iOS and Android): a rescheduled appointment waits for its time (D124: a confirmed one is settled), and stock below the
   // minimum waits for a restock; none of them is being called.
-  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera', confirmada: 'espera', reprogramada: 'espera', bajo_minimo: 'espera',
+  en_espera: 'espera', solicitada: 'espera', pendiente: 'espera', pendiente_cama: 'espera', borrador: 'espera', publicado: 'espera', reservada: 'espera', provisional: 'espera', por_vencer: 'espera', revisar: 'espera', reprogramada: 'espera', limpieza: 'espera', bajo_minimo: 'espera',
   // R4a (coordinator): only a call is «llamado»; a lab order in process is being worked on (atención).
   llamado: 'llamado',
-  // R1: a bed being cleaned is in use; a metric that asks for attention (metrics.tsx) is an attention state.
-  en_atencion: 'atencion', en_proceso: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion', limpieza: 'atencion', requiere_atencion: 'atencion',
-  atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', normal: 'listo', aprobada: 'listo', ok: 'listo', coincide: 'listo',
+  // D96: a bed being cleaned waits for verification (clock), like Android. A metric that asks for attention (metrics.tsx) is an attention state.
+  en_atencion: 'atencion', en_proceso: 'atencion', en_curso: 'atencion', ocupada: 'atencion', hospitalizado: 'atencion', en_servicio: 'atencion', abierta: 'atencion', requiere_atencion: 'atencion',
+  atendida: 'listo', atendido: 'listo', completado: 'listo', firmada: 'listo', alta_firmada: 'listo', egresado: 'listo', libre: 'listo', disponible: 'listo', activo: 'listo', exito: 'listo', confirmada: 'listo', normal: 'listo', aprobada: 'listo', ok: 'listo', coincide: 'listo',
   cancelado: 'cerrado', cancelada: 'cerrado', no_asistio: 'cerrado', no_se_presento: 'cerrado', cerrado: 'cerrado', rechazada: 'cerrado', vencida: 'cerrado', bloqueada: 'cerrado', inactivo: 'cerrado', desactivado: 'cerrado', denegado: 'cerrado', fallido: 'cerrado', en_mantenimiento: 'cerrado',
   critico_alto: 'critico', critico_bajo: 'critico',
 };

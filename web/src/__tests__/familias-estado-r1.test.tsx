@@ -12,17 +12,17 @@ const badge = (value: string) => {
 };
 
 describe('familias de estado corregidas (R1, WC-9, WC-10, WC-11)', () => {
-  it('confirmada espera su hora: reloj, no megáfono', () => {
-    expect(statusFamily('confirmada')).toBe('espera');
-    expect(badge('confirmada').className).toContain('fam-espera');
+  it('confirmada ya está resuelta (D124): check, no reloj de pendiente', () => {
+    expect(statusFamily('confirmada')).toBe('listo');
+    expect(badge('confirmada').className).toContain('fam-listo');
   });
 
   it('reprogramada espera su nueva hora', () => {
     expect(statusFamily('reprogramada')).toBe('espera');
   });
 
-  it('una cama en limpieza está en uso, no llamada', () => {
-    expect(statusFamily('limpieza')).toBe('atencion');
+  it('una cama en limpieza espera verificación (D96), no está ocupada', () => {
+    expect(statusFamily('limpieza')).toBe('espera');
   });
 
   // Cross-platform mapping (web, iOS, Android): stock below the minimum waits for a restock.
