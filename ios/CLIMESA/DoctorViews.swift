@@ -48,7 +48,8 @@ struct DoctorDayView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
-            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
+            // D68: the banner also stays to confirm «Enterado» or «Recordarme» where they were asked.
+            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty || notices.bannerDone != nil { CriticalNoticeBanner(model: notices) }
             LoadState(loader: loader, retry: load) { day in
                 if day.criticalResults > 0 {
                     Button { go(.resultados) } label: {
@@ -58,7 +59,8 @@ struct DoctorDayView: View {
                 // I-11: no tile grid repeating what each section already says.
                 partErrors(day)
                 // Lote 5 S11: Ahora, the queue, Próximas, Pendientes de firmar and Atendidas hoy, then the earlier days.
-                let today = day.agenda?.value.map { DoctorDaySections.split($0, now: Date()) }
+                // D76: a patient already called or in attention in this office shows once, in the queue card.
+                let today = day.agenda?.value.map { DoctorDaySections.split(DoctorDaySections.withoutCalled($0, tickets: day.tickets?.value ?? []), now: Date()) }
                 if let today, !today.now.isEmpty { agendaBlock(L.text("day.section.now"), today.now) }
                 if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
                 if let today { upcomingSection(today.upcoming, nothingToday: today.now.isEmpty && today.done.isEmpty) }
@@ -265,6 +267,9 @@ struct DoctorDayView: View {
                 }
                 Text(verbatim: proposal.patientName ?? "").font(Typo.body).foregroundStyle(Theme.ink)
                 Text(verbatim: proposal.reasonText).font(Typo.small).foregroundStyle(Theme.muted)
+            } else if let text = next.noProposalText {
+                // D74: people wait, but with another doctor's appointment; "Nadie espera" would be false.
+                Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
             }
@@ -473,7 +478,8 @@ struct DoctorDayView: View {
             if profile.hasPermission("admision.ver") {
                 day.hospitalized = try await Part<Int>.load {
                     let admissions = try await api.get("/admisiones", as: [Admission].self)
-                    return DischargeRules.current(admissions).count
+                    // D84: the same stays «Mis hospitalizados» lists (signed discharges still in the bed included).
+                    return DischargeRules.listed(admissions).count
                 }
             }
             return day
@@ -773,12 +779,11 @@ private struct LabFollowUpInbox: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { Divider().overlay(Theme.line) }
                 VStack(alignment: .leading, spacing: Spacing.s) {
-                    HStack(spacing: Spacing.s) {
-                        Text(verbatim: item.patientName ?? L.text("results.followUp.patient")).font(Typo.label).foregroundStyle(Theme.ink)
-                        Spacer()
-                        // A relevant observation is not a process state: neutral tag; red only for the critical value.
-                        PatientTag(item.critical ? "critico_alto" : "observacion", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
-                    }
+                    // A relevant observation is not a process state: neutral tag; red only for the critical value.
+                    // D69: the tag goes above the name, so the full name keeps the whole width and is never cut.
+                    PatientTag(item.critical ? "critico_alto" : "observacion", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
+                    Text(verbatim: item.patientName ?? L.text("results.followUp.patient")).font(Typo.label).foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let record = item.patientRecord { Text(verbatim: String(format: L.text("results.followUp.record"), record)).font(Typo.small).foregroundStyle(Theme.muted) }
                     Text(verbatim: item.detail).font(Typo.small).foregroundStyle(Theme.ink)
                     if let order = orders.first(where: { $0.id == item.orderId }) {
@@ -945,12 +950,31 @@ private struct ReleaseResultsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var followUp = true
     @State private var note = ""
+    /// D71: a critical result is released only after this explicit tick.
+    @State private var criticalAcknowledged = false
 
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "results.release.confirm", onClose: { dismiss() }) {
                 if ReviewRules.isCritical(order) { MedicoAlert(text: L.text("results.critical.notice")) }
                 Text(verbatim: ReleaseRules.summary(order)).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                if ReviewRules.isCritical(order) {
+                    // D71: the critical values in red, then the tick the dialog asks for.
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        ForEach(ReleaseRules.criticalLines(order), id: \.self) { line in
+                            Label { Text(verbatim: line).fixedSize(horizontal: false, vertical: true) } icon: { ClimesaIcon(.alert, size: 14) }
+                                .font(Typo.label).foregroundStyle(Theme.danger)
+                        }
+                    }
+                    SectionCard {
+                        Toggle(isOn: $criticalAcknowledged) {
+                            Text(verbatim: ReleaseRules.criticalAcknowledgement).font(Typo.label).foregroundStyle(Theme.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .tint(Theme.primary)
+                        .frame(minHeight: Spacing.control)
+                    }
+                }
                 SectionCard {
                     Toggle(isOn: $followUp) {
                         VStack(alignment: .leading, spacing: Spacing.xs) {
@@ -966,7 +990,9 @@ private struct ReleaseResultsSheet: View {
                     CharacterCounter(count: note.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 0...ReleaseRules.noteMaximum)
                 }
                 SubmissionNotice(submission: submission)
-                ClimesaButton(title: L.text("results.release"), loading: submission.busy) {
+                // D71 / S12: a disabled release says why under the button.
+                ClimesaButton(title: L.text("results.release"), loading: submission.busy,
+                              blockedReason: ReleaseRules.canRelease(order, acknowledged: criticalAcknowledged) ? nil : ReleaseRules.criticalBlocked) {
                     Task { if await release(followUp, note) { dismiss() } }
                 }
                 .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).count > ReleaseRules.noteMaximum)
@@ -1153,6 +1179,45 @@ private struct PendingLine: Identifiable {
     var responsible = ""
 }
 
+/// D89 · «Quién responde»: the usual teams in a menu, and «Otro» opens a text field for a name or team not listed.
+private struct ResponsibleField: View {
+    @Binding var responsible: String
+    @State private var other = false
+    private let options = DischargeRules.pendingResponsibles
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Text(verbatim: L.text("discharge.pending.responsible")).font(Typo.label).foregroundStyle(Theme.ink)
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button(option) { other = false; responsible = option }
+                }
+                Button(DischargeRules.otherResponsible) {
+                    other = true
+                    if options.contains(responsible) { responsible = "" }
+                }
+            } label: {
+                HStack(spacing: Spacing.s) {
+                    Text(verbatim: shown).font(Typo.body).foregroundStyle(responsible.isEmpty && !other ? Theme.muted : Theme.ink)
+                    Spacer(minLength: Spacing.s)
+                    Image(systemName: "chevron.up.chevron.down").font(Typo.small).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                }
+                .padding(.horizontal, Spacing.m).frame(maxWidth: .infinity, minHeight: Spacing.control)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(Theme.controlLine, lineWidth: 1))
+                .contentShape(Rectangle())
+            }
+            if other { FormField(label: DischargeRules.otherResponsibleField, text: $responsible) }
+        }
+        .onAppear { other = !responsible.isEmpty && !options.contains(responsible) }
+    }
+
+    private var shown: String {
+        if other { return DischargeRules.otherResponsible }
+        return responsible.isEmpty ? DischargeRules.pickResponsible : responsible
+    }
+}
+
 private struct DischargeView: View {
     let admission: Admission
     let reload: () async -> Void
@@ -1190,7 +1255,9 @@ private struct DischargeView: View {
                     FieldError(text: submission.fieldErrors["type"])
                 }
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    MedicoTextArea(label: L.text("discharge.summary"), text: $summary, error: errors["summary"] ?? submission.fieldErrors["summary"])
+                    // D88: the length rule shows under the field while typing, never only after the tap.
+                    MedicoTextArea(label: L.text("discharge.summary"), text: $summary,
+                                   error: DischargeRules.summaryError(summary) ?? errors["summary"] ?? submission.fieldErrors["summary"])
                     CharacterCounter(count: summary.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 10...2000)
                 }
                 if type == .voluntaria {
@@ -1205,7 +1272,9 @@ private struct DischargeView: View {
                     HStack(alignment: .top, spacing: Spacing.s) {
                         VStack(alignment: .leading, spacing: Spacing.m) {
                             FormField(label: L.text("discharge.pending.description"), text: $line.description)
-                            FormField(label: L.text("discharge.pending.responsible"), text: $line.responsible)
+                            // D89: a choice of the usual teams, with «Otro» for anyone not listed.
+                            ResponsibleField(responsible: $line.responsible)
+                            FieldError(text: DischargeRules.pendingLineError(description: line.description, responsible: line.responsible))
                         }
                         Button {
                             let id = line.id
@@ -1231,7 +1300,8 @@ private struct DischargeView: View {
                 if errors.isEmpty { confirming = true }
             }
             .confirmationDialog(L.text("discharge.sign.confirm"), isPresented: $confirming, titleVisibility: .visible) {
-                Button(L.text("discharge.sign")) { Task { await sign() } }
+                // D87: the signature cannot be undone by this screen, so it reads apart from «Cancelar».
+                Button(L.text("discharge.sign"), role: .destructive) { Task { await sign() } }
             } message: {
                 // §4.7: who, what type, the pending items and the summary, before the signature.
                 Text(verbatim: DischargeConfirmRules.signRecap(patient: admission.patientName, type: type, pendingCount: lines.count, summary: summary))

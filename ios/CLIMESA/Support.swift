@@ -296,6 +296,18 @@ extension View {
             }
     }
 
+    /// D79 / D101: keeps `visible` in step with the software keyboard, from the system notifications (no timer, no
+    /// Combine). A screen with a docked action bar uses it to move the actions into the form while the keyboard is up.
+    func trackingKeyboard(_ visible: Binding<Bool>) -> some View {
+        self
+            .task {
+                for await _ in NotificationCenter.default.notifications(named: UIResponder.keyboardWillShowNotification) { visible.wrappedValue = true }
+            }
+            .task {
+                for await _ in NotificationCenter.default.notifications(named: UIResponder.keyboardWillHideNotification) { visible.wrappedValue = false }
+            }
+    }
+
     /// Barra de navegación azul marino con texto claro: pestañas, detalles empujados y hojas (I-6).
     func climesaNavBar() -> some View {
         toolbarBackground(Theme.navy, for: .navigationBar)

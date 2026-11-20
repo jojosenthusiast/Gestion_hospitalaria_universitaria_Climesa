@@ -133,6 +133,9 @@ struct ConsultationView: View {
     @State private var askingUnsigned = false
     /// «Reanudarla» switched this screen to that consultation.
     @State private var resumedOther: UnsignedConsultation?
+    /// D79 (owner): while the keyboard is up the actions are the last thing of the form, never a bar floating over the
+    /// keyboard or covering the field being typed.
+    @State private var keyboardShown = false
 
     init(origin: ConsultationOrigin, profile: AccessProfile) {
         self.origin = origin
@@ -172,7 +175,7 @@ struct ConsultationView: View {
             .climesaNavBar()
             .toolbar { ToolbarItem(placement: .topBarTrailing) { LiveClock() } }
             .safeAreaInset(edge: .bottom, spacing: 0) {
-                if editableNow, let value = detail.value { actionBar(value) }
+                if editableNow, !keyboardShown, let value = detail.value { actionBar(value) }
             }
             .onChange(of: scrollTarget) { _, target in
                 guard let target else { return }
@@ -181,6 +184,17 @@ struct ConsultationView: View {
                 Task { @MainActor in
                     try? await Task.sleep(nanoseconds: 150_000_000)
                     withAnimation(.easeOut(duration: 0.25)) { proxy.scrollTo(target, anchor: .top) }
+                }
+            }
+        }
+        .trackingKeyboard($keyboardShown)
+        // S13 / D35: signing asks first; each zero count stands out in amber, but nothing blocks the signature.
+        .sheet(isPresented: $confirmingSign) {
+            if let value = detail.value {
+                SignConfirmSheet(counts: signCounts(value),
+                                 effect: ConsultationRecordRules.signEffect(notesPending: notesPending, unsentWork: unsentWork)) {
+                    confirmingSign = false
+                    Task { await sign(value) }
                 }
             }
         }
@@ -219,6 +233,8 @@ struct ConsultationView: View {
             LoadState(loader: detail, retry: loadDetail) { value in
                 editor(value)
             }
+            // D79: with the keyboard up the bar leaves the bottom edge and closes the form instead.
+            if editableNow, keyboardShown, let value = detail.value { actionBar(value) }
         }
     }
 
@@ -271,12 +287,13 @@ struct ConsultationView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.surface)
         .overlay(alignment: .top) { Rectangle().fill(Theme.line).frame(height: 1) }
-        .confirmationDialog(L.text("consultation.sign.confirm"), isPresented: $confirmingSign, titleVisibility: .visible) {
-            Button(L.text("consultation.sign")) { Task { await sign(value) } }
-        } message: {
-            Text(verbatim: ConsultationRecordRules.signRecap(diagnoses: value.diagnoses.count, prescriptions: value.prescriptions.count,
-                                                            labOrders: labOrders?.value?.count, notesPending: notesPending, unsentWork: unsentWork))
-        }
+    }
+
+    /// D35: what the signature closes, as the owner listed it: diagnoses, medications (prescription lines) and exams.
+    private func signCounts(_ value: ConsultationDetail) -> [ConsultationRecordRules.SignCount] {
+        let medications = value.prescriptions.reduce(0) { $0 + $1.items.count }
+        let exams = labOrders?.value.map { orders in orders.reduce(0) { $0 + $1.items.count } }
+        return ConsultationRecordRules.signCounts(diagnoses: value.diagnoses.count, medications: medications, exams: exams)
     }
 
     /// Lote 5 S3: signing without motive or plan marks each empty field in red and scrolls to the first one.
@@ -970,6 +987,9 @@ struct ConsultationView: View {
                 }
                 Text(verbatim: proposal.patientName ?? "").font(Typo.body).foregroundStyle(Theme.ink)
                 Text(verbatim: proposal.reasonText).font(Typo.small).foregroundStyle(Theme.muted)
+            } else if let text = next.noProposalText {
+                // D74: people wait, but with another doctor's appointment; "Nadie espera" would be false.
+                Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
             }
@@ -1048,6 +1068,38 @@ private struct ConsultationStepBar: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(Text("consultation.steps.label"))
+    }
+}
+
+/// S13 / D35 (owner) · «¿Firmar la consulta?»: the counts the signature closes, each zero as an amber chip with a warning
+/// icon (never a block), then what signing does and the one primary «Firmar consulta».
+private struct SignConfirmSheet: View {
+    let counts: [ConsultationRecordRules.SignCount]
+    let effect: String
+    let confirm: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ScreenFrame(title: "consultation.sign.confirm", onClose: { dismiss() }) {
+                FlowLayout(spacing: Spacing.s) {
+                    ForEach(counts, id: \.text) { count in
+                        HStack(spacing: Spacing.xs) {
+                            if count.empty { ClimesaIcon(.alert, size: 14).accessibilityHidden(true) }
+                            Text(verbatim: count.text).font(Typo.label)
+                        }
+                        .padding(.horizontal, Spacing.m).padding(.vertical, Spacing.xs)
+                        .foregroundStyle(count.empty ? Theme.warning : Theme.ink)
+                        .background(count.empty ? Theme.warningSoft : Theme.soft, in: RoundedRectangle(cornerRadius: Radius.control))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(count.empty ? Theme.warning : Theme.line, lineWidth: 1))
+                        .accessibilityElement(children: .combine)
+                    }
+                }
+                Text(verbatim: effect).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                ClimesaButton(title: L.text("consultation.sign"), action: confirm)
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 

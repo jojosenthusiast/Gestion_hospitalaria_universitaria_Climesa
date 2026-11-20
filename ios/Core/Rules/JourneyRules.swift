@@ -171,6 +171,89 @@ public enum AccessLogRules {
     }
 
     public static func olderTitle(_ count: Int) -> String { count == 1 ? "1 acceso anterior" : "\(count) accesos anteriores" }
+
+    /// D130: accesses that repeat the same who, what and why within this window collapse into one row.
+    public static let groupWindowMinutes = 15
+
+    /// D130: one row per burst of identical accesses, newest first: `latest` is the most recent, `earliest` the first.
+    public struct Group: Equatable, Sendable {
+        public let row: MyAccess
+        public let earliest: String
+        public let latest: String
+        public let count: Int
+    }
+
+    /// D130: each access joins the group above it when it repeats who, what and why within `groupWindowMinutes` of the
+    /// previous one in the group.
+    public static func collapse(_ rows: [MyAccess]) -> [Group] {
+        let dated = rows.compactMap { row in ClimesaDates.parse(row.date).map { ($0, row) } }.sorted { $0.0 > $1.0 }
+        var groups: [[(Date, MyAccess)]] = []
+        for item in dated {
+            if let last = groups.last?.last, sameAccess(last.1, item.1),
+               last.0.timeIntervalSince(item.0) <= Double(groupWindowMinutes * 60) {
+                groups[groups.count - 1].append(item)
+            } else {
+                groups.append([item])
+            }
+        }
+        return groups.compactMap { group in
+            guard let first = group.first, let last = group.last else { return nil }
+            return Group(row: first.1, earliest: last.1.date, latest: first.1.date, count: group.count)
+        }
+    }
+
+    private static func sameAccess(_ a: MyAccess, _ b: MyAccess) -> Bool {
+        a.role == b.role && a.dataType == b.dataType && a.reason == b.reason && a.name == b.name && a.isUrgent == b.isUrgent
+    }
+
+    /// D130: what was read, in plain words instead of the audit code.
+    public static func dataText(_ kind: String) -> String {
+        switch kind.lowercased() {
+        case "fila": return "Tu número en la fila"
+        case "consulta", "consultas": return "Tus consultas"
+        case "expediente", "paciente", "": return "Tu expediente"
+        case "signos", "signos_vitales": return "Tus signos vitales"
+        case "laboratorio", "examenes", "exámenes": return "Tus exámenes"
+        case "receta", "recetas": return "Tus recetas"
+        case "admision", "admisión", "hospitalizacion", "hospitalización": return "Tu hospitalización"
+        case "cita", "citas": return "Tus citas"
+        default:
+            let text = kind.replacingOccurrences(of: "_", with: " ")
+            return text.prefix(1).uppercased() + text.dropFirst()
+        }
+    }
+
+    /// D120: «Recepción de ambulancia (urgente)» is the urgent read of the ambulance reception.
+    public static func isUrgentReason(_ reason: String) -> Bool { reason.lowercased().contains("(urgente)") }
+
+    /// D130: why, in plain words («para atenderte») instead of the audit code.
+    public static func reasonText(_ reason: String) -> String {
+        switch reason.lowercased() {
+        case "atencion", "atención": return "para atenderte"
+        case "emergencia": return "por una emergencia"
+        case "auditoria", "auditoría": return "por una revisión de calidad"
+        case "recepción de ambulancia (urgente)", "recepcion de ambulancia (urgente)": return "al recibirte de una ambulancia (acceso urgente)"
+        case "": return ""
+        default: return "motivo: " + reason.replacingOccurrences(of: "_", with: " ")
+        }
+    }
+
+    /// D130: «Tus consultas para atenderte», one sentence for the row.
+    public static func detail(_ row: MyAccess) -> String {
+        [dataText(row.dataType), reasonText(row.reason)].filter { !$0.isEmpty }.joined(separator: " ")
+    }
+
+    /// D130: who read it: the person's name with the role when the API sends the name, the role alone otherwise.
+    public static func who(_ row: MyAccess, roleLabel: String) -> String {
+        guard let name = row.name?.trimmingCharacters(in: .whitespacesAndNewlines), !name.isEmpty else { return roleLabel }
+        return "\(name) · \(roleLabel)"
+    }
+
+    /// D130: «3 accesos seguidos» for a collapsed burst; nil for a single access.
+    public static func burstText(_ count: Int) -> String? { count > 1 ? "\(count) accesos seguidos" : nil }
+
+    /// D130 / D120: the tag on an urgent access row.
+    public static let urgentLabel = "Urgente"
 }
 
 /// «Mis solicitudes»: pending ones stay in view; assigned, rejected or withdrawn ones fold under one line.
@@ -523,6 +606,28 @@ public enum ConsultationRecordRules {
         return "Se firma con \(spokenList(held)). " + ConsultationActionRules.signSummary(notesPending: notesPending, unsentWork: unsentWork)
     }
 
+    /// One count of the signature summary; `empty` marks a zero the confirmation highlights in amber (D35, owner).
+    public struct SignCount: Equatable, Sendable {
+        public let text: String
+        public let empty: Bool
+    }
+
+    /// D35 (owner): signing is never blocked by zero counts, but each zero (diagnoses, medications, exams) is flagged so
+    /// the doctor notices it. Unknown exams (the order list could not be read) are left out instead of showing a false 0.
+    public static func signCounts(diagnoses: Int, medications: Int, exams: Int?) -> [SignCount] {
+        var counts = [
+            SignCount(text: plural(diagnoses, "diagnóstico", "diagnósticos"), empty: diagnoses == 0),
+            SignCount(text: plural(medications, "medicamento", "medicamentos"), empty: medications == 0)
+        ]
+        if let exams { counts.append(SignCount(text: plural(exams, "examen", "exámenes"), empty: exams == 0)) }
+        return counts
+    }
+
+    /// What signing does, after the counts: the notes are saved first and the consultation closes for good.
+    public static func signEffect(notesPending: Bool, unsentWork: Bool) -> String {
+        ConsultationActionRules.signSummary(notesPending: notesPending, unsentWork: unsentWork)
+    }
+
     /// The count a step carries in its chip: diagnoses on «Consulta», prescriptions and orders on «Receta y exámenes».
     public static func stepCount(_ step: ConsultationStep, diagnoses: Int, prescriptions: Int, labOrders: Int) -> Int? {
         switch step {
@@ -592,6 +697,25 @@ public enum ReleaseRules {
         }
         let seen = values.isEmpty ? "sus resultados" : values.joined(separator: ", ")
         return "\(who) verá: \(seen). La revisión queda registrada y no se puede deshacer."
+    }
+
+    /// D71: the critical values, one line each («Hemoglobina 7.1 g/dL (crítico bajo)»), painted red in the confirmation.
+    public static func criticalLines(_ order: LabOrder) -> [String] {
+        orderedItems(order).filter { $0.result?.mark?.isCritical == true }.map { item in
+            var text = "\(item.name) \(PatientLabRules.valueText(item.result, unit: item.unit))"
+            if let mark = item.result?.mark { text += " (\(mark.label.lowercased()))" }
+            return text
+        }
+    }
+
+    /// D71: the tick a critical release waits for.
+    public static let criticalAcknowledgement = "Ya atendí al paciente o avisé del valor crítico."
+    /// D71: why «Revisar y liberar» waits, said under the button.
+    public static let criticalBlocked = "Marca la casilla de arriba para liberar un resultado con valor crítico."
+
+    /// D71: a critical result is released only after the doctor ticks that the patient was attended or warned.
+    public static func canRelease(_ order: LabOrder, acknowledged: Bool) -> Bool {
+        !ReviewRules.isCritical(order) || acknowledged
     }
 
     public static func done(_ order: LabOrder) -> String {
