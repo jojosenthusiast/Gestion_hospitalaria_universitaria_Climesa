@@ -7,8 +7,11 @@ import { AppointmentsPage } from '../features/appointments';
 beforeEach(() => {
   HTMLDialogElement.prototype.showModal = function () { this.setAttribute('open', ''); };
   HTMLDialogElement.prototype.close = function () { this.removeAttribute('open'); };
+  // The fixtures are on 2026-11-20 at 09:00 local; pin the clock before them so they stay upcoming whatever today is.
+  vi.useFakeTimers({ toFake: ['Date'] });
+  vi.setSystemTime(new Date('2026-11-20T12:00:00Z'));
 });
-afterEach(() => { cleanup(); rows = [appointment]; });
+afterEach(() => { cleanup(); vi.useRealTimers(); rows = [appointment]; });
 
 // REC real: tiene citas.agendar y citas.cancelar, pero no personal.ver.
 const rec = (): AccessProfile => ({
@@ -154,7 +157,11 @@ describe('acciones de cita según el servidor (CITA-04, CITA-06, CITA-08)', () =
     rows = [{ ...appointment, state: 'solicitada', allowedActions: ['confirmar', 'rechazar'], blockedActions: [] }];
     const api = mount();
     await userEvent.click(await screen.findByRole('button', { name: /^Confirmar · Paciente Ficticio Uno/ }));
+    // Audit D63: confirming asks first, with who, which doctor and when.
+    expect(api.write).not.toHaveBeenCalled();
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Confirmar cita' })).getByRole('button', { name: 'Confirmar cita' }));
     expect(api.write).toHaveBeenCalledWith('/citas/solicitudes/c-1/confirmar', { version: 1 }, 'POST');
+    expect(await screen.findByText(/^Cita confirmada: Paciente Ficticio Uno con Médica Ficticia/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: /^Rechazar · Paciente Ficticio Uno/ }));
     const dialog = screen.getByRole('dialog');
     await userEvent.type(within(dialog).getByRole('textbox'), 'razonamiento');

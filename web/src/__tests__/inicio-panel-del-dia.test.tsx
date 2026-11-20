@@ -128,7 +128,7 @@ describe('Inicio · panel del día', () => {
 
   it('JOP: sin existencias se lee «Agotado», y los huecos dicen cuántas personas faltan', async () => {
     montar('JOP');
-    const inventario = await screen.findByRole('region', { name: 'Inventario bajo el mínimo' });
+    const inventario = await screen.findByRole('region', { name: 'Inventario por reponer o vencer' });
     const fila = within(inventario).getByText('Jeringa de 5 ml').closest('li')!;
     expect(within(fila).getByText('Agotado')).toBeTruthy();
     expect(within(await screen.findByRole('region', { name: 'Turnos por cubrir hoy' })).getByText(/falta 1 persona$/)).toBeTruthy();
@@ -140,7 +140,7 @@ describe('Inicio · panel del día', () => {
     const kit = { articulo_id: 'k', codigo: 'CREA', nombre: 'Reactivo de creatinina', tipo: 'reactivo', unidad: 'kit', minimo: 4, disponible: 2, vencido: 0, bajo_minimo: true };
     const api = { request: vi.fn(async (path: string) => path.startsWith('/inventario/existencias') ? [tubo, tubo, kit] : respuestas[path.split('?')[0]] ?? []), write: vi.fn() } as unknown as Api;
     render(<Dashboard api={api} profile={perfil('LAB')} version={0} />);
-    const inventario = await screen.findByRole('region', { name: 'Inventario bajo el mínimo' });
+    const inventario = await screen.findByRole('region', { name: 'Inventario por reponer o vencer' });
     expect(await within(inventario).findAllByText('Tubo de muestra tapón verde')).toHaveLength(1);
     expect(within(inventario).getByText('Quedan 2 kits · mínimo 4')).toBeTruthy();
   });

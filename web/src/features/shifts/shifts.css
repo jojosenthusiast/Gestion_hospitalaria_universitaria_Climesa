@@ -263,14 +263,16 @@
 .shift-area-option { min-height: 36px; }
 
 /* Semana: one card per day with bands, roles and holes; readable with 30+ shifts a day. */
-.shift-summary-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; }
+/* Each day keeps room for a role name and its count; a narrow screen scrolls the week sideways instead of cutting words. */
+.shift-summary-week { display: grid; grid-template-columns: repeat(7, minmax(150px, 1fr)); gap: 8px; overflow-x: auto; padding-bottom: 6px; scroll-snap-type: x proximity; }
+.shift-summary-week > .shift-summary-day { scroll-snap-align: start; }
 .shift-summary-day { min-width: 0; padding: 10px; display: grid; gap: 8px; align-content: start; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); }
 .shift-summary-day.is-today { border-color: color-mix(in srgb, var(--primary) 55%, var(--line)); background: color-mix(in srgb, var(--soft) 45%, var(--surface)); }
 .shift-summary-head { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 6px; }
 .shift-summary-open { min-width: 0; padding: 2px 4px; display: grid; justify-items: start; gap: 0; border: 0; border-radius: var(--radius-control); background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
 .shift-summary-open:hover .shift-summary-cta { text-decoration: underline; }
 .shift-summary-open:focus-visible { outline: 3px solid var(--outline); outline-offset: 2px; }
-.shift-summary-weekday { color: var(--muted); font-size: 0.8125rem; text-transform: capitalize; overflow-wrap: anywhere; }
+.shift-summary-weekday { color: var(--muted); font-size: 0.8125rem; text-transform: capitalize; overflow-wrap: normal; word-break: keep-all; }
 .shift-summary-date { font-size: 1.375rem; line-height: 1.2; font-variant-numeric: tabular-nums; }
 .shift-summary-cta { display: inline-flex; align-items: center; gap: 2px; color: var(--primary-text); font-size: 0.75rem; font-weight: 700; }
 .shift-summary-day.is-today .shift-summary-weekday, .shift-summary-day.is-today .shift-summary-date { color: var(--primary-text); font-weight: 700; }

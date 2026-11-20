@@ -36,7 +36,7 @@ describe('R7 G3 · ingresos indicados', () => {
     expect((within(dialog).getByRole('radio', { name: /HAB-203/ }) as HTMLInputElement).checked).toBe(true);
     await userEvent.click(within(dialog).getByRole('button', { name: 'Confirmar cama' }));
     expect(write).toHaveBeenCalledWith('/admisiones/adm-1/cama', { bedId: 'bed-203', version: 5 }, 'POST');
-    expect(await screen.findByText('Ana Pérez Ficticia: ingresada · Cama HAB-203.')).toBeTruthy();
+    expect(await screen.findByText('Ana Pérez Ficticia: ingreso registrado · Cama HAB-203.')).toBeTruthy();
     await vi.waitFor(() => expect(screen.queryByRole('region', { name: 'Ingresos indicados' })).toBeNull());
   });
 
@@ -60,7 +60,7 @@ describe('R7 G3 · ingresos indicados', () => {
     mount([], origin);
     const dialog = await screen.findByRole('dialog', { name: 'Asignar cama' });
     await userEvent.click(within(dialog).getByRole('button', { name: 'Ingresar sin cama' }));
-    expect(await screen.findByText('Ana Pérez Ficticia queda ingresada sin cama; aparece en «Admisiones sin cama» de Inicio.')).toBeTruthy();
+    expect(await screen.findByText('Ingreso de Ana Pérez Ficticia registrado sin cama; aparece en «Admisiones sin cama» de Inicio.')).toBeTruthy();
     expect(screen.queryByText(/«Ingresos indicados»/)).toBeNull();
   });
 

@@ -110,10 +110,11 @@ const expiringSoon = (rows: (StockRow & { expiresAt?: string | null; quantity?: 
   }
   return soon;
 };
+// Audit D108: the tray lists articles under their minimum, with expired stock or about to expire, so its title says all three.
 const lowStock = (d: DashboardData): TrayGroupSpec => {
   const soon = expiringSoon(d.stock.data ?? []);
   return {
-    id: 'inventario', title: 'Inventario bajo el mínimo', href: '#/inventario', masculine: true, state: asRemote(d.stock),
+    id: 'inventario', title: 'Inventario por reponer o vencer', href: '#/inventario', masculine: true, state: asRemote(d.stock),
     items: perArticle(d.stock.data ?? []).filter(r => r.bajo_minimo || r.vencido > 0 || soon.has(r.articulo_id)).map(r => ({ id: r.articulo_id, title: r.nombre, detail: [(r.bajo_minimo || r.disponible <= 0) && `Quedan ${plural(r.disponible, r.unidad, unitsOf(r.unidad))} · mínimo ${r.minimo}`, r.vencido > 0 && `${plural(r.vencido, r.unidad, unitsOf(r.unidad))} vencidos`, soon.has(r.articulo_id) && `${plural(soon.get(r.articulo_id) as number, r.unidad, unitsOf(r.unidad))} por vencer`].filter(Boolean).join(' · '), tone: 'warn' as Tone, href: '#/inventario', action: 'Ver', ...stockState(r) })),
   };
 };

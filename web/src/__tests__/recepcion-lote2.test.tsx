@@ -61,7 +61,10 @@ describe('S26 · Registrar llamada más rápido', () => {
     const api = callApi(), onSaved = vi.fn();
     render(<PhoneRequestForm api={api} profile={profile(['ambulancia.solicitar'])} onClose={() => {}} onSaved={onSaved} />);
     await userEvent.type(screen.getByLabelText('Dirección'), 'Calle{Enter}');
-    expect(await screen.findByText('Indica la dirección y el motivo, de al menos 5 caracteres cada uno.')).toBeTruthy();
+    // Audit D15: the message names every field with a problem (the phone too), and each field says why under itself.
+    expect(await screen.findByText('Revisa el teléfono y el motivo.')).toBeTruthy();
+    expect(screen.getByText('Indica un teléfono de 8 a 20 dígitos.')).toBeTruthy();
+    expect(screen.getByText('Indica el motivo, de al menos 5 caracteres.')).toBeTruthy();
     expect(api.write).not.toHaveBeenCalled();
     await userEvent.type(screen.getByLabelText('Dirección'), ' Ficticia 3');
     await userEvent.type(screen.getByLabelText('Motivo'), 'Caída en casa');

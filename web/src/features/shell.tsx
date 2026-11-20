@@ -3,6 +3,7 @@ import { Component,lazy,Suspense,useEffect,useLayoutEffect,useRef,useState,type 
 import { Brand,Icon,StatusView,type IconName } from '../components/ui';
 import { Skeleton } from '../components/system';
 import { can,roleNames,type AccessProfile,type Api } from '../lib/api';
+import { avatarInitial } from '../lib/identity';
 import { CompactHeader,Tag } from './common';
 import { ChangePasswordForm } from './password';
 import { Dashboard } from './dashboards';
@@ -185,7 +186,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
     <Brand light/>
     <div className="workspace-role"><span>{roleLabel}</span><span className="mono-label">HOSPITAL UNIVERSITARIO</span></div><HospitalDate />
     <NoticesBell api={api} version={version} current={route==='avisos'}/>
-    <details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><span className="account-menu-label">Mi cuenta</span><span aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details>
+    <details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{avatarInitial(profile.name||profile.email)}</span><span className="account-menu-label">Mi cuenta</span><span aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details>
    </div>
   </header>
   <div className="hospital-frame">
@@ -204,4 +205,4 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
   </div>
  </div>;
 }
-function ProfilePage({profile,onLogout,onChangePassword}:{profile:AccessProfile;onLogout:()=>void;onChangePassword?:(current:string,next:string)=>Promise<string|null>}){return <><CompactHeader breadcrumb="CLIMESA / Cuenta personal" title="Mi cuenta"/><section className="profile-sheet"><div className="profile-identity"><span>{(profile.name||profile.email).slice(0,1).toUpperCase()}</span><div><h2>{profile.name||'Cuenta de CLIMESA'}</h2><p>{profile.email}</p></div></div><dl className="detail-grid"><div><dt>Estado</dt><dd><Tag value="activo"/></dd></div><div><dt>Plataformas habilitadas</dt><dd>{profile.platforms.map(p=>({web:'Web',android:'Android',ios:'iOS'} as Record<string,string>)[p]??p).join(' · ')}</dd></div><div className="full-width"><dt>Roles asignados</dt><dd>{profile.roles.map(r=>roleNames[r]??r).join(' · ')}</dd></div></dl><div className="profile-security"><Icon name="lock" size={20}/><p>Tu contraseña es personal. El administrador gestiona tus roles, sin conocerla.</p></div>{onChangePassword&&<ChangePasswordForm onChange={onChangePassword}/>}<button className="secondary-button" onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></section></>;}
+function ProfilePage({profile,onLogout,onChangePassword}:{profile:AccessProfile;onLogout:()=>void;onChangePassword?:(current:string,next:string)=>Promise<string|null>}){return <><CompactHeader breadcrumb="CLIMESA / Cuenta personal" title="Mi cuenta"/><section className="profile-sheet"><div className="profile-identity"><span>{avatarInitial(profile.name||profile.email)}</span><div><h2>{profile.name||'Cuenta de CLIMESA'}</h2><p>{profile.email}</p></div></div><dl className="detail-grid"><div><dt>Estado</dt><dd><Tag value="activo"/></dd></div><div><dt>Plataformas habilitadas</dt><dd>{profile.platforms.map(p=>({web:'Web',android:'Android',ios:'iOS'} as Record<string,string>)[p]??p).join(' · ')}</dd></div><div className="full-width"><dt>Roles asignados</dt><dd>{profile.roles.map(r=>roleNames[r]??r).join(' · ')}</dd></div></dl><div className="profile-security"><Icon name="lock" size={20}/><p>Tu contraseña es personal. El administrador gestiona tus roles, sin conocerla.</p></div>{onChangePassword&&<ChangePasswordForm onChange={onChangePassword}/>}<button className="secondary-button" onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></section></>;}

@@ -18,7 +18,10 @@
 .fd-issued-number strong { font-size: 56px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--ink); }
 .fd-issued-who { display: grid; gap: 4px; min-width: 0; }
 .fd-issued-who strong { font-size: 18px; overflow-wrap: anywhere; }
-.fd-issued-who span { color: var(--muted); }
+/* Audit D29: only the plain lines are muted; a badge keeps its own colours (white on red for «Emergencia»). */
+.fd-issued-who > span:not(.priority-badge):not(.qb-cita) { color: var(--muted); }
+.fd-void-confirm { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.fd-void-confirm > span { flex: 1 1 100%; font-weight: 700; }
 .fd-issued .danger-link { grid-column: 1 / -1; justify-self: start; margin-left: 0; }
 @media (max-width: 520px) {
   .fd-desk { min-width: 0; }

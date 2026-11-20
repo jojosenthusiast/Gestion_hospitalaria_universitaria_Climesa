@@ -84,6 +84,7 @@ describe('Lote 5 S6 · sin personal disponible', () => {
     mount([], [asked]);
     const inbox = await openRequests();
     await userEvent.click(within(inbox).getByRole('button', { name: /Confirmar · Paciente Ficticio Dos/ }));
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'Confirmar cita' })).getByRole('button', { name: 'Confirmar cita' }));
     const card = within(inbox).getByText('Paciente Ficticio Dos').closest('li')!;
     expect(await within(card as HTMLElement).findByText(NO_STAFF)).toBeTruthy();
   });

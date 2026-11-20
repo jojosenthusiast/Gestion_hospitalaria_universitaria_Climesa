@@ -80,6 +80,9 @@
 .notice-history td[data-label="Aviso"] small { display: -webkit-box; margin-top: var(--space-1); -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; color: var(--muted); }
 /* Date-time inputs shrink with their column instead of spilling out of the form card. */
 .notice-fieldset .form-grid > * { min-width: 0; }
+/* A datetime input will not shrink below its content: wrap "Hasta" under "Desde" instead of letting them overlap. */
+.notice-dates { grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.notice-dates input { width: 100%; }
 .notice-fieldset input[type="datetime-local"] { width: 100%; min-width: 0; }
 .notice-history td[data-label="Nivel"] small { display: block; margin-top: var(--space-1); color: var(--muted); font-size: 12.5px; }
 

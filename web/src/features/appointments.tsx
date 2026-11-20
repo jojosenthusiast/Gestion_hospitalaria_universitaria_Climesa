@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { Field, Icon, Notice } from '../components/ui';
 import { ExportMenu } from '../components/export-menu';
+import { HoldCountdown } from '../components/countdown';
 import { ActionButton, StatusBadge, statusNames } from '../components/system';
 import { Segmented } from '../components/segmented';
 import { formatDate, formatDayHeading, formatRelative, formatShortDateTime, formatShortDay, plural } from '../lib/format';
@@ -18,7 +19,7 @@ import { useQuickAction } from './personal/accion';
 import { CategoryBadges, CategoryGlyph, type CategoryRef } from '../components/category';
 import { readHashParams, writeHashParams } from '../lib/hash-params';
 import { can, type AccessProfile, type Api, type ApiError, type Appointment as BaseAppointment } from '../lib/api';
-import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from './common';
+import { Dialog, Empty, CompactHeader, InViewNotice, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData, type Remote } from './common';
 import './appointments.css';
 import './front-desk.css';
 
@@ -31,8 +32,8 @@ type Appointment = BaseAppointment & { categories?: CategoryRef[]; allowedAction
 /** D-8: the patient's quick cancel reasons (`AppointmentCancelDto.reasonCode`). */
 type CancelCode = 'ya_no_lo_necesito' | 'no_puedo_a_esa_hora' | 'otro';
 const CANCEL_CODES: [CancelCode, string][] = [['ya_no_lo_necesito', 'Ya no lo necesito'], ['no_puedo_a_esa_hora', 'No puedo a esa hora'], ['otro', 'Otro motivo']];
-/** D-3: «No asistió» waits this long on the client before it is sent, so it can be undone. */
-export const NO_SHOW_DELAY_MS = 8000;
+/** D-3: «No asistió» waits this long on the client before it is sent, so it can be undone (audit D45: 8 s was too short). */
+export const NO_SHOW_DELAY_MS = 15000;
 type Issued = { id: string; numero: number; area?: string; service: string; ahead?: number };
 /** A-1: `GET /citas/solicitudes-categoria/{id}/sugerencia`. */
 type Suggestion = { found: boolean; doctorId: string | null; doctorName: string | null; specialty: string | null; date: string | null; start: string | null; end: string | null };
@@ -103,7 +104,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
     if (issued) { setArrived({ appointmentId: row.id, text: `Llegada registrada: ${row.patientName} tiene el número ${issued.area ?? 'CON'} ${issued.numero}${issued.ahead === undefined ? '' : issued.ahead === 0 ? ', nadie antes' : `, ${issued.ahead} antes`}.` }); data.refresh(); }
   }
   // D-3: «No asistió» is held for 8 s with «Deshacer»; only then is it sent. Leaving the page sends what is pending.
-  const [noShows, setNoShows] = useState<Record<string, true>>({});
+  const [noShows, setNoShows] = useState<Record<string, number>>({});
   const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
   const sendNoShow = useRef<(row: Appointment) => void>(() => undefined);
   // The row is read again when the hold ends: a refresh during the 8 s brings the live version (and state) to send.
@@ -121,7 +122,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   useEffect(() => () => { for (const [id, timer] of timers.current) { clearTimeout(timer); const row = pendingRows.current.get(id); if (row) sendNoShow.current(row); } }, []);
   function holdNoShow(row: Appointment) {
     pendingRows.current.set(row.id, row);
-    setNoShows(current => ({ ...current, [row.id]: true }));
+    setNoShows(current => ({ ...current, [row.id]: Date.now() + NO_SHOW_DELAY_MS }));
     timers.current.set(row.id, setTimeout(() => { pendingRows.current.delete(row.id); sendNoShow.current(row); }, NO_SHOW_DELAY_MS));
   }
   function undoNoShow(row: Appointment) {
@@ -132,24 +133,41 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   // Lote 5 S6: a «no doctors on shift» refusal of a direct action shows on the card it came from.
   const [directRow, setDirectRow] = useState<string | null>(null);
   const cardError = (id: string) => (directRow === id ? direct.error : null);
-  async function runDirect(row: Appointment, name: AppointmentAction) {
+  // Audit D52/D55/D56/D63: one confirmation line for the last action, in view; «Confirmar» and «Aceptar nuevo horario» ask first.
+  const [notice, setNotice] = useState<string | null>(null), [pendingDirect, setAskingDirect] = useState<{ row: Appointment; name: 'confirmar' | 'aceptar_reprogramacion' } | null>(null);
+  // Audit D62: a decided reschedule leaves the card at once, before the list comes back.
+  const [decided, setDecided] = useState<Record<string, true>>({});
+  async function runDirect(row: Appointment, name: AppointmentAction, confirmed = false) {
     if (name === 'no_asistio') { holdNoShow(row); return; }
+    if (!confirmed && (name === 'confirmar' || name === 'aceptar_reprogramacion')) { setAskingDirect({ row, name }); return; }
     const path = name === 'confirmar' ? `/citas/solicitudes/${row.id}/confirmar` : `/citas/reprogramaciones/${row.reschedule!.id}/aceptar`;
     const body = name === 'aceptar_reprogramacion' ? { version: row.reschedule!.version } : { version: row.version };
-    setDirectRow(row.id);
-    if (await direct.run(path, body)) data.refresh();
+    // The question closes on send: a refusal shows on the card (no staff) or above the list, like before.
+    setAskingDirect(null); setDirectRow(row.id); setNotice(null);
+    if (await direct.run(path, body)) {
+      if (name === 'aceptar_reprogramacion') setDecided(current => ({ ...current, [row.id]: true }));
+      setNotice(name === 'confirmar' ? `Cita confirmada: ${row.patientName} con ${row.doctorName}, ${formatShortDateTime(row.start)}.`
+        : `Nuevo horario aceptado: la cita de ${row.patientName} pasó a ${formatShortDateTime(row.reschedule!.start)}; la encuentras en «Próximas».`);
+      data.refresh();
+    }
   }
   // #9: Inicio links «Asignar» as #/citas?asignar=<id>; the list opens on «Solicitudes» with that request open.
   // «Confirmar» and the requests panel link #/citas?vista=solicitudes to open on that segment.
   const [query, setQuery] = useState(''), [state, setState] = useState<StateFilter>(() => canSchedule && (readHashParams().get('asignar') || readHashParams().get('vista') === 'solicitudes') ? 'solicitudes' : 'proximas'), [range, setRange] = useState<Range>(() => defaultRange(canSchedule)), [day, setDay] = useState(todayKey()), [doctor, setDoctor] = useState<PickerItem | null>(null);
-  const reload = () => { setCreate(false); setPrefilled(null); setSelected(null); data.refresh(); };
+  const reload = (message?: string) => {
+    if (selected?.action === 'rechazar_reprogramacion') setDecided(current => ({ ...current, [selected.appointment.id]: true }));
+    setCreate(false); setPrefilled(null); setSelected(null); setNotice(message ?? null); data.refresh();
+  };
   const all = data.data ?? [];
   const now = Date.now();
   const window = range === 'hoy' ? { from: todayKey(), to: todayKey() } : range === 'semana' ? weekOf(day) : range === 'dia' ? { from: day, to: day } : null;
   const rows = all.filter(a => inState(a, state, now) && (!doctor || a.doctorId === doctor.id)
     && (!window || (dayKey(a.start) >= window.from && dayKey(a.start) <= window.to)) && matches(query, a.patientName, a.doctorName, a.reason));
   const doctorItems: PickerItem[] = [...new Map(all.map(a => [a.doctorId, a.doctorName])).entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label, 'es'));
-  const stateName = (value: string) => STATE_FILTERS.find(([key]) => key === value)?.[1] ?? statusNames[value] ?? 'Otro estado';
+  // Audit D64: a row's state is singular («Solicitada»), never the plural name of a filter («Solicitadas»).
+  const stateName = (value: string) => statusNames[value] ?? STATE_FILTERS.find(([key]) => key === value)?.[1] ?? 'Otro estado';
+  // Audit D65: an appointment whose arrival was registered exports it, with its queue number.
+  const exportState = (a: Appointment) => a.arrival ? `Llegó · CON ${a.arrival.numero}` : stateName(shownState(a, now));
   // S8: «Solicitudes» counts everything that waits on Recepción: asked appointments plus requests by category.
   const pendingRequests = (requests.data ?? []).filter(isPendingCategoryRequest);
   const countOf = (filter: StateFilter) => all.filter(a => inState(a, filter, now)).length + (filter === 'solicitudes' ? pendingRequests.length : 0);
@@ -163,7 +181,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
   const [phoneAgenda] = useState(() => typeof globalThis.matchMedia === 'function' && globalThis.matchMedia('(max-width: 767px)').matches);
   const [openDoctors, setOpenDoctors] = useState<Record<string, boolean>>({});
   const ahead = agenda.filter(g => g.day >= today), past = agenda.filter(g => g.day < today).reverse();
-  const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: plural(rows.length, 'cita', 'citas'), columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [formatDate(a.start, { withYear: true }), timeRange(a.start, a.end), a.patientName, a.doctorName, stateName(shownState(a, now)), a.reason ?? '']) });
+  const exportTable = () => ({ filename: 'citas', title: 'Citas', subtitle: plural(rows.length, 'cita', 'citas'), columns: ['Fecha', 'Horario', 'Paciente', 'Médico', 'Estado', 'Motivo'], rows: rows.map(a => [formatDate(a.start, { withYear: true }), timeRange(a.start, a.end), a.patientName, a.doctorName, exportState(a), a.reason ?? '']) });
   // #15: on a phone a busy day is a page per doctor; each doctor folds to its header (the first stays open).
   const doctorOpen = (day: string, doctorId: string, index: number) => !phoneAgenda || (openDoctors[`${day}:${doctorId}`] ?? (index === 0 && day === (ahead[0]?.day ?? today)));
   const dayGroup = (group: typeof agenda[number]) => <section className="ag-day" key={group.day} aria-label={formatDayHeading(group.day)}><h3>{formatDayHeading(group.day)}{group.day === today && <small> · hoy</small>}</h3>
@@ -175,13 +193,14 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
         <span className="ag-time">{timeRange(row.start, row.end)}<small>{minutesBetween(row.start, row.end)} min</small></span>
         <span className="ag-who"><strong>{row.patientName}<CategoryBadges categories={row.categories} /></strong>{row.reason && <small>{row.reason}</small>}
           {row.state === 'cancelada' && (row.cancelReasonCode || row.cancelReason) && <small>Motivo: {[CANCEL_CODES.find(([code]) => code === row.cancelReasonCode)?.[1], row.cancelReason].filter(Boolean).join(' · ')}</small>}</span>
+        <RescheduleNote row={row} decided={!!decided[row.id]} />
         <StatusBadge value={shown} />
         {noShows[row.id]
-          ? <div className="row-actions ag-held" role="status"><small>Se marcará «No asistió» en unos segundos.</small><button type="button" className="row-action" onClick={() => undoNoShow(row)}><Icon name="retry" size={16} />Deshacer</button></div>
+          ? <div className="row-actions ag-held" role="status"><HoldCountdown deadline={noShows[row.id]} what="No asistió" /><button type="button" className="row-action" onClick={() => undoNoShow(row)}><Icon name="retry" size={16} />Deshacer</button></div>
           : <div className="ag-row-end">
             {row.arrival ? <span className="qb-cita" title="Número de fila de la llegada"><Icon name="check" size={14} />Llegó · CON {row.arrival.numero}</span>
               : canArrive && row.state === 'confirmada' && dayKey(row.start) === today && <button type="button" className="row-action ag-arrive" disabled={arrive.busy} aria-label={`Registrar llegada · ${row.patientName}`} onClick={() => void registerArrival(row)}>{arrive.busy ? 'Registrando…' : 'Registrar llegada'}</button>}
-            <AppointmentRowActions row={row} busy={direct.busy} onDirect={name => void runDirect(row, name)} onDialog={name => setSelected({ appointment: row, action: name })} /></div>}
+            <AppointmentRowActions row={row} busy={direct.busy} decided={!!decided[row.id]} overdue={shown === 'vencida'} onDirect={name => void runDirect(row, name)} onDialog={name => setSelected({ appointment: row, action: name })} /></div>}
         {arrived?.appointmentId === row.id && <Notice kind="success">{arrived.text}</Notice>}<NoStaffNotice error={cardError(row.id)} /></div>; })}</div>; })}</section>;
   return <>
     <CompactHeader breadcrumb="Atención / Agenda" title="Citas" actions={<>
@@ -201,6 +220,7 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
           <div className="cl-doctor-filter"><SearchPicker label="Médico" value={doctor} onChange={setDoctor} items={doctorItems} minChars={0} placeholder="Todos los médicos" emptyText="Ningún médico con citas coincide." /></div></>}
           <span className="ag-toolbar-end">{filtered && <button type="button" className="cl-link-button" onClick={clear}>Quitar filtros</button>}{!requestsTab && <ExportMenu table={exportTable} disabled={!rows.length} />}</span>
         </div>
+        <InViewNotice kind="success" text={notice} />
         <WriteError error={besidesNoStaff(direct.error)} onReload={data.refresh} reloadLabel="Recargar las citas" />
         {noShowChanged && (!noShow.error || noShow.error.status === 409) ? <Notice kind="error">La cita cambió mientras esperaba; no se marcó «No asistió».</Notice> : <WriteError error={noShow.error} />}
         <WriteError error={arrive.error} />
@@ -216,6 +236,12 @@ export function AppointmentsPage({ api, profile, version }: { api: Api; profile:
     {selected && (selected.action === 'reprogramar'
       ? <RescheduleDialog api={api} appointment={selected.appointment} onClose={() => setSelected(null)} onSaved={reload} />
       : <ReasonDialog api={api} appointment={selected.appointment} action={selected.action} patientOnly={!profile.permissions.some(p => p.code === 'citas.cancelar' && p.context !== 'propio')} onClose={() => setSelected(null)} onSaved={reload} />)}
+    {pendingDirect && <Dialog title={pendingDirect.name === 'confirmar' ? 'Confirmar cita' : 'Aceptar nuevo horario'} onClose={() => setAskingDirect(null)} busy={direct.busy}><div className="module-form">
+      <dl className="ag-summary"><div><dt>Paciente</dt><dd>{pendingDirect.row.patientName}</dd></div><div><dt>Médico</dt><dd>{pendingDirect.row.doctorName}</dd></div>
+        <div><dt>{pendingDirect.name === 'confirmar' ? 'Horario' : 'Horario actual'}</dt><dd>{formatShortDateTime(pendingDirect.row.start)}</dd></div>
+        {pendingDirect.name === 'aceptar_reprogramacion' && pendingDirect.row.reschedule && <div><dt>Pasa a</dt><dd>{formatShortDateTime(pendingDirect.row.reschedule.start)}</dd></div>}</dl>
+      <div className="dialog-actions"><button type="button" className="secondary-button" disabled={direct.busy} onClick={() => setAskingDirect(null)}>Volver</button>
+        <button type="button" className="primary-button" disabled={direct.busy} onClick={() => void runDirect(pendingDirect.row, pendingDirect.name, true)}>{direct.busy ? 'Guardando…' : pendingDirect.name === 'confirmar' ? 'Confirmar cita' : 'Aceptar nuevo horario'}</button></div></div></Dialog>}
   </>;
 }
 
@@ -263,15 +289,27 @@ function AppointmentForm({ api, version, patientId, onClose, onSaved }: { api: A
 const isDialogued = (name: AppointmentAction): name is Dialogued => name === 'rechazar' || name === 'cancelar' || name === 'reprogramar' || name === 'rechazar_reprogramacion';
 
 /** CITA-04, R1: buttons come from the server's `allowedActions`; a blocked action is not drawn and its reason is not body text. */
-function AppointmentRowActions({ row, busy, onDirect, onDialog }: { row: Appointment; busy: boolean; onDirect: (name: AppointmentAction) => void; onDialog: (name: Dialogued) => void }) {
-  const allowed = row.allowedActions ?? [], blocked = row.blockedActions ?? [];
-  const pending = row.reschedule?.state === 'pendiente' ? row.reschedule : null;
+function AppointmentRowActions({ row, busy, decided = false, overdue = false, onDirect, onDialog }: { row: Appointment; busy: boolean; decided?: boolean; overdue?: boolean; onDirect: (name: AppointmentAction) => void; onDialog: (name: Dialogued) => void }) {
+  const allowed = (row.allowedActions ?? []).filter(name => !decided || (name !== 'aceptar_reprogramacion' && name !== 'rechazar_reprogramacion')), blocked = row.blockedActions ?? [];
+  // Audit D59: an overdue appointment shows what is blocked and why, so «Vencidas» never looks like a dead end.
+  const shown = ROW_ACTIONS.filter(name => allowed.includes(name) || (overdue && blocked.some(item => item.action === name)));
   return <div className="row-actions">
-    {pending && <small className="form-hint">Pide cambiar a {formatShortDateTime(pending.start)}{pending.reason ? ` · ${pending.reason}` : ''}</small>}
-    {row.reschedule?.state === 'rechazada' && <small className="form-hint">Reprogramación rechazada: {row.reschedule.rejectionReason}</small>}
-    {row.state === 'reprogramada' && <small className="form-hint">Se movió a otra franja.</small>}
-    {ROW_ACTIONS.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} disabled={busy} aria-label={`${ACTION_LABEL[name]} · ${row.patientName}`} onClick={() => isDialogued(name) ? onDialog(name) : onDirect(name)}>{ACTION_LABEL[name]}</ActionButton>)}
+    {shown.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={overdue} disabled={busy} aria-label={`${ACTION_LABEL[name]} · ${row.patientName}`} onClick={() => isDialogued(name) ? onDialog(name) : onDirect(name)}>{ACTION_LABEL[name]}</ActionButton>)}
+    {overdue && !shown.length && <small className="form-hint">Sin acciones: la hora de la cita pasó y no hay nada que Recepción pueda cambiar aquí.</small>}
   </div>;
+}
+
+/**
+ * Audit D61 (owner: redesign the change-request card): what the patient asked sits in its own full-width block under the
+ * name, current time → requested time, so the name never squeezes into a narrow column.
+ */
+function RescheduleNote({ row, decided }: { row: Appointment; decided: boolean }) {
+  const pending = !decided && row.reschedule?.state === 'pendiente' ? row.reschedule : null;
+  if (pending) return <div className="ag-change" role="note"><Icon name="clock" size={16} /><span><strong>Pide cambiar de horario</strong>
+    <span className="ag-change-times">{formatShortDateTime(row.start)} → {formatShortDateTime(pending.start)}</span>{pending.reason && <small>{pending.reason}</small>}</span></div>;
+  if (row.reschedule?.state === 'rechazada') return <p className="ag-change-note form-hint">Reprogramación rechazada: {row.reschedule.rejectionReason}</p>;
+  if (row.state === 'reprogramada') return <p className="ag-change-note form-hint">Se movió a otra franja.</p>;
+  return null;
 }
 
 /** CITA-08: live counter that only warns while characters are missing. */
@@ -315,20 +353,20 @@ function ReasonDialog({ api, appointment, action: kind, patientOnly = false, onC
 }
 
 /** CITA-02: a free slot of the same doctor; reception applies it, the patient's request waits for a decision. */
-function RescheduleDialog({ api, appointment, onClose, onSaved }: { api: Api; appointment: Appointment; onClose: () => void; onSaved: () => void }) {
+function RescheduleDialog({ api, appointment, onClose, onSaved }: { api: Api; appointment: Appointment; onClose: () => void; onSaved: (message?: string) => void }) {
   const [date, setDate] = useState(dayKey(appointment.start)), [slot, setSlot] = useState('');
   const action = useAction(api);
   const { availability, error, loading } = useAvailability(api, appointment.doctorId, date);
   useEffect(() => setSlot(''), [date]);
   const franjas = availability?.franjas ?? [];
   const chosen = franjas.find(item => item.start === slot && item.estado === 'libre');
-  async function save(e: FormEvent) { e.preventDefault(); if (!chosen) return; if (await action.run(`/citas/${appointment.id}/reprogramar`, { version: appointment.version, start: chosen.start, end: chosen.end })) onSaved(); }
+  async function save(e: FormEvent) { e.preventDefault(); if (!chosen) return; if (await action.run(`/citas/${appointment.id}/reprogramar`, { version: appointment.version, start: chosen.start, end: chosen.end })) onSaved(`Cita reprogramada: ${appointment.patientName} pasa a ${formatShortDateTime(chosen.start)}.`); }
   return <Dialog title="Reprogramar cita" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save}>
     <p className="form-intro">Paciente: <strong>{appointment.patientName}</strong> · {appointment.doctorName}<br />Horario actual: {formatShortDateTime(appointment.start)}. Elige una franja libre del mismo médico.</p>
     <WriteError error={besidesNoStaff(action.error)} onReload={onSaved} />
     <Field label="Fecha" type="date" value={date} onChange={value => value && setDate(value)} required />
     <section className="slot-section" aria-label="Horarios del día" aria-busy={loading}>
-      {loading ? <p className="form-hint" role="status">Consultando horarios…</p> : <SlotGrid franjas={franjas} value={slot} onChange={setSlot} />}
+      {loading ? <p className="form-hint" role="status">Consultando horarios…</p> : <SlotGrid franjas={franjas} value={slot} onChange={setSlot} current={appointment.start} />}
       {!loading && franjas.length > 0 && !franjas.some(item => item.estado === 'libre') && <Notice kind="info">No quedan franjas libres este día. Prueba con otra fecha.</Notice>}
       <NoStaffNotice error={action.error} />
     </section>
@@ -351,8 +389,11 @@ function useAvailability(api: Api, doctorId: string, date: string) {
   };
 }
 
-function SlotGrid({ franjas, value, onChange }: { franjas: Slot[]; value: string; onChange: (start: string) => void }) {
-  return <div className="slot-grid" role="group" aria-label="Franjas del día">{franjas.map(item => item.estado === 'libre'
+function SlotGrid({ franjas, value, onChange, current }: { franjas: Slot[]; value: string; onChange: (start: string) => void; current?: string }) {
+  // Audit D57: when rescheduling, the slot the appointment holds now reads «Actual», not «Ocupado».
+  return <div className="slot-grid" role="group" aria-label="Franjas del día">{franjas.map(item => current && Date.parse(item.start) === Date.parse(current)
+    ? <button type="button" key={item.start} className="slot slot-ocupado slot-actual" disabled aria-label={`${timeOnly(item.start)}, horario actual de la cita`}><strong>{timeOnly(item.start)}</strong><small>Actual</small></button>
+    : item.estado === 'libre'
     ? <button type="button" key={item.start} className={`slot slot-libre${item.start === value ? ' is-selected' : ''}`} aria-pressed={item.start === value} aria-label={`${timeOnly(item.start)}, ${slotNames.libre}`} onClick={() => onChange(item.start)}><strong>{timeOnly(item.start)}</strong></button>
     : <button type="button" key={item.start} className={`slot slot-${item.estado}`} disabled aria-label={`${timeOnly(item.start)}, no disponible: ${item.motivo ?? slotNames[item.estado]}`}><strong>{timeOnly(item.start)}</strong><small>{item.motivo ?? slotNames[item.estado]}</small></button>)}</div>;
 }
@@ -398,7 +439,7 @@ function RequestInbox({ api, version, requests, query, asked, busy, cardError, o
   useEffect(() => { if (linked && pending.some(r => r.id === linked)) document.getElementById(`rq-${linked}`)?.scrollIntoView?.({ block: 'center' }); }, [linked, pending.length]);
   const finish = (message: string) => { setOpen(null); setRejecting(null); setDone(message); requests.refresh(); onAssigned(); };
   return <section className="rq-inbox rq-tab" aria-label="Solicitudes">
-    {done && <Notice kind="success">{done}</Notice>}
+    <InViewNotice kind="success" text={done} />
     <RemoteState state={requests} skeletonRows={2}>{() => total ? <>
       {pending.length > 0 && <section className="rq-group" aria-label="Por asignar">
         <header className="rq-group-head"><h3>Por asignar <span className="rq-count">{pending.length}</span></h3><p>Pidieron cita por motivo, sin médico ni hora: asigna ambos o rechaza con el motivo.</p></header>
@@ -460,8 +501,14 @@ function AssignPanel({ api, version, request, onCancel, onSaved }: { api: Api; v
   const doctorId = doctor?.id ?? '';
   const { availability, error, loading } = useAvailability(api, doctorId, date);
   const franjas = (availability?.franjas ?? []).filter(f => wholeDay || inFranja(f.start, request.franja));
-  useEffect(() => { setSlot(franjas.find(f => f.estado === 'libre')?.start ?? ''); // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Audit D50: the preselected slot is inside the time of day the patient asked for, even while the whole day is shown.
+  useEffect(() => { const free = franjas.filter(f => f.estado === 'libre'); setSlot((free.find(f => inFranja(f.start, request.franja)) ?? free[0])?.start ?? ''); // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [availability, wholeDay]);
+  // Audit D54: the doctor the patient asked for has no shift that day, so say so instead of silently suggesting another.
+  const preferred = request.preferredDoctorId ? items.find(i => i.id === request.preferredDoctorId) : undefined;
+  const preferredMissing = !!request.preferredDoctorId && !!catalogs.data && (!preferred || preferred.disabled);
+  // Audit D51: the «first gap» line only speaks of the suggested doctor while that doctor and day are the chosen ones.
+  const onSuggestion = !!suggested_ && doctor?.id === suggested_.doctorId && date === suggested_.date;
   const chosen = franjas.find(f => f.start === slot && f.estado === 'libre');
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -472,8 +519,9 @@ function AssignPanel({ api, version, request, onCancel, onSaved }: { api: Api; v
   return <form className="rq-assign" onSubmit={save} aria-label={`Asignar médico y hora a ${request.patientName ?? 'paciente'}`}>
     <WriteError error={besidesNoStaff(action.error)} onReload={onCancel} reloadLabel="Cerrar y actualizar la bandeja" />
     {suggestion.loading && !suggestion.data ? <p className="form-hint" role="status">Buscando el primer hueco…</p>
-      : suggested_ ? <p className="form-hint">Primer hueco en la franja pedida: <strong>{formatDayHeading(suggested_.date!)}</strong>, {timeOnly(suggested_.start!)} con {suggested_.doctorName}.</p>
+      : suggested_ ? <p className="form-hint">{onSuggestion ? 'Primer hueco en la franja pedida' : 'Primer hueco sugerido'}: <strong>{formatDayHeading(suggested_.date!)}</strong>, {timeOnly(suggested_.start!)} con {suggested_.doctorName}.{!onSuggestion && doctor && <> Ahora ves los horarios de {doctor.label}.</>}</p>
       : suggestion.data ? <Notice kind="info">Nadie tiene hueco en esa franja en las próximas 2 semanas. Elige otra fecha o todo el día.</Notice> : null}
+    {preferredMissing && <Notice kind="warning">Pidió a {request.preferredDoctorName ?? 'un médico'}, que no tiene turno ese día. Elige otro día o asigna otro médico.</Notice>}
     <div className="rq-days" role="group" aria-label="Días">{days.map(day => <button type="button" key={day} className="cl-chip" aria-pressed={date === day} onClick={() => setDate(day)}>{formatDayHeading(day)}</button>)}</div>
     <div className="form-grid"><Field label="Fecha" type="date" value={date} onChange={value => value && setDate(value)} required />
       <DoctorShiftPicker label="Médico" value={doctor} onChange={item => { setTouched(true); setDoctor(item); }} items={items} required emptyText={catalogs.loading ? 'Cargando médicos…' : 'No hay médicos que coincidan.'} hint={request.specialties.length ? `Sugeridos: ${request.specialties.join(', ')}` : undefined} /></div>

@@ -116,7 +116,7 @@ export type MovementForm = {
 export const emptyMovement = (type: MovementType = 'consumo'): MovementForm => ({ type, articleId: '', lotId: '', lotNumber: '', expiresAt: '', origin: '', destination: '', quantity: '', reason: '', patientId: '' });
 
 /** Validación en línea: un mensaje por campo, solo de lo que ese tipo necesita. La API vuelve a validar todo. */
-export function validateMovement(f: MovementForm, lot: AvailableLot | null): Partial<Record<'article' | 'lot' | 'lotNumber' | 'origin' | 'destination' | 'quantity' | 'reason', string>> {
+export function validateMovement(f: MovementForm, lot: AvailableLot | null, today = todayIso()): Partial<Record<'article' | 'lot' | 'lotNumber' | 'expiresAt' | 'origin' | 'destination' | 'quantity' | 'reason', string>> {
   const need = fieldsFor(f.type), e: ReturnType<typeof validateMovement> = {}, quantity = Number(f.quantity);
   if (!f.articleId) e.article = 'Elige el artículo.';
   if (need.origin && !f.origin) e.origin = f.type === 'ajuste' ? 'Elige la bodega que contaste.' : 'Elige la bodega de origen.';
@@ -124,6 +124,8 @@ export function validateMovement(f: MovementForm, lot: AvailableLot | null): Par
   if (f.type === 'traslado' && f.origin && f.origin === f.destination) e.destination = 'El destino debe ser otra bodega.';
   if (need.existingLot && f.articleId && f.origin && !f.lotId) e.lot = 'Elige el lote.';
   if (need.newLot && !f.lotNumber.trim()) e.lotNumber = 'Escribe el número de lote.';
+  // Audit D111: an entry of a lot that already expired would count as usable stock; the date is checked before sending.
+  if (need.newLot && f.expiresAt && f.expiresAt < today) e.expiresAt = 'Ese lote ya venció: revisa la fecha. Lo vencido no entra como existencia.';
   if (!f.quantity.trim() || !Number.isFinite(quantity) || quantity === 0) e.quantity = 'Indica la cantidad.';
   else if (f.type !== 'ajuste' && quantity < 0) e.quantity = 'La cantidad debe ser mayor que cero.';
   else if (lot && ['consumo', 'merma', 'traslado', 'salida'].includes(f.type) && quantity > lot.quantity) e.quantity = `Solo hay ${lot.quantity} disponibles en ese lote.`;

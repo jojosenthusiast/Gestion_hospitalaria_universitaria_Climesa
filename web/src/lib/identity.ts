@@ -6,3 +6,5 @@ export function validDui(value: string): boolean {
 }
 export const validPhone = (value: string) => /^[267]\d{3}-?\d{4}$/.test(value);
 export const validPersonName = (value: string) => /^[\p{L}\p{M} .’'-]+$/u.test(value);
+/** Audit D5: the avatar letter is the first letter of the name, skipping marks such as «[DEMO]». */
+export const avatarInitial = (name: string) => (/\p{L}/u.exec(name.replace(/^\s*\[[^\]]*\]\s*/, ''))?.[0] ?? /\p{L}/u.exec(name)?.[0] ?? '?').toUpperCase();
