@@ -81,6 +81,9 @@ describe('B1 · mostrador', () => {
     expect(api.write).toHaveBeenCalledWith('/fila', { service: 'laboratorio', patientId: 'p-2', priority: 'urgente' }, 'POST');
     expect(within(await within(dialog).findByRole('status', { name: 'Número emitido' })).getByText(/Nadie antes/)).toBeTruthy();
     await userEvent.click(within(dialog).getByRole('button', { name: 'Anular este número' }));
+    // Audit D30: the first tap asks; nothing is sent until «Sí, anular».
+    expect(api.write).not.toHaveBeenCalledWith('/fila/t-5/anular', { version: 1 }, 'POST');
+    await userEvent.click(within(dialog).getByRole('button', { name: 'Sí, anular' }));
     expect(api.write).toHaveBeenCalledWith('/fila/t-5/anular', { version: 1 }, 'POST');
     expect(await within(dialog).findByText('Se anuló LAB 5. Puedes emitir otro número.')).toBeTruthy();
   });
@@ -192,7 +195,7 @@ describe('B2-B3 · tablero', () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     try {
       fireEvent.drop(screen.getByRole('region', { name: 'Terminados' }), { dataTransfer: transfer });
-      expect(screen.getByText('Se marcará «No se presentó» en unos segundos.')).toBeTruthy();
+      expect(screen.getByText(/Se marcará «No se presentó» en/)).toBeTruthy();
       expect(screen.queryByRole('dialog', { name: 'Cerrar número' })).toBeNull();
       await act(async () => { vi.advanceTimersByTime(NO_SHOW_DELAY_MS - 100); });
       expect(api.write).not.toHaveBeenCalled();
@@ -225,6 +228,7 @@ describe('B2-B3 · tablero', () => {
     const api = montar([ticket({ voidableUntil: new Date(Date.now() + 300_000).toISOString() })]);
     await userEvent.click(await screen.findByRole('button', { name: 'Más acciones de CON 7' }));
     await userEvent.click(within(screen.getByRole('menu')).getByRole('menuitem', { name: 'Anular número (emitido por error)' }));
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Anular número' })).getByRole('button', { name: 'Anular número' }));
     expect(api.write).toHaveBeenCalledWith('/fila/t-7/anular', { version: 2 }, 'POST');
   });
 });

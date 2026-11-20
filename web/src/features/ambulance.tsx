@@ -40,7 +40,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
    <DispatchBlockStrip status={s} action={dispatcher?blockAction(s):undefined}>{dispatcher&&closeInNotice(s)&&<p className="amb-crew-next"><AdminCloseAction api={api} service={s.activeService!} onSaved={()=>saved(ADMIN_CLOSED)}/></p>}{dispatcher&&missingCrew(s)&&<p className="amb-crew-next"><CrewAction profile={profile} missing={missingCrew(s)!}/></p>}</DispatchBlockStrip></div>
   {(dispatcher||manage)&&<CrewCoverageWarning api={api} version={version}/>}
   {done&&<Notice kind="success">{done}</Notice>}
-  {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} closeAbove={dispatcher&&closeInNotice(s)} onSaved={saved} service={s.activeService} onReport={receiver&&s.activeService.hasPrehospital?()=>setReport(s.activeService!.id):undefined}/>:null}
+  {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} closeAbove={dispatcher&&closeInNotice(s)} onSaved={saved} service={s.activeService} onReport={receiver&&(s.activeService.hasPrehospital||s.activeService.milestones?.some(m=>m.type==='en_hospital'))?()=>setReport(s.activeService!.id):undefined}/>:null}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
   {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
@@ -85,9 +85,14 @@ function ActiveService({api,service,canOperate,closeAbove=false,onReport,onSaved
  </section>;
 }
 /** FR-109-11: reporte prehospital; la API omite motivo y signos a quien no tiene relación de atención. */
-function PrehospitalDialog({api,serviceId,version,onClose}:{api:Api;serviceId:string;version:number;onClose:()=>void}){
- const data=useData<PrehospitalView>(api,`/ambulancia/servicios/${serviceId}/prehospital`,version);
- return <Dialog title="Reporte prehospital" onClose={onClose}><RemoteState state={data}>{v=><div>{handoverNotice(v)}{v.reports.length?<div>{!v.clinical&&<Notice kind="info">Los datos clínicos solo los ve el equipo que recibe al paciente.</Notice>}{v.reports.map(r=><dl key={r.id} className="detail-grid">
+export function PrehospitalDialog({api,serviceId,version,onClose}:{api:Api;serviceId:string;version:number;onClose:()=>void}){
+ const data=useData<PrehospitalView>(api,`/ambulancia/servicios/${serviceId}/prehospital`,version),receive=useAction(api),[received,setReceived]=useState(false);
+ // Audit D120: «Marcar recibido» is offered only when the API lists `recibir` for this account (S12); otherwise the line says who registers it.
+ async function markReceived(){if(await receive.run(`/ambulancia/servicios/${serviceId}/recepcion`,{})){setReceived(true);data.refresh();}}
+ return <Dialog title="Reporte prehospital" onClose={onClose} busy={receive.busy}><RemoteState state={data}>{v=><div>{handoverNotice(v)}
+  {!v.handover&&v.allowedActions?.includes('recibir')&&<p><button type="button" className="primary-button" disabled={receive.busy} onClick={()=>void markReceived()}>{receive.busy?'Registrando…':'Marcar recibido al paciente'}</button></p>}
+  {received&&!v.handover&&<Notice kind="success">Entrega registrada.</Notice>}
+  <WriteError error={receive.error} onReload={data.refresh} reloadLabel="Recargar el reporte"/>{v.reports.length?<div>{!v.clinical&&<Notice kind="info">Los datos clínicos solo los ve el equipo que recibe al paciente.</Notice>}{v.reports.map(r=><dl key={r.id} className="detail-grid">
   <div><dt>Prioridad</dt><dd><PriorityBadge value={priorityLevel(r.priority)} label={priorityNames[r.priority]??r.priority}/></dd></div><div><dt>Hora estimada de llegada</dt><dd>{r.estimatedArrival?formatDateTime(r.estimatedArrival):'Sin estimar'}</dd></div><div><dt>Capturado</dt><dd>{formatDateTime(r.capturedAt)}</dd></div>
   {r.reason!==undefined&&<div><dt>Motivo</dt><dd>{r.reason}</dd></div>}
   {r.vitalSigns&&Object.entries(r.vitalSigns).map(([k,val])=><div key={k}><dt>{signNames[k]??k}</dt><dd>{val}</dd></div>)}
@@ -96,5 +101,7 @@ function PrehospitalDialog({api,serviceId,version,onClose}:{api:Api;serviceId:st
 /** MA-AMB-04: la entrega al hospital la registra el personal clínico que recibe (apps); aquí solo se muestra. */
 function handoverNotice(v:PrehospitalView){
  if(v.handover)return <Notice kind="success">Paciente recibido por {v.handover.receivedByName??'personal clínico'} a las {formatDateTime(v.handover.receivedAt)}.</Notice>;
- return v.arrived?<p className="muted">La ambulancia llegó al hospital; falta que el personal clínico marque recibido al paciente.</p>:null;
+ if(!v.arrived)return null;
+ return v.allowedActions?.includes('recibir')?<p className="muted">La ambulancia llegó al hospital; marca recibido al paciente cuando lo entreguen.</p>
+  :<p className="muted">La ambulancia llegó al hospital. La entrega la registra el personal clínico que recibe al paciente (con acceso al expediente); tu cuenta no puede marcarla.</p>;
 }

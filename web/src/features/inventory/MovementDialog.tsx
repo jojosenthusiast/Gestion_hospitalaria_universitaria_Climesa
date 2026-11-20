@@ -37,13 +37,16 @@ export function MovementDialog({ api, profile, articles, allowedTypes, initialAr
     return allWarehouses.filter(w => withStock.has(w.id));
   }, [allWarehouses, detail.data, form.type]);
   const lot = (lotsData ?? []).find(l => l.id === form.lotId) ?? null;
-  const lotItems: PickerItem[] = (lotsData ?? []).map(l => ({ id: l.id, label: `Lote ${l.number}${l.fefo ? ' · sugerido (vence primero)' : ''}`, detail: `${quantityText(l.quantity, article?.unit ?? '')} · ${l.expiresAt ? `${expiryText(l.expiresAt, todayIso())}` : 'No vence'}`, disabled: l.expired && form.type !== 'merma' && form.type !== 'ajuste', reason: 'Vencido' }));
+  // Audit D112: a loss (merma) starts on an expired lot when there is one; otherwise the one that expires first (FEFO).
+  const writesOff = form.type === 'merma';
+  const suggestedLot = (lotsData ?? []).find(l => writesOff && l.expired) ?? (lotsData ?? []).find(l => l.fefo) ?? (lotsData ?? [])[0];
+  const lotItems: PickerItem[] = (lotsData ?? []).map(l => ({ id: l.id, label: `Lote ${l.number}${l.id === suggestedLot?.id ? (l.expired ? ' · vencido, sugerido para dar de baja' : ' · sugerido (vence primero)') : ''}`, detail: `${quantityText(l.quantity, article?.unit ?? '')} · ${l.expiresAt ? `${expiryText(l.expiresAt, todayIso())}` : 'No vence'}`, disabled: l.expired && form.type !== 'merma' && form.type !== 'ajuste', reason: 'Vencido' }));
   // FEFO por defecto: al cargar los lotes de la bodega se elige el que vence primero.
   useEffect(() => {
-    if (!need.existingLot || form.lotId || !lotsData?.length) return;
-    const first = lotsData.find(l => l.fefo) ?? lotsData[0];
-    set({ lotId: first.id });
-  }, [lotsData, need.existingLot, form.lotId]);
+    // Audit D113: once the person cleared the lot («Cambiar») the list stays open for them; only a new bodega re-suggests.
+    if (!need.existingLot || form.lotId || !suggestedLot || touched.lot) return;
+    set({ lotId: suggestedLot.id });
+  }, [lotsData, suggestedLot, need.existingLot, form.lotId, touched.lot]);
   const errors = validateMovement(form, lot);
   const show = (name: keyof typeof errors) => (submitted || touched[name]) && errors[name] ? errors[name] : undefined;
   const articleItems: PickerItem[] = articles.filter(a => a.active).map(a => ({ id: a.id, label: `${a.code} · ${a.name}`, detail: `${categories[a.type].label} · ${quantityText(a.available, a.unit)}` }));
@@ -70,7 +73,7 @@ export function MovementDialog({ api, profile, articles, allowedTypes, initialAr
             onChange={item => { set({ articleId: item?.id ?? '', lotId: '', origin: '', lotNumber: '' }); touch('article'); }} />
           {show('article') && <span className="inv-field-error" role="alert">{show('article')}</span>}
         </div>
-        {need.origin && <div><Select label={originLabel} value={form.origin} required disabled={!form.articleId} onChange={value => { set({ origin: value, lotId: '' }); touch('origin'); }}>
+        {need.origin && <div><Select label={originLabel} value={form.origin} required disabled={!form.articleId} onChange={value => { set({ origin: value, lotId: '' }); setTouched(current => ({ ...current, origin: true, lot: false })); }}>
             <option value="">{form.articleId ? (origins.length ? 'Elige la bodega' : 'Sin existencia en ninguna bodega') : 'Primero elige el artículo'}</option>{origins.map(w => <option key={w.id} value={w.id}>{w.name}</option>)}</Select>
           {show('origin') && <span className="inv-field-error" role="alert">{show('origin')}</span>}</div>}
         {need.destination && <div><Select label={form.type === 'entrada' ? 'Llega a la bodega' : 'Va a la bodega'} value={form.destination} required onChange={value => { set({ destination: value }); touch('destination'); }}>
@@ -81,13 +84,13 @@ export function MovementDialog({ api, profile, articles, allowedTypes, initialAr
             emptyText="Ese artículo no tiene lotes con existencia en la bodega." onChange={item => { set({ lotId: item?.id ?? '' }); touch('lot'); }} />
           {show('lot') && <span className="inv-field-error" role="alert">{show('lot')}</span>}</div>}
         {need.newLot && <><div><Field label="Número de lote" value={form.lotNumber} onChange={value => set({ lotNumber: value })} onBlur={() => touch('lotNumber')} required maxLength={40} hint="Si el lote ya existe se suma a él." error={show('lotNumber')} /></div>
-          <Field label="Vencimiento" type="date" min={todayIso()} value={form.expiresAt} onChange={value => set({ expiresAt: value })} hint="Déjalo vacío si no vence." /></>}
+          <Field label="Vencimiento" type="date" min={todayIso()} value={form.expiresAt} onChange={value => { set({ expiresAt: value }); touch('expiresAt'); }} hint="dd/mm/aaaa. Déjalo vacío si no vence." error={show('expiresAt')} /></>}
         <Field label="Cantidad" type="number" step="any" value={form.quantity} onChange={value => set({ quantity: value })} onBlur={() => touch('quantity')} required error={show('quantity')}
           hint={lot ? `Disponible en el lote: ${quantityText(lot.quantity, article?.unit ?? '')}` : form.type === 'ajuste' ? 'Número negativo para restar un faltante; positivo para un sobrante.' : article ? `En ${article.unit}` : undefined} />
         {need.patient && can(profile, 'pacientes.buscar') && <SearchPicker label="Paciente (opcional)" value={patient} search={searchPatients} onChange={item => { setPatient(item); set({ patientId: item?.id ?? '' }); }} hint="Liga el consumo a su expediente." />}
         <Field label="Motivo" value={form.reason} onChange={value => set({ reason: value })} onBlur={() => touch('reason')} required minLength={5} maxLength={500} error={show('reason')} />
       </div>
-      {lot?.expiresAt && <p className="inv-lot-note">Lote {lot.number}: {expiryText(lot.expiresAt, todayIso())}{lot.fefo ? ' · es el que vence primero' : ' · hay otro lote que vence antes'}.</p>}
+      {lot?.expiresAt && <p className="inv-lot-note">Lote {lot.number}: {expiryText(lot.expiresAt, todayIso())}{lot.expired ? ' · está vencido' : lot.fefo ? ' · es el que vence primero' : ' · hay otro lote que vence antes'}.</p>}
       <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose}>Cancelar</button><SaveButton busy={action.busy} label="Guardar movimiento" /></div>
     </form>
   </Dialog>;

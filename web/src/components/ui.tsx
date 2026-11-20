@@ -66,6 +66,18 @@ export function Notice({ kind, children }: { kind: 'success' | 'error' | 'info' 
   return <div className={`notice ${kind}`} role={kind === 'error' ? 'alert' : 'status'} aria-live={kind === 'error' ? 'assertive' : 'polite'} aria-atomic="true"><span className="notice-icon"><Icon name={kind === 'success' ? 'check' : kind === 'warning' ? 'alert' : 'info'} /></span><span>{children}</span></div>;
 }
 
+/**
+ * Audit D111: digits typed without separators take the dd/mm/aaaa shape as they are typed («01012020» → «01/01/2020»).
+ * Text the person separates their own way («1/1/2026») is left as typed; an ISO date («2026-01-01») drops the slashes
+ * the mask put in while only its year was typed.
+ */
+export function maskDateText(raw: string): string {
+  if (/[.-]/.test(raw)) return /^[\d/]+[.-]/.test(raw) ? raw.replace(/\//g, '') : raw;
+  if (raw.split('/').slice(0, -1).some(part => part.length !== 2)) return raw;
+  const digits = raw.replace(/\D/g, '').slice(0, 8);
+  return digits.length > 4 ? `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}` : digits.length > 2 ? `${digits.slice(0, 2)}/${digits.slice(2)}` : digits;
+}
+
 /** dd/mm/aaaa (or an ISO date) to ISO; '' clears; null while the text is not a whole, real date. */
 export function isoFromDateText(text: string): string | null {
   const t = text.trim();
@@ -98,7 +110,8 @@ export function Field({ label, value, onChange, hint, error, ...props }: { label
       <span className="input-wrap">
         {date ? <>
           <input {...props} min={undefined} max={undefined} id={inputId} aria-invalid={error ? true : props['aria-invalid']} aria-describedby={describedBy} type="text" inputMode="numeric" autoComplete="off" maxLength={10} placeholder={props.placeholder ?? 'dd/mm/aaaa'} value={text}
-            onChange={e => { setText(e.target.value); const iso = isoFromDateText(e.target.value); if (iso !== null) onChange(iso); }} />
+            onFocus={e => { e.target.select(); props.onFocus?.(e); }}
+            onChange={e => { const masked = maskDateText(e.target.value); setText(masked); const iso = isoFromDateText(masked); if (iso !== null) onChange(iso); }} />
           <input ref={picker} className="date-native" type="date" tabIndex={-1} aria-hidden="true" value={value} min={props.min} max={props.max} disabled={props.disabled} onChange={e => { setText(dateText(e.target.value)); onChange(e.target.value); }} />
           <button type="button" className="password-toggle" aria-label={`Elegir ${label.toLowerCase()} en el calendario`} disabled={props.disabled} onClick={() => { try { picker.current?.showPicker?.(); } catch { picker.current?.focus(); } }}><Icon name="calendar" /></button>
         </>

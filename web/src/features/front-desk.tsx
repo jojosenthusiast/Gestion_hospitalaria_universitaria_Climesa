@@ -142,6 +142,8 @@ function IssuedCard({ issued, appointment, busy, onVoid }: { issued: IssuedNumbe
   const until = issued.voidableUntil ? Date.parse(issued.voidableUntil) : 0;
   useEffect(() => { if (!until) return; const left = until - Date.now(); if (left <= 0) return; const timer = setTimeout(() => setTick(v => v + 1), left); return () => clearTimeout(timer); }, [until]);
   const voidable = until > Date.now();
+  // Audit D30: voiding cannot be undone, so the first tap asks; the second one voids.
+  const [confirming, setConfirming] = useState(false);
   return <section className="fd-issued" role="status" aria-live="polite" aria-label="Número emitido">
     <div className="fd-issued-number"><AreaTag code={issued.area ?? SERVICE_AREA[issued.service] ?? 'GEN'} /><strong className="mono-data">{issued.numero}</strong></div>
     <div className="fd-issued-who">
@@ -150,6 +152,10 @@ function IssuedCard({ issued, appointment, busy, onVoid }: { issued: IssuedNumbe
       {issued.appointmentId && appointment && <span className="qb-cita"><Icon name="clock" size={14} />Llegada registrada · cita {localTime(appointment.start)} con {appointment.doctorName}</span>}
       {issued.priority && issued.priority !== 'rutina' && <PriorityBadge value={issued.priority} />}
     </div>
-    {voidable && <button type="button" className="danger-link" disabled={busy} onClick={onVoid}>Anular este número</button>}
+    {voidable && (confirming
+      ? <div className="fd-void-confirm" role="group" aria-label="Confirmar anulación"><span>¿Anular {deskCode(issued)}? No se puede deshacer.</span>
+          <button type="button" className="secondary-button" disabled={busy} onClick={() => setConfirming(false)}>Volver</button>
+          <button type="button" className="primary-button" disabled={busy} onClick={onVoid}>{busy ? 'Anulando…' : 'Sí, anular'}</button></div>
+      : <button type="button" className="danger-link" disabled={busy} onClick={() => setConfirming(true)}>Anular este número</button>)}
   </section>;
 }

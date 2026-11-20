@@ -50,7 +50,7 @@ describe('lista de trabajo en pantalla', () => {
     montar();
     const lista = await screen.findByRole('list', { name: 'Órdenes de laboratorio' });
     expect(within(lista).getAllByRole('button')[0].getAttribute('aria-label')).toContain('Ulises Urgente');
-    await userEvent.type(screen.getByRole('searchbox'), 'maria');
+    await userEvent.type(screen.getByRole('combobox', { name: 'Buscar órdenes' }), 'maria');
     expect(within(lista).getAllByRole('button')).toHaveLength(1);
     expect(screen.getAllByText('Dr. Ficticio Uno', { exact: false }).length).toBeGreaterThan(0);
   });

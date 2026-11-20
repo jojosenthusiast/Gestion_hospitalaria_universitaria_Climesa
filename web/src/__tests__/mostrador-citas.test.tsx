@@ -117,7 +117,7 @@ describe('A3 · «No asistió» con deshacer (D-3)', () => {
     const button = await screen.findByRole('button', { name: 'No asistió · Ana Ficticia Agenda' });
     vi.useRealTimers(); vi.useFakeTimers({ now: NOW, toFake: ['Date', 'setTimeout', 'clearTimeout'] });
     fireEvent.click(button);
-    expect(screen.getByText('Se marcará «No asistió» en unos segundos.')).toBeTruthy();
+    expect(screen.getByText(/Se marcará «No asistió» en/)).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: /Deshacer/ }));
     await act(async () => { vi.advanceTimersByTime(NO_SHOW_DELAY_MS + 100); });
     expect(api.write).not.toHaveBeenCalled();

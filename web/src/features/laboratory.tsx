@@ -6,7 +6,7 @@ import { ExportMenu } from '../components/export-menu';
 import { ApiError, can, type AccessProfile, type Api } from '../lib/api';
 import { downloadAttachment, uploadAttachment } from '../lib/lab-attachments';
 import { ATTACHMENT_ACCEPT, EXTERNAL_INSTRUCTIONS_TEMPLATE, attachmentMimeType, attachmentProblem, externalResultBody, fingerprintFile, formatBytes, groupLabOrders, type LabGroupId } from '../lib/lab-flow';
-import { Dialog, Empty, CompactHeader, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
+import { Dialog, Empty, CompactHeader, InViewNotice, RemoteState, SaveButton, Tag, WriteError, formatDateTime, useAction, useData } from './common';
 import { newIntentKey, withIntentKey } from './intent';
 import { spanishProblem } from './problems';
 import { useQuickAction } from './personal/accion';
@@ -118,8 +118,12 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
     ...(stage !== 'todas' ? [{ key: 'etapa', label: STAGE_LABEL[stage], remove: () => setStage('todas') }] : []),
     ...(urgentOnly ? [{ key: 'urgentes', label: 'Solo urgentes', remove: () => setUrgentOnly(false) }] : []),
     ...(criticalOnly ? [{ key: 'criticos', label: 'Con valores críticos', remove: () => setCriticalOnly(false) }] : []),
-    ...(query.trim() ? [{ key: 'texto', label: `«${query.trim()}»`, remove: () => setQuery('') }] : []),
   ];
+  // Audit D110: the text search lists its matches while typing instead of turning into a filter chip.
+  const suggestions = query.trim() ? rows.map(order => ({ id: order.id, label: order.patientName, detail: [order.patientRecord, order.items.map(item => item.name).join(', ')].filter(Boolean).join(' · ') })) : [];
+  // Audit D105: changing a filter shows the filtered list; it never opens the first filtered order on its own.
+  const filterKey = `${stage}|${urgentOnly}|${criticalOnly}|${query}`, lastFilter = useRef(filterKey);
+  useEffect(() => { if (lastFilter.current !== filterKey) { lastFilter.current = filterKey; setDetailOpen(false); } }, [filterKey]);
   const clear = () => { setStage('todas'); setUrgentOnly(false); setCriticalOnly(false); setQuery(''); };
   const toggle = <T,>(set: Set<T>, value: T) => { const next = new Set(set); if (next.has(value)) next.delete(value); else next.add(value); return next; };
   // `?accion=muestra`: opens the sample of `?orden=<id>` (a row of "Muestras por tomar" in Inicio) or, without it, the
@@ -159,7 +163,7 @@ export function LaboratoryPage({ api, profile, version }: { api: Api; profile: A
     <section className="data-workbench" aria-label="Lista de trabajo de laboratorio"><RemoteState state={data}>{() => <>
       <div className="lab-controls">
       <ListToolbar trailing={<><label className="cl-sort">Ordenar<select value={sort} onChange={event => setSort(event.target.value as WorkSort)}>{(Object.keys(SORT_NAMES) as WorkSort[]).map(key => <option key={key} value={key}>{SORT_NAMES[key]}</option>)}</select></label><ExportMenu table={exportTable} disabled={!rows.length} /></>}>
-        <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} />
+        <LiveSearch label="Buscar órdenes" placeholder="Paciente, expediente, examen o médico" value={query} onChange={setQuery} suggestions={suggestions} onPick={pick} />
       </ListToolbar>
       <div className="cl-filter-row">
         {/* Each group keeps its label with its chips: they wrap together, never a label at the end of a row. */}
@@ -248,7 +252,7 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample, on
     <header><StatusBadge value={STAGE_STATUS[stage]} label={stageLabel(order, allows(order, 'revisar')) ?? STAGE_LABEL[stage]} /><h3>{order.patientName}</h3><p className="muted">{patientLine(order) || 'Sin datos del expediente'}</p>
       {next && <small className="lab-next"><strong>Ahora: {next.who}</strong> {next.what}</small>}</header>
     {order.external && <ExternalNote order={order} />}
-    {done && <Notice kind="success">{done}</Notice>}
+    <InViewNotice kind="success" text={done} />
     <WriteError error={spanishProblem(action.error)} onReload={onChanged} reloadLabel="Recargar la orden" />
     <div className="lw-actions">
       {allows(order, 'tomar_muestra') && <button className="primary-button" onClick={onSample}>Tomar muestra</button>}
@@ -260,10 +264,11 @@ function LabDetail({ api, order, canAttach, canComplete, onChanged, onSample, on
       {allowsExternal(order, 'enviar_externo') && <button className="secondary-button" onClick={() => setExternalOpen(true)}>Se realiza en otro sitio</button>}
       {allows(order, 'cancelar') && <CrudButton kind="deactivate" label="Cancelar orden" onClick={() => setCancelOpen(true)} />}
     </div>
-    {order.amendedAt && <p className="lab-requirement" role="note">Un resultado se corrigió el {formatDateTime(order.amendedAt)}; el valor anterior queda en el historial.{order.reviewedAt ? '' : ' Medicina debe revisarlo de nuevo antes de que el paciente lo vea.'}</p>}
+    {/* Audit D104: right after a correction its own confirmation says this; the standing note returns on the next visit. */}
+    {order.amendedAt && !done && <p className="lab-requirement" role="note">Un resultado se corrigió el {formatDateTime(order.amendedAt)}; el valor anterior queda en el historial.{order.reviewedAt ? '' : ' Medicina debe revisarlo de nuevo antes de que el paciente lo vea.'}</p>}
     {capturing
       ? <ResultSheet api={api} order={order} canComplete={canComplete || allows(order, 'completar')} onSaved={message => { setDone(message); onChanged(); }} />
-      : <div className="lab-order-detail">{order.items.map(item => <LabItemRow key={item.id} api={api} order={order} item={item} onChanged={onChanged} />)}</div>}
+      : <div className="lab-order-detail">{order.items.map(item => <LabItemRow key={item.id} api={api} order={order} item={item} onChanged={onChanged} onAmended={setDone} />)}</div>}
     {order.external && order.state === 'completado' && <ExternalReport api={api} order={order} canAttach={canAttach} />}
     <details className="lab-more">
       <summary>Datos de la orden</summary>
@@ -460,18 +465,21 @@ function SampleDialog({ api, order, onClose, onSaved }: { api: Api; order: LabOr
     <Field label="Número de expediente" value={expediente} onChange={setExpediente} required autoFocus />
     <IdentityHint ok={recordOk} />
     <Field label="Nombre completo" value={nombreCompleto} onChange={setNombreCompleto} required />
-    <IdentityHint ok={nameOk} />
+    <IdentityHint ok={nameOk} accentsOnly={nameOk === false && foldAccents(normalizeName(nombreCompleto)) === foldAccents(normalizeName(order.patientName ?? ''))} />
     <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={action.busy}>Cancelar</button><button className="primary-button" type="submit" disabled={action.busy || !expediente.trim() || !nombreCompleto.trim() || mismatch}>{action.busy ? 'Confirmando…' : 'Confirmar identidad'}</button></div></form></Dialog>;
 }
 
 const normalizeName = (value: string) => value.trim().toLocaleLowerCase('es-SV').replace(/\s+/g, ' ');
+const foldAccents = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 /** null while empty or when the order does not carry the datum; true/false once typed. */
 export function identityCheck(typed: string, expected: string | null | undefined, normalize: (value: string) => string): boolean | null {
   if (!typed.trim() || !expected) return null;
   return normalize(typed) === normalize(expected);
 }
-function IdentityHint({ ok }: { ok: boolean | null }) {
+function IdentityHint({ ok, accentsOnly = false }: { ok: boolean | null; accentsOnly?: boolean }) {
   if (ok === null) return null;
+  // Audit D102: the API compares the name with its accents, so say what to fix instead of a bare «No coincide».
+  if (accentsOnly) return <small className="lab-identity is-bad" role="status"><Icon name="close" size={14} />Coincide salvo las tildes: escríbelo con tildes, como en el expediente.</small>;
   return <small className={`lab-identity ${ok ? 'is-ok' : 'is-bad'}`} role="status"><Icon name={ok ? 'check' : 'close'} size={14} />{ok ? 'Coincide con la orden' : 'No coincide con la orden'}</small>;
 }
 
@@ -484,13 +492,13 @@ function ObservationLine({ result }: { result: LabResult }) {
 }
 
 /** Read-only value of a completed or pending exam; amend once completed (`enmendar`). Capture happens in `ResultSheet`. */
-function LabItemRow({ api, order, item, onChanged }: { api: Api; order: LabOrder; item: LabItem; onChanged: () => void }) {
+function LabItemRow({ api, order, item, onChanged, onAmended }: { api: Api; order: LabOrder; item: LabItem; onChanged: () => void; onAmended?: (message: string) => void }) {
   const [amending, setAmending] = useState(false);
   const title = <strong>{item.code} · {item.name}{item.unit ? <small className="muted"> ({item.unit})</small> : null}</strong>;
   return <div className="lab-result-row">{title}{item.result ? <span><Tag value={item.result.mark} /> {resultText(item)}</span> : <span>Resultado pendiente</span>}
     {item.result && <ObservationLine result={item.result} />}
     {allows(order, 'enmendar') && item.result && <CrudButton kind="edit" label="Corregir resultado" onClick={() => setAmending(true)} />}
-    {amending && <AmendDialog api={api} order={order} item={item} onClose={() => setAmending(false)} onSaved={() => { setAmending(false); onChanged(); }} />}</div>;
+    {amending && <AmendDialog api={api} order={order} item={item} onClose={() => setAmending(false)} onSaved={() => { setAmending(false); onAmended?.(`Se corrigió ${item.name}; el valor anterior queda en el historial.${order.reviewedAt ? ' El paciente deja de verlo hasta que Medicina lo revise de nuevo.' : ' Medicina lo revisa con el valor corregido.'}`); onChanged(); }} />}</div>;
 }
 
 /** Normal range and critical limits on their own lines, each kept whole, so a range never breaks into three lines. */
@@ -499,6 +507,9 @@ function RangeCell({ range }: { range?: ReferenceRange | null }) {
   const normal = rangeText({ ...range!, criticalLow: null, criticalHigh: null }), critical = rangeText({ ...range!, min: null, max: null });
   return <>{normal && <span className="lab-range-part">{normal}</span>}{critical && <span className="lab-range-part">{critical}</span>}</>;
 }
+
+/** Audit D103: a negative value is impossible unless the exam's range itself goes below zero (the API still decides). */
+export const impossibleValue = (value: number, range?: ReferenceRange | null) => value < 0 && ![range?.min, range?.max, range?.criticalLow, range?.criticalHigh].some(bound => typeof bound === 'number' && bound < 0);
 
 type SheetRow = { raw: string; note: string; relevant: boolean; noteOpen: boolean; left: boolean };
 const SHEET_MARK: Record<SheetMark, { label: string; status: string } | null> = { critico: { label: 'Crítico', status: 'critico_alto' }, fuera: { label: 'Fuera de rango', status: 'alto' }, normal: { label: 'Normal', status: 'completado' }, sin_rango: null };
@@ -517,7 +528,7 @@ function ResultSheet({ api, order, canComplete, onSaved }: { api: Api; order: La
   const [reason, setReason] = useState(''), [confirming, setConfirming] = useState(false);
   const patch = (id: string, change: Partial<SheetRow>) => setRows(current => ({ ...current, [id]: { ...current[id], ...change } }));
   const numericValue = (item: LabItem) => parseValue(rows[item.id].raw);
-  const valid = (item: LabItem) => { const raw = rows[item.id].raw.trim(); return isNumeric(item) ? numericValue(item) !== null : raw.length > 0; };
+  const valid = (item: LabItem) => { const raw = rows[item.id].raw.trim(); return isNumeric(item) ? numericValue(item) !== null && !impossibleValue(numericValue(item)!, item.referenceRange) : raw.length > 0; };
   const mark = (item: LabItem): SheetMark => isNumeric(item) && numericValue(item) !== null ? markOf(numericValue(item)!, item.referenceRange) : 'sin_rango';
   const savedText = (item: LabItem) => item.result ? String(item.result.text ?? item.result.value ?? '') : '';
   const changed = order.items.filter(item => {
@@ -560,7 +571,7 @@ function ResultSheet({ api, order, canComplete, onSaved }: { api: Api; order: La
             <input aria-label={`${item.name}${item.unit ? ` (${item.unit})` : ''}`} inputMode={isNumeric(item) ? 'decimal' : 'text'} value={row.raw} disabled={action.busy}
               aria-invalid={bad ? true : undefined} onChange={event => patch(item.id, { raw: event.target.value, left: false })} onBlur={() => patch(item.id, { left: true })} />
             {item.unit && <span className="muted">{item.unit}</span>}</span>
-            {bad && <small className="field-error">Escribe un número, por ejemplo 5.1.</small>}
+            {bad && <small className="field-error">{numericValue(item) !== null ? 'El valor no puede ser negativo.' : 'Escribe un número, por ejemplo 5.1.'}</small>}
             {row.noteOpen
               ? <span className="lab-sheet-note"><input aria-label={`Observación de ${item.name}`} value={row.note} maxLength={1000} disabled={action.busy} placeholder="Observación" onChange={event => patch(item.id, { note: event.target.value, relevant: event.target.value.trim() ? row.relevant : false })} />
                 <label className="lab-relevant"><input type="checkbox" checked={row.relevant} disabled={!row.note.trim() || action.busy} onChange={event => patch(item.id, { relevant: event.target.checked })} />Avisar al médico</label></span>
@@ -593,12 +604,13 @@ function ResultSheet({ api, order, canComplete, onSaved }: { api: Api; order: La
 function AmendDialog({ api, order, item, onClose, onSaved }: { api: Api; order: LabOrder; item: LabItem; onClose: () => void; onSaved: () => void }) {
   const action = useAction(api), numeric = item.result?.text == null;
   const [value, setValue] = useState(numeric ? item.result?.value?.toString() ?? '' : item.result?.text ?? ''), [reason, setReason] = useState('');
-  const ready = value.trim() !== '' && reason.trim().length >= 10;
+  const negative = numeric && value.trim() !== '' && impossibleValue(Number(value), item.referenceRange);
+  const ready = value.trim() !== '' && !negative && reason.trim().length >= 10;
   async function save() { if (await action.run(`/laboratorio/ordenes/${order.id}/enmendar`, { orderItemId: item.id, version: order.version, ...(numeric ? { value: Number(value) } : { text: value.trim() }), reason: reason.trim() })) onSaved(); }
   return <Dialog title={`Corregir ${item.name}`} onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={event => { event.preventDefault(); void save(); }}>
     <p className="form-intro">El valor actual ({resultText(item)}) queda en el historial con tu motivo.{order.reviewedAt ? ' El paciente deja de ver los valores hasta que Medicina los revise de nuevo.' : ' Medicina revisa la orden con el valor corregido.'}</p>
     <WriteError error={action.error} onReload={onSaved} reloadLabel="Recargar la orden" />
-    <Field label={numeric ? `Valor corregido${item.unit ? ` (${item.unit})` : ''}` : 'Resultado corregido'} type={numeric ? 'number' : 'text'} value={value} onChange={setValue} required autoFocus />
+    <Field label={numeric ? `Valor corregido${item.unit ? ` (${item.unit})` : ''}` : 'Resultado corregido'} type={numeric ? 'number' : 'text'} value={value} onChange={setValue} required autoFocus error={negative ? 'El valor no puede ser negativo.' : undefined} />
     <Field label="Motivo de la corrección" value={reason} onChange={setReason} required minLength={10} maxLength={500} />
     <div className="dialog-actions"><button className="secondary-button" type="button" onClick={onClose} disabled={action.busy}>Volver</button><SaveButton busy={action.busy} disabled={!ready} label="Guardar corrección" /></div>
   </form></Dialog>;

@@ -3,7 +3,7 @@ import { SearchPicker,type PickerItem } from '../../components/search-picker';
 import { patientPicker } from '../appointments';
 import { Field,Icon,Notice } from '../../components/ui';
 import './call-form.css';
-import { Dialog,SaveButton,Select,WriteError,isVersionConflict,useAction } from '../common';
+import { Dialog,FormProblem,SaveButton,Select,WriteError,isVersionConflict,useAction } from '../common';
 import { can,type AccessProfile,type Api,type Patient } from '../../lib/api';
 import { crewProblem,defaultCrew,priorityNames,roleNames,typeNames,type AmbulanceRequest,type CrewCandidate } from './types';
 
@@ -12,20 +12,24 @@ export function dispatchProblem(code?:string){return code==='ambulancia_ya_despa
 /** MA-AMB-02: el despachador elige la tripulación entre el personal de turno; viene propuesta y solo ella atiende al paciente. */
 export function DispatchForm({api,unitVersion,request,crewPool,onClose,onSaved}:{api:Api;unitVersion:number;request:AmbulanceRequest|null;crewPool:CrewCandidate[];onClose:()=>void;onSaved:()=>void}){
  const [crew,setCrew]=useState<string[]>(()=>defaultCrew(crewPool));
- const [type,setType]=useState(request?'emergencia_domicilio':'traslado_interhospitalario'),[priority,setPriority]=useState('naranja'),[origin,setOrigin]=useState(''),[destination,setDestination]=useState('Hospital CLIMESA, emergencia'),[municipality,setMunicipality]=useState(request?.municipality??''),[problem,setProblem]=useState(''),action=useAction(api);
- async function save(e:FormEvent){e.preventDefault();if(!request&&origin.trim().length<5){setProblem('Indica el origen, de al menos 5 caracteres.');return;}if(destination.trim().length<3){setProblem('Indica el destino.');return;}
-  const missing=crewProblem(crewPool,crew);if(missing){setProblem(missing);return;}setProblem('');
+ const [type,setType]=useState(request?'emergencia_domicilio':'traslado_interhospitalario'),[priority,setPriority]=useState('naranja'),[origin,setOrigin]=useState(''),[destination,setDestination]=useState('Hospital CLIMESA, emergencia'),[municipality,setMunicipality]=useState(request?.municipality??''),action=useAction(api);
+ // Audit D16: each problem shows under its own control (the crew one right above «Despachar»), never at the top of the dialog.
+ const [errors,setErrors]=useState<{origin?:string;destination?:string;crew?:string}>({});
+ async function save(e:FormEvent){e.preventDefault();
+  const next={origin:!request&&origin.trim().length<5?'Indica el origen, de al menos 5 caracteres.':undefined,destination:destination.trim().length<3?'Indica el destino.':undefined,crew:crewProblem(crewPool,crew)??undefined};
+  setErrors(next);if(next.origin||next.destination||next.crew)return;
   const body={version:unitVersion,type,priority,destination:destination.trim(),...(request?{requestId:request.id}:{origin:origin.trim()}),...(municipality.trim()?{municipality:municipality.trim()}:{}),crew:crewPool.filter(p=>crew.includes(p.staffId)).map(p=>p.staffId)};
   if(await action.run('/ambulancia/servicios',body))onSaved();}
  const known=dispatchProblem(action.error?.code);
- return <Dialog title="Confirmar y despachar" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save} noValidate>{problem&&<Notice kind="error">{problem}</Notice>}
-  {known?<><Notice kind="error">{known}</Notice><button type="button" className="secondary-button" onClick={onSaved}>Cerrar y recargar</button></>:isVersionConflict(action.error)?<><Notice kind="error">La unidad cambió. Cierra y vuelve a abrir para ver su estado actual; no se despachó.</Notice><button type="button" className="secondary-button" onClick={onSaved}>Cerrar y recargar</button></>:<WriteError error={action.error}/>}
-  {request?<p>Confirmaste por teléfono la solicitud de <strong>{request.address}</strong>{request.requesterName?<> (pidió {request.requesterName})</>:null}. La unidad pasa a En Servicio.</p>:<Field label="Origen" value={origin} onChange={setOrigin} required minLength={5} maxLength={300}/>}
+ return <Dialog title="Confirmar y despachar" onClose={onClose} busy={action.busy}><form className="module-form" onSubmit={save} noValidate>
+  {request?<p>Confirmaste por teléfono la solicitud de <strong>{request.address}</strong>{request.requesterName?<> (pidió {request.requesterName})</>:null}. La unidad pasa a En Servicio.</p>:<Field label="Origen" value={origin} onChange={setOrigin} required minLength={5} maxLength={300} error={errors.origin}/>}
   <Select label="Tipo de servicio" value={type} onChange={setType} required>{Object.entries(typeNames).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Select>
   <Select label="Prioridad" value={priority} onChange={setPriority} required>{Object.entries(priorityNames).map(([k,v])=><option key={k} value={k}>{v}</option>)}</Select>
-  <Field label="Destino" value={destination} onChange={setDestination} required maxLength={300}/>
+  <Field label="Destino" value={destination} onChange={setDestination} required maxLength={300} error={errors.destination}/>
   <Field label="Municipio" value={municipality} onChange={setMunicipality} maxLength={80}/>
   <fieldset className="choice-list"><legend>Tripulación</legend>{crewPool.length?crewPool.map(p=><label className="check-field" key={p.staffId}><input type="checkbox" checked={crew.includes(p.staffId)} onChange={e=>setCrew(list=>e.target.checked?[...list,p.staffId]:list.filter(id=>id!==p.staffId))} disabled={action.busy}/> <span><strong>{p.name}</strong> <small>{roleNames[p.role]??p.role}{p.role==='paramedico'&&!p.hasAccount?' · Sin cuenta en la app':''}</small></span></label>):<p className="muted">No hay paramédicos ni motoristas con turno en curso.</p>}</fieldset>
+  <FormProblem text={errors.crew}/>
+  {known?<><FormProblem text={known}/><button type="button" className="secondary-button" onClick={onSaved}>Cerrar y recargar</button></>:isVersionConflict(action.error)?<><FormProblem text="La unidad cambió. Cierra y vuelve a abrir para ver su estado actual; no se despachó."/><button type="button" className="secondary-button" onClick={onSaved}>Cerrar y recargar</button></>:<WriteError error={action.error}/>}
   <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={action.busy}>Cancelar</button><SaveButton busy={action.busy} label="Despachar"/></div></form></Dialog>;
 }
 export function DiscardForm({api,request,onClose,onSaved}:{api:Api;request:AmbulanceRequest;onClose:()=>void;onSaved:()=>void}){
@@ -36,6 +40,17 @@ export function DiscardForm({api,request,onClose,onSaved}:{api:Api;request:Ambul
 }
 type CallField='caller'|'phone'|'address';
 const callFieldNames:Record<CallField,string>={caller:'nombre de quien llama',phone:'teléfono',address:'dirección'};
+type CallErrors={caller?:string;phone?:string;address?:string;reason?:string};
+const callErrorNames:Record<keyof CallErrors,string>={caller:'el nombre de quien llama',phone:'el teléfono',address:'la dirección',reason:'el motivo'};
+/** Audit D15: the checks of «Registrar llamada», one message per field (the API checks the same). */
+export function callErrors(v:{caller:string;phone:string;address:string;reason:string}):CallErrors{
+ const out:CallErrors={};
+ if(v.caller.trim()&&v.caller.trim().length<2)out.caller='Escribe al menos 2 caracteres.';
+ if(!/^[0-9+ -]{8,20}$/.test(v.phone.trim()))out.phone='Indica un teléfono de 8 a 20 dígitos.';
+ if(v.address.trim().length<5)out.address='Indica la dirección, de al menos 5 caracteres.';
+ if(v.reason.trim().length<5)out.reason='Indica el motivo, de al menos 5 caracteres.';
+ return out;
+}
 const joinNames=(names:string[])=>names.length>1?`${names.slice(0,-1).join(', ')} y ${names[names.length-1]}`:names[0]??'';
 /**
  * FR-109-03: recepción registra una solicitud recibida por teléfono; queda por confirmar.
@@ -50,7 +65,7 @@ export function PhoneRequestForm({api,profile,onClose,onSaved,onRegistered,doneM
  const [patient,setPatient]=useState<PickerItem|null>(null),[filled,setFilled]=useState<CallField[]>([]),[loading,setLoading]=useState(false),[lookupFailed,setLookupFailed]=useState(false);
  // S26: after a successful save the form shows the confirmation; «Registrar otra» starts a blank form (new key, so the
  // first field takes the focus again).
- const [registered,setRegistered]=useState<string|null>(null),[round,setRound]=useState(0);
+ const [registered,setRegistered]=useState<string|null>(null),[round,setRound]=useState(0),[errors,setErrors]=useState<CallErrors>({});
  const edited=useRef(new Set<CallField>()),values={caller,phone,address};
  const setters:Record<CallField,(v:string)=>void>={caller:setCaller,phone:setPhone,address:setAddress};
  const edit=(k:CallField)=>(v:string)=>{edited.current.add(k);setFilled(f=>f.filter(x=>x!==k));setters[k](v);};
@@ -67,33 +82,34 @@ export function PhoneRequestForm({api,profile,onClose,onSaved,onRegistered,doneM
   finally{setLoading(false);}
  }
  function again(){
-  setAddress('');setMunicipality('');setReason('');setPhone('');setCaller('');setProblem('');setPatient(null);setFilled([]);setLookupFailed(false);
+  setErrors({});setAddress('');setMunicipality('');setReason('');setPhone('');setCaller('');setProblem('');setPatient(null);setFilled([]);setLookupFailed(false);
   edited.current=new Set();setRegistered(null);setRound(r=>r+1);
  }
  async function save(e:FormEvent){e.preventDefault();if(busy)return;
-  if(address.trim().length<5||reason.trim().length<5){setProblem('Indica la dirección y el motivo, de al menos 5 caracteres cada uno.');return;}
-  if(caller.trim()&&caller.trim().length<2){setProblem('El nombre de quien llama debe tener al menos 2 caracteres.');return;}
-  if(!/^[0-9+ -]{8,20}$/.test(phone.trim())){setProblem('Indica un teléfono de contacto de 8 a 20 dígitos.');return;}
+  // Audit D15: every field with a problem says so under itself, and the line above the actions names all of them.
+  const next=callErrors({caller,phone,address,reason});setErrors(next);
+  const wrong=(Object.keys(next) as (keyof CallErrors)[]).filter(k=>next[k]);
+  if(wrong.length){setProblem(`Revisa ${joinNames(wrong.map(k=>callErrorNames[k]))}.`);return;}
   setProblem('');if(await action.run('/ambulancia/solicitudes',{address:address.trim(),reason:reason.trim(),contactPhone:phone.trim(),...(patient?{patientId:patient.id}:{}),...(caller.trim()?{callerName:caller.trim()}:{}),...(municipality.trim()?{municipality:municipality.trim()}:{})})){setRegistered(address.trim());onRegistered?.();}}
  if(registered!==null)return <Dialog title="Registrar llamada" onClose={onSaved}><div className="module-form">
   <Notice kind="success">{doneMessage} <span className="call-done-where">{registered}</span></Notice>
   <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onSaved}>Listo</button><button type="button" className="primary-button" onClick={again} autoFocus>Registrar otra</button></div></div></Dialog>;
  return <Dialog title="Registrar llamada" onClose={onClose} busy={busy}><form key={round} className="module-form call-form" onSubmit={save} noValidate aria-busy={busy}>
   <p className="call-911" role="note"><Icon name="alert" size={16}/>Si hay riesgo de vida, que llame al 911.</p>
-  {problem&&<Notice kind="error">{problem}</Notice>}<WriteError error={action.error}/>
   <div className="call-groups">
    <fieldset className="call-group"><legend>Quién llama</legend>
     {canPick&&<SearchPicker label="Paciente · opcional" value={patient} onChange={item=>void pick(item)} search={patientPicker(api)} autoFocus emptyText="No hay pacientes con ese nombre, DUI o expediente."/>}
     {lookupFailed&&<Notice kind="error">No pudimos leer el expediente. Escribe los datos de contacto a mano.</Notice>}
     {filled.length>0&&<p className="muted call-copied" role="status">Copiamos del expediente: {joinNames(filled.map(k=>callFieldNames[k]))}.</p>}
-    <Field label="Nombre de quien llama" value={caller} onChange={edit('caller')} maxLength={120} autoComplete="off" autoFocus={!canPick}/>
-    <Field label="Teléfono de contacto" value={phone} onChange={edit('phone')} required type="tel" inputMode="tel" autoComplete="off" maxLength={20} placeholder="7000-0000"/>
+    <Field label="Nombre de quien llama" value={caller} onChange={edit('caller')} maxLength={120} autoComplete="off" autoFocus={!canPick} error={errors.caller}/>
+    <Field label="Teléfono de contacto" value={phone} onChange={edit('phone')} required type="tel" inputMode="tel" autoComplete="off" maxLength={20} placeholder="7000-0000" error={errors.phone}/>
    </fieldset>
    <fieldset className="call-group"><legend>Dónde y qué pasa</legend>
-    <Field label="Dirección" value={address} onChange={edit('address')} required maxLength={300} autoComplete="off"/>
+    <Field label="Dirección" value={address} onChange={edit('address')} required maxLength={300} autoComplete="off" error={errors.address}/>
     <Field label="Municipio" value={municipality} onChange={setMunicipality} maxLength={80} autoComplete="off"/>
-    <Field label="Motivo" value={reason} onChange={setReason} required maxLength={500} autoComplete="off"/>
+    <Field label="Motivo" value={reason} onChange={setReason} required maxLength={500} autoComplete="off" error={errors.reason}/>
    </fieldset>
   </div>
+  <FormProblem text={problem}/><WriteError error={action.error}/>
   <div className="dialog-actions"><button type="button" className="secondary-button" onClick={onClose} disabled={busy}>Cancelar</button><SaveButton busy={busy} label="Registrar solicitud"/></div></form></Dialog>;
 }

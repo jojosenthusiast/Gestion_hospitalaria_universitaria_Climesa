@@ -23,7 +23,7 @@ describe('laboratorio: espacios y adaptación (obs. lote 3)', () => {
     const lista = await screen.findByRole('list', { name: 'Órdenes de laboratorio' });
     const controls = container.querySelector('.lab-controls')!;
     expect(controls).not.toBeNull();
-    expect(within(controls as HTMLElement).getByRole('searchbox')).toBeTruthy();
+    expect(within(controls as HTMLElement).getByRole('combobox', { name: 'Buscar órdenes' })).toBeTruthy();
     expect(controls.querySelector('.cl-filter-row')).not.toBeNull();
     expect(lista.closest('.lab-body')).not.toBeNull();
     expect(lista.closest('.lab-controls')).toBeNull();

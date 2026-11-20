@@ -682,6 +682,13 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .priority-badge { --prio: var(--priority-rutina); --prio-soft: var(--priority-rutina-soft); padding: 3px 8px; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--prio); border-radius: var(--radius-chip); background: var(--prio-soft); color: var(--prio); font-size: var(--text-xs); font-weight: 700; line-height: 1.35; white-space: nowrap; }
 .priority-urgente { --prio: var(--priority-urgente); --prio-soft: var(--priority-urgente-soft); }
 .priority-emergencia { --prio: var(--critical); background: var(--critical); color: var(--on-status); }
+/* Audit D29: a parent's text colour never reaches the label inside the solid red badge. */
+.priority-emergencia > * { color: var(--on-status); }
+/* Audit D33: the actions of a queue card line up in equal columns instead of stacking at their own widths. */
+.qb-ticket .row-actions:not(.ag-held) { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); align-items: stretch; gap: var(--space-2); }
+.qb-ticket .row-actions:not(.ag-held) > .row-action, .qb-ticket .row-actions:not(.ag-held) > .action-blocked > .row-action { width: 100%; justify-content: center; }
+.qb-ticket .row-actions:not(.ag-held) > .qb-card-menu { margin-left: 0; justify-self: end; }
+.qb-undo-close { min-width: 32px; min-height: 32px; }
 
 /* R4a (owner): a filter for a status wears the same colour, texture and icon as the badge it filters (segments,
    chips, pills). Unselected: soft tint + the family texture; selected: the family fill, texture still visible.

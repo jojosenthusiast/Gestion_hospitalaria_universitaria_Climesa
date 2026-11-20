@@ -254,7 +254,7 @@ function NoticeComposer({ api, profile, editing, onDone, onCancel, onReload }: {
             <small className="field-hint">{levels.find(l => l.id === level)?.hint}</small>
           </fieldset>
           <fieldset className="notice-fieldset"><legend>Vigencia</legend>
-            <div className="form-grid">
+            <div className="form-grid notice-dates">
               {started
                 ? <p className="field-hint">Vigente desde {editing?.desde ? shortWhen(editing.desde) : '—'}; el inicio no cambia.</p>
                 : <Field label="Desde (opcional)" type="datetime-local" value={from} onChange={setFrom} hint={scheduled && editing?.desde ? `Programado para ${shortWhen(editing.desde)}. Si lo vacías, empieza al guardar.` : 'Sin fecha, empieza al publicarlo.'} />}

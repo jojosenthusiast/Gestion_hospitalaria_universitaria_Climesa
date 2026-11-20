@@ -113,3 +113,13 @@
 .rq-group-head p { margin: 0; color: var(--muted); font-size: var(--text-sm); }
 .rq-tab .rq-row { border-left: 3px solid var(--warning); padding-left: var(--space-3); }
 @media (max-width: 720px) { .data-workbench > .rq-tab { padding: var(--space-3) var(--space-4) var(--space-4); } }
+/* Audit D61: the change a patient asks for is a full-width block under the row (current → requested), never a hint squeezed
+   next to the buttons, which pushed the name into a one-letter column. */
+.ag-slot > .ag-change, .ag-slot > .ag-change-note { grid-column: 1 / -1; order: 1; margin: 0; }
+.ag-change { display: flex; align-items: flex-start; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--line); border-left: 3px solid var(--warning); border-radius: var(--radius-control); background: var(--surface); }
+.ag-change > span { display: grid; gap: 2px; min-width: 0; }
+.ag-change-times { font-variant-numeric: tabular-nums; font-weight: 700; }
+.ag-change small { color: var(--muted); overflow-wrap: anywhere; }
+.ag-slot .ag-who strong { word-break: normal; }
+/* Audit D57: the slot the appointment holds now reads «Actual». */
+.slot.slot-actual { border-style: dashed; }

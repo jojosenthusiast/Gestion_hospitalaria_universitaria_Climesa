@@ -38,5 +38,6 @@ export function groupAgenda<T extends AgendaItem>(items: T[]): AgendaDay<T>[] {
  * «confirmada» forever. The client shows it as «Vencida» (same family as the server's expired requests) and groups it
  * with them; the server's actions (for example «No asistió») stay as they are.
  */
-export const isOverdue = (a: { state: string; end: string }, now = Date.now()) => (a.state === 'confirmada' || a.state === 'solicitada') && Date.parse(a.end) < now;
-export const shownState = (a: { state: string; end: string }, now = Date.now()) => isOverdue(a, now) ? 'vencida' : a.state;
+/** Audit D60: an appointment whose arrival was registered (it holds a queue number) is not overdue: the patient came. */
+export const isOverdue = (a: { state: string; end: string; arrival?: unknown }, now = Date.now()) => !a.arrival && (a.state === 'confirmada' || a.state === 'solicitada') && Date.parse(a.end) < now;
+export const shownState = (a: { state: string; end: string; arrival?: unknown }, now = Date.now()) => isOverdue(a, now) ? 'vencida' : a.state;
