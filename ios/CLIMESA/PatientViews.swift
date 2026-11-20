@@ -937,7 +937,9 @@ struct PatientExamsView: View {
     let profile: AccessProfile
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
-    @State private var loader = Loader<[LabOrder]>()
+    /// S13: the read and the «seen» mark live in the view model.
+    @State private var model = PatientExamsViewModel()
+    private var loader: Loader<[LabOrder]> { model.loader }
     @State private var filter: LabFilter = .all
     @State private var showPast = false
 
@@ -979,11 +981,9 @@ struct PatientExamsView: View {
     }
 
     private func load() async {
-        await loader.load { try await account.client().get("/me/laboratorio", as: [LabOrder].self) }
+        model.client = { [account] in try account.client() }
         // G6: the results on screen are seen, so «Resultados nuevos» on Inicio goes back to 0 (stored on the device, G-7).
-        if loader.value != nil {
-            _ = DraftStore.shared.save(PatientResultsRules.Seen(at: Date()), user: profile.id, key: PatientResultsRules.seenKey)
-        }
+        await model.load(user: profile.id)
     }
 }
 
@@ -1440,19 +1440,18 @@ struct LabeledText: View {
 struct AmbulanceRequestView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
-    @State private var loader = Loader<[OwnAmbulanceRequest]>()
-    @State private var submission = Submission()
-    @State private var cancelling: OwnAmbulanceRequest?
-    @State private var cancelReason = ""
-    @State private var address = ""
-    @State private var municipality = ""
-    @State private var reason = ""
-    @State private var phone = ""
-    @State private var errors: [String: String] = [:]
-    /// S13: the notice naming what the contact on file filled (address, phone or both), to say where it came from.
-    @State private var prefillNotice: String?
-    /// The prefill runs once per screen, so a field the patient cleared is not filled again when the view reappears.
-    @State private var didPrefill = false
+    /// S13: the form, the own requests, the prefill and the writes live in the view model; the view draws them.
+    @State private var model = AmbulanceRequestViewModel()
+    private var loader: Loader<[OwnAmbulanceRequest]> { model.loader }
+    private var submission: Submission { model.submission }
+    private var errors: [String: String] { model.errors }
+    private var prefillNotice: String? { model.prefillNotice }
+
+    /// The view model, bound to the session's client before each call.
+    private var vm: AmbulanceRequestViewModel {
+        model.client = { [account] in try account.client() }
+        return model
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1478,7 +1477,7 @@ struct AmbulanceRequestView: View {
         }
         .task(id: live.snapshot.version(.ambulance)) { await load() }
         .task { await prefill() }
-        .sheet(item: $cancelling) { request in cancelSheet(request) }
+        .sheet(item: $model.cancelling) { request in cancelSheet(request) }
     }
 
     private func activeCard(_ request: OwnAmbulanceRequest) -> some View {
@@ -1503,16 +1502,16 @@ struct AmbulanceRequestView: View {
             Text(verbatim: request.notice).font(Typo.small).foregroundStyle(Theme.muted)
             PatientSubmissionNotice(submission: submission)
             if request.canCancel {
-                CrudButton(kind: .deactivate, label: L.text("ambulance.cancel"), loading: submission.busy) { cancelReason = ""; cancelling = request }
+                CrudButton(kind: .deactivate, label: L.text("ambulance.cancel"), loading: submission.busy) { model.askCancel(request) }
             }
         }
     }
 
     private func cancelSheet(_ request: OwnAmbulanceRequest) -> some View {
         NavigationStack {
-            ScreenFrame(title: "ambulance.cancel", onClose: { cancelling = nil }) {
+            ScreenFrame(title: "ambulance.cancel", onClose: { model.cancelling = nil }) {
                 Text("ambulance.cancel.detail").font(Typo.body).foregroundStyle(Theme.ink)
-                PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $cancelReason, lines: 2...4, error: nil)
+                PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $model.cancelReason, lines: 2...4, error: nil)
                 ClimesaButton(title: L.text("ambulance.cancel"), kind: .destructive, loading: submission.busy) { Task { await cancel(request) } }
             }
         }
@@ -1522,10 +1521,10 @@ struct AmbulanceRequestView: View {
         VStack(alignment: .leading, spacing: 16) {
                 SectionCard {
                     if let prefillNotice { Text(LocalizedStringKey(prefillNotice)).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true) }
-                    PatientTextArea(label: L.text("ambulance.address"), text: $address, lines: 1...3, error: errors["address"] ?? submission.fieldErrors["address"])
-                    FormField(label: L.text("ambulance.municipality"), text: $municipality)
-                    PatientTextArea(label: L.text("ambulance.reason"), text: $reason, lines: 2...5, error: errors["reason"] ?? submission.fieldErrors["reason"])
-                    FormField(label: L.text("ambulance.phone"), text: $phone, error: errors["contactPhone"] ?? submission.fieldErrors["contactPhone"])
+                    PatientTextArea(label: L.text("ambulance.address"), text: $model.address, lines: 1...3, error: errors["address"] ?? submission.fieldErrors["address"])
+                    FormField(label: L.text("ambulance.municipality"), text: $model.municipality)
+                    PatientTextArea(label: L.text("ambulance.reason"), text: $model.reason, lines: 2...5, error: errors["reason"] ?? submission.fieldErrors["reason"])
+                    FormField(label: L.text("ambulance.phone"), text: $model.phone, error: errors["contactPhone"] ?? submission.fieldErrors["contactPhone"])
                         .keyboardType(.phonePad).textContentType(.telephoneNumber)
                 }
                 PatientSubmissionNotice(submission: submission)
@@ -1533,41 +1532,19 @@ struct AmbulanceRequestView: View {
         }
     }
 
-    private func load() async { await loader.load { try await account.client().get("/ambulancia/solicitudes/mias", as: [OwnAmbulanceRequest].self) } }
+    private func load() async { await vm.load() }
 
-    /// Fills address and phone from "Mis datos" (`GET /me/paciente`) without overwriting what was typed. Best effort:
-    /// if the read fails, the form stays empty and works as before.
+    /// Prefill from "Mis datos" only for a linked patient who may read it (best effort, once per screen).
     private func prefill() async {
-        guard !didPrefill else { return }
-        didPrefill = true
-        guard let profile = account.profile, profile.patientId != nil,
-              profile.hasPermission(AppSection.misDatos.requiredPermission ?? "") else { return }
-        guard let patient = try? await account.client().get("/me/paciente", as: PatientProfile.self) else { return }
-        // Recompute against the fields as they are now: the patient may have typed while the read was in flight.
-        let filled = AmbulancePrefillRules.prefill(address: address, phone: phone, from: patient)
-        address = filled.address
-        phone = filled.phone
-        prefillNotice = filled.noticeKey
+        let allowed = account.profile.map { $0.patientId != nil && $0.hasPermission(AppSection.misDatos.requiredPermission ?? "") } ?? false
+        await vm.prefill(allowed: allowed)
     }
 
     private func cancel(_ request: OwnAmbulanceRequest) async {
-        let body = AmbulanceCancelBody(version: request.version, reason: cancelReason)
-        let ok = await submission.run(request.id, body: body, success: L.text("ambulance.cancel.done")) { key in
-            _ = try await account.client().send("POST", "/ambulancia/solicitudes/\(request.id)/cancelar", body: body, key: key, as: AmbulanceRequestStateResult.self)
-        }
-        if ok { cancelling = nil }
-        await load()
+        await vm.cancel(request, success: L.text("ambulance.cancel.done"))
     }
 
-    private func send() async {
-        errors = AmbulanceRules.errors(address: address, reason: reason, phone: phone)
-        guard errors.isEmpty else { return }
-        let body = AmbulanceRules.body(address: address, municipality: municipality, reason: reason, phone: phone)
-        let ok = await submission.run(body: body) { key in
-            _ = try await account.client().send("POST", "/ambulancia/solicitudes", body: body, key: key, as: AmbulanceRequestCreated.self)
-        }
-        if ok { await load() }
-    }
+    private func send() async { await vm.send() }
 }
 
 /// I11 · Quién vio mi expediente: fecha, rol y motivo de cada acceso.

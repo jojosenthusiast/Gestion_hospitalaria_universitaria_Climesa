@@ -16,7 +16,7 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
     Views.swift            marca, componentes, ingreso, raíz
     WorkspaceView.swift    pestañas por rol, rol sin iOS, banda de conexión
     LiveViewModel.swift    @MainActor @Observable: consume el flujo de tiempo real
-    Support.swift          Loader (lecturas) y Submission (escrituras con Idempotency-Key), componentes
+    Support.swift          componentes y utilidades de vista
     PatientViews.swift     I03 a I12 (Paciente)
     DoctorViews.swift      I20, I22 a I25 (Médico)
     ConsultationView.swift I21 (consulta)
@@ -28,6 +28,8 @@ Lee antes `../AGENTS.md`. Spec base: `specs/122-cliente-ios/`. Roles en iOS: Mé
     DesignTokens.swift     tokens de Fase 2: área, familia de estado, prioridad, espaciado, radios, movimiento
     Contract/              modelos Codable del contrato, Problem, SubmissionIntent, fechas
     Rules/                 reglas puras de Paciente y Médico
+    Screen/                Loader (lecturas), Submission (escrituras con Idempotency-Key), SubmissionBook, Part
+    ViewModels/            ClinicalAPI (protocolo de get/send) y view models por pantalla: consulta, Mis exámenes, Pedir ambulancia
     Realtime/              protocolo Phoenix, servicio, transporte URLSession, estado en vivo (LiveTopic)
   Config/                  Debug.xcconfig y Release.xcconfig (CLIMESA_API_BASE_URL; incluyen ../Config.xcconfig local)
   Tests/CoreTests/         XCTest de Core con sockets y API falsos

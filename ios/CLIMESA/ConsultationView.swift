@@ -1,12 +1,6 @@
 import SwiftUI
 
-/// Desde dónde se abre la consulta: una cita de la agenda o un número llamado de la fila.
-enum ConsultationOrigin {
-    case appointment(AgendaEntry)
-    case ticket(QueueTicket)
-    /// m-22: una consulta propia abierta de cualquier día (`GET /consultas/sin-firmar`).
-    case resume(UnsignedConsultation)
-}
+// `ConsultationOrigin` and the screen's reads and writes live in Core/ViewModels/ConsultationViewModel.swift (S13).
 
 private struct PrescriptionDraft: Identifiable {
     let id = UUID()
@@ -55,20 +49,22 @@ struct ConsultationView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var consultationId: String?
-    @State private var detail = Loader<ConsultationDetail>()
-    @State private var catalog = Loader<[LabExam]>()
-    @State private var starting = Submission()
-    @State private var saving = Submission()
-    @State private var diagnosing = Submission()
-    @State private var prescribing = Submission()
-    @State private var ordering = Submission()
-    @State private var signing = Submission()
+    /// S13: the reads and writes of this screen (loaders, submissions, method, path and body of every call).
+    @State private var model = ConsultationViewModel()
+    private var detail: Loader<ConsultationDetail> { model.detail }
+    private var catalog: Loader<[LabExam]> { model.catalog }
+    private var starting: Submission { model.starting }
+    private var saving: Submission { model.saving }
+    private var diagnosing: Submission { model.diagnosing }
+    private var prescribing: Submission { model.prescribing }
+    private var ordering: Submission { model.ordering }
+    private var signing: Submission { model.signing }
     /// S9: after signing, who goes next in the consultation's area (`nextProposal`), with the call one tap away.
     @State private var handoff: QueueNextProposal?
-    @State private var handoffCall = Submission()
+    private var handoffCall: Submission { model.handoffCall }
     /// S9: the number called from the handoff, undoable from here like on Mi día ("Llamaste CON 4 · Deshacer").
     @State private var lastCall: (id: String, version: Int, code: String)?
-    @State private var undoing = Submission()
+    private var undoing: Submission { model.undoing }
     @State private var prefilledVersion: Int?
     @State private var reason = ""
     @State private var exam = ""
@@ -76,7 +72,7 @@ struct ConsultationView: View {
     @State private var draftErrors: [String: String] = [:]
     /// Fase 2R: the diagnosis comes from the CIE-10 search (`GET /consultas/cie10`), never a typed code.
     @State private var cieQuery = ""
-    @State private var cieResults = Loader<[Cie10Entry]>()
+    private var cieResults: Loader<[Cie10Entry]> { model.cieResults }
     @State private var cieChoice: Cie10Entry?
     /// Row 5: set from the record when it loads (principal only while the consultation has none).
     @State private var principal = false
@@ -104,9 +100,8 @@ struct ConsultationView: View {
     @State private var labQuery = ""
     /// Descriptions returned when a diagnosis is added (the detail response only carries the code).
     @State private var diagnosisNames: [String: String] = [:]
-    /// B-6: this consultation's lab orders, read from the doctor's order list (the detail does not carry them). A failed
-    /// read is never "no orders": ordering waits until the list is known, so an exam is not ordered twice.
-    @State private var labOrders: Part<[LabOrder]>?
+    /// B-6: this consultation's lab orders (see `ConsultationViewModel.labOrders`).
+    private var labOrders: Part<[LabOrder]>? { model.labOrders }
     /// Exams ordered from this device in this consultation (stored per account), so a repeat is blocked at once.
     @State private var orderedHere: Set<String> = []
     @Environment(\.scenePhase) private var scenePhase
@@ -123,7 +118,7 @@ struct ConsultationView: View {
     /// «Guardar borrador» and «Firmar consulta» wait for so two writes never race on one version.
     @State private var debounce: Task<Void, Never>?
     @State private var inflight: Task<Int?, Never>?
-    @State private var autosaving = Submission()
+    private var autosaving: Submission { model.autosaving }
     /// «Borrador guardado…» with the time of the last save that reached the server.
     @State private var savedFeedback: String?
     /// Lote 5 S12: «Lo que pidió el paciente».
@@ -155,6 +150,12 @@ struct ConsultationView: View {
         case let .ticket(ticket): return ticket.patientName ?? String(format: L.text("consultation.ticket"), ticket.number)
         case let .resume(open): return open.patientName ?? L.text("day.patient.unknown")
         }
+    }
+
+    /// The view model, bound to the session's client before each call (the view calls the network only through it).
+    private var vm: ConsultationViewModel {
+        model.client = { [account] in try account.client() }
+        return model
     }
 
     /// The consultation is loaded, open and this doctor may write it: the bottom action bar shows.
@@ -311,7 +312,7 @@ struct ConsultationView: View {
         await loadContext()
         guard !autoStartTried else { return }
         if consultationId == nil && profile.hasPermission("consulta.iniciar") {
-            let open = (try? await account.client().get("/consultas/sin-firmar", as: [UnsignedConsultation].self)) ?? []
+            let open = await vm.unsignedConsultations()
             if let other = ConsultationGuard.unsignedOther(open, current: nil) {
                 unsignedOther = other
                 askingUnsigned = true
@@ -343,18 +344,8 @@ struct ConsultationView: View {
 
     /// A resumed consultation finds its appointment in the agenda or its number in today's queue; best effort.
     private func resumedContext(appointmentId: String?, ticketId: String?) async -> VisitContext? {
-        guard let api = try? account.client() else { return nil }
-        if let appointmentId, profile.hasPermission("consulta.iniciar"),
-           let agenda = try? await api.get("/consultas/agenda", as: [AgendaEntry].self),
-           let entry = agenda.first(where: { $0.appointmentId == appointmentId }) {
-            return ConsultationContextRules.of(appointment: entry, ticket: nil)
-        }
-        if let ticketId, profile.hasPermission("fila.ver"),
-           let tickets = try? await api.get("/fila", as: [QueueTicket].self),
-           let ticket = tickets.first(where: { $0.id == ticketId }) {
-            return ConsultationContextRules.of(appointment: nil, ticket: ticket)
-        }
-        return nil
+        await vm.resumedContext(appointmentId: appointmentId, ticketId: ticketId,
+                                canReadAgenda: profile.hasPermission("consulta.iniciar"), canReadQueue: profile.hasPermission("fila.ver"))
     }
 
     // MARK: - Autoguardado en el servidor (S12)
@@ -382,13 +373,9 @@ struct ConsultationView: View {
               !saving.busy, !signFlow
         else { return version }
         let notes = (reason, exam, plan)
-        let body = ConsultationUpdateBody(version: current, reason: notes.0, physicalExam: notes.1, plan: notes.2)
         let task = Task { @MainActor () -> Int? in
-            var saved: ConsultationCommandResult?
-            let ok = await autosaving.run("autosave", body: body) { key in
-                saved = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
-            }
-            guard ok, let saved else { return nil }
+            guard let saved = await vm.autosave(consultationId: id, version: current, reason: notes.0, exam: notes.1, plan: notes.2)
+            else { return nil }
             version = saved.version
             savedNotes = ConsultationDraft(reason: notes.0, exam: notes.1, plan: notes.2)
             savedFeedback = ConsultationAutosave.savedText(Date())
@@ -726,8 +713,7 @@ struct ConsultationView: View {
     }
 
     private func searchCie() async {
-        guard let query = Cie10SearchRules.query(cieQuery) else { cieResults.clear(); return }
-        await cieResults.load { try await account.client().get(Cie10SearchRules.path(query), as: [Cie10Entry].self) }
+        await vm.searchCie(cieQuery)
     }
 
     @ViewBuilder private func prescriptionSection(_ value: ConsultationDetail, editable: Bool) -> some View {
@@ -798,7 +784,7 @@ struct ConsultationView: View {
 
     private func loadDetail() async {
         guard let id = consultationId else { return }
-        await detail.load { try await account.client().get("/consultas/\(id)/detalle", as: ConsultationDetail.self) }
+        await vm.loadDetail(consultationId: id)
         // The server's version is the one the next write sends (a live event after our own save brings it too).
         if let summary = detail.value?.consultation, inflight == nil { version = summary.version }
         // El borrador se llena con lo guardado al abrir y cuando otra versión reemplaza la que se estaba editando.
@@ -827,16 +813,10 @@ struct ConsultationView: View {
         guard let id = consultationId else { return }
         orderedHere = DraftStore.shared.load(Set<String>.self, user: profile.id, key: ConsultationRecordRules.orderedKey(id)) ?? []
         guard profile.hasPermission("resultados.ver") else { return }
-        do {
-            let orders = try await account.client().get("/laboratorio/ordenes", as: [LabOrder].self)
-            labOrders = .loaded(ConsultationRecordRules.labOrders(orders, consultationId: id))
-        } catch is CancellationError {
-        } catch {
-            labOrders = .failed(error.userMessage)
-        }
+        await vm.loadLabOrders(consultationId: id)
     }
 
-    private func loadCatalog() async { await catalog.load { try await account.client().get("/laboratorio/catalogo", as: [LabExam].self) } }
+    private func loadCatalog() async { await vm.loadCatalog() }
 
     // MARK: - Escrituras
 
@@ -848,25 +828,8 @@ struct ConsultationView: View {
     }
 
     private func start() async {
-        let body: ConsultationStartBody
-        switch origin {
-        case let .appointment(entry): body = ConsultationStartBody(appointmentId: entry.appointmentId)
-        case let .ticket(ticket): body = ConsultationStartBody(ticketId: ticket.id)
-        case let .resume(open):
-            // Ya existe: no se vuelve a iniciar.
-            consultationId = open.id
-            return
-        }
-        var started: ConsultationStartResult?
-        let ok = await starting.run(body: body) { key in
-            started = try await account.client().send("POST", "/consultas", body: body, key: key, as: ConsultationStartResult.self)
-        }
-        if ok, let started { consultationId = started.id; return }
-        // Ya estaba iniciada por este médico (otro toque, la web o una visita anterior a este número): se retoma.
-        if let existing = starting.lastFailure?.resumableConsultationId {
-            starting.error = nil
-            consultationId = existing
-        }
+        // The new consultation, the resumed one, or the one this doctor already started; nil keeps the manual retry.
+        if let id = await vm.start(origin) { consultationId = id }
     }
 
     /// Saves the notes; returns the consultation version the API answered with, or nil if the save did not go through.
@@ -876,13 +839,9 @@ struct ConsultationView: View {
         await joinAutosave()
         draftErrors = ConsultationRules.draftErrors(reason: reason, physicalExam: exam, plan: plan)
         guard draftErrors.isEmpty, let id = consultationId else { return nil }
-        let body = ConsultationUpdateBody(version: version ?? value.consultation.version, reason: reason, physicalExam: exam, plan: plan)
-        var saved: ConsultationCommandResult?
-        let ok = await saving.run(id, body: body) { key in
-            saved = try await account.client().send("PATCH", "/consultas/\(id)", body: body, key: key, as: ConsultationCommandResult.self)
-        }
-        if ok {
-            if let saved { version = saved.version }
+        let saved = await vm.save(consultationId: id, version: version ?? value.consultation.version, reason: reason, exam: exam, plan: plan)
+        if let saved {
+            version = saved.version
             savedFeedback = ConsultationAutosave.savedByHandText(Date())
             // The notes are saved, so an earlier "not saved" error next to «Firmar» no longer applies.
             signSaveFailed = false
@@ -892,18 +851,15 @@ struct ConsultationView: View {
             persistDraft()
         }
         await loadDetail()
-        return ok ? saved?.version : nil
+        return saved?.version
     }
 
     private func addDiagnosis() async {
         codeError = ConsultationRules.diagnosisSelectionError(cieChoice)
         guard codeError == nil, let choice = cieChoice, let id = consultationId else { return }
         let text = note.trimmingCharacters(in: .whitespacesAndNewlines)
-        let body = DiagnosisBody(code: choice.code, principal: principal, note: text.isEmpty ? nil : text)
-        var created: DiagnosisCreated?
-        let ok = await diagnosing.run(body: body) { key in
-            created = try await account.client().send("POST", "/consultas/\(id)/diagnosticos", body: body, key: key, as: DiagnosisCreated.self)
-        }
+        let created = await vm.addDiagnosis(consultationId: id, code: choice.code, principal: principal, note: text.isEmpty ? nil : text)
+        let ok = created != nil
         if ok { diagnosisNames[choice.code] = choice.description }
         if ok, let created { diagnosisNames[created.code] = created.description }
         if ok { cieChoice = nil; cieQuery = ""; cieResults.clear(); note = "" }
@@ -915,10 +871,7 @@ struct ConsultationView: View {
         let items = lines.map(\.body)
         lineError = items.compactMap { ConsultationRules.prescriptionError($0) }.first
         guard lineError == nil, !items.isEmpty, let id = consultationId else { return }
-        let body = PrescriptionBody(items: items)
-        let ok = await prescribing.run(body: body, success: L.text("rx.issued")) { key in
-            _ = try await account.client().send("POST", "/consultas/\(id)/receta", body: body, key: key, as: Prescription.self)
-        }
+        let ok = await vm.prescribe(consultationId: id, items: items, success: L.text("rx.issued"))
         if ok { lines = [PrescriptionDraft()] }
         await loadDetail()
     }
@@ -930,10 +883,7 @@ struct ConsultationView: View {
         guard ConsultationRecordRules.orderBlocker(canReadOrders: profile.hasPermission("resultados.ver"), ordersKnown: labOrders?.value != nil) == nil,
               ConsultationRecordRules.repeated(selected: selectedExams, catalog: catalogExams, orders: labOrders?.value ?? [], orderedHere: orderedHere).isEmpty
         else { return }
-        let body = LabOrderBody(consultationId: id, exams: selectedExams.sorted(), priority: priority)
-        let ok = await ordering.run(body: body, success: L.text("lab.ordered")) { key in
-            _ = try await account.client().send("POST", "/laboratorio/ordenes", body: body, key: key, as: LabOrderCreated.self)
-        }
+        let ok = await vm.orderLab(consultationId: id, exams: selectedExams.sorted(), priority: priority, success: L.text("lab.ordered"))
         if ok {
             orderedHere.formUnion(selectedExams)
             _ = DraftStore.shared.save(orderedHere, user: profile.id, key: ConsultationRecordRules.orderedKey(id))
@@ -961,13 +911,9 @@ struct ConsultationView: View {
             guard let saved = await save(value) else { signSaveFailed = true; return }
             version = saved
         }
-        let body = VersionBody(version: version)
-        var signed: ConsultationCommandResult?
-        let ok = await signing.run(id, body: body, success: L.text("consultation.signed")) { key in
-            signed = try await account.client().send("POST", "/consultas/\(id)/firmar", body: body, key: key, as: ConsultationCommandResult.self)
-        }
+        let signed = await vm.sign(consultationId: id, version: version, success: L.text("consultation.signed"))
         handoff = signed?.nextProposal
-        if ok, let key = draftKey {
+        if signed != nil, let key = draftKey {
             DraftStore.shared.clear(user: profile.id, key: key)
             draftSaved = false; draftFailed = false; draftRecovered = false
         }
@@ -1010,24 +956,16 @@ struct ConsultationView: View {
     }
 
     private func callProposed(_ proposal: QueueProposedTicket) async {
-        let body = VersionBody(version: proposal.version)
-        var result: QueueCallResult?
-        let ok = await handoffCall.run(proposal.id, body: body) { key in
-            result = try await account.client().send("POST", "/fila/\(proposal.id)/llamar", body: body, key: key, as: QueueCallResult.self)
-        }
-        if ok {
+        // The view model clears the last undo failure when the call goes through.
+        if let result = await vm.call(proposal) {
             handoff = nil
-            undoing.clearFailure()
-            if let result { lastCall = (result.id, result.version, proposal.code) }
+            lastCall = (result.id, result.version, proposal.code)
         }
     }
 
     private func undoCall() async {
         guard let last = lastCall else { return }
-        let body = VersionBody(version: last.version)
-        let ok = await undoing.run(last.id, body: body, success: String(format: L.text("queue.undone"), last.code)) { key in
-            _ = try await account.client().send("POST", "/fila/\(last.id)/deshacer-llamado", body: body, key: key, as: QueueTransitionResult.self)
-        }
+        let ok = await vm.undoCall(ticketId: last.id, version: last.version, success: String(format: L.text("queue.undone"), last.code))
         if ok { lastCall = nil }
     }
 }
