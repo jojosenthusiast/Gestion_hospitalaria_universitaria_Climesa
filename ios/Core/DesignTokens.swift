@@ -207,10 +207,14 @@ public enum StatusFamily: String, CaseIterable, Sendable {
         // Una cita confirmada o reprogramada espera su hora: no es "Llamado" (megáfono). Mismo mapa que web `familyOfValue`.
         "en_espera": .espera, "solicitada": .espera, "pendiente": .espera, "pendiente_cama": .espera, "borrador": .espera,
         "publicado": .espera, "reservada": .espera, "provisional": .espera, "por_vencer": .espera, "revisar": .espera,
-        "confirmada": .espera, "reprogramada": .espera, "bajo_minimo": .espera,
+        "reprogramada": .espera, "bajo_minimo": .espera,
+        // D96: a bed being cleaned waits (clock); it is not in use like an occupied one (pulse). Same as web and Android.
+        "limpieza": .espera,
         "llamado": .llamado, "en_proceso": .atencion,
         "en_atencion": .atencion, "en_curso": .atencion, "ocupada": .atencion, "hospitalizado": .atencion,
-        "en_servicio": .atencion, "abierta": .atencion, "limpieza": .atencion, "requiere_atencion": .atencion,
+        "en_servicio": .atencion, "abierta": .atencion, "requiere_atencion": .atencion,
+        // D124: a confirmed appointment is settled (check), not pending like a request (striped clock).
+        "confirmada": .listo,
         "atendida": .listo, "atendido": .listo, "completado": .listo, "firmada": .listo, "alta_firmada": .listo, "egresado": .listo, "libre": .listo,
         "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo, "ok": .listo, "coincide": .listo,
         "cancelado": .cerrado, "cancelada": .cerrado, "no_asistio": .cerrado, "no_se_presento": .cerrado, "cerrado": .cerrado,

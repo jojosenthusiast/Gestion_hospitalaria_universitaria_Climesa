@@ -52,7 +52,8 @@ struct LabAttachmentsSection: View {
                 }
             }
             if file.stored {
-                ClimesaButton(title: L.text(opening == file.id ? "lab.attachments.opening" : "lab.attachments.open"), kind: .secondary, loading: opening == file.id) {
+                // Lote 5 S13: the action says what opens: «Ver imagen» or «Ver informe PDF».
+                ClimesaButton(title: opening == file.id ? L.text("lab.attachments.opening") : LabResultView.attachmentAction(mime: file.mimeType), kind: ClimesaButtonKind(CardActionRole.neutral), loading: opening == file.id) {
                     Task { await open(file) }
                 }
                 .disabled(opening != nil)

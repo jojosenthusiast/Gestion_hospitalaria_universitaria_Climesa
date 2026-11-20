@@ -17,11 +17,16 @@ public struct AccessProfile: Codable, Sendable {
     public let patientId: String?
     /// Persona de personal vinculada (médico); la usa la indicación de hospitalización como médico tratante.
     public let staffId: String?
-    public init(id: String, email: String, name: String, roles: [String], platforms: [String], permissions: [Permission], channels: [String] = [], patientId: String? = nil, staffId: String? = nil) {
+    /// D129: name and number of the linked record (`patientName`, `patientRecord` of `/auth/me`); nil without a link or
+    /// from an older API.
+    public let patientName: String?
+    public let patientRecord: String?
+    public init(id: String, email: String, name: String, roles: [String], platforms: [String], permissions: [Permission], channels: [String] = [], patientId: String? = nil, staffId: String? = nil,
+                patientName: String? = nil, patientRecord: String? = nil) {
         self.id=id; self.email=email; self.name=name; self.roles=roles; self.platforms=platforms; self.permissions=permissions; self.channels=channels
-        self.patientId=patientId; self.staffId=staffId
+        self.patientId=patientId; self.staffId=staffId; self.patientName=patientName; self.patientRecord=patientRecord
     }
-    private enum CodingKeys: String, CodingKey { case id, email, name, roles, platforms, permissions, channels, patientId, staffId }
+    private enum CodingKeys: String, CodingKey { case id, email, name, roles, platforms, permissions, channels, patientId, staffId, patientName, patientRecord }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
@@ -34,6 +39,15 @@ public struct AccessProfile: Codable, Sendable {
         channels = try container.decodeIfPresent([String].self, forKey: .channels) ?? []
         patientId = try container.decodeIfPresent(String.self, forKey: .patientId)
         staffId = try container.decodeIfPresent(String.self, forKey: .staffId)
+        patientName = try container.decodeIfPresent(String.self, forKey: .patientName)
+        patientRecord = try container.decodeIfPresent(String.self, forKey: .patientRecord)
+    }
+
+    /// D129: the name to greet. An account without a staff record is a patient: its linked record's name wins (the API
+    /// now sends it as `name` too); a staff member keeps their own name.
+    public var displayName: String {
+        if staffId == nil, let linked = patientName?.trimmingCharacters(in: .whitespacesAndNewlines), !linked.isEmpty { return linked }
+        return name.isEmpty ? (patientName ?? "") : name
     }
     public func hasPermission(_ code: String) -> Bool { permissions.contains { $0.code == code } }
     // Solo se invoca con el perfil verificado que devuelve /auth/me; nunca con metadatos del JWT.

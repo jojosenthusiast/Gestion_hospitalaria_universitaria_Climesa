@@ -117,7 +117,9 @@ final class PlatformParityRulesTests: XCTestCase {
         XCTAssertFalse(NoticeRules.bellIsCritical(scheduled))
         XCTAssertEqual(NoticeRules.badgeText(4), "4")
         XCTAssertEqual(NoticeRules.badgeText(9), "9")
-        XCTAssertEqual(NoticeRules.badgeText(10), "9+")
+        XCTAssertEqual(NoticeRules.badgeText(10), "10")
+        XCTAssertEqual(NoticeRules.badgeText(99), "99")
+        XCTAssertEqual(NoticeRules.badgeText(100), "99+")
         XCTAssertNil(NoticeRules.badgeText(0))
         XCTAssertNil(NoticeRules.badgeText(nil))
     }

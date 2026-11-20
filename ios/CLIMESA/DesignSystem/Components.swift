@@ -1125,3 +1125,102 @@ struct FlowLayout: Layout {
         return rows
     }
 }
+
+// MARK: - Lote 5 (S2, S3): card action roles and required fields
+
+extension ClimesaButtonKind {
+    /// Lote 5 S2: a card action's role picks its look (`CardActionRole.crud`): main step filled, edit outlined primary,
+    /// danger outlined red, neutral outlined grey.
+    init(_ role: CardActionRole) { self.init(role.crud) }
+}
+
+/// Lote 5 S2: one action of a card, drawn by its role, with its own spinner. An action the person can never do is not
+/// passed (never shown disabled).
+struct CardActionButton: View {
+    let title: String
+    let role: CardActionRole
+    var icon: ClimesaIconName? = nil
+    var loading = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s) {
+                if let icon { ClimesaIcon(icon, size: 18).accessibilityHidden(true) }
+                Text(verbatim: title)
+            }
+        }
+        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(role), loading: loading))
+        .disabled(loading)
+    }
+}
+
+/// Label of a `NavigationLink` styled as a card action (`ClimesaButtonStyle(kind: ClimesaButtonKind(role))`).
+struct CardActionLabel: View {
+    let title: String
+    var icon: ClimesaIconName? = nil
+
+    var body: some View {
+        HStack(spacing: Spacing.s) {
+            if let icon { ClimesaIcon(icon, size: 18).accessibilityHidden(true) }
+            Text(verbatim: title)
+        }
+    }
+}
+
+/// Lote 5 S3: a field label with the red «*» of a required field; VoiceOver reads «obligatorio» instead of the mark.
+struct RequiredLabel: View {
+    let label: String
+    var required = false
+
+    var body: some View {
+        let mark = required ? Text(verbatim: " \(FormCopy.requiredMark)").foregroundColor(Theme.danger) : Text(verbatim: "")
+        (Text(verbatim: label).foregroundColor(Theme.ink) + mark)
+            .font(Typo.label)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(Text(verbatim: required ? "\(label), \(FormCopy.requiredSpoken)" : label))
+    }
+}
+
+/// «Los campos con * son obligatorios.» once, above a form that has required fields.
+struct RequiredLegend: View {
+    var body: some View {
+        Text(verbatim: FormCopy.legend).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Lote 5 S3: the answer to «¿se guardó?»: a green check with what was saved and when.
+struct SavedFeedback: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+            ClimesaIcon(.check, size: 16).accessibilityHidden(true)
+            Text(verbatim: text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(Typo.caption).foregroundStyle(Theme.success)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Lote 5 S2: a card's actions on one line when they fit, stacked when they do not (large text, narrow screen). The
+/// line sits inside the card, under its content, so it is clear which card the buttons belong to.
+struct ActionRow<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.s) { content() }
+            VStack(alignment: .leading, spacing: Spacing.s) { content() }
+        }
+    }
+}
+
+/// Lote 5 S13: the flag next to a result: «En rango», «Alto», «Bajo», «Crítico alto»… on its result colour.
+struct LabFlagBadge: View {
+    let flag: LabFlag
+
+    var body: some View {
+        StatusBadge(flag.statusValue, label: flag.label)
+    }
+}

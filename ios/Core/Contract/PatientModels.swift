@@ -39,10 +39,14 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     /// B5: numbers waiting before this one in its area, when the API sends it (today only the issue response does);
     /// nil otherwise, and the public board gives the estimate.
     public var ahead: Int? = nil
+    /// Lote 5 S11: age in years on the ticket's day (`pacientes.ver_nacimiento`) and sex (`pacientes.ver_ficha`); nil on an
+    /// older API or without the permission.
+    public var patientAge: Int? = nil
+    public var patientSex: String? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
-        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead, patientAge, patientSex
     }
 }
 
@@ -415,7 +419,14 @@ public struct MyAccess: Decodable, Sendable, Equatable {
     public let role: String
     public let dataType: String
     public let reason: String
-    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo" }
+    /// D120: true for the urgent read of an ambulance reception; nil from an older API.
+    public var urgent: Bool? = nil
+    /// D130: the person's name, only when the API sends it; otherwise the row shows the role alone.
+    public var name: String? = nil
+    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo", urgent = "urgente", name = "nombre" }
+
+    /// D120: urgent by the API flag, or by the reason text an older API writes.
+    public var isUrgent: Bool { (urgent ?? false) || AccessLogRules.isUrgentReason(reason) }
 }
 
 /// `PublicOccupancyResponse` de `GET /publico/ocupacion`.
@@ -636,4 +647,30 @@ public struct CategoryRequestCommandResult: Decodable, Sendable, Equatable {
     public let version: Int
     public let state: String
     public let appointmentId: String?
+}
+
+/// D128 · `RequestLimitResponse` of `GET /citas/solicitudes-categoria/limite`: pending requests that count for the limit,
+/// the policy maximum, and whether a new one would be accepted (with the server's code and reason). Read tolerantly: a
+/// missing field never fails the read, and a missing `canRequest` counts as allowed.
+public struct CategoryRequestLimit: Decodable, Sendable, Equatable {
+    public let pending: Int
+    public let max: Int
+    public let canRequest: Bool
+    public let code: String?
+    public let reason: String?
+
+    public init(pending: Int, max: Int, canRequest: Bool, code: String? = nil, reason: String? = nil) {
+        self.pending = pending; self.max = max; self.canRequest = canRequest; self.code = code; self.reason = reason
+    }
+
+    enum CodingKeys: String, CodingKey { case pending, max, canRequest, code, reason }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        pending = (try? container.decodeIfPresent(Int.self, forKey: .pending)) ?? 0
+        max = (try? container.decodeIfPresent(Int.self, forKey: .max)) ?? 0
+        canRequest = (try? container.decodeIfPresent(Bool.self, forKey: .canRequest)) ?? true
+        code = try? container.decodeIfPresent(String.self, forKey: .code)
+        reason = try? container.decodeIfPresent(String.self, forKey: .reason)
+    }
 }

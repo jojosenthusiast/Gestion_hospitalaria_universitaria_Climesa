@@ -28,9 +28,9 @@ final class DesignTokensTests: XCTestCase {
     func testApiValuesMapToTheirFamily() {
         let cases: [String: StatusFamily] = [
             "en_espera": .espera, "solicitada": .espera, "pendiente_cama": .espera, "provisional": .espera,
-            "confirmada": .espera, "reprogramada": .espera, "bajo_minimo": .espera,
+            "confirmada": .listo, "reprogramada": .espera, "bajo_minimo": .espera,
             "llamado": .llamado, "en_proceso": .atencion,
-            "limpieza": .atencion, "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
+            "limpieza": .espera, "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
             "atendida": .listo, "atendido": .listo, "alta_firmada": .listo, "libre": .listo, "normal": .listo, "aprobada": .listo,
             "cancelado": .cerrado, "cancelada": .cerrado, "no_se_presento": .cerrado, "en_mantenimiento": .cerrado,
             "critico_alto": .critico, "critico_bajo": .critico
@@ -38,14 +38,15 @@ final class DesignTokensTests: XCTestCase {
         for (value, family) in cases { XCTAssertEqual(StatusFamily.of(value), family, value) }
     }
 
-    /// R2 (I-4): an appointment that is confirmed or rescheduled is waiting for its time, never "Llamado" (megaphone).
+    /// R2 (I-4): a rescheduled or requested appointment waits for its time, never "Llamado" (megaphone). D124: a confirmed
+    /// one is settled (check). D96: a bed in cleaning waits (clock), it is not in attention.
     func testScheduledAppointmentStatesAreWaitingNotCalled() {
-        for value in ["confirmada", "reprogramada", "solicitada"] {
+        for value in ["reprogramada", "solicitada"] {
             XCTAssertEqual(StatusFamily.of(value), .espera, value)
             XCTAssertNotEqual(StatusFamily.of(value), .llamado, value)
         }
-        XCTAssertEqual(StatusBadgeStyle.of("confirmada"), StatusBadgeStyle(label: "Confirmada", family: .espera))
-        XCTAssertEqual(StatusBadgeStyle.of("limpieza"), StatusBadgeStyle(label: "En limpieza", family: .atencion))
+        XCTAssertEqual(StatusBadgeStyle.of("confirmada"), StatusBadgeStyle(label: "Confirmada", family: .listo))
+        XCTAssertEqual(StatusBadgeStyle.of("limpieza"), StatusBadgeStyle(label: "En limpieza", family: .espera))
         XCTAssertEqual(StatusBadgeStyle.of("bajo_minimo"), StatusBadgeStyle(label: "Bajo mínimo", family: .espera))
     }
 

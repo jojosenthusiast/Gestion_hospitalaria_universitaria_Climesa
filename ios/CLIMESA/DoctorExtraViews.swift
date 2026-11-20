@@ -123,7 +123,7 @@ private struct DoctorPatientVitals: View {
                     if items.isEmpty { Text("consultation.vitals.none").font(Typo.small).foregroundStyle(Theme.muted) }
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, sign in
                         if index > 0 { Divider().overlay(Theme.line) }
-                        ListRow(title: ConsultationView.vitalsText(sign), meta: ClimesaDates.short(sign.takenAt))
+                        VitalSignsBlock(sign: sign, when: ClimesaDates.short(sign.takenAt))
                     }
                     // D5 · rule 8: recording depends on `signos.registrar`, never on the role.
                     if VitalsEntryRules.canRecord(account.profile) {
@@ -190,7 +190,8 @@ private struct VitalsEntrySheet: View {
     }
 
     private func binding(_ measure: VitalEntryMeasure) -> Binding<String> {
-        Binding(get: { values[measure] ?? "" }, set: { values[measure] = String($0.prefix(6)) })
+        // D78: digits only (one decimal separator where the measure takes it), at most six characters.
+        Binding(get: { values[measure] ?? "" }, set: { values[measure] = VitalsEntryRules.sanitize(measure, $0) })
     }
 
     private func save() async {

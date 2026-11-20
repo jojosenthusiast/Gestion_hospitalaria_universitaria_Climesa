@@ -25,6 +25,24 @@ public struct QueueNextProposal: Decodable, Sendable, Equatable {
     public let area: String
     public let rule: String
     public let proposal: QueueProposedTicket?
+    /// D74: numbers waiting in the service now, with or without a proposal; nil from an older API.
+    public var waiting: Int? = nil
+    /// D74: `sin_espera`, or `citas_de_otro_medico` (people wait, but with another doctor's appointment); nil with a proposal.
+    public var noProposalReason: String? = nil
+
+    /// D74: how many wait for another doctor when that is why nobody is proposed; nil means "nobody waits".
+    public var waitingForOtherDoctor: Int? {
+        guard proposal == nil, noProposalReason == "citas_de_otro_medico", let waiting, waiting > 0 else { return nil }
+        return waiting
+    }
+
+    /// D74: what the card says without a proposal; nil keeps the plain "Nadie espera" text.
+    public var noProposalText: String? {
+        guard let count = waitingForOtherDoctor else { return nil }
+        return count == 1
+            ? "1 persona espera, pero tiene cita con otro médico dentro de su horario. Por ahora nadie pasa contigo."
+            : "\(count) personas esperan, pero tienen cita con otro médico dentro de su horario. Por ahora nadie pasa contigo."
+    }
 }
 
 /// Board columns; a move between two of them is one server action.

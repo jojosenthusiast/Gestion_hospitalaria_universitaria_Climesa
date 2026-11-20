@@ -48,6 +48,8 @@ struct RoleTabsView:View {
     @State private var notices=NoticeInboxModel()
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var shifts=ShiftModel()
+    /// Lote 5 S9: `GET /me/turno-activo`, read on launch and on each return to the foreground; nil on 404 or failure.
+    @State private var shiftGate:ActiveShiftStatus?
 
     init(profile:AccessProfile,role:String,tabs:[AppTab]) {
         self.profile=profile; self.role=role; self.tabs=tabs
@@ -63,7 +65,9 @@ struct RoleTabsView:View {
                         VStack(alignment:.leading,spacing:Spacing.gap) {
                             content(for:tab)
                         }.padding(Spacing.gutter).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
-                    }.dismissibleKeyboard().safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
+                    }.dismissibleKeyboard().safeAreaInset(edge:.top,spacing:0) {
+                        VStack(spacing:0) { ConnectionBanner(state:live.snapshot.connection); ShiftGateBanner(status:shiftGate) }
+                    }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
                         .climesaNavBar()
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         // Avisos one tap away on every tab (Android/web bell); the count no longer sits on Más.
@@ -83,11 +87,21 @@ struct RoleTabsView:View {
         }
         .onChange(of:live.snapshot.profileVersion) { _,_ in Task { await account.refreshProfile() } }
         .onChange(of:scenePhase) { _,value in
-            if value == .background { live.sceneEnteredBackground() } else if value == .active { live.sceneBecameActive() }
+            if value == .background { live.sceneEnteredBackground() } else if value == .active { live.sceneBecameActive(); Task { await loadShiftGate() } }
         }
+        .task(id:"\(role)#\(live.snapshot.shiftsVersion)") { await loadShiftGate() }
         .onChange(of:role) { _,_ in selection=tabs.first ?? .perfil }
         .onAppear { if let saved=AppTab(rawValue:storedTab),tabs.contains(saved) { selection=saved } }
         .onChange(of:selection) { _,tab in storedTab=tab.rawValue }
+    }
+
+    /// Staff only: a patient never works by shifts. A server without the endpoint (404) or any failure hides the banner;
+    /// the API still refuses a write with 403 `sin_turno_activo` and its message.
+    private func loadShiftGate() async {
+        guard role != "PAC" else { shiftGate=nil; return }
+        do { shiftGate=try await account.client().get(ShiftGate.path,as:ActiveShiftStatus.self) }
+        catch is CancellationError {}
+        catch { shiftGate=nil }
     }
 
     @ViewBuilder private func content(for tab:AppTab)->some View {
@@ -112,7 +126,7 @@ struct RoleTabsView:View {
     }
 }
 
-/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("9+" over nine). Web
+/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("99+" over ninety-nine). Web
 /// `.notices-bell-count`: a white pill with primary text, red only while an in-force critical notice is unread.
 struct NoticesBell:View {
     let model:NoticeInboxModel
@@ -160,6 +174,26 @@ struct ConnectionBanner:View {
     }
 }
 
+/// Lote 5 S9: «Sin turno activo: puedes consultar pero no registrar.» with the next published shift, under the connection line.
+struct ShiftGateBanner:View {
+    let status:ActiveShiftStatus?
+    var body:some View {
+        if ShiftGate.showsBanner(status) {
+            HStack(alignment:.firstTextBaseline,spacing:Spacing.s) {
+                ClimesaIcon(.clock,size:16).accessibilityHidden(true)
+                VStack(alignment:.leading,spacing:2) {
+                    Text(verbatim:ShiftGate.bannerTitle).font(Typo.label).fixedSize(horizontal:false,vertical:true)
+                    if let next=ShiftGate.nextText(status?.next,now:Date()) { Text(verbatim:next).font(Typo.small).fixedSize(horizontal:false,vertical:true) }
+                }
+                Spacer(minLength:0)
+            }
+            .foregroundStyle(Theme.warning).padding(.horizontal,Spacing.gutter).padding(.vertical,Spacing.s)
+            .frame(maxWidth:.infinity,alignment:.leading).background(Theme.warningSoft)
+            .accessibilityElement(children:.combine)
+        }
+    }
+}
+
 struct ShiftsContent:View {
     @EnvironmentObject private var account:AccountModel
     @ObservedObject var model:ShiftModel
@@ -168,6 +202,8 @@ struct ShiftsContent:View {
     @State private var showPast=false
     var body:some View {
         VStack(alignment:.leading,spacing:Spacing.space6) {
+            // Lote 5 S9: «Mis turnos» is read-only; Jefatura publishes and changes them.
+            ReadOnlyBadge(who:"Jefatura de Operaciones",what:"tus turnos")
             if model.loading && model.shifts.isEmpty { Skeleton(label:L.text("shifts.loading")) }
             else if let error=model.error { ErrorStateView(message:error) { Task { await model.load(api:account.api) } } }
             else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty")) }
@@ -226,10 +262,11 @@ struct ProfileContent:View {
         VStack(alignment:.leading,spacing:Spacing.space6) {
             SectionCard {
                 HStack(spacing:Spacing.m) {
-                    Text(verbatim:String((profile.name.isEmpty ? profile.email:profile.name).prefix(1)).uppercased()).font(Typo.heading)
-                        .foregroundStyle(Theme.primaryText).frame(width:48,height:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
+                    // D129: a patient account greets with the linked patient's name.
+                    Text(verbatim:String((profile.displayName.isEmpty ? profile.email:profile.displayName).prefix(1)).uppercased()).font(Typo.heading)
+                        .foregroundStyle(Theme.primaryText).frame(minWidth:48,minHeight:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
                     VStack(alignment:.leading,spacing:2) {
-                        Text(verbatim:profile.name.isEmpty ? L.text("profile.welcome"):profile.name).font(Typo.heading).foregroundStyle(Theme.ink)
+                        Text(verbatim:profile.displayName.isEmpty ? L.text("profile.welcome"):profile.displayName).font(Typo.heading).foregroundStyle(Theme.ink)
                         Text(verbatim:profile.email).font(Typo.small).foregroundStyle(Theme.muted)
                     }
                 }
@@ -242,6 +279,16 @@ struct ProfileContent:View {
             }
             if profile.allowedIOSRoles.count>1 {
                 ClimesaSegmented(title:L.text("profile.work_role"),options:profile.allowedIOSRoles.map { ClimesaSegmented<String>.Option($0,L.text(RolePolicy.labelKey($0))) },selection:$account.role)
+            }
+            // Lote 5 S16: the patient reaches «Quién vio mi expediente» from Perfil too.
+            if AppSection.visible(for:account.role,profile:profile).contains(.accesos) {
+                NavigationLink { PatientSectionView(section:.accesos,profile:profile) } label: {
+                    SectionCard {
+                        ListRow(title:L.text("section.accesos"),subtitle:L.text("profile.accesos.hint")) {
+                            ClimesaIcon(.chevron,size:16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                        }
+                    }
+                }.buttonStyle(.plain)
             }
             ClimesaButton(title:L.text("profile.refresh"),kind:.secondary) { Task { await account.refreshProfile() } }
             // Rojo solo para lo crítico: cerrar sesión es una acción secundaria.

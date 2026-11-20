@@ -39,7 +39,8 @@ struct PatientHomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
+            // D68: the banner also stays to confirm «Enterado» or «Recordarme» where they were asked.
+            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty || notices.bannerDone != nil { CriticalNoticeBanner(model: notices) }
             if !linked { linkCard }
             if requestSent { PatientNotice(text: L.text("appointments.category.sent")) }
             LoadState(loader: loader, retry: load) { home in
@@ -642,20 +643,28 @@ private struct RescheduleAppointmentSheet: View {
                 SectionCard { ListRow(title: ClimesaDates.short(appointment.start), subtitle: appointment.doctorName) }
                 Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 SectionTitle("appointments.date")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Spacing.s) {
-                        ForEach(DayChipRules.days(from: Date()), id: \.self) { option in
-                            Button { day = option } label: {
-                                Text(verbatim: DayChipRules.label(option, today: Date())).font(Typo.label)
-                                    .padding(.horizontal, Spacing.m).frame(minHeight: 44)
-                                    .background(day == option ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
-                                    .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(day == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
-                                    .foregroundStyle(day == option ? Theme.onPrimary : Theme.ink)
-                                    .contentShape(Rectangle())
+                // D126: the chosen day chip always comes fully into view, never half cut at the edge.
+                ScrollViewReader { chips in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Spacing.s) {
+                            ForEach(DayChipRules.days(from: Date()), id: \.self) { option in
+                                Button { day = option } label: {
+                                    Text(verbatim: DayChipRules.label(option, today: Date())).font(Typo.label)
+                                        .padding(.horizontal, Spacing.m).frame(minHeight: 44)
+                                        .background(day == option ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                                        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(day == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
+                                        .foregroundStyle(day == option ? Theme.onPrimary : Theme.ink)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .id(option)
+                                .accessibilityAddTraits(day == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(day == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
                         }
+                        .padding(.horizontal, 1)
+                    }
+                    .onChange(of: day) { _, picked in
+                        withAnimation(.easeOut(duration: 0.2)) { chips.scrollTo(picked, anchor: .center) }
                     }
                 }
                 SectionTitle("appointments.slots")
@@ -729,9 +738,9 @@ private struct MyCategoryRequests: View {
 
     @ViewBuilder private func requestCard(_ item: CategoryRequest) -> some View {
             SectionCard {
-                ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note) {
-                    PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
-                }
+                // D123: the state goes on its own line above, so the reasons and the note keep the full width.
+                PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
+                ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note)
                 if let appointment = item.appointment {
                     Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.short(appointment.start)))
                         .font(Typo.small).foregroundStyle(Theme.primary)
@@ -771,10 +780,27 @@ private struct CategoryRequestSheet: View {
     @State private var doctor: AppointmentCatalogs.Doctor?
     /// R2: «Con turno (N)» is the default chip; «Todos (N)» shows the doctors without a shift today too.
     @State private var shiftFilter: DoctorShiftFilter = .conTurno
+    /// D128: the server's request limit, read when the sheet opens; nil until it answers or from an older API.
+    @State private var limit: CategoryRequestLimit?
 
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "appointments.request.title", onClose: { dismiss() }) {
+                if CategoryRequestRules.blocked(limit), let limit {
+                    // D128 (S12): at the limit the server's reason shows first and nothing can be filled or sent.
+                    PatientNotice(text: CategoryRequestRules.limitText(limit), failure: true)
+                    ClimesaButton(title: CategoryRequestRules.backToAppointments, kind: .secondary) { dismiss() }
+                } else {
+                    form
+                }
+            }
+            .task { await loadLimit() }
+            .task { await loadCategories() }
+            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
+        }
+    }
+
+    @ViewBuilder private var form: some View {
                 Group {
                 SectionTitle("appointments.category.reason")
                 Text(verbatim: String(format: L.text("appointments.category.count"), picked.count)).font(Typo.caption).foregroundStyle(Theme.muted)
@@ -782,8 +808,13 @@ private struct CategoryRequestSheet: View {
                 LoadState(loader: categories, retry: loadCategories) { list in
                     let visible = CategoryRequestRules.filter(list, query: query, picked: picked)
                     if visible.isEmpty { EmptyStateView(title: L.text("appointments.category.none")) }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
-                        ForEach(visible) { category in categoryButton(category) }
+                    // Lote 5 S16: grouped by body area (Cuerpo, Interno y digestivo, Mente y emociones, Sentidos, General).
+                    ForEach(CategoryGroups.sections(visible)) { section in
+                        Text(verbatim: section.group.title).font(Typo.label).foregroundStyle(Theme.muted).padding(.top, Spacing.s)
+                            .accessibilityAddTraits(.isHeader)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
+                            ForEach(section.categories) { category in categoryButton(category) }
+                        }
                     }
                 }
                 }
@@ -797,10 +828,12 @@ private struct CategoryRequestSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.category.submit"), loading: submission.busy) { Task { await send() } }
                     .disabled(!CategoryRequestRules.canSend(picked: picked, note: note))
-            }
-            .task { await loadCategories() }
-            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
-        }
+    }
+
+    /// D128: asks the server whether a new request would be accepted; a failure (older API) leaves the form open as before.
+    private func loadLimit() async {
+        guard let api = try? account.client() else { return }
+        limit = try? await api.get(CategoryRequestRules.limitPath, as: CategoryRequestLimit.self)
     }
 
     private func categoryButton(_ category: AppointmentCategory) -> some View {
@@ -960,6 +993,8 @@ struct LabOrderRow: View {
     let critical: Bool
     /// The patient's own list does not repeat their name on every row.
     var showPatient = true
+    /// Lote 5 S13: «2 fuera de rango · 1 crítico» for the doctor's list; nil hides it.
+    var summary: String? = nil
     /// A row inside a `ListCard`, not a card of its own (I-9).
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
@@ -973,8 +1008,11 @@ struct LabOrderRow: View {
                 if order.priority == .urgente { PriorityBadge(order.priority.rawValue) }
                 if critical { PatientTag("critico_alto", label: L.text("results.critical")) }
             }
-            .padding(.bottom, Spacing.s)
+            if let summary {
+                Text(verbatim: summary).font(Typo.small).foregroundStyle(critical ? Theme.danger : Theme.warning)
+            }
         }
+        .padding(.bottom, Spacing.s)
         .contentShape(Rectangle())
     }
 }
@@ -1008,6 +1046,10 @@ struct LabOrderDetail: View {
             // R7 C1: the doctor's note for the patient arrives only with the released results.
             if !staffView, showValues, let note = order.patientNote, !note.isEmpty { PatientNotice(text: String(format: L.text("exams.doctorNote"), note)) }
             ForEach(order.items) { item in
+                if staffView && showValues {
+                    // Lote 5 S13: each component with its value, unit, range and a coloured flag, so the review is not monotonous.
+                    StaffLabResultCard(item: item)
+                } else {
                 SectionCard(title: staffView ? "\(item.name) (\(item.code))" : item.name) {
                     if showValues {
                         HStack {
@@ -1032,8 +1074,53 @@ struct LabOrderDetail: View {
                         }
                     }
                 }
+                }
             }
         }
+    }
+}
+
+/// Lote 5 S13 · one result component for the doctor: name and code, the value large with its unit, the reference range
+/// and the flag (En rango, Alto, Bajo, Crítico) on its colour; a critical value gets a red edge on the whole card.
+struct StaffLabResultCard: View {
+    let item: LabOrderItem
+
+    var body: some View {
+        let flag = LabResultView.flag(item)
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+                Text(verbatim: item.name).font(Typo.subheading).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: item.code).font(Typo.caption).foregroundStyle(Theme.muted)
+                Spacer(minLength: Spacing.s)
+                LabFlagBadge(flag: flag)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
+                Text(verbatim: LabResultCopy.value(item)).font(Typo.heading).foregroundStyle(flag.critical ? Theme.danger : Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if item.result?.value != nil, let unit = item.unit, !unit.isEmpty { Text(verbatim: unit).font(Typo.label).foregroundStyle(Theme.muted) }
+            }
+            if let range = PatientLabRules.rangeText(item.referenceRange) {
+                Text(verbatim: String(format: L.text("results.range"), range)).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            if let observation = LabFollowUpRules.labNote(item.result, staffView: true) {
+                Text(verbatim: String(format: L.text(item.result?.relevant == true ? "exams.observation.relevant" : "exams.observation"), observation))
+                    .font(Typo.small).foregroundStyle(item.result?.relevant == true ? Theme.ink : Theme.muted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(flag.critical ? Theme.dangerSoft : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(flag.critical ? Theme.danger : (flag.outOfRange ? Theme.warning : Theme.line), lineWidth: flag.outOfRange ? 2 : 1))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The value shown for a result: the number without its unit, the written result, or «Pendiente».
+enum LabResultCopy {
+    static func value(_ item: LabOrderItem) -> String {
+        guard let result = item.result else { return LabFlag.pending.label }
+        if result.value != nil { return PatientLabRules.valueText(result, unit: nil) }
+        return result.text ?? "—"
     }
 }
 
@@ -1214,24 +1301,31 @@ private struct HistoryContent: View {
                                 meta: consultation.diagnoses.isEmpty ? nil : consultation.diagnoses.map { "\($0.code) \($0.description)" }.joined(separator: " · ")) {
                             PatientTag(consultation.state.rawValue, label: consultation.state.label)
                         }
+                        // Lote 5 S16: the row says when the consultation left a prescription, opened in its detail.
+                        if !consultation.prescriptions.isEmpty {
+                            Label { Text(verbatim: HistoryCopy.prescriptionLine(consultation.prescriptions.reduce(0) { $0 + $1.items.count })) } icon: { ClimesaIcon(.clipboard, size: 14) }
+                                .font(Typo.small).foregroundStyle(Theme.primaryText)
+                        }
                     }
                 }.buttonStyle(.plain)
             }
             SectionTitle("history.laboratory")
             if history.laboratory.isEmpty { EmptyStateView(title: L.text("history.none")) }
-            ForEach(history.laboratory) { order in
-                SectionCard {
-                    ListRow(title: ClimesaDates.display(order.createdAt, .date)) { PatientTag(order.state.rawValue, label: order.state.label) }
-                    ForEach(order.items) { item in
-                        HStack {
-                            Text(verbatim: item.name).font(Typo.small).foregroundStyle(Theme.ink)
-                            Spacer()
-                            if let result = item.result {
-                                Text(verbatim: PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark), unit: item.unit)).font(Typo.mono).foregroundStyle(Theme.ink)
-                                if let mark = result.mark { PatientTag(mark.rawValue, label: mark.label) }
+            // Lote 5 S15: one row per order (exams, date, how many fell out of range); its detail says why it was ordered.
+            ForEach(ClinicalRecordLab.rows(history)) { row in
+                if let order = history.laboratory.first(where: { $0.id == row.orderId }) {
+                    NavigationLink {
+                        ScreenFrame(title: "history.lab.detail") { RecordLabDetail(order: order, history: history, viewerIsPatient: viewerIsPatient) }
+                    } label: {
+                        SectionCard {
+                            ListRow(title: row.exams, subtitle: ClinicalRecordLab.summary(row), meta: ClimesaDates.display(row.orderedAt, .date)) {
+                                HStack(spacing: Spacing.s) {
+                                    PatientTag(order.state.rawValue, label: order.state.label)
+                                    ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                }
                             }
                         }
-                    }
+                    }.buttonStyle(.plain)
                 }
             }
             if !viewerIsPatient && !history.admissions.isEmpty {
@@ -1240,6 +1334,59 @@ private struct HistoryContent: View {
                     SectionCard {
                         ListRow(title: ClimesaDates.display(admission.createdAt, .date), subtitle: admission.doctor.name) {
                             PatientTag(admission.state.rawValue, label: admission.state.label)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Copy of the record list that depends on a count.
+enum HistoryCopy {
+    static func prescriptionLine(_ medicines: Int) -> String {
+        medicines == 1 ? "Con receta · 1 medicamento" : "Con receta · \(medicines) medicamentos"
+    }
+}
+
+/// Lote 5 S15 · one order of the record: «Por qué se pidió» (consultation, doctor, reason, diagnoses), then its results.
+private struct RecordLabDetail: View {
+    let order: ClinicalHistory.LabOrder
+    let history: ClinicalHistory
+    var viewerIsPatient = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionCard(title: L.text("history.lab.why")) {
+                if let origin = LabOriginRules.of(history, consultationId: order.consultationId) {
+                    ListRow(title: String(format: L.text("history.lab.origin"), ClimesaDates.display(origin.date, .date)),
+                            subtitle: origin.doctor ?? L.text("history.doctor.unknown"))
+                    if let reason = origin.reason {
+                        Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(origin.diagnoses, id: \.self) { diagnosis in
+                        Text(verbatim: diagnosis).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Text("history.lab.noOrigin").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            SectionCard {
+                ListRow(title: L.text("history.lab.ordered"), meta: ClimesaDates.display(order.createdAt, .date)) {
+                    PatientTag(order.state.rawValue, label: order.state.label)
+                }
+                if let row = ClinicalRecordLab.rows(history).first(where: { $0.orderId == order.id }) {
+                    Text(verbatim: ClinicalRecordLab.summary(row)).font(Typo.label).foregroundStyle(Theme.warning)
+                }
+            }
+            SectionCard(title: L.text("history.laboratory")) {
+                ForEach(order.items) { item in
+                    HStack {
+                        Text(verbatim: item.name).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        if let result = item.result {
+                            Text(verbatim: PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark), unit: item.unit)).font(Typo.mono).foregroundStyle(Theme.ink)
+                            if let mark = result.mark { PatientTag(mark.rawValue, label: mark.label) }
                         }
                     }
                 }
@@ -1454,18 +1601,32 @@ struct MyAccessView: View {
     }
 
     @ViewBuilder private func accessDay(_ day: AccessLogRules.Day, now: Date) -> some View {
-        ListCard(title: ClimesaDates.shortDay(day.day, now: now), items: Array(day.rows.enumerated()).map { AccessItem(index: $0.offset, row: $0.element) }) { item in
-            ListRow(title: String(format: L.text("accesses.row"), RoleNames.label(item.row.role), item.row.dataType),
-                    subtitle: String(format: L.text("accesses.reason"), item.row.reason), meta: ClimesaDates.display(item.row.date, .time))
+        // D130: a burst of the same access is one row; who and what in plain words; an urgent access is marked.
+        let groups = AccessLogRules.collapse(day.rows)
+        ListCard(title: ClimesaDates.shortDay(day.day, now: now), items: Array(groups.enumerated()).map { AccessItem(index: $0.offset, group: $0.element) }) { item in
+            let row = item.group.row
+            ListRow(title: AccessLogRules.who(row, roleLabel: RoleNames.label(row.role)),
+                    subtitle: [AccessLogRules.detail(row), AccessLogRules.burstText(item.group.count)].compactMap { $0 }.joined(separator: " · "),
+                    meta: accessTime(item.group)) {
+                if row.isUrgent { PatientTag("critico_alto", label: AccessLogRules.urgentLabel) }
+            }
         }
+    }
+
+    /// One time, or «HH:mm a HH:mm» when the row stands for a burst.
+    private func accessTime(_ group: AccessLogRules.Group) -> String {
+        let last = ClimesaDates.display(group.latest, .time)
+        guard group.count > 1 else { return last }
+        let first = ClimesaDates.display(group.earliest, .time)
+        return first == last ? last : "\(first) a \(last)"
     }
 
     private func load() async { await loader.load { try await account.client().get("/me/accesos", as: [MyAccess].self) } }
 }
 
-/// One row of a day of «Quién vio mi expediente» (rows have no id of their own).
+/// One row (one access or one burst, D130) of a day of «Quién vio mi expediente» (rows have no id of their own).
 private struct AccessItem: Identifiable {
     let index: Int
-    let row: MyAccess
+    let group: AccessLogRules.Group
     var id: Int { index }
 }
