@@ -301,6 +301,8 @@ public enum CategoryRequestRules {
     /// D128: `GET /citas/solicitudes-categoria/limite`, read when «Pedir una cita» opens.
     public static let limitPath = "\(path)/limite"
 
+    public static let backToAppointments = "Volver a mis citas"
+
     /// D128: the limit is reached, so the form is closed before the patient fills it (S12). Unknown (nil) never blocks.
     public static func blocked(_ limit: CategoryRequestLimit?) -> Bool { limit?.canRequest == false }
 

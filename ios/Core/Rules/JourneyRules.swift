@@ -251,6 +251,9 @@ public enum AccessLogRules {
 
     /// D130: «3 accesos seguidos» for a collapsed burst; nil for a single access.
     public static func burstText(_ count: Int) -> String? { count > 1 ? "\(count) accesos seguidos" : nil }
+
+    /// D130 / D120: the tag on an urgent access row.
+    public static let urgentLabel = "Urgente"
 }
 
 /// «Mis solicitudes»: pending ones stay in view; assigned, rejected or withdrawn ones fold under one line.

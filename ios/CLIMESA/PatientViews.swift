@@ -643,20 +643,28 @@ private struct RescheduleAppointmentSheet: View {
                 SectionCard { ListRow(title: ClimesaDates.short(appointment.start), subtitle: appointment.doctorName) }
                 Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 SectionTitle("appointments.date")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Spacing.s) {
-                        ForEach(DayChipRules.days(from: Date()), id: \.self) { option in
-                            Button { day = option } label: {
-                                Text(verbatim: DayChipRules.label(option, today: Date())).font(Typo.label)
-                                    .padding(.horizontal, Spacing.m).frame(minHeight: 44)
-                                    .background(day == option ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
-                                    .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(day == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
-                                    .foregroundStyle(day == option ? Theme.onPrimary : Theme.ink)
-                                    .contentShape(Rectangle())
+                // D126: the chosen day chip always comes fully into view, never half cut at the edge.
+                ScrollViewReader { chips in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Spacing.s) {
+                            ForEach(DayChipRules.days(from: Date()), id: \.self) { option in
+                                Button { day = option } label: {
+                                    Text(verbatim: DayChipRules.label(option, today: Date())).font(Typo.label)
+                                        .padding(.horizontal, Spacing.m).frame(minHeight: 44)
+                                        .background(day == option ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                                        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(day == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
+                                        .foregroundStyle(day == option ? Theme.onPrimary : Theme.ink)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .id(option)
+                                .accessibilityAddTraits(day == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(day == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
                         }
+                        .padding(.horizontal, 1)
+                    }
+                    .onChange(of: day) { _, picked in
+                        withAnimation(.easeOut(duration: 0.2)) { chips.scrollTo(picked, anchor: .center) }
                     }
                 }
                 SectionTitle("appointments.slots")
@@ -730,9 +738,9 @@ private struct MyCategoryRequests: View {
 
     @ViewBuilder private func requestCard(_ item: CategoryRequest) -> some View {
             SectionCard {
-                ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note) {
-                    PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
-                }
+                // D123: the state goes on its own line above, so the reasons and the note keep the full width.
+                PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
+                ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note)
                 if let appointment = item.appointment {
                     Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.short(appointment.start)))
                         .font(Typo.small).foregroundStyle(Theme.primary)
@@ -772,10 +780,27 @@ private struct CategoryRequestSheet: View {
     @State private var doctor: AppointmentCatalogs.Doctor?
     /// R2: «Con turno (N)» is the default chip; «Todos (N)» shows the doctors without a shift today too.
     @State private var shiftFilter: DoctorShiftFilter = .conTurno
+    /// D128: the server's request limit, read when the sheet opens; nil until it answers or from an older API.
+    @State private var limit: CategoryRequestLimit?
 
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "appointments.request.title", onClose: { dismiss() }) {
+                if CategoryRequestRules.blocked(limit), let limit {
+                    // D128 (S12): at the limit the server's reason shows first and nothing can be filled or sent.
+                    PatientNotice(text: CategoryRequestRules.limitText(limit), failure: true)
+                    ClimesaButton(title: CategoryRequestRules.backToAppointments, kind: .secondary) { dismiss() }
+                } else {
+                    form
+                }
+            }
+            .task { await loadLimit() }
+            .task { await loadCategories() }
+            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
+        }
+    }
+
+    @ViewBuilder private var form: some View {
                 Group {
                 SectionTitle("appointments.category.reason")
                 Text(verbatim: String(format: L.text("appointments.category.count"), picked.count)).font(Typo.caption).foregroundStyle(Theme.muted)
@@ -803,10 +828,12 @@ private struct CategoryRequestSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.category.submit"), loading: submission.busy) { Task { await send() } }
                     .disabled(!CategoryRequestRules.canSend(picked: picked, note: note))
-            }
-            .task { await loadCategories() }
-            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
-        }
+    }
+
+    /// D128: asks the server whether a new request would be accepted; a failure (older API) leaves the form open as before.
+    private func loadLimit() async {
+        guard let api = try? account.client() else { return }
+        limit = try? await api.get(CategoryRequestRules.limitPath, as: CategoryRequestLimit.self)
     }
 
     private func categoryButton(_ category: AppointmentCategory) -> some View {
@@ -1574,18 +1601,32 @@ struct MyAccessView: View {
     }
 
     @ViewBuilder private func accessDay(_ day: AccessLogRules.Day, now: Date) -> some View {
-        ListCard(title: ClimesaDates.shortDay(day.day, now: now), items: Array(day.rows.enumerated()).map { AccessItem(index: $0.offset, row: $0.element) }) { item in
-            ListRow(title: String(format: L.text("accesses.row"), RoleNames.label(item.row.role), item.row.dataType),
-                    subtitle: String(format: L.text("accesses.reason"), item.row.reason), meta: ClimesaDates.display(item.row.date, .time))
+        // D130: a burst of the same access is one row; who and what in plain words; an urgent access is marked.
+        let groups = AccessLogRules.collapse(day.rows)
+        ListCard(title: ClimesaDates.shortDay(day.day, now: now), items: Array(groups.enumerated()).map { AccessItem(index: $0.offset, group: $0.element) }) { item in
+            let row = item.group.row
+            ListRow(title: AccessLogRules.who(row, roleLabel: RoleNames.label(row.role)),
+                    subtitle: [AccessLogRules.detail(row), AccessLogRules.burstText(item.group.count)].compactMap { $0 }.joined(separator: " · "),
+                    meta: accessTime(item.group)) {
+                if row.isUrgent { PatientTag("critico_alto", label: AccessLogRules.urgentLabel) }
+            }
         }
+    }
+
+    /// One time, or «HH:mm a HH:mm» when the row stands for a burst.
+    private func accessTime(_ group: AccessLogRules.Group) -> String {
+        let last = ClimesaDates.display(group.latest, .time)
+        guard group.count > 1 else { return last }
+        let first = ClimesaDates.display(group.earliest, .time)
+        return first == last ? last : "\(first) a \(last)"
     }
 
     private func load() async { await loader.load { try await account.client().get("/me/accesos", as: [MyAccess].self) } }
 }
 
-/// One row of a day of «Quién vio mi expediente» (rows have no id of their own).
+/// One row (one access or one burst, D130) of a day of «Quién vio mi expediente» (rows have no id of their own).
 private struct AccessItem: Identifiable {
     let index: Int
-    let row: MyAccess
+    let group: AccessLogRules.Group
     var id: Int { index }
 }

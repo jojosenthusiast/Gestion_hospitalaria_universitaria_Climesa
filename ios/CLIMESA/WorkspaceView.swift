@@ -262,10 +262,11 @@ struct ProfileContent:View {
         VStack(alignment:.leading,spacing:Spacing.space6) {
             SectionCard {
                 HStack(spacing:Spacing.m) {
-                    Text(verbatim:String((profile.name.isEmpty ? profile.email:profile.name).prefix(1)).uppercased()).font(Typo.heading)
+                    // D129: a patient account greets with the linked patient's name.
+                    Text(verbatim:String((profile.displayName.isEmpty ? profile.email:profile.displayName).prefix(1)).uppercased()).font(Typo.heading)
                         .foregroundStyle(Theme.primaryText).frame(minWidth:48,minHeight:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
                     VStack(alignment:.leading,spacing:2) {
-                        Text(verbatim:profile.name.isEmpty ? L.text("profile.welcome"):profile.name).font(Typo.heading).foregroundStyle(Theme.ink)
+                        Text(verbatim:profile.displayName.isEmpty ? L.text("profile.welcome"):profile.displayName).font(Typo.heading).foregroundStyle(Theme.ink)
                         Text(verbatim:profile.email).font(Typo.small).foregroundStyle(Theme.muted)
                     }
                 }
