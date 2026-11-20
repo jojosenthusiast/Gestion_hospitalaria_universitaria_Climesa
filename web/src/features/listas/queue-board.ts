@@ -1,5 +1,5 @@
 /** Reglas puras del tablero de la fila del día (ronda 2, obs. 13). */
-export type BoardTicket = { id: string; service: string; numero: number; patientName?: string | null; state: string; llamados: number; issuedAt: string };
+export type BoardTicket = { id: string; service: string; numero: number; patientName?: string | null; state: string; llamados: number; issuedAt: string; calledAt?: string | null };
 
 export type Column = 'espera' | 'llamado' | 'atencion' | 'cerrado';
 export const COLUMN_LABEL: Record<Column, string> = { espera: 'En espera', llamado: 'Llamados', atencion: 'En atención', cerrado: 'Terminados' };
@@ -12,6 +12,11 @@ export const columnOf = (ticket: Pick<BoardTicket, 'state'>): Column =>
 export const serviceNames: Record<string, string> = { consulta_general: 'Consulta general', emergencia: 'Emergencia', laboratorio: 'Laboratorio', admisiones: 'Admisiones' };
 
 export const waitMinutes = (ticket: Pick<BoardTicket, 'issuedAt'>, now: number) => Math.max(0, Math.floor((now - Date.parse(ticket.issuedAt)) / 60_000));
+/** Audit D48: the wait a patient lived, from issue to the first call (calledAt); null when never called and no longer waiting. */
+export const waitUntilCall = (ticket: Pick<BoardTicket, 'issuedAt' | 'calledAt' | 'state'>, now: number): number | null => {
+  if (ticket.calledAt) return Math.max(0, Math.floor((Date.parse(ticket.calledAt) - Date.parse(ticket.issuedAt)) / 60_000));
+  return ticket.state === 'en_espera' ? waitMinutes(ticket, now) : null;
+};
 
 /** Meta visual de espera (minutos): guía de la pantalla, no una regla de negocio. */
 export const WAIT_GOAL = { warn: 20, late: 45 } as const;

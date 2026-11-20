@@ -15,7 +15,7 @@ import { LiveSearch, matches } from './listas/chips';
 import { patientFacts } from './listas/patient-facts';
 import { Segmented } from '../components/segmented';
 import { formatDuration, formatTime, plural } from '../lib/format';
-import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, waitingSplit, waitingSplitText, serviceNames, sortColumn, waitLevel, waitMinutes, type BoardTicket, type Column } from './listas/queue-board';
+import { COLUMNS, COLUMN_LABEL, COLUMN_TONE, boardSummary, columnOf, waitingSplit, waitingSplitText, serviceNames, sortColumn, waitLevel, waitMinutes, waitUntilCall, type BoardTicket, type Column } from './listas/queue-board';
 import './listas/lists.css';
 import { CategoryBadges, type CategoryRef } from '../components/category';
 import { QueueCardMenu, type CardMenuItem } from './queue/card-menu';
@@ -42,8 +42,8 @@ const finalNames: Record<string, string> = { atendido: 'Atendido', no_se_present
 const TOAST_MS = 8000;
 /** Audit D49: the export file carries the day it was taken (El Salvador date). */
 const dayStamp = (now: number) => new Date(now - 6 * 3_600_000).toISOString().slice(0, 10);
-/** Audit D48: a number that is no longer waiting has no running wait (the API does not send when it was called). */
-const stillWaiting = (ticket: Pick<QueueTicket, 'state'>) => ticket.state === 'en_espera' || ticket.state === 'llamado';
+/** Audit D48: the exported wait runs from issue to the first call; a number never called and no longer waiting shows «—». */
+const waitText = (ticket: QueueTicket, now: number) => { const minutes = waitUntilCall(ticket, now); return minutes === null ? '—' : minutesText(minutes); };
 /** Audit D47: a finished number exports its real outcome (Atendido, No se presentó, Anulado), not the column name. */
 const exportState = (ticket: QueueTicket) => columnOf(ticket) === 'cerrado' ? finalNames[ticket.state] ?? ticket.state : COLUMN_LABEL[columnOf(ticket)];
 /**
@@ -196,7 +196,7 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
         const visible = loadedVisible;
         const shown = visible.map(t => ({ ...t, column: (pending[t.id] ?? columnOf(t)) as Column }));
         const summary = boardSummary(visible, now);
-        const exportTable = () => ({ filename: `fila-del-dia-${dayStamp(now)}`, title: 'Fila del día', subtitle: `${visible.length} números`, columns: ['Número', 'Servicio', 'Paciente', 'Prioridad', 'Cita', 'Estado', 'Llamados', 'Emitido', 'Espera'], rows: visible.map(t => [ticketCode(t), serviceNames[t.service] ?? t.service, t.patientName ?? 'Paciente no identificado', PRIORITY_LABEL[t.priority ?? 'rutina'], t.appointmentAt ? localTime(t.appointmentAt) : 'Sin cita', exportState(t), t.llamados, formatDateTime(t.issuedAt, { withYear: true }), stillWaiting(t) ? minutesText(waitMinutes(t, now)) : '—']) });
+        const exportTable = () => ({ filename: `fila-del-dia-${dayStamp(now)}`, title: 'Fila del día', subtitle: `${visible.length} números`, columns: ['Número', 'Servicio', 'Paciente', 'Prioridad', 'Cita', 'Estado', 'Llamados', 'Emitido', 'Espera'], rows: visible.map(t => [ticketCode(t), serviceNames[t.service] ?? t.service, t.patientName ?? 'Paciente no identificado', PRIORITY_LABEL[t.priority ?? 'rutina'], t.appointmentAt ? localTime(t.appointmentAt) : 'Sin cita', exportState(t), t.llamados, formatDateTime(t.issuedAt, { withYear: true }), waitText(t, now)]) });
         return <>
           <div className="cl-toolbar qb-toolbar">
             <LiveSearch label="Buscar en la fila" placeholder="Número o paciente" value={query} onChange={setQuery} />
