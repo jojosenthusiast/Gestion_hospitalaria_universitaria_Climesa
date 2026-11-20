@@ -288,7 +288,13 @@
 .shift-band.is-guardia { border-left-color: var(--ink); }
 .shift-band-name { font-size: 0.8125rem; font-weight: 700; }
 .shift-band-count { font-size: 0.875rem; font-variant-numeric: tabular-nums; }
-.shift-band-roles { grid-column: 1 / -1; color: var(--muted); font-size: 0.75rem; line-height: 1.35; }
+.shift-band-bar { grid-column: 1 / -1; display: flex; gap: 2px; height: 6px; margin: 4px 0 2px; border-radius: 999px; overflow: hidden; }
+.shift-band-bar > span { min-width: 3px; background: var(--id-fg, var(--muted)); }
+.shift-band-roles { grid-column: 1 / -1; margin: 0; padding: 0; list-style: none; display: grid; gap: 1px; font-size: 0.75rem; line-height: 1.45; }
+.shift-band-roles > li { display: grid; grid-template-columns: 8px minmax(0, 1fr) auto; align-items: center; gap: 6px; }
+.shift-band-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--id-fg, var(--muted)); }
+.shift-band-role { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shift-band-n { color: var(--ink); font-weight: 700; font-variant-numeric: tabular-nums; }
 .shift-summary-gaps li { font-size: 0.75rem; font-variant-numeric: tabular-nums; }
 .shift-gap-tag { padding: 0 6px; border: 1px dashed var(--priority-urgente); border-radius: 4px; color: var(--priority-urgente); font-size: 0.6875rem; font-weight: 700; letter-spacing: 0.03em; text-transform: uppercase; }
 .shift-summary-more { color: var(--muted); }

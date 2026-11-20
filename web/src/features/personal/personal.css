@@ -17,7 +17,9 @@
 .personal-table td.cell-person strong { overflow-wrap: anywhere; }
 .personal-table td.cell-person small { font-size: 14px; }
 .personal-account { display: flex; align-items: center; gap: 10px; min-width: 0; }
-.personal-account-email { color: var(--ink); font-size: 14px; overflow-wrap: anywhere; }
+.personal-account-email { min-width: 0; color: var(--ink); font-size: 14px; overflow-wrap: break-word; word-break: break-word; }
+/* An invitation tag is wider than the check mark: stack it over the email so the email keeps the full cell width. */
+.personal-account.has-invitation { flex-direction: column; align-items: flex-start; gap: 6px; }
 .personal-account-mark { display: inline-grid; place-items: center; flex: 0 0 auto; width: 28px; height: 28px; border-radius: 999px; }
 .personal-account-mark.is-on { background: var(--success-soft); color: var(--success); }
 .personal-account-mark.is-off { background: var(--soft); color: var(--ink); }

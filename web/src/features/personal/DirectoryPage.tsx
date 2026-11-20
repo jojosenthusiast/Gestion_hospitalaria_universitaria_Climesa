@@ -29,7 +29,7 @@ function AccountCell({ account, showEmail }: { account: UserAccount | null; show
   const invitation = account.invitationState && invitationLabels[account.invitationState];
   const active = account.state === 'activo';
   const label = active ? 'Cuenta activa' : 'Cuenta desactivada';
-  return <div className="personal-account">
+  return <div className={`personal-account${invitation ? ' has-invitation' : ''}`}>
     {invitation
       ? <Tag value={account.invitationState === 'enviada' ? 'pendiente' : 'cancelada'} label={invitation} />
       : <span className={`personal-account-mark ${active ? 'is-on' : 'is-off'}`} role="img" aria-label={label} title={label}><Icon name={active ? 'check' : 'close'} size={18} /></span>}
