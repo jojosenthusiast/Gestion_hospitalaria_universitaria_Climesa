@@ -439,7 +439,7 @@
 .chart-svg { width: 100%; height: auto; display: block; overflow: visible; }
 .chart-grid { stroke: var(--line); stroke-width: 1; }
 .chart-threshold { stroke: var(--warning); stroke-width: 1.4; stroke-dasharray: 5 4; }
-.chart-value { fill: var(--ink); font-size: 11px; font-weight: 700; }
+.chart-value { fill: var(--ink); font-size: 11px; font-weight: 700; paint-order: stroke; stroke: var(--surface); stroke-width: 4px; stroke-linejoin: round; } /* the halo keeps a bar value readable over the dashed goal line */
 .chart-axis { fill: var(--muted); font-size: 10.5px; }
 /* BarChart draws at the card width (1:1), so it scrolls sideways on a very narrow card instead of shrinking its text. */
 .chart-frame { min-width: 0; overflow-x: auto; }
