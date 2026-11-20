@@ -153,3 +153,7 @@
 .record-table tbody tr.is-new > * { background: var(--soft); }
 .record-table tbody tr.is-new > :first-child { box-shadow: inset 3px 0 0 var(--primary); }
 .doctor-shift-picker { display: grid; gap: 8px; align-content: start; }
+/* Audit D110: live matches under a list search, same look as the SearchPicker suggestions. */
+.cl-search-box { position: relative; display: flex; flex: 1 1 260px; max-width: 460px; }
+.cl-search-box > .cl-search { flex: 1 1 auto; max-width: none; }
+.cl-search-pop { margin: 4px 0 0; padding: 4px; list-style: none; }

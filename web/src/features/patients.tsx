@@ -96,13 +96,13 @@ export function PatientsPage({api,profile,version}:{api:Api;profile:AccessProfil
  async function find(e:FormEvent){e.preventDefault();const text=query.trim();setTyped(text);const result=await search.run<SearchReceipt>('/pacientes/busquedas',{query:text});if(result)setReceipt(result);}
  const clearQuery=()=>{setQuery('');setTyped('');setReceipt(null);};
  const filtered=filters.estado!=='vigente'||!!filters.situacion||!!filters.area||!!filters.medico;
+ // Audit D110: the typed search is not a filter chip; the list already shows its matches while typing.
  const active=[
   ...(filters.estado!=='vigente'?[{key:'estado',label:stateChip(filters.estado),remove:()=>setFilters({estado:'vigente'})}]:[]),
   ...(filters.situacion?[{key:'situacion',label:situationChip(filters.situacion),remove:()=>setFilters({situacion:''})}]:[]),
   ...(filters.area?[{key:'area',label:`Área: ${areaName??'elegida'}`,remove:()=>setFilters({area:''})}]:[]),
   ...(filters.medico?[{key:'medico',label:`Médico: ${doctorName??'elegido'}`,remove:()=>setFilters({medico:''})}]:[]),
-  ...(query.trim()?[{key:'texto',label:`«${query.trim()}»`,remove:clearQuery}]:[]),
- ];
+  ];
  const filterCount=[filters.estado!=='vigente',!!filters.situacion,!!filters.area,!!filters.medico].filter(Boolean).length;
  // R4a: the server sorts the list by name; the reason only shows when a search matched a document or a record.
  const reasonOf=(p:Patient)=>(typed||receipt)&&/documento|expediente/i.test(p.matchReason??'')?p.matchReason:null;
