@@ -157,7 +157,7 @@ class ConsultationViewModelTest {
     }
 
     @Test fun draftsAreKeptPerUserAndRemovedAfterSigning() = runTest(dispatcher) {
-        val store = FileDraftStore(java.nio.file.Files.createTempDirectory("borradores").toFile())
+        val store = FileDraftStore(java.nio.file.Files.createTempDirectory("borradores").toFile(), sv.edu.catolica.climesa.data.TestCipher)
         val api = FakeGateway(agenda())
         api.responses["/consultas/c1"] = JSONObject().put("version", 4)
         val vm = ConsultationViewModel(api, NoRealtime, store)
@@ -170,7 +170,7 @@ class ConsultationViewModelTest {
     }
 
     @Test fun signingInAsAnotherUserDropsThePreviousUsersDrafts() {
-        val store = FileDraftStore(java.nio.file.Files.createTempDirectory("borradores").toFile())
+        val store = FileDraftStore(java.nio.file.Files.createTempDirectory("borradores").toFile(), sv.edu.catolica.climesa.data.TestCipher)
         store.save("u-1", "consulta:c1", JSONObject().put("plan", "a"))
         ConsultationViewModel(FakeGateway(), NoRealtime, store).configure("u-2", withQueue = false)
         assertNull(store.load("u-1", "consulta:c1"))

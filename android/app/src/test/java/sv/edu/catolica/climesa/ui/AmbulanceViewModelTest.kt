@@ -116,7 +116,7 @@ class AmbulanceViewModelTest {
     }
 
     @Test fun elReporteEnColaYElFormularioSobrevivenAQueSeCierreLaApp() = runTest(dispatcher) {
-        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("borradores").toFile())
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("borradores").toFile(), sv.edu.catolica.climesa.data.TestCipher)
         val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
         api.failures["/ambulancia/servicios/s1/prehospital"] = AuthRequestException("Sin conexión.")
         val first = AmbulanceViewModel(api, AmbulanceBus(), store)
@@ -253,7 +253,7 @@ class AmbulanceViewModelTest {
     /** Review of #117: a 503 (cold start), 429 or 401 keeps the queue; it never drops a milestone and sends the next one. */
     @Test fun unErrorTransitorioNoDescartaElHitoNiEnviaLosSiguientes() = runTest(dispatcher) {
         for (failure in listOf(AuthRequestException("Despertando.", 503), AuthRequestException("Muchas.", 429), AuthRequestException("Sesión.", 401))) {
-            val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+            val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile(), sv.edu.catolica.climesa.data.TestCipher)
             val api = FakeGateway()
             val vm = queuedTwo(store, api, AuthRequestException("Sin conexión.")); runCurrent()
             val service = vm.state.value.status!!.activeService!!
@@ -270,7 +270,7 @@ class AmbulanceViewModelTest {
 
     /** Review of #117: a definitive 4xx drops that milestone and every later one of the same service, and says so. */
     @Test fun unRechazoDefinitivoDescartaElHitoYLosSiguientesDelServicio() = runTest(dispatcher) {
-        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile(), sv.edu.catolica.climesa.data.TestCipher)
         val api = FakeGateway()
         val vm = queuedTwo(store, api, AuthRequestException("Sin conexión.")); runCurrent()
         val service = vm.state.value.status!!.activeService!!
@@ -287,7 +287,7 @@ class AmbulanceViewModelTest {
 
     /** Re-review of #117: the API rejects a queued milestone older than the last recorded one or than 24 h; the message is in Spanish. */
     @Test fun unHitoConHoraInvalidaSeDescartaConSuMensaje() = runTest(dispatcher) {
-        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile(), sv.edu.catolica.climesa.data.TestCipher)
         val api = FakeGateway()
         val vm = queuedTwo(store, api, AuthRequestException("Sin conexión.")); runCurrent()
         vm.advance(vm.state.value.status!!.activeService!!, "en_escena", at = Instant.parse("2026-11-15T14:12:00Z")); runCurrent()
@@ -298,7 +298,7 @@ class AmbulanceViewModelTest {
     }
 
     @Test fun sinSenalLosHitosQuedanEnColaConSuHoraSobrevivenALaAppYSeEnvianEnOrden() = runTest(dispatcher) {
-        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile())
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("hitos").toFile(), sv.edu.catolica.climesa.data.TestCipher)
         val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
         api.failures["/ambulancia/servicios/s1/hitos"] = AuthRequestException("Sin conexión.")
         val first = AmbulanceViewModel(api, AmbulanceBus(), store)
@@ -325,7 +325,7 @@ class AmbulanceViewModelTest {
     }
 
     @Test fun elPacienteProvisionalSobreviveAQueSeCierreLaApp() = runTest(dispatcher) {
-        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("provisional").toFile())
+        val store = sv.edu.catolica.climesa.data.FileDraftStore(java.nio.file.Files.createTempDirectory("provisional").toFile(), sv.edu.catolica.climesa.data.TestCipher)
         val api = FakeGateway(); api.responses["/ambulancia"] = status(withService = true)
         api.responses["/pacientes/busquedas"] = JSONObject().put("token", "t1")
         api.responses["/pacientes/provisionales"] = JSONObject().put("id", "p9").put("record", "EXP-9")
