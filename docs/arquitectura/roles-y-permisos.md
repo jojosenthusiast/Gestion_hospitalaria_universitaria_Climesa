@@ -242,6 +242,7 @@ Nivel: R = exigido por el curso; E = extra de alto valor; F = solo CLIMESA. Sema
 | POST | `/api/v1/citas/solicitudes-categoria/{id}/rechazar` | `citas.agendar` | Motivo | R | 5 | · | · | ✔ | · | · | · | · | · | · | · |
 | POST | `/api/v1/citas/solicitudes-categoria/{id}/cancelar` | `citas.cancelar` | PAC solo propias y pendientes | R | 5 | · | · | ✔ | · | · | · | · | · | · | propio |
 | GET | `/api/v1/citas/solicitudes-categoria/{id}/sugerencia` | `citas.agendar` | Hasta 14 días; médico preferido o de las especialidades sugeridas | R | 5 | · | · | ✔ | · | · | · | · | · | · | · |
+| GET | `/api/v1/citas/solicitudes-categoria/limite` | `citas.solicitar` | PAC propio | R | 5 | · | · | · | · | · | · | · | · | · | propio |
 
 ### Spec 106
 
