@@ -1,6 +1,6 @@
 # CLIMESA — Sistema de Gestión Hospitalaria Universitaria
 
-Sistema hospitalario del proyecto final DAMA (entrega y defensa: 21 de noviembre de 2026). La entrega incluye API, web administrativa, app Android y app iOS (Médico y Paciente, compilada y probada en CI, sin probar aún en dispositivo). Todos los datos son ficticios.
+Sistema hospitalario del proyecto final DAMA (entrega y defensa: 21 de noviembre de 2026). La entrega incluye API, web administrativa, app Android y app iOS (Médico y Paciente, compilada y probada en CI con arranque en simulador, IPA sin firmar en `instalar/ios/`; sin probar aún a mano en un iPhone). Todos los datos son ficticios.
 
 Documentos de la entrega final:
 
@@ -46,7 +46,7 @@ Cada componente tiene su propio workflow y solo se ejecuta cuando cambian sus ru
 | Datos e identidad | PostgreSQL 17 / Supabase Auth y Realtime; 54 migraciones SQL, 11 esquemas de dominio (más `metricas`, solo vistas), 66 tablas con RLS, 10 roles, 76 permisos y 160 operaciones HTTP en el contrato |
 | Web | React 19, TypeScript, Vite 6, CSS responsive, tipos de API generados desde OpenAPI |
 | Android | Kotlin 2.1.20, Jetpack Compose (BOM 2025.04.01) Material 3, MVVM con `StateFlow` y corrutinas, Hilt 2.57.1, OkHttp 4.12 (HTTP y Realtime), Android Keystore; API 26+, SDK 35 |
-| iOS | SwiftUI, MVVM, URLSession con async/await y Keychain; proyecto Xcode, iOS 17+; núcleo como Swift Package. Pantallas de MED y PAC; compila y corre `swift test` en CI (macOS 15), **sin probar** en simulador o dispositivo |
+| iOS | SwiftUI, MVVM, URLSession con async/await y Keychain; proyecto Xcode, iOS 17+; núcleo como Swift Package. Pantallas de MED y PAC; en CI (macOS 15) compila, corre `swift test` y arranca la app en un simulador iOS (`CLIMESAUITests`, XCUITest de la pantalla de ingreso); sin probar aún a mano en un iPhone |
 
 .NET se conserva únicamente en el material histórico. La decisión vigente es [ADR-024](docs/decisiones/ADR-024-backend-nodejs.md).
 
@@ -183,7 +183,7 @@ En Windows: `.\gradlew.bat testDebugUnitTest assembleDebug`. Release usa por def
 
 ## iOS
 
-El proyecto iOS (versión 1.0.0, build 4) cubre Médico y Paciente (pestañas en `ios/Core/Access.swift`) y se compila en CI, pero **no se ha probado** en simulador ni en un iPhone, y no se entrega IPA. En una Mac con Xcode 15+ abre `ios/CLIMESA.xcodeproj` y el esquema `CLIMESA`. Selecciona un simulador iPhone/iPad. Debug usa `http://localhost:3000/api/v1`; configura el backend en esa Mac o una URL HTTPS con `CLIMESA_API_BASE_URL` en Build Settings. Antes de Release define esa URL HTTPS y tu equipo de firma. Consulta [ios/README.md](ios/README.md).
+El proyecto iOS (versión 1.0.0, build 4) cubre Médico y Paciente (pestañas en `ios/Core/Access.swift`) En CI se compila, corre `swift test` y arranca en un simulador iOS (`CLIMESAUITests`); falta probarlo a mano en un iPhone. Se entrega un IPA sin firmar, `instalar/ios/CLIMESA-ios-2026-11-20-sin-firmar.ipa`: quien lo instala lo firma con su propia cuenta de Apple (Sideloadly; ver la sección IPA de [ios/README.md](ios/README.md)). En una Mac con Xcode 15+ abre `ios/CLIMESA.xcodeproj` y el esquema `CLIMESA`. Selecciona un simulador iPhone/iPad. Debug usa `http://localhost:3000/api/v1`; configura el backend en esa Mac o una URL HTTPS con `CLIMESA_API_BASE_URL` en Build Settings. Antes de Release define esa URL HTTPS y tu equipo de firma. Consulta [ios/README.md](ios/README.md).
 
 ```sh
 cd ios
