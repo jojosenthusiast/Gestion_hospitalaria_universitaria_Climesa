@@ -34,17 +34,23 @@ struct MedicoTextArea: View {
     @Binding var text: String
     var error: String?
     var lines: ClosedRange<Int> = 3...8
+    /// Lote 5 S3: a required field shows the red «*» after its label.
+    var required = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Text(verbatim: label).font(Typo.label).foregroundStyle(Theme.ink)
+            RequiredLabel(label: label, required: required)
             TextField("", text: $text, axis: .vertical)
                 .lineLimit(lines)
                 .font(Typo.body).foregroundStyle(Theme.ink)
-                .padding(Spacing.m).frame(minHeight: Spacing.control, alignment: .topLeading)
+                .padding(Spacing.m).frame(minHeight: 96, alignment: .topLeading)
                 .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
                 .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(error == nil ? Theme.controlLine : Theme.danger, lineWidth: error == nil ? 1 : 2))
-            if let error { Text(verbatim: error).font(Typo.caption).foregroundStyle(Theme.danger) }
+            // Lote 5 S3: the error sits under its own field, in red, and is read with it.
+            if let error {
+                Label { Text(verbatim: error).fixedSize(horizontal: false, vertical: true) } icon: { ClimesaIcon(.alert, size: 14) }
+                    .font(Typo.caption).foregroundStyle(Theme.danger)
+            }
         }
     }
 }
@@ -69,7 +75,7 @@ struct MedicoAlert: View {
 
     var body: some View {
         HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.danger).accessibilityHidden(true)
+            ClimesaIcon(.alert, size: 18).foregroundStyle(Theme.danger).accessibilityHidden(true)
             Text(verbatim: text).font(Typo.small).foregroundStyle(Theme.danger)
         }
         .padding(Spacing.l).frame(maxWidth: .infinity, alignment: .leading)

@@ -1,44 +1,5 @@
 import Foundation
 
-/// I03: vincular la cuenta con el expediente (spec 101, FR-101-08 a FR-101-10). El cliente solo revisa el formato;
-/// la API valida el DUI contra el expediente. Igual que `LinkRules` de Android.
-public enum LinkRules {
-    public static func digits(_ text: String) -> String { text.filter(\.isNumber) }
-
-    /// DUI de 9 dígitos con dígito verificador válido (8 dígitos ponderados de 9 a 2, módulo 10).
-    public static func validDui(_ text: String) -> Bool {
-        let numbers = digits(text).compactMap { $0.wholeNumberValue }
-        guard numbers.count == 9, numbers.prefix(8).contains(where: { $0 != 0 }) else { return false }
-        let sum = numbers.prefix(8).enumerated().reduce(0) { $0 + $1.element * (9 - $1.offset) }
-        return (10 - sum % 10) % 10 == numbers[8]
-    }
-
-    public static func formatDui(_ text: String) -> String {
-        let value = digits(text)
-        return value.count == 9 ? "\(value.prefix(8))-\(value.suffix(1))" : text.trimmingCharacters(in: .whitespaces)
-    }
-
-    /// Errores por campo (`dui`, `birth`); vacío cuando se puede enviar.
-    public static func errors(dui: String, birth: String, today: Date) -> [String: String] {
-        var errors: [String: String] = [:]
-        let trimmed = dui.trimmingCharacters(in: .whitespaces)
-        if trimmed.range(of: #"^[0-9]{8}-?[0-9]$"#, options: .regularExpression) == nil || !validDui(trimmed) {
-            errors["dui"] = "Usa 9 dígitos con un verificador válido."
-        }
-        let day = birth.trimmingCharacters(in: .whitespaces)
-        if day.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) == nil || ClimesaDates.parse(day + "T12:00:00Z") == nil {
-            errors["birth"] = "Escribe la fecha como aaaa-mm-dd."
-        } else if day > ClimesaDates.localDay(today) {
-            errors["birth"] = "La fecha de nacimiento no puede ser futura."
-        }
-        return errors
-    }
-
-    public static func body(dui: String, birth: String) -> LinkRequestBody {
-        LinkRequestBody(dui: formatDui(dui), birth: birth.trimmingCharacters(in: .whitespaces))
-    }
-}
-
 /// I05: seguimiento del número propio en la fila.
 public enum QueueRules {
     /// Número vigente de la persona (el más reciente que no terminó).
@@ -337,6 +298,20 @@ public enum CategoryRequestRules {
 
     public static func cancelPath(_ id: String) -> String { "\(path)/\(id)/cancelar" }
 
+    /// D128: `GET /citas/solicitudes-categoria/limite`, read when «Pedir una cita» opens.
+    public static let limitPath = "\(path)/limite"
+
+    public static let backToAppointments = "Volver a mis citas"
+
+    /// D128: the limit is reached, so the form is closed before the patient fills it (S12). Unknown (nil) never blocks.
+    public static func blocked(_ limit: CategoryRequestLimit?) -> Bool { limit?.canRequest == false }
+
+    /// D128: why the form is closed: the server's reason, or the counts when it sends none.
+    public static func limitText(_ limit: CategoryRequestLimit) -> String {
+        if let reason = limit.reason?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty { return reason }
+        return "Ya tienes \(limit.pending) de \(limit.max) solicitudes pendientes. Espera a que Recepción las atienda antes de pedir otra."
+    }
+
     private static func fold(_ text: String) -> String {
         text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es")).trimmingCharacters(in: .whitespacesAndNewlines)
     }
@@ -371,24 +346,41 @@ public enum CategoryRequestRules {
         return Array(doctors.filter { $0.active && fold("\($0.fullName) \($0.specialty ?? "")").contains(needle) }.prefix(limit))
     }
 
-    /// Clave estable del ícono de la categoría a SF Symbol; una clave desconocida usa un ícono genérico.
-    public static func symbol(_ icon: String) -> String {
+    /// Stable category key to its web glyph (`CategoryGlyph` in category.tsx); `general` and unknown keys use the
+    /// stethoscope, like the web.
+    public static func icon(_ icon: String) -> ClimesaIconName {
         switch icon {
-        case "general": return "stethoscope"
-        case "nino": return "figure.and.child.holdinghands"
-        case "mujer": return "figure.dress.line.vertical.figure"
-        case "corazon": return "heart"
-        case "hueso": return "figure.walk"
-        case "piel": return "hand.raised"
-        case "ojo": return "eye"
-        case "oido": return "ear"
-        case "mente": return "brain.head.profile"
-        case "neuro": return "brain"
-        case "digestivo": return "fork.knife"
-        case "rinon": return "drop"
-        case "alergia": return "allergens"
-        case "cirugia": return "bandage"
-        default: return "cross.case"
+        case "nino": return .catNino
+        case "mujer": return .catMujer
+        case "corazon": return .catCorazon
+        case "hueso": return .catHueso
+        case "piel": return .catPiel
+        case "ojo": return .catOjo
+        case "oido": return .catOido
+        case "mente": return .catMente
+        case "neuro": return .catNeuro
+        case "digestivo": return .catDigestivo
+        case "rinon": return .catRinon
+        case "alergia": return .catAlergia
+        case "cirugia": return .catCirugia
+        default: return .steth
+        }
+    }
+
+    /// Identity tone of a category (web `categoryTone`); unknown keys are slate.
+    public static func tone(_ icon: String) -> IdentityTone {
+        switch icon {
+        case "nino", "piel": return .amber
+        case "mujer": return .magenta
+        case "corazon": return .red
+        case "hueso", "alergia": return .orange
+        case "ojo": return .blue
+        case "oido": return .teal
+        case "mente": return .purple
+        case "neuro": return .indigo
+        case "digestivo": return .green
+        case "rinon": return .cyan
+        default: return .slate
         }
     }
 
@@ -430,5 +422,49 @@ public extension AppointmentRules {
             }
         }
         return days
+    }
+}
+
+// MARK: - Lote 5 S16: «Pedir cita» grouped by body area (Android `CategoryGroups`)
+
+/// Sections of «Pedir cita», in display order. They only group the catalog of `GET /citas/categorias`; no code is invented.
+public enum CategoryGroup: String, CaseIterable, Sendable {
+    case cuerpo, interno, mente, sentidos, general
+
+    public var title: String {
+        switch self {
+        case .cuerpo: return "Cuerpo: cabeza, torso y extremidades"
+        case .interno: return "Interno y digestivo"
+        case .mente: return "Mente y emociones"
+        case .sentidos: return "Sentidos: vista, oído, nariz y garganta"
+        case .general: return "General"
+        }
+    }
+}
+
+public struct CategorySection: Equatable, Sendable, Identifiable {
+    public let group: CategoryGroup
+    public let categories: [AppointmentCategory]
+    public var id: String { group.rawValue }
+}
+
+public enum CategoryGroups {
+    /// Real codes of `citas.categoria_motivo`; a code the server adds later falls in General.
+    private static let byCode: [String: CategoryGroup] = [
+        "cabeza_nervios": .cuerpo, "corazon": .cuerpo, "huesos": .cuerpo, "piel": .cuerpo,
+        "digestivo": .interno, "rinon_urinario": .interno, "alergias": .interno,
+        "salud_mental": .mente,
+        "ojos": .sentidos, "oido_garganta": .sentidos,
+        "consulta_general": .general, "ninos": .general, "mujer_embarazo": .general, "cirugia": .general
+    ]
+
+    public static func groupOf(_ code: String) -> CategoryGroup { byCode[code] ?? .general }
+
+    /// Non-empty sections in `CategoryGroup` order; inside each, the server's order.
+    public static func sections(_ categories: [AppointmentCategory]) -> [CategorySection] {
+        CategoryGroup.allCases.compactMap { group in
+            let rows = categories.filter { groupOf($0.code) == group }
+            return rows.isEmpty ? nil : CategorySection(group: group, categories: rows)
+        }
     }
 }

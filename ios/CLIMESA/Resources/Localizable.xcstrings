@@ -1,17 +1,6 @@
 {
   "sourceLanguage": "es",
   "strings": {
-    "link.retry": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Volver a pedir"
-          }
-        }
-      }
-    },
     "results.release.followUp": {
       "extractionState": "manual",
       "localizations": {
@@ -249,7 +238,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Reintentar"
+            "value": "Volver a intentar"
           }
         }
       }
@@ -1420,6 +1409,17 @@
         }
       }
     },
+    "common.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Listo"
+          }
+        }
+      }
+    },
     "common.loading": {
       "extractionState": "manual",
       "localizations": {
@@ -2064,7 +2064,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vincula tu cuenta con tu expediente para ver tus exámenes e historial."
+            "value": "Pide en Recepción que anoten tu correo en tu expediente para ver tus exámenes e historial."
           }
         }
       }
@@ -2289,61 +2289,6 @@
         }
       }
     },
-    "link.birth": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Fecha de nacimiento"
-          }
-        }
-      }
-    },
-    "link.dui": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "DUI (00000000-0)"
-          }
-        }
-      }
-    },
-    "link.intro": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Escribe tu DUI y tu fecha de nacimiento. Recepción verifica tu identidad y aprueba la vinculación."
-          }
-        }
-      }
-    },
-    "link.pending.body": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Te avisaremos aquí cuando recepción la resuelva."
-          }
-        }
-      }
-    },
-    "link.rejected": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "La vinculación fue rechazada. Revisa tus datos o acude a recepción."
-          }
-        }
-      }
-    },
     "link.status": {
       "extractionState": "manual",
       "localizations": {
@@ -2351,17 +2296,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Vinculación"
-          }
-        }
-      }
-    },
-    "link.submit": {
-      "extractionState": "manual",
-      "localizations": {
-        "es": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Enviar"
           }
         }
       }
@@ -3362,7 +3296,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Vincula tu expediente primero para editar tus datos."
+            "value": "Tu cuenta todavía no está unida a tu expediente. Pide en Recepción que anoten tu correo en él."
           }
         }
       }
@@ -3989,7 +3923,7 @@
         "es": {
           "stringUnit": {
             "state": "translated",
-            "value": "Consultas sin firmar"
+            "value": "Pendientes de firmar"
           }
         }
       }
@@ -6212,6 +6146,237 @@
           "stringUnit": {
             "state": "translated",
             "value": "Signos vitales registrados."
+          }
+        }
+      }
+    },
+    "ds.error.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No pudimos cargar esta información"
+          }
+        }
+      }
+    },
+    "ds.info.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No tienes acceso a esta información"
+          }
+        }
+      }
+    },
+    "link.reception.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cuando Recepción lo anote, tu cuenta se une sola a tu expediente."
+          }
+        }
+      }
+    },
+    "consultation.context.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo que pidió el paciente"
+          }
+        }
+      }
+    },
+    "consultation.context.none": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "El paciente no dejó un motivo escrito."
+          }
+        }
+      }
+    },
+    "consultation.unsigned.resume": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Reanudarla"
+          }
+        }
+      }
+    },
+    "consultation.unsigned.startAnyway": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Iniciar otra de todos modos"
+          }
+        }
+      }
+    },
+    "consultation.unsigned.back": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Volver"
+          }
+        }
+      }
+    },
+    "consultation.unsigned.message": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lo habitual es firmarla antes de iniciar otra. Puedes reanudarla ahora o iniciar esta consulta de todos modos."
+          }
+        }
+      }
+    },
+    "day.section.now": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ahora"
+          }
+        }
+      }
+    },
+    "day.section.upcoming": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Próximas"
+          }
+        }
+      }
+    },
+    "day.section.done": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Atendidas hoy"
+          }
+        }
+      }
+    },
+    "day.record.view": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ver expediente"
+          }
+        }
+      }
+    },
+    "day.history.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Historial de días anteriores"
+          }
+        }
+      }
+    },
+    "history.lab.detail": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Examen de laboratorio"
+          }
+        }
+      }
+    },
+    "history.lab.why": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Por qué se pidió"
+          }
+        }
+      }
+    },
+    "history.lab.origin": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Consulta del %@"
+          }
+        }
+      }
+    },
+    "history.lab.noOrigin": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Esta orden no viene de una consulta (por ejemplo, de una hospitalización)."
+          }
+        }
+      }
+    },
+    "history.lab.ordered": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedido"
+          }
+        }
+      }
+    },
+    "results.orderedAt": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pedido el %@"
+          }
+        }
+      }
+    },
+    "profile.accesos.hint": {
+      "extractionState": "manual",
+      "localizations": {
+        "es": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quién abrió tu expediente y cuándo"
           }
         }
       }

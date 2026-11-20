@@ -6,31 +6,31 @@ final class DesignTokensTests: XCTestCase {
     // MARK: Estados
 
     func testEachFamilyHasItsOwnIconPatternAndLabel() {
-        let expected: [StatusFamily: (String, StatusPattern, String)] = [
-            .espera: ("clock", .rayado, "En espera"),
-            .llamado: ("megaphone", .punteado, "Llamado"),
-            .atencion: ("waveform.path.ecg", .solido, "En atención o en uso"),
-            .listo: ("checkmark", .contorno, "Terminado o disponible"),
-            .cerrado: ("xmark", .discontinuo, "Cancelado o fuera de servicio"),
-            .critico: ("exclamationmark.triangle", .doble, "Crítico")
+        let expected: [StatusFamily: (ClimesaIconName, StatusPattern, String)] = [
+            .espera: (.clock, .rayado, "En espera"),
+            .llamado: (.megaphone, .punteado, "Llamado"),
+            .atencion: (.pulse, .solido, "En atención o en uso"),
+            .listo: (.check, .contorno, "Terminado o disponible"),
+            .cerrado: (.close, .discontinuo, "Cancelado o fuera de servicio"),
+            .critico: (.alert, .doble, "Crítico")
         ]
         for family in StatusFamily.allCases {
-            let (symbol, pattern, label) = expected[family]!
-            XCTAssertEqual(family.symbol, symbol, "\(family)")
+            let (icon, pattern, label) = expected[family]!
+            XCTAssertEqual(family.icon, icon, "\(family)")
             XCTAssertEqual(family.pattern, pattern, "\(family)")
             XCTAssertEqual(family.label, label, "\(family)")
         }
         // Distinguibles en escala de grises: ni el ícono ni el patrón se repiten.
-        XCTAssertEqual(Set(StatusFamily.allCases.map(\.symbol)).count, StatusFamily.allCases.count)
+        XCTAssertEqual(Set(StatusFamily.allCases.map(\.icon)).count, StatusFamily.allCases.count)
         XCTAssertEqual(Set(StatusFamily.allCases.map(\.pattern)).count, StatusFamily.allCases.count)
     }
 
     func testApiValuesMapToTheirFamily() {
         let cases: [String: StatusFamily] = [
             "en_espera": .espera, "solicitada": .espera, "pendiente_cama": .espera, "provisional": .espera,
-            "confirmada": .espera, "reprogramada": .espera, "bajo_minimo": .espera,
+            "confirmada": .listo, "reprogramada": .espera, "bajo_minimo": .espera,
             "llamado": .llamado, "en_proceso": .atencion,
-            "limpieza": .atencion, "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
+            "limpieza": .espera, "en_atencion": .atencion, "ocupada": .atencion, "hospitalizado": .atencion, "abierta": .atencion,
             "atendida": .listo, "atendido": .listo, "alta_firmada": .listo, "libre": .listo, "normal": .listo, "aprobada": .listo,
             "cancelado": .cerrado, "cancelada": .cerrado, "no_se_presento": .cerrado, "en_mantenimiento": .cerrado,
             "critico_alto": .critico, "critico_bajo": .critico
@@ -38,14 +38,15 @@ final class DesignTokensTests: XCTestCase {
         for (value, family) in cases { XCTAssertEqual(StatusFamily.of(value), family, value) }
     }
 
-    /// R2 (I-4): an appointment that is confirmed or rescheduled is waiting for its time, never "Llamado" (megaphone).
+    /// R2 (I-4): a rescheduled or requested appointment waits for its time, never "Llamado" (megaphone). D124: a confirmed
+    /// one is settled (check). D96: a bed in cleaning waits (clock), it is not in attention.
     func testScheduledAppointmentStatesAreWaitingNotCalled() {
-        for value in ["confirmada", "reprogramada", "solicitada"] {
+        for value in ["reprogramada", "solicitada"] {
             XCTAssertEqual(StatusFamily.of(value), .espera, value)
             XCTAssertNotEqual(StatusFamily.of(value), .llamado, value)
         }
-        XCTAssertEqual(StatusBadgeStyle.of("confirmada"), StatusBadgeStyle(label: "Confirmada", family: .espera))
-        XCTAssertEqual(StatusBadgeStyle.of("limpieza"), StatusBadgeStyle(label: "En limpieza", family: .atencion))
+        XCTAssertEqual(StatusBadgeStyle.of("confirmada"), StatusBadgeStyle(label: "Confirmada", family: .listo))
+        XCTAssertEqual(StatusBadgeStyle.of("limpieza"), StatusBadgeStyle(label: "En limpieza", family: .espera))
         XCTAssertEqual(StatusBadgeStyle.of("bajo_minimo"), StatusBadgeStyle(label: "Bajo mínimo", family: .espera))
     }
 
@@ -59,7 +60,7 @@ final class DesignTokensTests: XCTestCase {
         let unknown = StatusBadgeStyle.of("en_revision")
         XCTAssertEqual(unknown, StatusBadgeStyle(label: "en revision", family: nil))
         XCTAssertTrue(unknown.isNeutral)
-        for value in ["alto", "bajo", "sin_rango", ""] {
+        for value in ["sin_rango", ""] {
             XCTAssertNil(StatusFamily.of(value), value)
             XCTAssertTrue(StatusBadgeStyle.of(value).isNeutral, value)
         }
@@ -131,7 +132,9 @@ final class DesignTokensTests: XCTestCase {
 
     func testPriorityStylesAndFallback() {
         XCTAssertEqual(Priority.emergencia.strong, Palette.critical)
-        XCTAssertEqual(Priority.emergencia.symbol, "exclamationmark.triangle")
+        XCTAssertEqual(Priority.emergencia.icon, .alert)
+        XCTAssertEqual(Priority.urgente.icon, .chevronsUp)
+        XCTAssertEqual(Priority.rutina.icon, .minus)
         XCTAssertEqual(Priority.urgente.strong, ColorPair(light: 0xA3480A, dark: 0xF0A36B))
         XCTAssertEqual(Priority.urgente.soft, ColorPair(light: 0xFDEBDD, dark: 0x3A2314))
         XCTAssertEqual(Priority.rutina.strong, ColorPair(light: 0x55617A, dark: 0x9AA6BA))

@@ -19,6 +19,8 @@ final class NoticeInboxModel {
     private(set) var busy = false
     /// Notice whose last action failed; its message shows only under that notice, never under another one.
     private(set) var failedNotice: String?
+    /// D68: the confirmation of an action taken on the Inicio banner, kept there even after the banner goes away.
+    private(set) var bannerDone: String?
     let submission = Submission()
     private var current: Task<Void, Never>?
     private var generation = 0
@@ -50,23 +52,26 @@ final class NoticeInboxModel {
 
     /// «Enterado» o «Recordarme»: la escritura con su `Idempotency-Key` (una intención por aviso y acción) y después
     /// una sola lectura de la bandeja. Un rechazo se explica en español y la lista se vuelve a leer igual.
-    func send(_ verb: Verb, _ notice: InboxNotice, success: String? = nil, _ makeClient: () throws -> APIClient) async {
+    func send(_ verb: Verb, _ notice: InboxNotice, success: String? = nil, fromBanner: Bool = false, _ makeClient: () throws -> APIClient) async {
         guard !busy else { return }
         busy = true
         failedNotice = notice.id
+        bannerDone = nil
         defer { busy = false }
         let api: APIClient
         do { api = try makeClient() } catch { submission.error = error.userMessage; return }
         let body = EmptyBody()
         let path = "/me/avisos/\(notice.id)/\(verb.rawValue)"
-        let ok = await submission.run("\(notice.id)-\(verb.rawValue)", body: body, success: success) { key in
+        // D68: a banner action confirms on the banner, so its notice never shows up later in Avisos.
+        let ok = await submission.run("\(notice.id)-\(verb.rawValue)", body: body, success: fromBanner ? nil : success) { key in
             _ = try await api.send("POST", path, body: body, key: key, as: NoticeAck.self)
         }
-        if ok { hidden.insert(notice.id); failedNotice = nil } else if let failure = submission.lastFailure { submission.error = NoticeRules.actionMessage(failure) }
+        if ok { hidden.insert(notice.id); failedNotice = nil; if fromBanner { bannerDone = success } }
+        else if let failure = submission.lastFailure { submission.error = NoticeRules.actionMessage(failure) }
         await load(makeClient)
     }
 
-    func clearMessages() { submission.error = nil; submission.notice = nil; failedNotice = nil }
+    func clearMessages() { submission.error = nil; submission.notice = nil; failedNotice = nil; bannerDone = nil }
 }
 
 extension View {
@@ -94,7 +99,7 @@ struct CriticalNoticeBanner: View {
         if let notice = pending.first {
             let hours = NoticeRules.hoursText(model.inbox?.reminderHours ?? 4)
             HStack(alignment: .top, spacing: Spacing.m) {
-                Image(systemName: "exclamationmark.triangle.fill").font(Typo.heading)
+                ClimesaIcon(.alert, size: 22)
                     .foregroundStyle(Theme.critical).accessibilityHidden(true)
                 VStack(alignment: .leading, spacing: Spacing.m) {
                     HStack(spacing: Spacing.s) {
@@ -105,24 +110,21 @@ struct CriticalNoticeBanner: View {
                     }
                     Text(verbatim: notice.title).font(Typo.heading).foregroundStyle(Theme.ink)
                         .fixedSize(horizontal: false, vertical: true).accessibilityAddTraits(.isHeader)
-                    Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    // D66: the banner stays compact (three lines of text, actions side by side); the full text is in Avisos.
+                    Text(verbatim: notice.body).font(Typo.body).foregroundStyle(Theme.ink).lineLimit(3)
+                    if let done = model.bannerDone { PatientNotice(text: done) }
                     if model.failedNotice == notice.id, let error = model.submission.error { PatientNotice(text: error, failure: true) }
                     // Inside a home screen the screen keeps its own primary: «Enterado» is secondary.
-                    ClimesaButton(title: L.text("notices.ack"), kind: .secondary, loading: model.busy) {
-                        Task { await model.send(.enterado, notice) { try account.client() } }
-                    }
-                    if NoticeRules.canSnooze(notice) {
-                        ClimesaButton(title: String(format: L.text("notices.snooze"), hours), kind: .secondary) {
-                            Task { await model.send(.posponer, notice) { try account.client() } }
-                        }
-                        .disabled(model.busy)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: Spacing.s) { actions(notice, hours: hours) }
+                        VStack(alignment: .leading, spacing: Spacing.s) { actions(notice, hours: hours) }
                     }
                     NavigationLink {
                         ScreenFrame(title: "section.avisos") { NoticesView(initialFilter: .criticos) }
                     } label: {
                         HStack(spacing: Spacing.xs) {
                             Text("notices.banner.open").font(Typo.label)
-                            Image(systemName: "chevron.right").font(Typo.small).accessibilityHidden(true)
+                            ClimesaIcon(.chevron, size: 14).accessibilityHidden(true)
                         }
                         .foregroundStyle(Theme.primaryText)
                         .frame(minHeight: 44)
@@ -134,6 +136,24 @@ struct CriticalNoticeBanner: View {
             .background(Theme.criticalSoft, in: RoundedRectangle(cornerRadius: Radius.card))
             .overlay { CriticalBorder() }
             .accessibilityElement(children: .contain)
+        } else if let done = model.bannerDone {
+            // D68: the answer stays where it was asked, even when the banner goes away with it.
+            PatientNotice(text: done)
+        }
+    }
+
+    /// «Enterado» and «Recordarme en N h»; each confirms on the banner (D68).
+    @ViewBuilder private func actions(_ notice: InboxNotice, hours: String) -> some View {
+        ClimesaButton(title: L.text("notices.ack"), kind: .secondary, loading: model.busy) {
+            Task { await model.send(.enterado, notice, success: NoticeRules.acknowledgedText, fromBanner: true) { try account.client() } }
+        }
+        if NoticeRules.canSnooze(notice) {
+            ClimesaButton(title: String(format: L.text("notices.snooze"), hours), kind: .secondary) {
+                Task {
+                    await model.send(.posponer, notice, success: NoticeRules.snoozedText(model.inbox?.reminderHours ?? 4), fromBanner: true) { try account.client() }
+                }
+            }
+            .disabled(model.busy)
         }
     }
 }
@@ -193,9 +213,9 @@ struct NoticesView: View {
     @ViewBuilder private func list(_ inbox: NoticeInbox) -> some View {
         let items = NoticeRules.filter(inbox.notices, by: filter)
         if inbox.notices.isEmpty {
-            EmptyStateView(title: L.text("notices.empty.title"), message: L.text("notices.empty.body"), symbol: "bell")
+            EmptyStateView(title: L.text("notices.empty.title"), message: L.text("notices.empty.body"))
         } else if items.isEmpty {
-            EmptyStateView(title: L.text(filter == .criticos ? "notices.empty.critical" : "notices.empty.read"), message: L.text("notices.empty.filter"), symbol: "checkmark.circle")
+            EmptyStateView(title: L.text(filter == .criticos ? "notices.empty.critical" : "notices.empty.read"), message: L.text("notices.empty.filter"))
         } else {
             let timeline = NoticeRules.timeline(items)
             if !timeline.current.isEmpty {
@@ -252,7 +272,7 @@ private struct NoticeRow: View {
                 if !meta.isEmpty { Text(verbatim: meta).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             Spacer(minLength: Spacing.s)
-            Image(systemName: "chevron.right").font(Typo.small).foregroundStyle(Theme.muted).accessibilityHidden(true)
+            ClimesaIcon(.chevron, size: 14).foregroundStyle(Theme.muted).accessibilityHidden(true)
         }
         .padding(.vertical, Spacing.m)
         .frame(minHeight: Spacing.control)
@@ -291,7 +311,7 @@ struct NoticeDetailView: View {
                 Label {
                     Text(verbatim: "\(L.text("notices.read")) · \(ClimesaDates.short(acknowledged))").font(Typo.small)
                 } icon: {
-                    Image(systemName: "envelope.open").accessibilityHidden(true)
+                    ClimesaIcon(.mail, size: 18).accessibilityHidden(true)
                 }
                 .foregroundStyle(Theme.muted)
             } else if NoticeRules.canAcknowledge(notice) {
@@ -334,7 +354,7 @@ struct NoticeLevelBadge: View {
         let critical = level == .critico
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
         HStack(spacing: 6) {
-            Image(systemName: level.symbol).imageScale(.small).accessibilityHidden(true)
+            ClimesaIcon(level.icon, size: 14).accessibilityHidden(true)
             Text(verbatim: level.label).lineLimit(1)
         }
         .font(Typo.tag)
@@ -360,7 +380,7 @@ struct InboxNoticeCard: View {
             }
         }()
         HStack(alignment: .top, spacing: Spacing.m) {
-            Image(systemName: notice.level == .informativo ? notice.level.symbol : "exclamationmark.triangle.fill")
+            ClimesaIcon(notice.level == .informativo ? notice.level.icon : .alert, size: 20)
                 .foregroundStyle(tone.strong).accessibilityHidden(true)
             VStack(alignment: .leading, spacing: Spacing.s) {
                 NoticeLevelBadge(level: notice.level)

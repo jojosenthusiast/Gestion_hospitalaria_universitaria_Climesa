@@ -5,6 +5,8 @@ import SwiftUI
 /// Cada parte se pide por separado: la que falla muestra su error con «Reintentar» (CH-02), nunca un cero falso.
 struct DoctorDay: Sendable {
     var agenda: Part<[AgendaEntry]>?
+    /// Lote 5 S11: earlier days of the agenda, newest first, for «Historial de días anteriores».
+    var pastDays: [AgendaDay] = []
     var tickets: Part<[QueueTicket]>?
     /// S9: who goes next in consulta general by the server rule (`GET /fila/siguiente`). B3: a failed read shows its
     /// error in place; `.loaded(nil)` is a doctor who only sees their own queue (403).
@@ -41,10 +43,13 @@ struct DoctorDayView: View {
     /// Owner rule: pending lists show their two most urgent rows; the rest fold behind «Ver N pendientes más».
     @State private var unsignedOpen = false
     @State private var reschedulesOpen = false
+    /// Lote 5 S11: «Mostrar N más de hoy» opens the rest of today's upcoming appointments.
+    @State private var upcomingOpen = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.l) {
-            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
+            // D68: the banner also stays to confirm «Enterado» or «Recordarme» where they were asked.
+            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty || notices.bannerDone != nil { CriticalNoticeBanner(model: notices) }
             LoadState(loader: loader, retry: load) { day in
                 if day.criticalResults > 0 {
                     Button { go(.resultados) } label: {
@@ -53,10 +58,16 @@ struct DoctorDayView: View {
                 }
                 // I-11: no tile grid repeating what each section already says.
                 partErrors(day)
+                // Lote 5 S11: Ahora, the queue, Próximas, Pendientes de firmar and Atendidas hoy, then the earlier days.
+                // D76: a patient already called or in attention in this office shows once, in the queue card.
+                let today = day.agenda?.value.map { DoctorDaySections.split(DoctorDaySections.withoutCalled($0, tickets: day.tickets?.value ?? []), now: Date()) }
+                if let today, !today.now.isEmpty { agendaBlock(L.text("day.section.now"), today.now) }
+                if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
+                if let today { upcomingSection(today.upcoming, nothingToday: today.now.isEmpty && today.done.isEmpty) }
                 if let open = day.unsigned?.value, !open.isEmpty { unsignedSection(open) }
                 if let pending = day.reschedules?.value, !pending.isEmpty { rescheduleSection(pending) }
-                if let tickets = day.tickets?.value { queueSection(tickets, next: day.next) }
-                if let agenda = day.agenda?.value { agendaSection(agenda) }
+                if let today, !today.done.isEmpty { agendaBlock(L.text("day.section.done"), today.done) }
+                historyEntry(day.pastDays)
                 moreSection(day)
             }
         }
@@ -72,15 +83,19 @@ struct DoctorDayView: View {
         // The oldest open consultation is the most urgent to sign.
         let ranked = open.sorted { (ClimesaDates.parse($0.startedAt) ?? .distantPast) < (ClimesaDates.parse($1.startedAt) ?? .distantPast) }
         ListCard(title: L.text("day.unsigned"), items: AttentionFold.shown(ranked, expanded: unsignedOpen)) { item in
-            NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: {
-                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.short(item.startedAt)) {
-                    HStack(spacing: Spacing.s) {
-                        Text("day.unsigned.resume").font(Typo.label).foregroundStyle(Theme.primaryText)
-                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Spacing.s) {
+                ListRow(title: item.patientName ?? L.text("day.patient.unknown"), subtitle: item.reason, meta: ClimesaDates.short(item.startedAt))
+                // Lote 5 S2: resume is an edit of the open consultation; the record is a neutral view.
+                ActionRow {
+                    NavigationLink { ConsultationView(origin: .resume(item), profile: profile) } label: { CardActionLabel(title: L.text("day.unsigned.resume"), icon: .pencil) }
+                        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.edit)))
+                    if account.can("expediente.ver") {
+                        NavigationLink { PatientRecordScreen(patientId: item.patientId) } label: { CardActionLabel(title: L.text("day.record.view"), icon: .clipboard) }
+                            .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.neutral)))
                     }
                 }
-                .contentShape(Rectangle())
-            }.buttonStyle(.plain)
+            }
+            .padding(.bottom, Spacing.s)
         }
         AttentionFoldToggle(count: ranked.count, expanded: $unsignedOpen)
     }
@@ -96,10 +111,11 @@ struct DoctorDayView: View {
                         meta: item.reschedule.map { "→ \(ClimesaDates.short($0.start))" })
                 // S13: a list of decisions has no primary of its own; "Llamar siguiente" / "Atender" is the day's primary.
                 // I-15: the spinner shows only on the row being decided.
-                HStack(spacing: Spacing.m) {
-                    ClimesaButton(title: L.text("day.reschedules.accept"), kind: .secondary, loading: deciding.busyId != nil && deciding.busyId == item.reschedule?.id) { Task { await accept(item) } }
+                // Lote 5 S2: accept is the main step of the request, reject is danger.
+                ActionRow {
+                    CardActionButton(title: L.text("day.reschedules.accept"), role: .primary, icon: .check, loading: deciding.busyId != nil && deciding.busyId == item.reschedule?.id) { Task { await accept(item) } }
                         .disabled(deciding.busy)
-                    ClimesaButton(title: L.text("day.reschedules.reject"), kind: .secondary) { rejecting = item }
+                    CardActionButton(title: L.text("day.reschedules.reject"), role: .danger, icon: .close) { rejecting = item }
                         .disabled(deciding.busy)
                 }
             }
@@ -144,7 +160,7 @@ struct DoctorDayView: View {
                 nextCard(proposal)
             }
             if account.can("fila.llamar"), QueueRules.nextToCall(tickets) != nil {
-                ClimesaButton(title: L.text("day.queue.callNext"), kind: primary == .callNext ? .primary : .secondary, loading: calling.busy) { Task { await callNext() } }
+                CardActionButton(title: L.text("day.queue.callNext"), role: primary == .callNext ? .primary : .edit, icon: .megaphone, loading: calling.busy) { Task { await callNext() } }
             }
             WriteNotice(submission: calling, reload: load)
             absenceNotices
@@ -181,10 +197,15 @@ struct DoctorDayView: View {
                 Spacer()
                 MedicoTag(ticket.state.rawValue, label: ticket.state.label)
             }
-            Text(verbatim: ticket.patientName ?? ticket.service.label).font(Typo.body).foregroundStyle(Theme.ink)
+            Text(verbatim: ticket.patientName ?? ticket.service.label).font(Typo.subheading).foregroundStyle(Theme.ink)
+            // Lote 5 S11: what the doctor needs before calling them in: age and sex, service and origin, the wait.
+            if let who = QueueRowContext.demographics(age: ticket.patientAge, sex: ticket.patientSex) {
+                Text(verbatim: who).font(Typo.small).foregroundStyle(Theme.ink)
+            }
+            Text(verbatim: QueueRowContext.line(ticket)).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
             HStack(spacing: Spacing.s) {
                 if QueueBoardRules.priority(ticket) != "rutina" { PriorityBadge(ticket.priority) }
-                Text(verbatim: QueueBoardRules.arrival(ticket)).font(Typo.small).foregroundStyle(ticket.appointmentAt == nil ? Theme.muted : Theme.ink)
+                if let wait = QueueRowContext.wait(ticket, now: Date()) { Text(verbatim: wait).font(Typo.small).foregroundStyle(Theme.muted) }
             }
             if absences.isPending(ticket.id) {
                 // D-3: nothing reached the server yet; «Deshacer» cancels it with no API call.
@@ -209,23 +230,30 @@ struct DoctorDayView: View {
     @ViewBuilder private func rowActions(_ ticket: QueueTicket, row: Submission, primary: DoctorDayAction?) -> some View {
         let allowed = ticket.allowedActions ?? []
         let undoable = account.can("fila.llamar") && DoctorDayActionRules.canUndo(ticket, calledHere: calledHere)
-        if allowed.contains(.llamar) || allowed.contains(.noSePresento) || undoable {
-            HStack(spacing: Spacing.m) {
-                if undoable { ClimesaButton(title: L.text("queue.undo"), kind: .secondary, loading: row.busy && row.busyId == "undo-\(ticket.id)") { Task { await undoCall(ticket) } }.disabled(row.busy) }
-                if allowed.contains(.llamar) { ClimesaButton(title: L.text("day.queue.callAgain"), kind: .secondary, loading: row.busy && row.busyId == ticket.id) { Task { await call(ticket) } }.disabled(row.busy) }
-                if allowed.contains(.noSePresento) { ClimesaButton(title: QueueAction.noSePresento.label, kind: .secondary) { Task { await absent(ticket) } }.disabled(row.busy) }
-            }
-        }
-        cardMenu(ticket, row: row, undoable: undoable)
+        // Lote 5 S2: attend is the main step, call again and undo are edits, «No se presentó» is danger, the record is neutral.
         if DoctorDayActionRules.calledElsewhere(ticket) {
             // Another clinician called this number: it is theirs to attend (web `calledElsewhere`).
             Text("day.queue.calledElsewhere").font(Typo.small).foregroundStyle(Theme.muted)
         } else if account.can("consulta.iniciar") {
             // Un número con consulta propia ya iniciada se retoma; los demás se atienden.
-            NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: { Text(LocalizedStringKey(ticket.consultationId == nil ? "day.attend" : "day.resume")) }
-                .buttonStyle(ClimesaButtonStyle(kind: primary == .attend(ticket.id) ? .primary : .secondary))
-                .disabled(row.busy)
+            NavigationLink { ConsultationView(origin: .ticket(ticket), profile: profile) } label: {
+                CardActionLabel(title: L.text(ticket.consultationId == nil ? "day.attend" : "day.resume"), icon: .steth)
+            }
+            .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(primary == .attend(ticket.id) ? CardActionRole.primary : CardActionRole.edit)))
+            .disabled(row.busy)
         }
+        if allowed.contains(.llamar) || allowed.contains(.noSePresento) || undoable || (account.can("expediente.ver") && ticket.patientId != nil) {
+            ActionRow {
+                if undoable { CardActionButton(title: L.text("queue.undo"), role: .edit, loading: row.busy && row.busyId == "undo-\(ticket.id)") { Task { await undoCall(ticket) } }.disabled(row.busy) }
+                if allowed.contains(.llamar) { CardActionButton(title: L.text("day.queue.callAgain"), role: .edit, icon: .megaphone, loading: row.busy && row.busyId == ticket.id) { Task { await call(ticket) } }.disabled(row.busy) }
+                if let patientId = ticket.patientId, account.can("expediente.ver") {
+                    NavigationLink { PatientRecordScreen(patientId: patientId) } label: { CardActionLabel(title: L.text("day.record.view"), icon: .clipboard) }
+                        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.neutral)))
+                }
+                if allowed.contains(.noSePresento) { CardActionButton(title: QueueAction.noSePresento.label, role: .danger) { Task { await absent(ticket) } }.disabled(row.busy) }
+            }
+        }
+        cardMenu(ticket, row: row, undoable: undoable)
     }
 
     @ViewBuilder private func nextCard(_ next: QueueNextProposal) -> some View {
@@ -239,6 +267,9 @@ struct DoctorDayView: View {
                 }
                 Text(verbatim: proposal.patientName ?? "").font(Typo.body).foregroundStyle(Theme.ink)
                 Text(verbatim: proposal.reasonText).font(Typo.small).foregroundStyle(Theme.muted)
+            } else if let text = next.noProposalText {
+                // D74: people wait, but with another doctor's appointment; "Nadie espera" would be false.
+                Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("queue.next.none").font(Typo.body).foregroundStyle(Theme.ink)
             }
@@ -275,37 +306,90 @@ struct DoctorDayView: View {
         }
     }
 
-    @ViewBuilder private func agendaSection(_ agenda: [AgendaEntry]) -> some View {
-        if agenda.isEmpty {
+    /// Lote 5 S11 · «Próximas»: the first three of today, then «Mostrar N más de hoy». An empty day says so in one line.
+    @ViewBuilder private func upcomingSection(_ upcoming: [AgendaEntry], nothingToday: Bool) -> some View {
+        if upcoming.isEmpty {
             // I-37: one line inside the section, not a large empty block.
-            SectionCard(title: L.text("day.agenda")) { EmptyNote("day.agenda.none") }
+            if nothingToday { SectionCard(title: L.text("day.section.upcoming")) { EmptyNote("day.agenda.none") } }
         } else {
-            ListCard(title: L.text("day.agenda"), items: agenda) { entry in
-                VStack(alignment: .leading, spacing: Spacing.s) {
-                    ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
-                        if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
-                        else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
-                    }
-                    CategoryMarks(categories: entry.categories)
-                    // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`). I-12: a blocked
-                    // start is hidden; its server reason is not body text.
-                    let canOpen = entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada)))
-                    if canOpen || account.can("expediente.ver") {
-                        HStack(spacing: Spacing.m) {
-                            if canOpen {
-                                NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: { Text(LocalizedStringKey(Self.consultationLinkKey(entry))) }
-                                    .buttonStyle(ClimesaButtonStyle(kind: .secondary))
-                            }
-                            if account.can("expediente.ver") {
-                                NavigationLink {
-                                    PatientRecordScreen(patientId: entry.patientId)
-                                } label: { CrudLabel(kind: .view, label: L.text("day.record")) }
-                                    .buttonStyle(ClimesaButtonStyle(kind: .view))
-                            }
+            let shown = upcomingOpen ? upcoming : Array(upcoming.prefix(DoctorDaySections.upcomingVisible))
+            SectionCard(title: L.text("day.section.upcoming")) {
+                ForEach(Array(shown.enumerated()), id: \.element.id) { index, entry in
+                    if index > 0 { Divider().overlay(Theme.line) }
+                    agendaRow(entry)
+                }
+                if let label = DoctorDaySections.moreTodayLabel(upcoming.count, expanded: upcomingOpen) {
+                    Button { upcomingOpen.toggle() } label: {
+                        HStack(spacing: Spacing.space1) {
+                            Text(verbatim: label).font(Typo.label)
+                            Image(systemName: upcomingOpen ? "chevron.up" : "chevron.down").font(Typo.small).accessibilityHidden(true)
                         }
-                        .padding(.bottom, Spacing.s)
+                        .foregroundStyle(Theme.primaryText).frame(minHeight: 44).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    /// «Ahora» and «Atendidas hoy»: today's appointments of that section, one row each with its actions.
+    @ViewBuilder private func agendaBlock(_ title: String, _ entries: [AgendaEntry]) -> some View {
+        SectionCard(title: title) {
+            ForEach(Array(entries.enumerated()), id: \.element.id) { index, entry in
+                if index > 0 { Divider().overlay(Theme.line) }
+                agendaRow(entry)
+            }
+        }
+    }
+
+    /// One appointment: time, patient, reason and categories, its state, then its actions on one line (Lote 5 S2).
+    @ViewBuilder private func agendaRow(_ entry: AgendaEntry) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            ListRow(title: entry.patientName ?? L.text("day.patient.unknown"), subtitle: entry.reason, meta: ClimesaDates.display(entry.start, .time)) {
+                if let state = entry.consultationState { MedicoTag(state.rawValue, label: state.label) }
+                else { MedicoTag(entry.appointmentState.rawValue, label: entry.appointmentState.label) }
+            }
+            CategoryMarks(categories: entry.categories)
+            // MA-CIT-03: iniciar solo el día de la cita (lo decide el servidor con `allowedActions`). I-12: a blocked
+            // start is hidden; its server reason is not body text.
+            let canOpen = entry.consultationId != nil || (account.can("consulta.iniciar") && (entry.allowedActions?.contains(.iniciarConsulta) ?? (entry.appointmentState == .confirmada)))
+            if canOpen || account.can("expediente.ver") {
+                ActionRow {
+                    if canOpen {
+                        NavigationLink { ConsultationView(origin: .appointment(entry), profile: profile) } label: {
+                            CardActionLabel(title: L.text(Self.consultationLinkKey(entry)), icon: entry.consultationState == .firmada ? .eye : .steth)
+                        }
+                        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(Self.consultationRole(entry))))
+                    }
+                    if account.can("expediente.ver") {
+                        NavigationLink { PatientRecordScreen(patientId: entry.patientId) } label: { CardActionLabel(title: L.text("day.record.view"), icon: .clipboard) }
+                            .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(CardActionRole.neutral)))
                     }
                 }
+                .padding(.bottom, Spacing.s)
+            }
+        }
+    }
+
+    /// Start or resume is the main step; viewing a signed consultation is neutral.
+    static func consultationRole(_ entry: AgendaEntry) -> CardActionRole {
+        entry.consultationState == .firmada ? .neutral : .primary
+    }
+
+    /// Lote 5 S11 · «Historial de días anteriores»: one dated entry to the agenda's earlier days, instead of «Ver más».
+    @ViewBuilder private func historyEntry(_ past: [AgendaDay]) -> some View {
+        if let detail = DoctorDaySections.historyDetail(past), AppSection.visible(for: "MED", profile: profile).contains(.agenda) {
+            SectionCard {
+                NavigationLink { PatientSectionView(section: .agenda, profile: profile) } label: {
+                    HStack(spacing: Spacing.m) {
+                        ClimesaIcon(.calendar, size: 22).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+                        ListRow(title: L.text("day.history.title"), subtitle: detail) {
+                            ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                        }
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
         }
     }
@@ -327,7 +411,7 @@ struct DoctorDayView: View {
                         ListRow(title: L.text("day.results.title")) {
                             HStack(spacing: Spacing.s) {
                                 Text(verbatim: "\(pendingResults)").font(Typo.label).monospacedDigit().foregroundStyle(Theme.ink)
-                                Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                             }
                         }
                         .contentShape(Rectangle())
@@ -338,11 +422,11 @@ struct DoctorDayView: View {
                     if index > 0 { Divider().overlay(Theme.line) }
                     NavigationLink { PatientSectionView(section: section, profile: profile) } label: {
                         HStack(spacing: Spacing.m) {
-                            Image(systemName: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
+                            SectionIcon(icon: section.icon, symbol: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
                             ListRow(title: L.text(section.titleKey)) {
                                 HStack(spacing: Spacing.s) {
                                     if section == .hospitalizados, let count = day.hospitalized?.value { Text(verbatim: "\(count)").font(Typo.label).foregroundStyle(Theme.ink) }
-                                    Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                    ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                                 }
                             }
                         }
@@ -358,10 +442,12 @@ struct DoctorDayView: View {
             var day = DoctorDay()
             let today = ClimesaDates.localDay(Date())
             if profile.hasPermission("consulta.iniciar") {
+                var all: [AgendaEntry] = []
                 day.agenda = try await Part<[AgendaEntry]>.load {
-                    let entries = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
-                    return entries.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
+                    all = try await api.get("/consultas/agenda", as: [AgendaEntry].self)
+                    return all.filter { ClimesaDates.parse($0.start).map(ClimesaDates.localDay) == today }.sorted { $0.start < $1.start }
                 }
+                day.pastDays = AgendaRules.past(all, now: Date())
             }
             if profile.hasPermission("consulta.iniciar") {
                 day.unsigned = try await Part<[UnsignedConsultation]>.load { try await api.get("/consultas/sin-firmar", as: [UnsignedConsultation].self) }
@@ -392,7 +478,8 @@ struct DoctorDayView: View {
             if profile.hasPermission("admision.ver") {
                 day.hospitalized = try await Part<Int>.load {
                     let admissions = try await api.get("/admisiones", as: [Admission].self)
-                    return DischargeRules.current(admissions).count
+                    // D84: the same stays «Mis hospitalizados» lists (signed discharges still in the bed included).
+                    return DischargeRules.listed(admissions).count
                 }
             }
             return day
@@ -562,7 +649,7 @@ struct DoctorPatientsView: View {
             if trimmed.count == 1 { EmptyNote("patients.search.hint") }
             LoadState(loader: loader, retry: search) { rows in
                 if rows.isEmpty {
-                    EmptyStateView(title: L.text("patients.none"), message: L.text("patients.treating_only"), symbol: "magnifyingglass")
+                    EmptyStateView(title: L.text("patients.none"), message: L.text("patients.treating_only"))
                 } else {
                     // S2: patients the doctor attends first; the rest show why they do not open, with no navigation.
                     ListCard(items: RecordAccess.ordered(rows)) { patient in
@@ -582,7 +669,7 @@ struct DoctorPatientsView: View {
                                 ListRow(title: patient.fullName, meta: RecordAccess.rowMeta(patient)) {
                                     HStack(spacing: Spacing.s) {
                                         if !patient.active { StatusTag("inactivo", label: L.text("patients.inactive")) }
-                                        Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                        ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                                     }
                                 }
                                 .contentShape(Rectangle())
@@ -632,11 +719,12 @@ struct ResultsReviewView: View {
             let inInbox = Set((followUps?.value ?? []).map(\.orderId))
             let pending = ReviewRules.pending(orders).filter { !inInbox.contains($0.id) }
             let inProgress = ReviewRules.cancellable(orders)
-            if pending.isEmpty && inInbox.isEmpty { EmptyStateView(title: L.text("results.none"), symbol: "checkmark.circle") }
+            if pending.isEmpty && inInbox.isEmpty { EmptyStateView(title: L.text("results.none")) }
             else if !pending.isEmpty {
                 ListCard(items: pending) { order in
                     NavigationLink { ReviewDetailView(order: order, reload: load) } label: {
-                        LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order))
+                        LabOrderRow(order: order, status: L.text(ReviewRules.rowStatusKey(order)), critical: ReviewRules.isCritical(order),
+                                    summary: LabResultView.summary(order.items))
                     }.buttonStyle(.plain)
                 }
             }
@@ -691,12 +779,11 @@ private struct LabFollowUpInbox: View {
             ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                 if index > 0 { Divider().overlay(Theme.line) }
                 VStack(alignment: .leading, spacing: Spacing.s) {
-                    HStack(spacing: Spacing.s) {
-                        Text(verbatim: item.patientName ?? L.text("results.followUp.patient")).font(Typo.label).foregroundStyle(Theme.ink)
-                        Spacer()
-                        // A relevant observation is not a process state: neutral tag; red only for the critical value.
-                        PatientTag(item.critical ? "critico_alto" : "observacion", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
-                    }
+                    // A relevant observation is not a process state: neutral tag; red only for the critical value.
+                    // D69: the tag goes above the name, so the full name keeps the whole width and is never cut.
+                    PatientTag(item.critical ? "critico_alto" : "observacion", label: L.text(item.critical ? "results.critical" : "results.followUp.observation"))
+                    Text(verbatim: item.patientName ?? L.text("results.followUp.patient")).font(Typo.label).foregroundStyle(Theme.ink)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let record = item.patientRecord { Text(verbatim: String(format: L.text("results.followUp.record"), record)).font(Typo.small).foregroundStyle(Theme.muted) }
                     Text(verbatim: item.detail).font(Typo.small).foregroundStyle(Theme.ink)
                     if let order = orders.first(where: { $0.id == item.orderId }) {
@@ -737,6 +824,8 @@ private struct ReviewDetailView: View {
     @State private var confirmingRelease = false
     /// Set once the API accepted the release: the result stays on this screen instead of closing it in silence.
     @State private var released: String?
+    /// Lote 5 S13: the consultation that ordered these exams, read from the patient's record (best effort).
+    @State private var origin: LabOrigin?
 
     init(order: LabOrder, reload: @escaping () async -> Void) {
         _order = State(initialValue: order)
@@ -751,6 +840,20 @@ private struct ReviewDetailView: View {
                 Text("results.amended").font(Typo.label).foregroundStyle(Theme.warning)
             }
             if let refreshError { PartError(message: refreshError, retry: refreshOrder) }
+            // Lote 5 S13: how many fell out of range, and the consultation and date that ordered them, before the values.
+            if let summary = LabResultView.summary(order.items) {
+                Label { Text(verbatim: summary) } icon: { ClimesaIcon(.alert, size: 16) }
+                    .font(Typo.label).foregroundStyle(ReviewRules.isCritical(order) ? Theme.danger : Theme.warning)
+            }
+            if let origin {
+                SectionCard(title: L.text("history.lab.why")) {
+                    ListRow(title: String(format: L.text("history.lab.origin"), ClimesaDates.display(origin.date, .date)), subtitle: origin.doctor)
+                    if let reason = origin.reason { Text(verbatim: reason).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true) }
+                    ForEach(origin.diagnoses, id: \.self) { Text(verbatim: $0).font(Typo.small).foregroundStyle(Theme.muted) }
+                }
+            } else {
+                Text(verbatim: String(format: L.text("results.orderedAt"), ClimesaDates.display(order.createdAt, .date))).font(Typo.small).foregroundStyle(Theme.muted)
+            }
             LabOrderDetail(order: order, showValues: true, staffView: true)
             // T07c: the external report's photo or PDF, opened through a 5-minute signed link (same rule as the web).
             if order.external && order.state == .completado { LabAttachmentsSection(order: order) }
@@ -797,6 +900,15 @@ private struct ReviewDetailView: View {
         }
         // A live lab event (another device, the lab) brings the current version of this order.
         .task(id: live.snapshot.version(.laboratory)) { await refreshOrder() }
+        .task(id: order.id) { await loadOrigin() }
+    }
+
+    /// Reads the record only to name the consultation that ordered the exams; a failure just leaves the date.
+    private func loadOrigin() async {
+        guard let consultationId = order.consultationId, account.can("expediente.ver") else { return }
+        if let history = try? await account.client().get("/pacientes/\(order.patientId)/historial", as: ClinicalHistory.self) {
+            origin = LabOriginRules.of(history, consultationId: consultationId)
+        }
     }
 
     /// The list behind and this order, after a write from this screen.
@@ -838,12 +950,31 @@ private struct ReleaseResultsSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var followUp = true
     @State private var note = ""
+    /// D71: a critical result is released only after this explicit tick.
+    @State private var criticalAcknowledged = false
 
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "results.release.confirm", onClose: { dismiss() }) {
                 if ReviewRules.isCritical(order) { MedicoAlert(text: L.text("results.critical.notice")) }
                 Text(verbatim: ReleaseRules.summary(order)).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                if ReviewRules.isCritical(order) {
+                    // D71: the critical values in red, then the tick the dialog asks for.
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        ForEach(ReleaseRules.criticalLines(order), id: \.self) { line in
+                            Label { Text(verbatim: line).fixedSize(horizontal: false, vertical: true) } icon: { ClimesaIcon(.alert, size: 14) }
+                                .font(Typo.label).foregroundStyle(Theme.danger)
+                        }
+                    }
+                    SectionCard {
+                        Toggle(isOn: $criticalAcknowledged) {
+                            Text(verbatim: ReleaseRules.criticalAcknowledgement).font(Typo.label).foregroundStyle(Theme.ink)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .tint(Theme.primary)
+                        .frame(minHeight: Spacing.control)
+                    }
+                }
                 SectionCard {
                     Toggle(isOn: $followUp) {
                         VStack(alignment: .leading, spacing: Spacing.xs) {
@@ -859,7 +990,9 @@ private struct ReleaseResultsSheet: View {
                     CharacterCounter(count: note.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 0...ReleaseRules.noteMaximum)
                 }
                 SubmissionNotice(submission: submission)
-                ClimesaButton(title: L.text("results.release"), loading: submission.busy) {
+                // D71 / S12: a disabled release says why under the button.
+                ClimesaButton(title: L.text("results.release"), loading: submission.busy,
+                              blockedReason: ReleaseRules.canRelease(order, acknowledged: criticalAcknowledged) ? nil : ReleaseRules.criticalBlocked) {
                     Task { if await release(followUp, note) { dismiss() } }
                 }
                 .disabled(note.trimmingCharacters(in: .whitespacesAndNewlines).count > ReleaseRules.noteMaximum)
@@ -961,7 +1094,7 @@ struct HospitalizedView: View {
         LoadState(loader: loader, retry: load) { admissions in
             // Row 13: discharge requests first, then signed discharges; two shown, the rest folded.
             let listed = DischargeRules.ranked(admissions)
-            if listed.isEmpty { EmptyStateView(title: L.text("hospitalized.none"), symbol: "bed.double") }
+            if listed.isEmpty { EmptyStateView(title: L.text("hospitalized.none")) }
             ForEach(AttentionFold.shown(listed, expanded: expanded)) { admission in
                 HospitalizedRow(admission: admission, actions: HospitalizedRowActions.of(admission), reload: load)
             }
@@ -990,7 +1123,7 @@ private struct HospitalizedRow: View {
             }
             if let hint = actions.requestHint {
                 HStack(alignment: .top, spacing: Spacing.s) {
-                    Image(systemName: "bell.badge").foregroundStyle(Theme.warning).accessibilityHidden(true)
+                    ClimesaIcon(.bell, size: 18).foregroundStyle(Theme.warning).accessibilityHidden(true)
                     Text(verbatim: hint).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 }
                 .padding(Spacing.s).frame(maxWidth: .infinity, alignment: .leading)
@@ -1046,6 +1179,45 @@ private struct PendingLine: Identifiable {
     var responsible = ""
 }
 
+/// D89 · «Quién responde»: the usual teams in a menu, and «Otro» opens a text field for a name or team not listed.
+private struct ResponsibleField: View {
+    @Binding var responsible: String
+    @State private var other = false
+    private let options = DischargeRules.pendingResponsibles
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            Text(verbatim: L.text("discharge.pending.responsible")).font(Typo.label).foregroundStyle(Theme.ink)
+            Menu {
+                ForEach(options, id: \.self) { option in
+                    Button(option) { other = false; responsible = option }
+                }
+                Button(DischargeRules.otherResponsible) {
+                    other = true
+                    if options.contains(responsible) { responsible = "" }
+                }
+            } label: {
+                HStack(spacing: Spacing.s) {
+                    Text(verbatim: shown).font(Typo.body).foregroundStyle(responsible.isEmpty && !other ? Theme.muted : Theme.ink)
+                    Spacer(minLength: Spacing.s)
+                    Image(systemName: "chevron.up.chevron.down").font(Typo.small).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                }
+                .padding(.horizontal, Spacing.m).frame(maxWidth: .infinity, minHeight: Spacing.control)
+                .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(Theme.controlLine, lineWidth: 1))
+                .contentShape(Rectangle())
+            }
+            if other { FormField(label: DischargeRules.otherResponsibleField, text: $responsible) }
+        }
+        .onAppear { other = !responsible.isEmpty && !options.contains(responsible) }
+    }
+
+    private var shown: String {
+        if other { return DischargeRules.otherResponsible }
+        return responsible.isEmpty ? DischargeRules.pickResponsible : responsible
+    }
+}
+
 private struct DischargeView: View {
     let admission: Admission
     let reload: () async -> Void
@@ -1083,7 +1255,9 @@ private struct DischargeView: View {
                     FieldError(text: submission.fieldErrors["type"])
                 }
                 VStack(alignment: .leading, spacing: Spacing.xs) {
-                    MedicoTextArea(label: L.text("discharge.summary"), text: $summary, error: errors["summary"] ?? submission.fieldErrors["summary"])
+                    // D88: the length rule shows under the field while typing, never only after the tap.
+                    MedicoTextArea(label: L.text("discharge.summary"), text: $summary,
+                                   error: DischargeRules.summaryError(summary) ?? errors["summary"] ?? submission.fieldErrors["summary"])
                     CharacterCounter(count: summary.trimmingCharacters(in: .whitespacesAndNewlines).count, range: 10...2000)
                 }
                 if type == .voluntaria {
@@ -1098,13 +1272,15 @@ private struct DischargeView: View {
                     HStack(alignment: .top, spacing: Spacing.s) {
                         VStack(alignment: .leading, spacing: Spacing.m) {
                             FormField(label: L.text("discharge.pending.description"), text: $line.description)
-                            FormField(label: L.text("discharge.pending.responsible"), text: $line.responsible)
+                            // D89: a choice of the usual teams, with «Otro» for anyone not listed.
+                            ResponsibleField(responsible: $line.responsible)
+                            FieldError(text: DischargeRules.pendingLineError(description: line.description, responsible: line.responsible))
                         }
                         Button {
                             let id = line.id
                             pending.removeAll { $0.id == id }
                         } label: {
-                            Image(systemName: "minus.circle").font(Typo.heading).frame(width: 44, height: 44).contentShape(Rectangle())
+                            ClimesaIcon(.close, size: 22).frame(width: 44, height: 44).contentShape(Rectangle())
                         }
                         .foregroundStyle(Theme.muted)
                         .accessibilityLabel(Text("discharge.pending.remove"))
@@ -1112,7 +1288,7 @@ private struct DischargeView: View {
                 }
                 FieldError(text: errors["pending"] ?? submission.fieldErrors["pending"])
                 Button { pending.append(PendingLine()) } label: {
-                    Label { Text("discharge.pending.add") } icon: { Image(systemName: "plus") }
+                    Label { Text("discharge.pending.add") } icon: { ClimesaIcon(.plus, size: 18) }
                         .font(Typo.label).frame(minHeight: 44).contentShape(Rectangle())
                 }
                 .foregroundStyle(Theme.primaryText)
@@ -1124,7 +1300,8 @@ private struct DischargeView: View {
                 if errors.isEmpty { confirming = true }
             }
             .confirmationDialog(L.text("discharge.sign.confirm"), isPresented: $confirming, titleVisibility: .visible) {
-                Button(L.text("discharge.sign")) { Task { await sign() } }
+                // D87: the signature cannot be undone by this screen, so it reads apart from «Cancelar».
+                Button(L.text("discharge.sign"), role: .destructive) { Task { await sign() } }
             } message: {
                 // §4.7: who, what type, the pending items and the summary, before the signature.
                 Text(verbatim: DischargeConfirmRules.signRecap(patient: admission.patientName, type: type, pendingCount: lines.count, summary: summary))
@@ -1227,7 +1404,7 @@ struct AmbulanceArrivalView: View {
                             Task { await load() }
                         } label: {
                             ListRow(title: String(format: L.text(candidate.arrived ? "arrival.pending.arrived" : "arrival.pending.onTheWay"), ClimesaDates.display(candidate.dispatchedAt, .time))) {
-                                if candidate.serviceId == arrival.prehospital?.serviceId { Image(systemName: "checkmark").foregroundStyle(Theme.ink) }
+                                if candidate.serviceId == arrival.prehospital?.serviceId { ClimesaIcon(.check, size: 18).foregroundStyle(Theme.ink) }
                             }
                         }
                         .buttonStyle(.plain)
@@ -1251,7 +1428,7 @@ struct AmbulanceArrivalView: View {
             } else if arrival.status.activeService != nil {
                 Text("arrival.noReport").font(Typo.small).foregroundStyle(Theme.muted)
             } else {
-                EmptyStateView(title: L.text("arrival.none"), symbol: "cross.case")
+                EmptyStateView(title: L.text("arrival.none"))
             }
         }
         .task(id: live.snapshot.version(.ambulance)) { await load() }
@@ -1311,7 +1488,7 @@ private struct PrehospitalReportCard: View {
             HStack {
                 MedicoTag(report.priority.rawValue, label: report.priority.label)
                 Spacer()
-                Text(verbatim: ClimesaDates.display(report.capturedAt, .time)).font(Typo.mono).foregroundStyle(Theme.muted)
+                Text(verbatim: ClimesaDates.display(report.capturedAt, .time)).font(Typo.time).foregroundStyle(Theme.muted)
             }
             if let eta = report.estimatedArrival { Text(verbatim: String(format: L.text("arrival.eta"), ClimesaDates.display(eta, .time))).font(Typo.heading).foregroundStyle(Theme.ink) }
             if let reason = report.reason { Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink) }

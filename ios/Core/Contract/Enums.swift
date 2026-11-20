@@ -165,21 +165,6 @@ public enum RoomCategory: String, ContractEnum {
 }
 extension RoomCategory: Decodable { public init(from decoder: Decoder) throws { self = try Self.decodeLenient(decoder) } }
 
-/// `EstadoVinculacion`
-public enum LinkState: String, ContractEnum {
-    case pendiente, aprobada, rechazada, desconocido
-    public static var fallback: LinkState { .desconocido }
-    public var label: String {
-        switch self {
-        case .pendiente: return "En verificación"
-        case .aprobada: return "Aprobada"
-        case .rechazada: return "Rechazada"
-        case .desconocido: return "Sin estado"
-        }
-    }
-}
-extension LinkState: Decodable { public init(from decoder: Decoder) throws { self = try Self.decodeLenient(decoder) } }
-
 /// `EstadoSolicitudAmbulancia`
 public enum AmbulanceRequestState: String, ContractEnum {
     case porConfirmar = "por_confirmar", confirmada, descartada, cancelada, desconocido

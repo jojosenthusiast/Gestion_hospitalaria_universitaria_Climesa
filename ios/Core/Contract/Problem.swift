@@ -174,6 +174,8 @@ public enum ProblemText {
         case "sin_paramedico_de_turno": return "No hay paramédico con cuenta en la app con turno en curso."
         case "conflicto": return "La operación no se pudo completar porque el registro cambió. Vuelve a cargar."
         case "sin_permiso": return "No tienes permiso para esta acción."
+        // Lote 5 S9: an operational command without an active shift (the API's own wording).
+        case "sin_turno_activo": return ShiftGate.noActiveShiftText
         default: return nil
         }
     }

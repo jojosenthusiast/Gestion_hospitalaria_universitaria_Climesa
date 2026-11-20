@@ -153,11 +153,11 @@ struct PartError: View {
         let retryable = failure?.offersRetry ?? true
         VStack(alignment: .leading, spacing: Spacing.s) {
             HStack(alignment: .top, spacing: Spacing.s) {
-                Image(systemName: retryable ? "exclamationmark.triangle.fill" : "info.circle")
+                ClimesaIcon(retryable ? .alert : .info, size: 18)
                     .foregroundStyle(retryable ? Theme.danger : Theme.muted).accessibilityHidden(true)
                 Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             }
-            if retryable { ClimesaButton(title: L.text("ds.retry"), kind: .secondary) { Task { await retry() } } }
+            if retryable { RetryButton { Task { await retry() } } }
         }
         .accessibilityElement(children: .contain)
     }
@@ -205,7 +205,7 @@ struct Card<Content: View>: View {
 struct SectionTitle: View {
     let key: LocalizedStringKey
     init(_ key: LocalizedStringKey) { self.key = key }
-    var body: some View { Text(key).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).padding(.top, 6).accessibilityAddTraits(.isHeader) }
+    var body: some View { Text(key).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking).padding(.top, 6).accessibilityAddTraits(.isHeader) }
 }
 
 struct FieldError: View {
@@ -264,10 +264,11 @@ struct ScreenFrame<Content: View>: View {
     var body: some View {
         ScrollView {
             // S1: sin título gigante; el título va en línea en la barra de navegación (HIG).
-            VStack(alignment: .leading, spacing: Spacing.space5) {
+            VStack(alignment: .leading, spacing: Spacing.gap) {
                 content()
-            }.padding(Spacing.space6).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
+            }.padding(Spacing.gutter).frame(maxWidth: 760, alignment: .leading).frame(maxWidth: .infinity)
         }
+        .dismissibleKeyboard()
         .background(Theme.bg).navigationTitle(title).navigationBarTitleDisplayMode(.inline)
         .climesaNavBar()
         .toolbar {
@@ -281,6 +282,32 @@ struct ScreenFrame<Content: View>: View {
 }
 
 extension View {
+    /// The keyboard always has a way out (owner report: on the patient search it covered the tab bar and nothing
+    /// closed it): dragging the content down hides it, and «Listo» sits above the keys on every tab, pushed screen and sheet.
+    func dismissibleKeyboard() -> some View {
+        scrollDismissesKeyboard(.interactively)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button(L.text("common.done")) {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }.font(Typo.label)
+                }
+            }
+    }
+
+    /// D79 / D101: keeps `visible` in step with the software keyboard, from the system notifications (no timer, no
+    /// Combine). A screen with a docked action bar uses it to move the actions into the form while the keyboard is up.
+    func trackingKeyboard(_ visible: Binding<Bool>) -> some View {
+        self
+            .task {
+                for await _ in NotificationCenter.default.notifications(named: UIResponder.keyboardWillShowNotification) { visible.wrappedValue = true }
+            }
+            .task {
+                for await _ in NotificationCenter.default.notifications(named: UIResponder.keyboardWillHideNotification) { visible.wrappedValue = false }
+            }
+    }
+
     /// Barra de navegación azul marino con texto claro: pestañas, detalles empujados y hojas (I-6).
     func climesaNavBar() -> some View {
         toolbarBackground(Theme.navy, for: .navigationBar)

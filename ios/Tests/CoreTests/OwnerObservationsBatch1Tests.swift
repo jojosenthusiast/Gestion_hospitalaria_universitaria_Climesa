@@ -14,7 +14,7 @@ final class OwnerObservationsBatch1Tests: XCTestCase {
     // MARK: - CRUD convention (S0)
 
     func testEachCrudActionKeepsOneSymbolAndOnlyCreateIsFilled() {
-        XCTAssertEqual(CrudKind.allCases.map(\.symbol), ["plus", "pencil", "trash", "eye"])
+        XCTAssertEqual(CrudKind.allCases.map(\.icon), [.plus, .pencil, .trash, .eye])
         XCTAssertEqual(CrudKind.allCases.filter(\.filled), [.create])
     }
 

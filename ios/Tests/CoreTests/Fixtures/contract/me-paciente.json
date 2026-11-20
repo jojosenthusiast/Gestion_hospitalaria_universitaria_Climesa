@@ -4,7 +4,6 @@
   "body": {
     "version": 4,
     "phone": "7777-7777",
-    "email": "paciente.demo@example.com",
     "address": "Colonia Escalón, San Salvador"
   }
 }
