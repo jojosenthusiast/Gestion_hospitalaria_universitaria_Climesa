@@ -419,7 +419,14 @@ public struct MyAccess: Decodable, Sendable, Equatable {
     public let role: String
     public let dataType: String
     public let reason: String
-    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo" }
+    /// D120: true for the urgent read of an ambulance reception; nil from an older API.
+    public var urgent: Bool? = nil
+    /// D130: the person's name, only when the API sends it; otherwise the row shows the role alone.
+    public var name: String? = nil
+    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo", urgent = "urgente", name = "nombre" }
+
+    /// D120: urgent by the API flag, or by the reason text an older API writes.
+    public var isUrgent: Bool { (urgent ?? false) || AccessLogRules.isUrgentReason(reason) }
 }
 
 /// `PublicOccupancyResponse` de `GET /publico/ocupacion`.
@@ -640,4 +647,30 @@ public struct CategoryRequestCommandResult: Decodable, Sendable, Equatable {
     public let version: Int
     public let state: String
     public let appointmentId: String?
+}
+
+/// D128 · `RequestLimitResponse` of `GET /citas/solicitudes-categoria/limite`: pending requests that count for the limit,
+/// the policy maximum, and whether a new one would be accepted (with the server's code and reason). Read tolerantly: a
+/// missing field never fails the read, and a missing `canRequest` counts as allowed.
+public struct CategoryRequestLimit: Decodable, Sendable, Equatable {
+    public let pending: Int
+    public let max: Int
+    public let canRequest: Bool
+    public let code: String?
+    public let reason: String?
+
+    public init(pending: Int, max: Int, canRequest: Bool, code: String? = nil, reason: String? = nil) {
+        self.pending = pending; self.max = max; self.canRequest = canRequest; self.code = code; self.reason = reason
+    }
+
+    enum CodingKeys: String, CodingKey { case pending, max, canRequest, code, reason }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        pending = (try? container.decodeIfPresent(Int.self, forKey: .pending)) ?? 0
+        max = (try? container.decodeIfPresent(Int.self, forKey: .max)) ?? 0
+        canRequest = (try? container.decodeIfPresent(Bool.self, forKey: .canRequest)) ?? true
+        code = try? container.decodeIfPresent(String.self, forKey: .code)
+        reason = try? container.decodeIfPresent(String.self, forKey: .reason)
+    }
 }

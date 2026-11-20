@@ -298,6 +298,18 @@ public enum CategoryRequestRules {
 
     public static func cancelPath(_ id: String) -> String { "\(path)/\(id)/cancelar" }
 
+    /// D128: `GET /citas/solicitudes-categoria/limite`, read when «Pedir una cita» opens.
+    public static let limitPath = "\(path)/limite"
+
+    /// D128: the limit is reached, so the form is closed before the patient fills it (S12). Unknown (nil) never blocks.
+    public static func blocked(_ limit: CategoryRequestLimit?) -> Bool { limit?.canRequest == false }
+
+    /// D128: why the form is closed: the server's reason, or the counts when it sends none.
+    public static func limitText(_ limit: CategoryRequestLimit) -> String {
+        if let reason = limit.reason?.trimmingCharacters(in: .whitespacesAndNewlines), !reason.isEmpty { return reason }
+        return "Ya tienes \(limit.pending) de \(limit.max) solicitudes pendientes. Espera a que Recepción las atienda antes de pedir otra."
+    }
+
     private static func fold(_ text: String) -> String {
         text.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "es")).trimmingCharacters(in: .whitespacesAndNewlines)
     }

@@ -174,6 +174,27 @@ public enum DischargeRules {
         return errors
     }
 
+    public static let summaryMinimum = 10
+    public static let summaryMaximum = 2000
+
+    /// D88: the summary rule shown under the field while typing, before the tap (the same rule `errors` applies).
+    public static func summaryError(_ summary: String) -> String? {
+        let size = summary.trimmingCharacters(in: .whitespacesAndNewlines).count
+        if size > 0 && size < summaryMinimum { return "Faltan \(summaryMinimum - size) caracteres (mínimo \(summaryMinimum)), o déjalo vacío." }
+        if size > summaryMaximum { return "El resumen no puede pasar de \(summaryMaximum) caracteres." }
+        return nil
+    }
+
+    /// D89: who usually answers for a discharge pending; any other text is still accepted through «Otro».
+    public static let pendingResponsibles = ["Consulta general", "Enfermería", "Paciente o familia", "Farmacia", "Laboratorio", "Recepción"]
+
+    /// D89: a pending line with only one of its two fields says so under it, before the tap.
+    public static func pendingLineError(description: String, responsible: String) -> String? {
+        let hasDescription = !description.trimmingCharacters(in: .whitespaces).isEmpty
+        let hasResponsible = !responsible.trimmingCharacters(in: .whitespaces).isEmpty
+        return hasDescription == hasResponsible ? nil : "Completa la descripción y quién responde, o quita el pendiente."
+    }
+
     /// Hospitalizados del médico: en cama o esperando una.
     public static func current(_ admissions: [Admission]) -> [Admission] {
         admissions.filter { $0.state == .hospitalizado || $0.state == .pendienteCama }
@@ -469,6 +490,23 @@ public enum VitalsEntryRules {
         return value
     }
 
+    /// D78: what a field keeps while typing: digits only, plus one decimal separator for the measures that take one,
+    /// and at most six characters. Pasted text such as "13[DEMO]" never reaches the form.
+    public static func sanitize(_ measure: VitalEntryMeasure, _ text: String) -> String {
+        var kept = ""
+        var separator = false
+        for character in text {
+            if character.isASCII && character.isNumber {
+                kept.append(character)
+            } else if measure.decimals && (character == "." || character == ",") && !separator {
+                separator = true
+                kept.append(character)
+            }
+            if kept.count == 6 { break }
+        }
+        return kept
+    }
+
     /// Inline error for one field, or nil when it is empty or acceptable.
     public static func fieldError(_ measure: VitalEntryMeasure, _ text: String) -> String? {
         if text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { return nil }
@@ -757,6 +795,20 @@ public enum DoctorDaySections {
             }
         }
         return DoctorTodaySections(now: current, upcoming: upcoming, done: done)
+    }
+
+    /// D76: an appointment of today whose patient is already called or in attention in this doctor's office shows once,
+    /// in the queue card, not again in the agenda. Matched by patient id, else by the exact name.
+    public static func withoutCalled(_ entries: [AgendaEntry], tickets: [QueueTicket]) -> [AgendaEntry] {
+        let inOffice = tickets.filter { ($0.calledByMe == true || $0.consultationId != nil) && ($0.state == .llamado || $0.state == .enAtencion) }
+        guard !inOffice.isEmpty else { return entries }
+        return entries.filter { entry in
+            guard entry.consultationState != .firmada else { return true }
+            return !inOffice.contains { ticket in
+                if let patientId = ticket.patientId { return patientId == entry.patientId }
+                return ticket.patientName != nil && ticket.patientName == entry.patientName
+            }
+        }
     }
 
     /// «Mostrar 3 más de hoy» under the first `upcomingVisible` rows, «Mostrar menos» when open; nil when nothing hides.
