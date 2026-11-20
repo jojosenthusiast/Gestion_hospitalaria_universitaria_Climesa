@@ -109,6 +109,7 @@ export class PatientCreatedResponse {
   @UuidProp() id!: string;
   @StrProp({ description: 'Número de expediente' }) record!: string;
   @IntProp() version!: number;
+  @UuidProp({ optional: true, description: 'Auditoría D21: servicio de ambulancia activo de la tripulación al que quedó vinculado el expediente provisional; ausente si no se vinculó' }) linkedServiceId?: string;
 }
 
 export class PatientStateResponse {

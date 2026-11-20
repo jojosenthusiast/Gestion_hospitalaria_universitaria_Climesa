@@ -191,8 +191,26 @@ export class PatientsService {
       await this.openDuplicateCases(c,actor,{id:row.id,fonApellido:phonetic(data.surnames),fonNombres:phonetic(data.givenNames),nacimiento:data.birth});
       // Flow 2: the patient made the app account first; writing its verified email here joins it to this record now.
       await linkRecordByEmail(c,this.commands,actor,data.email,permission);
-      return {id:row.id,record:recordNumber(seq),version:1};
+      const linkedServiceId=data.provisional?await this.linkToCrewService(c,actor,row.id):null;
+      // `linkedServiceId` only appears when the record was linked, so every other registration keeps its exact body.
+      return {id:row.id,record:recordNumber(seq),version:1,...(linkedServiceId?{linkedServiceId}:{})};
     });
+  }
+  /**
+   * Audit D21: a provisional record that a paramedic registers during a service belongs to that service. When the actor is
+   * in the crew of exactly one active service without a patient, the record is linked to it now (the prehospital reports
+   * hang from the service), so it is never left orphaned when the report was sent before the record existed.
+   */
+  private async linkToCrewService(c:PoolClient,actor:Actor,patientId:string):Promise<string|null> {
+    if(!actor.staffId)return null;
+    const services=(await c.query<{id:string}>(`SELECT s.id FROM ambulancia.servicio s JOIN ambulancia.tripulacion t ON t.servicio_id=s.id
+      WHERE t.persona_id=$1 AND s.finalizado_en IS NULL AND s.paciente_id IS NULL FOR UPDATE OF s`,[actor.staffId])).rows;
+    if(services.length!==1)return null;
+    const service=services[0];
+    const version=(await c.query<{version:number}>('UPDATE ambulancia.servicio SET paciente_id=$2,version=version+1 WHERE id=$1 RETURNING version',[service.id,patientId])).rows[0].version;
+    await this.commands.audit(c,actor,{action:'ambulancia.servicio.vincular_paciente',entity:'servicio',entityId:service.id,patientId,permission:'pacientes.registrar_provisional'});
+    await this.commands.event(c,'ambulancia.prehospital','servicio',service.id,version,['ambulancia',...await channelsFor(c,['ambulancia.recibir_prehospital'])]);
+    return service.id;
   }
   /** FR-102-09: un registro parecido abre caso para revisión; nunca fusiona ni impide el registro. */
   private async openDuplicateCases(c:PoolClient,actor:Actor,created:DuplicateKey) {

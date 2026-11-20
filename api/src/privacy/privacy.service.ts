@@ -6,7 +6,7 @@ import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
 import { DatabaseService } from '../platform/database.service';
 import { AuditQueryDto, ExportAuditDto } from './privacy.dto';
-import { entityLabel, EXCEPTIONAL_REASON, isRecordAccess } from './privacy.rules';
+import { entityLabel, EXCEPTIONAL_REASON, isRecordAccess, URGENT_RECEPTION_REASON } from './privacy.rules';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type Row = Record<string, any>;
@@ -136,7 +136,8 @@ export class PrivacyService {
       // The audit `motivo` may hold free text written by staff; legacy rows of the retired exceptional-access module keep their label.
       return rows.filter(r => isRecordAccess(r.accion)).slice(0, 200).map(r => ({
         fecha: r.fecha, rol: r.rol ?? 'Personal del hospital', tipoDato: entityLabel(r.entidad),
-        motivo: r.motivo === EXCEPTIONAL_REASON ? 'acceso excepcional' : 'atención',
+        motivo: r.motivo === EXCEPTIONAL_REASON ? 'acceso excepcional' : r.motivo === URGENT_RECEPTION_REASON ? URGENT_RECEPTION_REASON : 'atención',
+        urgente: r.motivo === URGENT_RECEPTION_REASON,
       }));
     });
   }
