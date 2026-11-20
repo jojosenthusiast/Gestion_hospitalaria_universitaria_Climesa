@@ -13,13 +13,15 @@ data class Bed(
     /** Floor of the bed (`level`), null when the API does not know it. */
     val level: Int? = null,
     val roomId: String = "",
+    /** Room category (`vip` or `semiprivada`), null when the API does not send it. */
+    val category: String? = null,
 )
 
 /** One room of the board with its beds, in code order. */
 data class BedRoomGroup(val room: String, val beds: List<Bed>)
 
-/** One floor of the board; [level] null groups beds without a floor. */
-data class BedFloorGroup(val level: Int?, val rooms: List<BedRoomGroup>)
+/** One floor of the board and its room category; [level] null groups beds without a floor. */
+data class BedFloorGroup(val level: Int?, val rooms: List<BedRoomGroup>, val category: String? = null)
 
 /**
  * Beds board as a map (obs 7/17): floor, then room, then the beds as tiles, with one filter chip per state and its count.
@@ -39,15 +41,16 @@ object BedBoard {
         return listOf<Pair<String?, Int>>(null to beds.size) + states.filter { (counts[it] ?: 0) > 0 || it == selected }.map { it to (counts[it] ?: 0) }
     }
 
+    /** Groups by floor and room category ("Piso 3 · VIP"), so a floor that mixed categories would show one card per category. */
     fun group(beds: List<Bed>, state: String? = null): List<BedFloorGroup> =
         beds.filter { state == null || it.state == state }
-            .groupBy { it.level }
-            .entries.sortedWith(compareBy<Map.Entry<Int?, List<Bed>>> { it.key == null }.thenBy { it.key ?: 0 })
-            .map { (level, onFloor) ->
+            .groupBy { it.level to it.category }
+            .entries.sortedWith(compareBy<Map.Entry<Pair<Int?, String?>, List<Bed>>> { it.key.first == null }.thenBy { it.key.first ?: 0 }.thenBy { it.key.second.orEmpty() })
+            .map { (key, onFloor) ->
                 val rooms = onFloor.groupBy { it.roomId.ifBlank { it.room } }.values
                     .map { list -> BedRoomGroup(list.first().room, list.sortedWith(compareBy(natural) { it.code })) }
                     .sortedWith(compareBy(natural) { it.room })
-                BedFloorGroup(level, rooms)
+                BedFloorGroup(key.first, rooms, key.second)
             }
 
     /** "C-2" before "C-10": digits compare as numbers. */

@@ -32,8 +32,10 @@
     <string name="ing_inestable">Paciente inestable</string>
     <string name="ing_postquirurgico">Posquirúrgico</string>
     <string name="ing_cama_ayuda">Planta, habitación y cama. Solo se pueden elegir las camas compatibles (libres, mismo sexo en habitación compartida, aislamiento y categoría).</string>
-    <string name="ing_cama_planta">Planta %1$d</string>
-    <string name="ing_cama_sin_planta">Sin planta</string>
+    <string name="ing_cama_planta">Piso %1$d</string>
+    <string name="ing_cama_sin_planta">Sin piso</string>
+    <string name="ing_cama_piso_categoria">Piso %1$d · %2$s</string>
+    <string name="ing_cama_sin_planta_categoria">Sin piso · %1$s</string>
     <string name="ing_cama_habitacion">%1$s · %2$d camas</string>
     <string name="ing_cama_sugerida">Sugerida</string>
     <string name="ing_cama_sin_permiso">Tu cuenta no puede asignar cama: el ingreso queda pendiente de cama para quien tenga ese permiso.</string>

@@ -28,7 +28,7 @@ fun elapsedText(minutes: Long): String = when {
     else -> "${minutes / (24 * 60)} d ${(minutes / 60) % 24} h"
 }
 
-enum class LabStage(val label: String) { PENDING("Pendiente"), IN_PROCESS("En proceso"), TO_REVIEW("Por revisar"), RELEASED("Liberada"), CANCELLED("Cancelada") }
+enum class LabStage(val label: String) { PENDING("Pendiente"), IN_PROCESS("En Proceso"), TO_REVIEW("Por revisar"), RELEASED("Liberada"), CANCELLED("Cancelada") }
 
 /** The lab list as a clinical worklist: urgent first, oldest first, with a time goal colour per order. */
 object LabWorklist {

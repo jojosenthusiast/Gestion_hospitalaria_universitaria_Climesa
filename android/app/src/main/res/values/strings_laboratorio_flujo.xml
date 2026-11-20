@@ -5,5 +5,5 @@
     <string name="lab_nota_medico">Nota de tu médico: %1$s</string>
     <string name="lab_referencia">Referencia: %1$s</string>
     <string name="lab_fuera_de_rango">Fuera de rango</string>
-    <string name="lab_grupo_en_proceso">En proceso</string>
+    <string name="lab_grupo_en_proceso">En Proceso</string>
 </resources>

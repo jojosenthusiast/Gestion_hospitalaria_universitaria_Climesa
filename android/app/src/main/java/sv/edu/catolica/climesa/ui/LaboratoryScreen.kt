@@ -523,7 +523,7 @@ private fun ObservationLine(note: String, relevant: Boolean) {
 }
 
 /**
- * Journey of the order: Solicitada, Muestra, En proceso, Completada, Revisada, Visible al paciente. Done steps are green with a
+ * Journey of the order: Solicitada, Muestra, En Proceso, Completada, Revisada, Visible al paciente. Done steps are green with a
  * check, the current one is blue with a ring, pending ones are empty; the caption and the next hand-off say it in words too.
  */
 @Composable

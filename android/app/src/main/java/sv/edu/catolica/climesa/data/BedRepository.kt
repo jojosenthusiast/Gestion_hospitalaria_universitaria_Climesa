@@ -25,6 +25,7 @@ internal fun parseBeds(rows: JSONArray): List<Bed> = (0 until rows.length()).map
             occupant = r.optString("occupant").takeIf { it.isNotBlank() },
             level = if (r.isNull("level")) null else r.optInt("level"),
             roomId = r.optString("roomId"),
+            category = if (r.isNull("category")) null else r.optString("category").takeIf { it.isNotBlank() },
         )
     }
 }

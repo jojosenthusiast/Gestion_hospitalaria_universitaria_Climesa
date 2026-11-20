@@ -16,7 +16,7 @@ internal object StatusCatalog {
         "desactivado" to "Desactivado", "pendiente_cama" to "Pendiente de cama", "hospitalizado" to "Hospitalizado",
         "alta_firmada" to "Alta firmada", "egresado" to "Egresado", "exito" to "Correcto", "denegado" to "Denegado", "fallido" to "Fallido",
         "en_espera" to "En espera", "llamado" to "Llamado", "en_atencion" to "En atención", "no_se_presento" to "No se presentó",
-        "en_proceso" to "En proceso", "abierta" to "Abierta", "bajo_minimo" to "Bajo mínimo", "vencido" to "Vencido", "normal" to "Normal",
+        "en_proceso" to "En Proceso", "abierta" to "Abierta", "bajo_minimo" to "Bajo mínimo", "vencido" to "Vencido", "normal" to "Normal",
         "alto" to "Alto", "bajo" to "Bajo", "critico_alto" to "Crítico alto", "critico_bajo" to "Crítico bajo", "sin_rango" to "Sin rango",
         "disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento",
         "vencida" to "Vencida", "reprogramada" to "Reprogramada", "cerrado" to "Cerrado sin atender", "aprobada" to "Aprobada",

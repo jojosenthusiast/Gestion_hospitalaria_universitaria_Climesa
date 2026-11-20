@@ -28,6 +28,18 @@ private fun BedAction.labelRes() = when (this) {
     BedAction.VERIFY_CLEANING -> R.string.camas_verificar_limpieza
 }
 
+/** Bed group header shared by the board and the admission intake: "Piso 3 · VIP", "Piso 2 · Semiprivada" or "Piso 1". */
+@Composable
+internal fun floorTitle(floor: Int?, category: String?): String {
+    val kind = category?.let { AdmissionIntake.CATEGORY_LABELS[it] ?: it }
+    return when {
+        floor != null && kind != null -> stringResource(R.string.ing_cama_piso_categoria, floor, kind)
+        floor != null -> stringResource(R.string.ing_cama_planta, floor)
+        kind != null -> stringResource(R.string.ing_cama_sin_planta_categoria, kind)
+        else -> stringResource(R.string.ing_cama_sin_planta)
+    }
+}
+
 /** Tablero de camas: el estado vive en [BedsViewModel]; esta vista solo lo muestra y le manda eventos. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -70,8 +82,8 @@ fun BedsScreen(profile: AccessProfile, modifier: Modifier = Modifier, model: Bed
                 val floors = BedBoard.group(state.beds, stateFilter)
                 if (floors.isEmpty()) item { EmptyState(stringResource(R.string.listas_sin_coincidencias), detail = stringResource(R.string.listas_sin_coincidencias_detalle)) }
                 floors.forEach { floor ->
-                    item(key = "f-${floor.level}") {
-                        SectionCard(floor.level?.let { stringResource(R.string.ing_cama_planta, it) } ?: stringResource(R.string.ing_cama_sin_planta)) {
+                    item(key = "f-${floor.level}-${floor.category}") {
+                        SectionCard(floorTitle(floor.level, floor.category)) {
                             floor.rooms.forEach { room ->
                                 Text(stringResource(R.string.ing_cama_habitacion, room.room, room.beds.size), style = MaterialTheme.typography.titleSmall)
                                 // D95: the tiles share the whole width in equal columns instead of leaving a gap on the right.

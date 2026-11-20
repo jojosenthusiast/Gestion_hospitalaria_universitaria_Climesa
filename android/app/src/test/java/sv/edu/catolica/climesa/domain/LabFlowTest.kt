@@ -16,7 +16,14 @@ class LabFlowTest {
     private val later = LabStepStatus.PENDING
 
     @Test fun losSeisPasosSiguenElOrdenDelProducto() {
-        assertEquals(listOf("Solicitada", "Muestra", "En proceso", "Completada", "Revisada", "Visible al paciente"), LabFlow.stepLabels)
+        assertEquals(listOf("Solicitada", "Muestra", "En Proceso", "Completada", "Revisada", "Visible al paciente"), LabFlow.stepLabels)
+    }
+
+    /** S12: the course wording for `en_proceso` is "En Proceso" everywhere the lab state is labelled. */
+    @Test fun elEstadoEnProcesoSeLeeComoEnElCurso() {
+        assertEquals("En Proceso", LaboratoryLabels.state("en_proceso"))
+        assertEquals("En Proceso", LabStage.IN_PROCESS.label)
+        assertEquals("En Proceso", LabFilter.IN_PROCESS.label)
     }
 
     @Test fun cadaEstadoMarcaElPasoActual() {

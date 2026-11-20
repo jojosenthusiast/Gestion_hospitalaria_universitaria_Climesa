@@ -180,7 +180,7 @@ private fun sv.edu.catolica.climesa.domain.IntakeField.label(): Int = when (this
             val beds = state.bedMap?.beds.orEmpty().filter { it.category == draft.category }
             if (!state.loading && beds.none { it.compatible }) NoticeBanner(NoticeKind.ERROR, stringResource(R.string.ing_cama_sin_compatibles))
             AdmissionIntake.floors(beds).forEach { floor ->
-                SectionCard(if (floor.floor == null) stringResource(R.string.ing_cama_sin_planta) else stringResource(R.string.ing_cama_planta, floor.floor)) {
+                SectionCard(floorTitle(floor.floor, draft.category)) {
                     floor.rooms.forEach { room ->
                         Text(stringResource(R.string.ing_cama_habitacion, room.name, room.capacity), style = MaterialTheme.typography.titleSmall)
                         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { room.beds.forEach { BedChip(it, draft.bed?.id == it.id) { model.pickBed(it) } } }

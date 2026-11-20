@@ -79,7 +79,7 @@ object LabCritical {
 }
 
 object LaboratoryLabels {
-    fun state(value: String) = mapOf("pendiente" to "Pendiente", "en_proceso" to "En proceso", "completado" to "Completado", "cancelado" to "Cancelado")[value] ?: value
+    fun state(value: String) = mapOf("pendiente" to "Pendiente", "en_proceso" to "En Proceso", "completado" to "Completado", "cancelado" to "Cancelado")[value] ?: value
     /** One es-SV number format for lab values on every screen («13.5», «452», at most three decimals, no grouping). */
     fun number(value: Double): String = java.text.NumberFormat.getNumberInstance(java.util.Locale.forLanguageTag("es-SV")).apply { maximumFractionDigits = 3; isGroupingUsed = false }.format(value)
     /** The value (or text) of a result; a number carries its unit when the exam has one («5.1 g/dL»). */
