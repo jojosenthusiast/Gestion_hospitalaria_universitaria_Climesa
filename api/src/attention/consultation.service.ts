@@ -105,7 +105,7 @@ export class ConsultationService {
   /** A waiting or called number moves to `en_atencion` (a waiting one through `llamado`, as the state machine requires). */
   private async moveIntoAttention(c: PoolClient, actor: Actor, ticket: Row, patientId: string) {
     if (ticket.estado === 'en_atencion') return;
-    if (ticket.estado === 'en_espera') await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,llamado_por=$2::uuid,version=version+1 WHERE id=$1`, [ticket.id, actor.staffId]);
+    if (ticket.estado === 'en_espera') await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,llamado_por=$2::uuid,primer_llamado_en=COALESCE(primer_llamado_en,$3::timestamptz),version=version+1 WHERE id=$1`, [ticket.id, actor.staffId, this.clock.now()]);
     const moved = (await c.query(`UPDATE atencion.ticket_fila SET estado='en_atencion',version=version+1 WHERE id=$1 RETURNING version`, [ticket.id])).rows[0];
     await this.commands.event(c, 'fila.actualizada', 'ticket_fila', ticket.id, moved.version, await channelsFor(c, ['fila.ver', 'fila.llamar', 'fila.gestionar'], { users: [await patientAccount(c, patientId)] }));
   }

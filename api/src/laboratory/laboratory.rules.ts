@@ -16,8 +16,12 @@ export function classifyLabValue(value: number | undefined, range?: ReferenceRan
   return LabMark.NORMAL;
 }
 
+/**
+ * Audit D102: accents and case never decide the identity check ("Lucía" and "LUCIA" are the same name). The ñ is a
+ * letter, not an accent, so "Peña" and "Pena" stay different.
+ */
 export function normalizePatientName(value: string) {
-  return value.trim().toLocaleLowerCase('es-SV').replace(/\s+/g, ' ');
+  return value.normalize('NFD').replace(/[\u0300-\u0302\u0304-\u036f]|(?<![nN])\u0303/g, '').normalize('NFC').trim().toLocaleLowerCase('es-SV').replace(/\s+/g, ' ');
 }
 
 export function matchesDoubleIdentification(identity: { expediente: string; fullName: string }, expediente: string, nombreCompleto: string) {

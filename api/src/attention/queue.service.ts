@@ -11,7 +11,7 @@ import { QUEUE_SERVICES, QueueCallNextDto, QueueIssueDto, QueuePriorityDto, Queu
 import { PolicyRegistry } from '../platform/policy.registry';
 import { AttentionSweepService } from './attention-sweep.service';
 import { QUEUE_AREA } from './queue-areas';
-import { NEXT_PATIENT_RULE, NEXT_PATIENT_RULE_DOCTOR, nextReasonText, proposeNextFor, queueActions, queueUndoActions } from './attention.rules';
+import { DOCTOR_QUEUE_SERVICES, NEXT_PATIENT_RULE, NEXT_PATIENT_RULE_DOCTOR, UNSIGNED_CONSULTATION_REASON, nextReasonText, proposeNextFor, queueActions, queueUndoActions } from './attention.rules';
 
 type QueueRow = Record<string, any>;
 
@@ -101,13 +101,14 @@ export class QueueService {
     await this.sweeper.sweepSafely();
     return this.db.transaction(async c => { const rows = (await c.query(`SELECT t.id,t.servicio AS service,t.fecha,t.numero,t.paciente_id AS "patientId",
       coalesce(nullif(concat_ws(' ',p.nombres,p.primer_apellido,p.segundo_apellido),''),p.alias_provisional) AS "patientName",
-      t.estado AS state,t.consultorio_id AS "officeId",e.codigo AS "officeCode",t.llamados,t.version,t.emitido_en AS "issuedAt",
+      t.estado AS state,t.consultorio_id AS "officeId",e.codigo AS "officeCode",t.llamados,t.version,t.emitido_en AS "issuedAt",t.primer_llamado_en AS "calledAt",
       t.prioridad AS priority,date_part('year',age(t.fecha,p.nacimiento))::int AS "patientAge",p.sexo AS "patientSex",
       CASE WHEN t.estado='en_espera' THEN (SELECT count(*) FROM atencion.ticket_fila w WHERE w.servicio=t.servicio AND w.fecha=t.fecha AND w.estado='en_espera' AND w.numero<t.numero)::int END AS ahead,
       ap.start AS "appointmentAt",ap.id AS "appointmentId",ap.doctor_id AS "appointmentDoctorId",ap.doctor_name AS "appointmentDoctorName",
       ${appointmentCategoriesSql('ap.id')} AS categories,
       (t.cita_id IS NOT NULL) AS "arrivalFromAppointment",(t.emitido_por IS NOT DISTINCT FROM $6::uuid) AS "issuedByMe",
       k.id AS "consultationId",k.estado AS "consultationState",coalesce(t.llamado_por=$4::uuid,false) AS "calledByMe",
+      EXISTS(SELECT 1 FROM atencion.consulta ks WHERE ks.ticket_id=t.id AND ks.estado='firmada') AS "consultationSigned",
       (t.llamado_por IS NOT NULL AND t.llamado_por IS DISTINCT FROM $4::uuid AND EXISTS(SELECT 1 FROM acceso.usuario u
         JOIN acceso.v_permisos_usuario v ON v.usuario_id=u.id WHERE u.persona_personal_id=t.llamado_por AND v.permiso_codigo=$5)) AS "calledByColleague"
       FROM atencion.ticket_fila t LEFT JOIN pacientes.paciente p ON p.id=t.paciente_id
@@ -123,9 +124,9 @@ export class QueueService {
       const now = this.clock.now().valueOf();
       // Lote 5: age only with pacientes.ver_nacimiento, sex only with pacientes.ver_ficha (privacidad.md).
       const seesAge = hasPermission(actor, 'pacientes.ver_nacimiento'), seesSex = hasPermission(actor, 'pacientes.ver_ficha');
-      return rows.map(({ issuedByMe, patientAge, patientSex, ...row }) => ({ ...row, patientAge: seesAge ? patientAge ?? null : null, patientSex: seesSex ? patientSex ?? null : null, area: QUEUE_AREA[row.service] ?? 'GEN', walkIn: !row.appointmentAt, ...policies,
+      return rows.map(({ issuedByMe, patientAge, patientSex, consultationSigned, ...row }) => ({ ...row, patientAge: seesAge ? patientAge ?? null : null, patientSex: seesSex ? patientSex ?? null : null, area: QUEUE_AREA[row.service] ?? 'GEN', walkIn: !row.appointmentAt, ...policies,
         voidableUntil: this.voidableUntil(row, issuedByMe, now),
-        ...queueActions({ state: row.state, calls: row.llamados }, policies, abilities),
+        ...queueActions({ state: row.state, calls: row.llamados, doctorService: DOCTOR_QUEUE_SERVICES.includes(row.service), consultationSigned }, policies, abilities),
         undoActions: queueUndoActions({ state: row.state, calls: row.llamados }, abilities) }));
     });
   }
@@ -195,7 +196,8 @@ export class QueueService {
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
       const { maxCalls } = await this.queuePolicies(c);
       if (old.llamados >= maxCalls) throw new ProblemException('fila_max_llamados', 409, `Este número ya se llamó ${maxCalls} veces.`);
-      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id, dto.officeId ?? null, actor.staffId ?? null])).rows[0];
+      // Audit D48: the first call time stays, so the wait is measured until the patient was called.
+      const row = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,primer_llamado_en=COALESCE(primer_llamado_en,$4::timestamptz),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id, dto.officeId ?? null, actor.staffId ?? null, this.clock.now()])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
       return row;
@@ -214,6 +216,9 @@ export class QueueService {
         const { callsForAbsence } = await this.queuePolicies(c);
         if (old.llamados < callsForAbsence) throw new ProblemException('fila_llamados_insuficientes', 409, `Marca "No se presentó" después de ${callsForAbsence} llamados (van ${old.llamados}).`);
       }
+      // Audit D46: a general-consultation number is attended by a doctor; the counter cannot mark it attended by hand.
+      if (state === 'atendido' && DOCTOR_QUEUE_SERVICES.includes(old.service)
+        && !(await c.query("SELECT 1 FROM atencion.consulta WHERE ticket_id=$1 AND estado='firmada'", [id])).rowCount) throw new ProblemException('consulta_sin_firmar', 409, UNSIGNED_CONSULTATION_REASON);
       const row = (await c.query(`UPDATE atencion.ticket_fila SET estado=$2,consultorio_id=COALESCE($3,consultorio_id),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state`, [id, state, dto.officeId ?? null])).rows[0];
       await this.commands.audit(c, actor, { action: `fila.${state}`, entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.gestionar', reason: dto.reason, detail: { from: old.state, to: state } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));
@@ -241,8 +246,12 @@ export class QueueService {
    * signing. With `doctorId` it follows D-2 (`proposeNextFor`) and says so in `rule`.
    */
   async proposalIn(c: PoolClient, service: string, doctorId: string | null = null) {
-    const next = proposeNextFor(await this.waiting(c, service, false) as any[], this.clock.now(), doctorId);
-    return { service, area: QUEUE_AREA[service], rule: doctorId ? NEXT_PATIENT_RULE_DOCTOR : NEXT_PATIENT_RULE, proposal: next ? this.proposalOf(service, next.ticket, next.reason, next.own) : null };
+    const waiting = await this.waiting(c, service, false);
+    const next = proposeNextFor(waiting as any[], this.clock.now(), doctorId);
+    // Audit D74: a null proposal does not mean nobody waits (the doctor's rule leaves out those cited with a colleague);
+    // `waiting` and `noProposalReason` let the client say which case it is instead of "Nadie espera".
+    const noProposalReason = next ? null : waiting.length ? 'citas_de_otro_medico' : 'sin_espera';
+    return { service, area: QUEUE_AREA[service], rule: doctorId ? NEXT_PATIENT_RULE_DOCTOR : NEXT_PATIENT_RULE, waiting: waiting.length, noProposalReason, proposal: next ? this.proposalOf(service, next.ticket, next.reason, next.own) : null };
   }
 
   /** The proposal shows a patient's name: its read is audited like the list (SEG-02). */
@@ -278,7 +287,7 @@ export class QueueService {
       const chosen = proposeNextFor(waiting as any[], this.clock.now(), this.doctorOf(actor));
       if (!chosen) throw new ProblemException('fila_sin_espera', 409, waiting.length ? 'Quienes esperan tienen cita con otro médico en este momento.' : 'No hay números en espera en este servicio.');
       const next = chosen.ticket as QueueRow;
-      const { consultorio_id: officeId, ...row } = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados,consultorio_id`, [next.id, dto.officeId ?? null, actor.staffId ?? null])).rows[0];
+      const { consultorio_id: officeId, ...row } = (await c.query(`UPDATE atencion.ticket_fila SET estado='llamado',llamados=llamados+1,consultorio_id=COALESCE($2,consultorio_id),llamado_por=$3::uuid,primer_llamado_en=COALESCE(primer_llamado_en,$4::timestamptz),version=version+1 WHERE id=$1 RETURNING id,version,estado AS state,llamados,consultorio_id`, [next.id, dto.officeId ?? null, actor.staffId ?? null, this.clock.now()])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.llamar', entity: 'ticket_fila', entityId: next.id, patientId: next.patientId ?? undefined, permission: 'fila.llamar', detail: { officeId: dto.officeId ?? null, next: true, reason: chosen.reason, ownAppointment: chosen.own } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', next.id, row.version, await this.channels(c, next.patientId));
       const officeCode = officeId ? (await c.query<{ codigo: string }>('SELECT codigo FROM infra.espacio WHERE id=$1', [officeId])).rows[0]?.codigo ?? null : null;
@@ -296,7 +305,7 @@ export class QueueService {
       if (old.version !== dto.version) throw new VersionConflictException(old.version, 'La fila cambió; vuelve a cargarla.');
       if (old.state !== 'llamado' || old.llamados < 1) throw new ProblemException('transicion_invalida', 409, 'Solo se deshace el llamado de un número llamado.');
       const row = (await c.query(`UPDATE atencion.ticket_fila SET llamados=llamados-1,estado=CASE WHEN llamados-1=0 THEN 'en_espera' ELSE estado END,
-        llamado_por=CASE WHEN llamados-1=0 THEN NULL ELSE llamado_por END,consultorio_id=CASE WHEN llamados-1=0 THEN NULL ELSE consultorio_id END,version=version+1
+        llamado_por=CASE WHEN llamados-1=0 THEN NULL ELSE llamado_por END,primer_llamado_en=CASE WHEN llamados-1=0 THEN NULL ELSE primer_llamado_en END,consultorio_id=CASE WHEN llamados-1=0 THEN NULL ELSE consultorio_id END,version=version+1
         WHERE id=$1 RETURNING id,version,estado AS state,llamados`, [id])).rows[0];
       await this.commands.audit(c, actor, { action: 'fila.deshacer_llamado', entity: 'ticket_fila', entityId: id, patientId: old.patientId, permission: 'fila.llamar', detail: { from: old.state, to: row.state, calls: row.llamados } });
       await this.commands.event(c, 'fila.actualizada', 'ticket_fila', id, row.version, await this.channels(c, old.patientId));

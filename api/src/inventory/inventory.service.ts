@@ -63,6 +63,8 @@ export class InventoryService {
       if (!lot.activo) throw new ConflictException('El lote está dado de baja.');
       if (dto.type !== 'ajuste' && dto.quantity <= 0) throw new ProblemException('validacion', 400, 'La cantidad debe ser mayor que cero.', 'quantity');
       const out = subtracts(dto.type, dto.quantity), amount = Math.abs(dto.quantity);
+      // Audit D111: an expired lot never enters stock; it would count as usable in the warehouse until someone notices.
+      if (dto.type === 'entrada' && lot.vence && lot.vence < this.clock.today()) throw new ProblemException('lote_vencido', 409, `El lote venció el ${lot.vence.split('-').reverse().join('/')}; no se registra la entrada de un lote vencido.`, 'expiresAt');
       if (lot.vence && lot.vence < this.clock.today() && blockedForExpired(dto.type)) throw new ConflictException('No se puede usar un lote vencido: registra una merma para darlo de baja.');
       if (dto.type === 'entrada' && !dto.destinationWarehouseId) throw new BadRequestException('La entrada necesita bodega destino.');
       if (['salida','consumo','merma'].includes(dto.type) && !dto.originWarehouseId) throw new BadRequestException('Esta salida necesita bodega origen.');
@@ -142,7 +144,8 @@ export class InventoryService {
         lots.set(r.id, lot);
         if (r.warehouseId) {
           lot.total += r.quantity; lot.warehouses.push({ warehouseId: r.warehouseId, warehouseCode: r.warehouseCode, warehouseName: r.warehouseName, quantity: r.quantity });
-          if (r.active) { const w = warehouses.get(r.warehouseId) ?? { warehouseId: r.warehouseId, warehouseCode: r.warehouseCode, warehouseName: r.warehouseName, quantity: 0 }; w.quantity += r.quantity; warehouses.set(r.warehouseId, w); }
+          // Audit D111: the warehouse total is usable stock; expired units are reported apart (`expired`), never summed in.
+          if (r.active) { const w = warehouses.get(r.warehouseId) ?? { warehouseId: r.warehouseId, warehouseCode: r.warehouseCode, warehouseName: r.warehouseName, quantity: 0, expired: 0 }; if (r.expired) w.expired += r.quantity; else w.quantity += r.quantity; warehouses.set(r.warehouseId, w); }
         }
       }
       const movements = (await c.query(`SELECT m.id,m.tipo AS type,l.numero AS "lotNumber",CASE WHEN m.tipo='ajuste' AND m.bodega_destino_id IS NULL THEN -m.cantidad ELSE m.cantidad END::float8 AS quantity,CASE WHEN $2 THEN m.motivo END AS reason,

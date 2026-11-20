@@ -380,6 +380,7 @@ export class QueueTicketResponse {
   @IntProp() llamados!: number;
   @IntProp() version!: number;
   @DateTimeProp() issuedAt!: string;
+  @DateTimeProp({ nullable: true, description: 'Auditoría D48: hora del primer llamado; la espera se mide de issuedAt a calledAt. null si no se ha llamado' }) calledAt!: string | null;
   @EnumProp(AREA_FILA, 'AreaFila', { description: 'Código del área del servicio; el número cuenta desde 1 por área y día' }) area!: string;
   @EnumProp(QUEUE_PRIORITIES, 'PrioridadFila') priority!: string;
   @IntProp({ optional: true, nullable: true, description: 'Números en espera antes de este en su área (mismo cálculo que al emitir); null si ya no espera' }) ahead?: number | null;
@@ -472,7 +473,9 @@ export class QueueNextProposalResponse {
   @EnumProp(QUEUE_SERVICES, 'ServicioFila') service!: string;
   @EnumProp(AREA_FILA, 'AreaFila') area!: string;
   @StrProp({ description: 'Regla documentada RN-FILA-SIGUIENTE' }) rule!: string;
-  @ClassProp(QueueProposalResponse, { nullable: true, description: 'null cuando nadie espera' }) proposal!: QueueProposalResponse | null;
+  @IntProp({ description: 'Auditoría D74: números en espera en el servicio ahora, haya o no propuesta' }) waiting!: number;
+  @EnumProp(['sin_espera', 'citas_de_otro_medico'] as const, 'MotivoSinPropuesta', { nullable: true, description: 'Por qué no hay propuesta: nadie espera, o quienes esperan tienen cita con otro médico dentro de su ventana; null con propuesta' }) noProposalReason!: string | null;
+  @ClassProp(QueueProposalResponse, { nullable: true, description: 'null sin propuesta; ver noProposalReason' }) proposal!: QueueProposalResponse | null;
 }
 
 // Declared after the queue responses it embeds (decorators run at class definition).

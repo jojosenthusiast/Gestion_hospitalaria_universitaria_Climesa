@@ -104,7 +104,14 @@ export function appointmentActions(facts: AppointmentFacts, policies: Appointmen
   return { allowedActions: allowed, blockedActions: blocked };
 }
 
-export type QueueFacts = { state: string; calls: number };
+/**
+ * `doctorService` (audit D46): the number belongs to a service a doctor attends (`consulta_general`), so only a signed
+ * consultation completes it; `consultationSigned` says one exists. Other services complete from the counter as before.
+ */
+export type QueueFacts = { state: string; calls: number; doctorService?: boolean; consultationSigned?: boolean };
+/** Audit D46: services whose numbers close only when the doctor signs the consultation. */
+export const DOCTOR_QUEUE_SERVICES: readonly string[] = ['consulta_general'];
+export const UNSIGNED_CONSULTATION_REASON = 'Este número se completa cuando el médico firma la consulta.';
 export type QueuePolicies = { maxCalls: number; callsForAbsence: number };
 export type QueueAbilities = { call: boolean; manage: boolean };
 
@@ -116,7 +123,7 @@ export function queueActions(facts: QueueFacts, policies: QueuePolicies, abiliti
     add('llamar', facts.calls >= policies.maxCalls ? `Ya se llamó ${policies.maxCalls} veces.` : null);
   }
   if (abilities.manage && facts.state === 'llamado') add('atender', null);
-  if (abilities.manage && facts.state === 'en_atencion') add('completar', null);
+  if (abilities.manage && facts.state === 'en_atencion') add('completar', facts.doctorService && !facts.consultationSigned ? UNSIGNED_CONSULTATION_REASON : null);
   // FILA-01: nobody "fails to show" without being called N times first.
   if (abilities.manage && facts.state === 'llamado') {
     add('no_se_presento', facts.calls >= policies.callsForAbsence ? null : `Disponible después de ${policies.callsForAbsence} llamados (van ${facts.calls}).`);

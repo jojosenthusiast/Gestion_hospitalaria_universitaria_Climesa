@@ -348,6 +348,12 @@ export class LaboratoryService {
 
   /** The mark is always computed with the range valid on the sample date (RN-24), never chosen by the client. */
   private async mark(c: PoolClient, item: Row, value?: number) {
+    // Audit D103: a negative value is impossible unless a reference range of the exam valid on the sample date goes below zero.
+    if (value !== undefined && value < 0) {
+      const belowZero = (await c.query(`SELECT 1 FROM laboratorio.rango_referencia WHERE examen_id=$1 AND $2::date <@ vigencia
+        AND least(minimo,critico_bajo)<0 LIMIT 1`, [item.examId, item.sampleDate])).rowCount;
+      if (!belowZero) throw new ProblemException('validacion', 400, `${item.name} no admite valores negativos; revisa el valor capturado.`, 'value');
+    }
     const ranges = value === undefined ? [] : (await c.query(`SELECT id,minimo,maximo,critico_bajo,critico_alto FROM laboratorio.rango_referencia
       WHERE examen_id=$1 AND (sexo=$2 OR sexo='cualquiera') AND $3::int <@ edad_anios AND $4::date <@ vigencia
       ORDER BY (sexo=$2) DESC LIMIT 1`, [item.examId, item.sex, item.age, item.sampleDate])).rows;

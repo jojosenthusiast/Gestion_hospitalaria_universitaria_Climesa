@@ -19,7 +19,9 @@ export class SessionProfileResponse {
   @ClassProp(SessionUserResponse) user!: SessionUserResponse;
   @UuidProp() id!: string;
   @StrProp() email!: string;
-  @StrProp({ nullable: true }) name!: string | null;
+  @StrProp({ nullable: true, description: 'Nombre a mostrar; en una cuenta de paciente sin ficha de personal es el nombre del expediente vinculado (auditoría D129)' }) name!: string | null;
+  @StrProp({ nullable: true, description: 'Nombre del expediente vinculado (patientId); null sin vinculación' }) patientName!: string | null;
+  @StrProp({ nullable: true, description: 'Número de expediente vinculado; null sin vinculación' }) patientRecord!: string | null;
   @StrArrayProp({ description: 'Códigos de rol' }) roles!: string[];
   @StrArrayProp({ description: 'Plataformas permitidas en minúscula' }) platforms!: string[];
   @ClassArrayProp(RolePlatformsResponse, { description: 'Plataformas de cada rol; `platforms` es su unión' }) rolePlatforms!: RolePlatformsResponse[];

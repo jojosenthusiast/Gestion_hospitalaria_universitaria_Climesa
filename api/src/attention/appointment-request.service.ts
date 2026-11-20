@@ -30,6 +30,13 @@ export class AppointmentRequestService {
       FROM atencion.categoria_cita WHERE activo ORDER BY orden,nombre`);
   }
 
+  /** Audit D128: whether the linked patient may ask for another appointment now (`citas.solicitudes_pendientes_max`). */
+  async requestLimit(actor: Actor) {
+    const patientId = actor.patientId;
+    if (!patientId) throw new ForbiddenException('La cuenta no está vinculada a un paciente.');
+    return this.db.transaction(c => this.attention.pendingLimit(c, patientId));
+  }
+
   private async channels(c: PoolClient, patientId: string) {
     return channelsFor(c, ['citas.ver'], { users: [await patientAccount(c, patientId)] });
   }

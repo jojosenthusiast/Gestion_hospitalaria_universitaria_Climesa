@@ -18,6 +18,18 @@ export class AccessService {
       await this.commands.event(c, 'usuario.actualizado', 'usuario', actor.id, 1, ['rol:ADM', `usuario:${actor.id}`]);
     });
   }
+  /**
+   * Audit D129: the identity a patient account must show is its linked record, never the account's display name (which
+   * can differ). Mixed staff accounts keep their staff name in `name`; `patientName` always carries the record.
+   * The holder reads their own name and record number, as the patient app already does with `GET /me/paciente`.
+   */
+  async patientIdentity(actor: Actor): Promise<{ name: string | null; patientName: string | null; patientRecord: string | null }> {
+    if (!actor.patientId) return { name: actor.name ?? null, patientName: null, patientRecord: null };
+    const row = (await this.db.query(`SELECT expediente AS record,coalesce(nullif(concat_ws(' ',nombres,primer_apellido,segundo_apellido),''),alias_provisional) AS name
+      FROM pacientes.paciente WHERE id=$1`, [actor.patientId]))[0] as { record: string; name: string | null } | undefined;
+    const patientName = row?.name ?? null;
+    return { name: !actor.staffId && patientName ? patientName : actor.name ?? null, patientName, patientRecord: row?.record ?? null };
+  }
   /** Solo el administrador principal (o la única cuenta administradora activa, antes de fijarlo) puede crear otros administradores. */
   async canInviteAdmin(actor: Actor): Promise<boolean> {
     if (!hasPermission(actor, ADMIN_AUTHORITY_PERMISSION)) return false;
