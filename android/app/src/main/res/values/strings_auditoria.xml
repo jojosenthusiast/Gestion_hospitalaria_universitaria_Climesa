@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Auditoría de flujos 2026-11-20 (Android). -->
+    <string name="par_deshacer_segundos">Deshacer (%1$d s)</string>
+    <string name="par_motivo_corto">Indica el motivo, de al menos 5 caracteres.</string>
+    <string name="par_edad_rango">La edad estimada va de 0 a 120 años.</string>
+    <string name="hoja_descartar_titulo">¿Descartar lo escrito?</string>
+    <string name="hoja_descartar_detalle">Si cierras ahora se pierde lo que escribiste en este formulario.</string>
+    <string name="hoja_descartar">Descartar</string>
+    <string name="hoja_seguir">Seguir editando</string>
+    <string name="amb_sin_ambulancias">No hay ambulancias en camino ni por recibir.</string>
+    <string name="amb_elige_servicio">Elige arriba el servicio que vas a recibir.</string>
+    <string name="amb_prioridad_grande">Prioridad %1$s</string>
+    <string name="amb_estado_llego">Ya está en el hospital</string>
+    <string name="amb_estado_en_camino">En camino</string>
+    <string name="amb_llega_aprox">llega aprox. %1$s</string>
+    <string name="amb_recibir_servicio">Servicio despachado el %1$s.</string>
+</resources>

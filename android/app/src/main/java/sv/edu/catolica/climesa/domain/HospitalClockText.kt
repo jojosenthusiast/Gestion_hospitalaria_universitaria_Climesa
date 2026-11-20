@@ -19,6 +19,11 @@ object HospitalClockText {
 
     fun date(now: Instant): String = date.format(now).replaceFirstChar { it.uppercase(locale) }
 
+    private val shortDate = DateTimeFormatter.ofPattern("EEE d MMM", locale).withZone(zone)
+
+    /** D12/D67/D132: "Vie 20 nov", short enough for the top bar at the largest font size. */
+    fun shortDate(now: Instant): String = shortDate.format(now).replace(".", "").replaceFirstChar { it.uppercase(locale) }
+
     /** Milliseconds until the next whole second, so every tick lands on the second and never drifts. */
     fun untilNextSecond(nowMillis: Long): Long = 1_000L - Math.floorMod(nowMillis, 1_000L)
 }

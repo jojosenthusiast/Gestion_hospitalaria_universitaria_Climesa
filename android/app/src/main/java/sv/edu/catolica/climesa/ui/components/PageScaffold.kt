@@ -58,7 +58,9 @@ internal fun ClimesaTopBar(
         navigationIcon = navigationIcon,
         title = {
             Column {
-                Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                // D67: a long section name ("Resultados por revisar") steps down a size and may wrap instead of being cut.
+                val long = title.length > 18
+                Text(title, style = if (long) MaterialTheme.typography.titleMedium else MaterialTheme.typography.titleLarge, maxLines = if (long && subtitle.isNullOrBlank()) 2 else 1, overflow = TextOverflow.Ellipsis)
                 if (!subtitle.isNullOrBlank()) Text(subtitle, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onPrimary.copy(alpha = .82f), maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         },

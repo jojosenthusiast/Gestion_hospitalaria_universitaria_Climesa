@@ -95,10 +95,16 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     private var restoredForm: JSONObject? = null
 
     /** Restores the saved prehospital form of [serviceId] once, when the sheet opens with an empty form. */
-    fun restorePrehospital(serviceId: String) {
-        val form = sv.edu.catolica.climesa.domain.FormDrafts.prehospital(restoredForm, serviceId) ?: return
-        restoredForm = null
-        if (sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(mutable.value.prehospital)) mutable.value = mutable.value.copy(prehospital = form)
+    fun restorePrehospital(serviceId: String, servicePriority: String? = null) {
+        sv.edu.catolica.climesa.domain.FormDrafts.prehospital(restoredForm, serviceId)?.let { form ->
+            restoredForm = null
+            if (sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(mutable.value.prehospital)) mutable.value = mutable.value.copy(prehospital = form)
+        }
+        // D17: an untouched report starts with the priority dispatch gave the service, not the form default.
+        val current = mutable.value.prehospital
+        if (servicePriority != null && servicePriority in AmbulanceLabels.priorities.map { it.first } &&
+            sv.edu.catolica.climesa.domain.FormDrafts.isEmpty(current) && current.priority == PrehospitalForm().priority
+        ) mutable.value = mutable.value.copy(prehospital = current.copy(priority = servicePriority))
     }
 
     private val mutable = MutableStateFlow(AmbulanceUiState())
@@ -160,8 +166,9 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         if (readsStatus) api.request("/ambulancia").let { r -> mutable.value = mutable.value.copy(status = AmbulanceParser.status(r)) }
         val arrivals = AmbulanceParser.arrivals(api.request("/ambulancia/llegada"))
         val chosen = mutable.value.arrivalServiceId
-        // The chosen one while it is still listed; else the first; with nothing listed, the last one shown (its handover stays visible).
-        val id = chosen?.takeIf { c -> arrivals.any { it.serviceId == c } } ?: arrivals.firstOrNull()?.serviceId ?: chosen
+        // D27: the chosen one stays on screen even after it was received and left the list (its handover shows who received
+        // it); the screen never jumps by itself to another service. Without a choice yet, the first of the list.
+        val id = chosen ?: arrivals.firstOrNull()?.serviceId
         mutable.value = mutable.value.copy(arrivals = arrivals, arrivalServiceId = id)
         val view = id?.let { AmbulanceParser.prehospital(api.request("/ambulancia/servicios/$it/prehospital")) }
         mutable.value = mutable.value.copy(loading = false, arrival = view)
@@ -179,7 +186,8 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         live.start(viewModelScope, channels) { signal ->
             when (signal) {
                 is RealtimeSignal.Event -> if (AmbulanceEvents.matches(signal.event)) {
-                    if (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio")) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
+                    // D27: an event only picks the service when none is chosen; it never switches away from the one being read.
+                    if (mutable.value.arrivalServiceId == null && (AmbulanceEvents.isPrehospital(signal.event) || (signal.event.type == "ambulancia.hito" && signal.event.entity == "servicio"))) mutable.value = mutable.value.copy(arrivalServiceId = signal.event.id)
                     load()
                 }
                 RealtimeSignal.Resync -> { load(); retryQueued(); resumeHeld(); flushMilestones() }
@@ -268,7 +276,7 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
     var clock: () -> Long = { System.currentTimeMillis() }
     private val holds = mutableMapOf<String, Job>()
 
-    private fun pendingOf(item: QueuedMilestone) = PendingUndo(item.serviceId, "Registrando «${AmbulanceLabels.milestone(item.type)}» a las ${localClock(runCatching { Instant.parse(item.occurredAt) }.getOrDefault(Instant.now()))}…")
+    private fun pendingOf(item: QueuedMilestone) = PendingUndo(item.serviceId, until = item.holdUntil, label = "Registrando «${AmbulanceLabels.milestone(item.type)}» a las ${localClock(runCatching { Instant.parse(item.occurredAt) }.getOrDefault(Instant.now()))}…")
 
     private fun hold(item: QueuedMilestone, wait: Long, notice: String? = null) {
         mutable.value = mutable.value.copy(pendingMilestone = pendingOf(item))
@@ -450,5 +458,5 @@ class AmbulanceViewModel @Inject constructor(private val api: ApiGateway, realti
         }
     }
 
-    companion object { const val MILESTONE_UNDO_MS = 10_000L }
+    companion object { /** D117: long enough to reach "Deshacer" with gloves on. */ const val MILESTONE_UNDO_MS = 15_000L }
 }

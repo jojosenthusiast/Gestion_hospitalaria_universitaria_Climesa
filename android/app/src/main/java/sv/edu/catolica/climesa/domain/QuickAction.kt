@@ -61,8 +61,10 @@ object QuickActions {
             Entry("Mis hospitalizados", AndroidSection.HOSPITALIZED, null, "admision.ver"),
         ),
         "PAR" to listOf(
+            // D13/D114: a running service already has its own pending row with "Registrar hito"; a fixed "Servicio en curso"
+            // shortcut lied when there was none and opened the same screen as "Ver unidad".
             Entry("Ver unidad", AndroidSection.SERVICE, null, "ambulancia.ver_estado"),
-            Entry("Servicio en curso", AndroidSection.SERVICE, null, "ambulancia.operar"),
+            Entry("Bitácora", AndroidSection.LOG, null, "ambulancia.ver_bitacora"),
         ),
         "PAC" to listOf(
             Entry("Pedir cita", AndroidSection.MY_APPOINTMENTS, QuickAction.REQUEST_APPOINTMENT, "citas.solicitar"),

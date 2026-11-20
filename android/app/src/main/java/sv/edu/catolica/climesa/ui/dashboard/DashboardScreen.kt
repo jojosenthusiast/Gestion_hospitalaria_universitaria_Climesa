@@ -23,6 +23,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material3.AssistChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -119,10 +121,12 @@ fun RoleDashboardScreen(
 @OptIn(ExperimentalLayoutApi::class)
 private fun LazyListScope.dashboardContent(dashboard: DashboardModel, onAction: (QuickActionRequest) -> Unit) {
     if (dashboard.unavailable.isNotEmpty()) item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.dash_datos_parciales)) }
-    if (dashboard.kpis.isEmpty() && dashboard.actions.isEmpty() && dashboard.attention.isEmpty()) {
+    if (dashboard.kpis.isEmpty() && dashboard.actions.isEmpty() && dashboard.attention.isEmpty() && dashboard.alerts.isEmpty()) {
         item { EmptyState(stringResource(R.string.dash_vacio), detail = stringResource(R.string.dash_vacio_detalle)) }
         return
     }
+    // D25 (owner): an ambulance on its way or in the hospital is a large red card above everything else.
+    items(dashboard.alerts) { alert -> AmbulanceAlertCard(alert) { onAction(alert.request) } }
     // R3 A-28: Inicio is a pending inbox first. Each pending row carries its count and its one action; the tiles below only
     // show what no row already says.
     item { SectionLabel(stringResource(R.string.dash_atencion)) }
@@ -176,7 +180,9 @@ private fun KpiTile(kpi: DashboardKpi, modifier: Modifier, onClick: () -> Unit) 
                     Text(kpi.label, Modifier.weight(1f), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
                 Row(verticalAlignment = Alignment.Bottom) {
-                    Text(kpi.value, style = (if (kpi.value.length > 7) MaterialTheme.typography.titleLarge else MaterialTheme.typography.headlineLarge).copy(fontFeatureSettings = "tnum"), maxLines = 2)
+                    // D6/D132: long values step down and wrap (up to three lines at the largest font) instead of being cut.
+                    val valueStyle = when { kpi.value.length > 14 -> MaterialTheme.typography.titleMedium; kpi.value.length > 7 -> MaterialTheme.typography.titleLarge; else -> MaterialTheme.typography.headlineLarge }
+                    Text(kpi.value, Modifier.weight(1f, fill = false), style = valueStyle.copy(fontFeatureSettings = "tnum"), maxLines = 3, overflow = TextOverflow.Ellipsis)
                     kpi.suffix?.let { Text(" $it", Modifier.padding(bottom = 4.dp), style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 }
                 kpi.hint?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = if (kpi.tone.signals) fg else MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -213,6 +219,22 @@ private fun AttentionList(items: List<DashboardAttention>, onAction: (QuickActio
 }
 
 private const val ATTENTION_VISIBLE = 2
+
+/** D25: large red alert of an ambulance to receive, with its state and the one action that opens the reception. */
+@Composable
+private fun AmbulanceAlertCard(alert: sv.edu.catolica.climesa.domain.AmbulanceAlert, onClick: () -> Unit) {
+    val (red, _) = DashboardTone.DANGER.colors()
+    Surface(onClick = onClick, color = red, contentColor = androidx.compose.ui.graphics.Color.White, shape = MaterialTheme.shapes.medium, shadowElevation = 2.dp, modifier = Modifier.fillMaxWidth()) {
+        Row(Modifier.padding(Spacing.md), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.md)) {
+            Icon(Icons.Default.LocalHospital, null, Modifier.size(40.dp))
+            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                Text(alert.title, style = MaterialTheme.typography.titleLarge)
+                Text(alert.detail, style = MaterialTheme.typography.bodyMedium)
+                Text(alert.actionLabel + " ›", style = MaterialTheme.typography.labelLarge)
+            }
+        }
+    }
+}
 
 @Composable
 private fun AttentionRow(item: DashboardAttention, onClick: () -> Unit) {

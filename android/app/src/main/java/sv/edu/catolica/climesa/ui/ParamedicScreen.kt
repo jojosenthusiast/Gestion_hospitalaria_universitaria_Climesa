@@ -98,38 +98,53 @@ fun ParamedicScreen(section: AndroidSection, profile: AccessProfile, accountId: 
                 ).joinToString(" · "),
             )
         }
-        state.formError?.let { item { NoticeBanner(NoticeKind.ERROR, it) } }
-        state.notice?.let { item { NoticeBanner(NoticeKind.SUCCESS, it) } }
-        state.queued?.let { item { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)) } }
-        // The milestone in its undo window is not "waiting for signal": it has its own Deshacer row.
-        val waiting = state.queuedMilestones.count { it.holdUntil == 0L }
-        if (waiting > 0) item {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                NoticeBanner(NoticeKind.WARNING, pluralStringResource(R.plurals.par_hitos_en_cola, waiting, waiting))
-                SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryMilestones() }, enabled = !state.busy)
-            }
-        }
+        // D8: with a service running, the messages live under the step button (see [ServiceMessages]) so a new message never
+        // pushes the button away from the finger between two milestones.
+        if (service == null) item(key = "messages") { ServiceMessages(state, model) }
         when {
             state.loading && status == null -> item { LoadingState() }
             state.error != null && status == null -> item { ErrorState(state.error, onRetry = { model.open(AmbulanceMode.PARAMEDIC) }) }
             status == null -> Unit
             else -> {
-                unitCard(state, canPlan)
-                if (service != null) activeService(service, state, model, now, sheetOpen = { sheet = it.name }, locationFix = model::sendLocation, locationFail = model::reportLocationUnavailable)
-                else idle(state.log, onOpenLog = onOpenSection?.let { open -> { open(AndroidSection.LOG) } })
+                // D118: with a service running, its step button and report actions come first; the unit card goes below.
+                if (service != null) {
+                    activeService(service, state, model, now, sheetOpen = { sheet = it.name }, locationFix = model::sendLocation, locationFail = model::reportLocationUnavailable)
+                    unitCard(state, canPlan, idle = false, profile.permissions, accountId) { model.open(AmbulanceMode.PARAMEDIC) }
+                } else {
+                    unitCard(state, canPlan, idle = true, profile.permissions, accountId) { model.open(AmbulanceMode.PARAMEDIC) }
+                    idle(state.log, onOpenLog = onOpenSection?.let { open -> { open(AndroidSection.LOG) } })
+                }
             }
         }
     }
     // S5: the report sheets are crew-only; a deep link from another section opens nothing for the rest.
+    // D18/D119: full-height sheets that keep their place with the keyboard open; back asks before dropping typed data.
     when (if (service?.canReport == false) ParamedicSheet.NONE else ParamedicSheet.valueOf(sheet)) {
-        ParamedicSheet.PREHOSPITAL -> ModalBottomSheet(onDismissRequest = { sheet = ParamedicSheet.NONE.name }) { PrehospitalSheet(state, model, service, close = { sheet = ParamedicSheet.NONE.name }) }
-        ParamedicSheet.UNIDENTIFIED -> ModalBottomSheet(onDismissRequest = { sheet = ParamedicSheet.NONE.name }) { UnidentifiedSheet(state, model, close = { sheet = ParamedicSheet.NONE.name }) }
+        // The prehospital draft is kept on the phone, so closing that sheet never loses what was typed.
+        ParamedicSheet.PREHOSPITAL -> FormSheet(onDismiss = { sheet = ParamedicSheet.NONE.name }) { PrehospitalSheet(state, model, service, close = { sheet = ParamedicSheet.NONE.name }) }
+        ParamedicSheet.UNIDENTIFIED -> UnidentifiedSheetHost(state, model) { sheet = ParamedicSheet.NONE.name }
         ParamedicSheet.NONE -> Unit
     }
 }
 
-/** Estado de la unidad con el porqué del bloqueo (RN-30) y qué hacer. */
-private fun LazyListScope.unitCard(state: AmbulanceUiState, canPlan: Boolean) {
+/** Success, error and queue messages of the paramedic screen, in one block. */
+@Composable
+private fun ServiceMessages(state: AmbulanceUiState, model: AmbulanceViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+        state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        state.notice?.let { NoticeBanner(NoticeKind.SUCCESS, it) }
+        state.queued?.let { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)) }
+        // The milestone in its undo window is not "waiting for signal": it has its own Deshacer row.
+        val waiting = state.queuedMilestones.count { it.holdUntil == 0L }
+        if (waiting > 0) {
+            NoticeBanner(NoticeKind.WARNING, pluralStringResource(R.plurals.par_hitos_en_cola, waiting, waiting))
+            SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryMilestones() }, enabled = !state.busy)
+        }
+    }
+}
+
+/** Estado de la unidad con el porqué del bloqueo (RN-30) y qué hacer; D131: la tripulación pone o saca la unidad de mantenimiento. */
+private fun LazyListScope.unitCard(state: AmbulanceUiState, canPlan: Boolean, idle: Boolean, permissions: Collection<String>, accountId: String, onSaved: () -> Unit) {
     val status = state.status ?: return
     item {
         SectionCard(status.unit.plate, eyebrow = stringResource(R.string.op_amb_unidad), action = { OperacionStatusTag(status.unit.state, label = AmbulanceLabels.unitState(status.unit.state)) }) {
@@ -143,6 +158,10 @@ private fun LazyListScope.unitCard(state: AmbulanceUiState, canPlan: Boolean) {
             )
             status.dispatchBlock?.takeIf { ParamedicRules.showsDispatchBlock(it.code) }?.let { block ->
                 NoticeBanner(NoticeKind.WARNING, stringResource(R.string.par_bloqueo_titulo) + ". " + block.message + " " + ParamedicRules.blockGuidance(block.code, canPlan))
+            }
+            if (idle && sv.edu.catolica.climesa.domain.MaintenanceRules.available(permissions, status.unit.state)) {
+                val role: RoleViewModel = viewModel(key = "role-$accountId")
+                MaintenanceControl(role, status.unit.state, status.unit.version, status.paramedicOnDuty, status.driverOnDuty, onSaved)
             }
         }
     }
@@ -178,8 +197,11 @@ private fun LazyListScope.activeService(
             BlockedReason(AmbulanceService.NOT_CREW)
         }
     }
-    if (service.canAdvance || service.canUndo) item { NextStepButton(service, state.busy, model, state.pendingMilestone, state.formError) }
-    item {
+    // D7: a milestone held on the phone shows its Deshacer even before the API knows about it (canUndo is the server's).
+    val holding = state.pendingMilestone?.key == service.id
+    if (service.canAdvance || service.canUndo || holding) item(key = "next-step") { NextStepButton(service, state.busy, model, state.pendingMilestone, state.formError) }
+    item(key = "messages") { ServiceMessages(state, model) }
+    item(key = "actions") {
         SectionCard(stringResource(R.string.par_acciones)) {
             Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                 if (service.canReport) {
@@ -187,7 +209,8 @@ private fun LazyListScope.activeService(
                     SecondaryButton(stringResource(R.string.par_sin_identidad), { sheetOpen(ParamedicSheet.UNIDENTIFIED) }, icon = Icons.Default.PersonAdd)
                 }
                 if (!service.readOnly) LocationButton(state.busy, locationFix, locationFail)
-                OpenMap(service.origin)
+                // D22: the map searches the address with its municipality, so a common street name lands in the right city.
+                OpenMap(AmbulanceRules.mapQuery(service.origin, service.municipality))
             }
         }
     }
@@ -203,7 +226,17 @@ private fun NextStepButton(service: AmbulanceService, busy: Boolean, model: Ambu
     CloseWhenDone(busy, sent, error) { finishing = false }
     Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
         // G4: one tap records the next milestone; for 10 s the button becomes "Deshacer" instead of a confirm dialog.
-        if (pending != null && pending.key == service.id) { if (service.canUndo) PendingUndoRow(pending.label) { model.undoMilestone() } }
+        // D7/D117: the held milestone is local, so Deshacer is offered for its whole window, large, with the seconds left.
+        if (pending != null && pending.key == service.id) {
+            val left by produceState(undoSecondsLeft(pending.until, System.currentTimeMillis()), pending) {
+                while (value > 0) { delay(250); value = undoSecondsLeft(pending.until, System.currentTimeMillis()) }
+            }
+            Text(pending.label, style = MaterialTheme.typography.bodyMedium)
+            SecondaryButton(
+                if (pending.until > 0) stringResource(R.string.par_deshacer_segundos, left) else stringResource(R.string.fila_deshacer),
+                { model.undoMilestone() }, Modifier.heightIn(min = 72.dp),
+            )
+        }
         else if (next != null && service.canAdvance) {
             val early = next == "finalizado" && AmbulanceRules.finishNeedsReason(service)
             PrimaryButton(
@@ -280,14 +313,19 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
     LaunchedEffect(state.busy, state.formError, state.queued, sending) {
         if (sending && !state.busy) { sending = false; if (state.formError == null) close() }
     }
-    LaunchedEffect(service?.id) { service?.id?.let(model::restorePrehospital) }
+    LaunchedEffect(service?.id) { service?.let { model.restorePrehospital(it.id, it.priority) } }
+    // D19/D119: each vital sign says what is wrong under itself as soon as it is typed, with the API's range.
+    val signErrors = AmbulanceRules.signErrors(form)
+    var tried by rememberSaveable { mutableStateOf(false) }
     SheetColumn {
         Text(stringResource(R.string.par_reporte), style = MaterialTheme.typography.titleLarge)
-        state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
         state.queued?.let { NoticeBanner(NoticeKind.WARNING, stringResource(R.string.amb_en_cola)); SecondaryButton(stringResource(R.string.camas_reintentar), { model.retryQueued() }, enabled = !state.busy) }
         state.provisional?.let { NoticeBanner(NoticeKind.INFO, stringResource(R.string.amb_provisional_vinculara, it.record)) }
         if (service == null) { Text(stringResource(R.string.unidad_sin_servicio)); return@SheetColumn }
-        FormField(stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500)), service?.id) }, singleLine = false)
+        FormField(
+            stringResource(R.string.amb_motivo), form.reason, { model.updatePrehospital(form.copy(reason = it.take(500)), service?.id) }, singleLine = false,
+            error = stringResource(R.string.par_motivo_corto).takeIf { tried && form.reason.trim().length < 5 },
+        )
         Text(stringResource(R.string.amb_prioridad), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             AmbulanceLabels.priorities.forEach { (value, label) -> StatusFilterChip(form.priority == value, { model.updatePrehospital(form.copy(priority = value), service?.id) }, label, triageTone(value), Modifier.heightIn(min = 48.dp)) }
@@ -299,22 +337,37 @@ private fun PrehospitalSheet(state: AmbulanceUiState, model: AmbulanceViewModel,
             }
         }
         Text(stringResource(R.string.par_signos), style = MaterialTheme.typography.labelLarge)
-        NumberField(stringResource(R.string.amb_fc), form.heartRate) { model.updatePrehospital(form.copy(heartRate = it), service?.id) }
-        NumberField(stringResource(R.string.amb_pas), form.systolic) { model.updatePrehospital(form.copy(systolic = it), service?.id) }
-        NumberField(stringResource(R.string.amb_pad), form.diastolic) { model.updatePrehospital(form.copy(diastolic = it), service?.id) }
-        NumberField(stringResource(R.string.amb_spo2), form.oxygenSaturation) { model.updatePrehospital(form.copy(oxygenSaturation = it), service?.id) }
-        NumberField(stringResource(R.string.amb_temperatura), form.temperature, decimal = true) { model.updatePrehospital(form.copy(temperature = it), service?.id) }
-        NumberField(stringResource(R.string.amb_glasgow), form.glasgow) { model.updatePrehospital(form.copy(glasgow = it), service?.id) }
-        PrimaryButton(stringResource(R.string.amb_enviar_reporte), { sending = true; model.sendPrehospital(service.id) }, icon = Icons.Default.Send, enabled = state.queued == null, loading = state.busy)
+        NumberField(stringResource(R.string.amb_fc), form.heartRate, error = signErrors["heartRate"]) { model.updatePrehospital(form.copy(heartRate = it), service?.id) }
+        NumberField(stringResource(R.string.amb_pas), form.systolic, error = signErrors["systolic"]) { model.updatePrehospital(form.copy(systolic = it), service?.id) }
+        NumberField(stringResource(R.string.amb_pad), form.diastolic, error = signErrors["diastolic"]) { model.updatePrehospital(form.copy(diastolic = it), service?.id) }
+        NumberField(stringResource(R.string.amb_spo2), form.oxygenSaturation, error = signErrors["oxygenSaturation"]) { model.updatePrehospital(form.copy(oxygenSaturation = it), service?.id) }
+        NumberField(stringResource(R.string.amb_temperatura), form.temperature, decimal = true, error = signErrors["temperature"]) { model.updatePrehospital(form.copy(temperature = it), service?.id) }
+        NumberField(stringResource(R.string.amb_glasgow), form.glasgow, error = signErrors["glasgow"]) { model.updatePrehospital(form.copy(glasgow = it), service?.id) }
+        // S12: the error of the send sits right above its button, not at the top of the sheet out of view.
+        state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
+        PrimaryButton(stringResource(R.string.amb_enviar_reporte), { tried = true; sending = true; model.sendPrehospital(service.id) }, icon = Icons.Default.Send, enabled = state.queued == null && signErrors.isEmpty(), loading = state.busy)
+    }
+}
+
+/** A73 in a [FormSheet]: typed signs or age ask before being dropped. */
+@Composable
+private fun UnidentifiedSheetHost(state: AmbulanceUiState, model: AmbulanceViewModel, close: () -> Unit) {
+    var sex by rememberSaveable { mutableStateOf("no_registrado") }
+    var age by rememberSaveable { mutableStateOf("") }
+    var description by rememberSaveable { mutableStateOf("") }
+    val dirty = state.provisional == null && (age.isNotBlank() || description.isNotBlank() || sex != "no_registrado")
+    FormSheet(onDismiss = close, dirty = dirty) {
+        UnidentifiedSheet(state, model, sex, { sex = it }, age, { age = it }, description, { description = it }, close)
     }
 }
 
 /** Paciente sin identidad: sexo observado, edad estimada y señas; nunca se inventan nombre ni fecha (D-004). */
 @Composable
-private fun UnidentifiedSheet(state: AmbulanceUiState, model: AmbulanceViewModel, close: () -> Unit) {
-    var sex by rememberSaveable { mutableStateOf("no_registrado") }
-    var age by rememberSaveable { mutableStateOf("") }
-    var description by rememberSaveable { mutableStateOf("") }
+private fun UnidentifiedSheet(
+    state: AmbulanceUiState, model: AmbulanceViewModel,
+    sex: String, setSex: (String) -> Unit, age: String, setAge: (String) -> Unit, description: String, setDescription: (String) -> Unit,
+    close: () -> Unit,
+) {
     SheetColumn {
         Text(stringResource(R.string.par_sin_identidad), style = MaterialTheme.typography.titleLarge)
         val provisional = state.provisional
@@ -323,15 +376,16 @@ private fun UnidentifiedSheet(state: AmbulanceUiState, model: AmbulanceViewModel
             PrimaryButton(stringResource(R.string.par_cerrar), close)
             return@SheetColumn
         }
-        state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
         Text(stringResource(R.string.par_sexo), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             listOf("femenino" to stringResource(R.string.par_sexo_femenino), "masculino" to stringResource(R.string.par_sexo_masculino), "indeterminado" to stringResource(R.string.par_sexo_indeterminado), "no_registrado" to stringResource(R.string.rec_no_registrado)).forEach { (value, label) ->
-                FilterChip(selected = sex == value, onClick = { sex = value }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
+                FilterChip(selected = sex == value, onClick = { setSex(value) }, label = { Text(label) }, modifier = Modifier.heightIn(min = 48.dp))
             }
         }
-        NumberField(stringResource(R.string.amb_edad_estimada), age) { age = it.take(3) }
-        FormField(stringResource(R.string.amb_senas), description, { description = it.take(500) }, singleLine = false)
+        val ageError = stringResource(R.string.par_edad_rango).takeIf { age.isNotBlank() && age.toIntOrNull()?.let { it in 0..120 } != true }
+        NumberField(stringResource(R.string.amb_edad_estimada), age, error = ageError) { setAge(it.take(3)) }
+        FormField(stringResource(R.string.amb_senas), description, { setDescription(it.take(500)) }, singleLine = false)
+        state.formError?.let { NoticeBanner(NoticeKind.ERROR, it) }
         PrimaryButton(stringResource(R.string.amb_crear_provisional), { model.registerUnidentified(sex, age, description) }, icon = Icons.Default.PersonAdd, loading = state.busy)
     }
 }

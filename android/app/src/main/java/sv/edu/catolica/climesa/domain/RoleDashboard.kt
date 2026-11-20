@@ -52,7 +52,12 @@ data class DashboardModel(
     val actions: List<DashboardAction>,
     /** Sources that could not be read (403, network); their tiles are left out instead of showing a wrong zero. */
     val unavailable: Set<DashboardSource> = emptySet(),
+    /** D25: ambulances to receive, drawn as large red alert cards above "Requiere tu atención". */
+    val alerts: List<AmbulanceAlert> = emptyList(),
 )
+
+/** D25/D26: one ambulance the hospital receives: where it is ([title]), since when and with which report ([detail]). */
+data class AmbulanceAlert(val title: String, val detail: String, val priority: String?, val actionLabel: String, val request: QuickActionRequest)
 
 /** Existing endpoints a dashboard reads. [anyOf] holds the permissions that allow the read (rule 8: by permission). */
 enum class DashboardSource(val path: String, val anyOf: List<String>) {
@@ -161,6 +166,23 @@ object RoleDashboard {
         return if (next.third == "en_curso") "$area · en curso" else "$area · ${MyShifts.relative(next.first, now)}"
     }
 
+    /**
+     * The shift tile as (label, value, hint): "Mi turno" · "Hasta las 14:00" · area while one runs, otherwise
+     * "Mi próximo turno" · "Mañana 06:00" · area. Null without a published or running shift ahead.
+     */
+    fun shiftTile(value: Any?, now: Instant): Triple<String, String, String?>? {
+        val next = rows(value)
+            .filter { it.optString("state") in setOf("publicado", "en_curso") }
+            .mapNotNull { row -> instant(text(row, "end"))?.takeIf { it.isAfter(now) }?.let { end -> Triple(instant(text(row, "start")) ?: end, end, row) } }
+            .minByOrNull { it.first } ?: return null
+        val area = next.third.optString("area").takeIf { it.isNotBlank() }
+        val running = next.third.optString("state") == "en_curso" || !next.first.isAfter(now)
+        return if (running) Triple("Mi turno", "Hasta las ${java.time.format.DateTimeFormatter.ofPattern("HH:mm").format(next.second.atZone(zone))}", area)
+        else Triple("Mi próximo turno", MyShifts.relative(next.first, now), area)
+    }
+
+    const val UNIT_CANNOT_LEAVE = "No puede salir"
+
     fun nextAppointment(value: Any?, now: Instant): String? {
         val next = rows(value)
             .filter { it.optString("state") in setOf("solicitada", "confirmada") }
@@ -190,6 +212,7 @@ object RoleDashboard {
         val kpis = mutableListOf<DashboardKpi>()
         val charts = mutableListOf<DashboardChart>()
         val attention = mutableListOf<DashboardAttention>()
+        val alerts = mutableListOf<AmbulanceAlert>()
         val today = now.atZone(zone).toLocalDate()
 
         val bedStates = data[DashboardSource.BEDS]?.let { states(it) }
@@ -200,7 +223,6 @@ object RoleDashboard {
         val lab = (data[DashboardSource.LAB] ?: data[DashboardSource.MY_LAB])?.let { labCounts(it) }
         val stock = data[DashboardSource.STOCK]?.let { stockCounts(it, today) }
         val ambulance = data[DashboardSource.AMBULANCE]?.let { AmbulanceParser.status(it) }
-        val shift = data[DashboardSource.SHIFTS]?.let { nextShift(it, now) }
         val waiting = queue?.get("en_espera") ?: 0
         val pendingBed = admissions?.get("pendiente_cama") ?: 0
         val free = bedStates?.get("libre") ?: 0
@@ -248,7 +270,8 @@ object RoleDashboard {
                 ),
             )
         }
-        fun shiftKpi() { shift?.let { kpis += DashboardKpi("Mi próximo turno", it, DashboardTone.PROCESS, target = target(AndroidSection.SHIFTS)) } }
+        // D6/D73/D132: a running shift is "Mi turno" (not "próximo"); the area goes to the hint so the time is never cut.
+        fun shiftKpi() { data[DashboardSource.SHIFTS]?.let { shiftTile(it, now) }?.let { (label, value, hint) -> kpis += DashboardKpi(label, value, DashboardTone.PROCESS, hint = hint, target = target(AndroidSection.SHIFTS)) } }
         fun assignBedAttention() {
             if (pendingBed > 0 && QuickActions.allowed(QuickAction.ASSIGN_BED, permissions) && AndroidSection.ADMISSION in sections) {
                 attention += DashboardAttention(counted(pendingBed, "admisión sin cama", "admisiones sin cama"), "Asigna una cama sugerida para que el paciente pase a hospitalización.", DashboardTone.WARNING, "Asignar cama", QuickActionRequest(AndroidSection.ADMISSION, QuickAction.ASSIGN_BED), covers = "Admisiones sin cama")
@@ -303,10 +326,10 @@ object RoleDashboard {
                 stock?.let { kpis += DashboardKpi("Insumos bajo mínimo", it.belowMinimum.toString(), if (it.belowMinimum > 0) DashboardTone.WARNING else DashboardTone.SUCCESS, target = target(AndroidSection.SUPPLIES)) }
                 shiftKpi()
                 // ENF/AST audit #1: nursing reads `/ambulancia/llegada` (it has no `ambulancia.ver_estado`).
+                // D25/D26 (owner): every ambulance on its way or in the hospital is a large red alert above everything else,
+                // with its state (on the way, report sent, arrived), not a quiet row that only appears once it arrived.
                 data[DashboardSource.ARRIVALS]?.let { AmbulanceParser.arrivals(it) }?.takeIf { AndroidSection.AMBULANCE_RECEPTION in sections }?.let { list ->
-                    val arrived = list.count { it.arrived }
-                    if (arrived > 0) attention += DashboardAttention(if (arrived == 1) "Ambulancia en el hospital" else "$arrived ambulancias en el hospital", "Recibe al paciente y marca la entrega.", DashboardTone.WARNING, "Recibir", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
-                    else if (list.any { it.active }) attention += DashboardAttention("Ambulancia en camino", "Prepara la recepción del paciente.", DashboardTone.WARNING, "Ver recepción", QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION))
+                    alerts += ambulanceAlerts(list, now)
                 }
                 // ENF/AST audit #16: a signed discharge still holds the bed until the exit is registered.
                 val toExit = data[DashboardSource.ADMISSIONS]?.let { value -> rows(value).count { it.optString("state") == "alta_firmada" && it.optJSONArray("allowedActions")?.let { a -> (0 until a.length()).any { i -> a.optString(i) == "registrar_salida" } } == true } } ?: 0
@@ -338,7 +361,10 @@ object RoleDashboard {
             }
             "PAR" -> {
                 ambulance?.let {
-                    kpis += DashboardKpi("Unidad ${it.unit.plate}".trim(), unitLabel(it.unit.state), unitTone(it.unit.state), target = target(AndroidSection.SERVICE))
+                    // D136: the tile says the same as Servicio: a unit that cannot leave is not "Disponible".
+                    val block = it.dispatchBlock?.takeIf { b -> ParamedicRules.showsDispatchBlock(b.code) }
+                    kpis += if (block != null) DashboardKpi("Unidad ${it.unit.plate}".trim(), UNIT_CANNOT_LEAVE, DashboardTone.BLOCKED, hint = block.message.takeIf { m -> m.isNotBlank() }, target = target(AndroidSection.SERVICE))
+                    else DashboardKpi("Unidad ${it.unit.plate}".trim(), unitLabel(it.unit.state), unitTone(it.unit.state), target = target(AndroidSection.SERVICE))
                     kpis += DashboardKpi("Solicitudes pendientes", it.pendingRequests.size.toString(), if (it.pendingRequests.isNotEmpty()) DashboardTone.WARNING else DashboardTone.SUCCESS)
                     kpis += DashboardKpi("Servicio", if (it.activeService != null) "En curso" else "Sin servicio", if (it.activeService != null) DashboardTone.PROCESS else DashboardTone.NEUTRAL, target = target(AndroidSection.SERVICE))
                     it.activeService?.takeIf { AndroidSection.SERVICE in sections }?.let { service ->
@@ -389,7 +415,27 @@ object RoleDashboard {
             }
         }
         val covered = attention.mapNotNull { it.covers }.toSet()
-        return DashboardModel(kpis.filter { it.label !in covered }, charts.filter { it.total > 0 }, attention, actions(role, permissions, attention, linked), unavailable)
+        return DashboardModel(kpis.filter { it.label !in covered }, charts.filter { it.total > 0 }, attention, actions(role, permissions, attention, linked), unavailable, alerts)
+    }
+
+    /**
+     * D25/D26: arrived services first (they wait for the handover), then the ones on their way. The state line uses what
+     * `/ambulancia/llegada` sends; `priority` and `hasPrehospital` are read when the API includes them.
+     */
+    fun ambulanceAlerts(list: List<ArrivalCandidate>, now: Instant): List<AmbulanceAlert> {
+        val clock = java.time.format.DateTimeFormatter.ofPattern("HH:mm")
+        return list.filter { it.arrived || it.active }.sortedByDescending { it.arrived }.map { candidate ->
+            val since = instant(candidate.dispatchedAt)?.let { "despachada a las ${clock.format(it.atZone(zone))}" }
+            val report = if (candidate.hasPrehospital) "reporte prehospital enviado" else if (candidate.arrived) null else "sin reporte prehospital aún"
+            val priority = candidate.priority?.takeIf { it.isNotBlank() }
+            AmbulanceAlert(
+                title = if (candidate.arrived) "Ambulancia en el hospital" else "Ambulancia en camino",
+                detail = listOfNotNull(priority?.let { "Prioridad ${AmbulanceLabels.priority(it)}" }, since, report).joinToString(" · ").replaceFirstChar { it.uppercase() },
+                priority = priority,
+                actionLabel = if (candidate.arrived) "Recibir" else "Ver reporte",
+                request = QuickActionRequest(AndroidSection.AMBULANCE_RECEPTION),
+            )
+        }
     }
 
     /**

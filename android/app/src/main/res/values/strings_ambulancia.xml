@@ -13,7 +13,10 @@
     <string name="amb_todas">Todas</string>
     <string name="amb_estado_final">Estado final</string>
     <string name="amb_tipo">Tipo</string>
-    <string name="amb_servicios_n">%1$d servicios</string>
+    <plurals name="amb_servicios_n">
+        <item quantity="one">%1$d servicio</item>
+        <item quantity="other">%1$d servicios</item>
+    </plurals>
     <string name="amb_bitacora_sin_resultados">Ningún servicio coincide con la búsqueda y los filtros.</string>
     <!-- Auditoría del flujo de ambulancia. -->
     <string name="amb_ultima_solicitud">Tu última solicitud</string>

@@ -110,8 +110,10 @@ class NursingFlowTest {
         val sections = AndroidSections.visible("ENF", enf)
         if (AndroidSection.AMBULANCE_RECEPTION in sections) {
             val model = RoleDashboard.build("ENF", enf, mapOf(DashboardSource.ARRIVALS to coming), now = now)
-            assertEquals("Ambulancia en camino", model.attention.single().title)
-            assertEquals(AndroidSection.AMBULANCE_RECEPTION, model.attention.single().request.section)
+            // D25: the ambulance is a red alert card of its own, not a row of "Requiere tu atención".
+            assertEquals("Ambulancia en camino", model.alerts.single().title)
+            assertEquals(AndroidSection.AMBULANCE_RECEPTION, model.alerts.single().request.section)
+            assertTrue(model.attention.none { it.title.startsWith("Ambulancia") })
         }
     }
 

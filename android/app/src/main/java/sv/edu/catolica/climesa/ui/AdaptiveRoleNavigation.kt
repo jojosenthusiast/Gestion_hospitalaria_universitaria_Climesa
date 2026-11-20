@@ -86,6 +86,9 @@ private fun compactLabel(section: AndroidSection): String = when (section) {
     AndroidSection.UNIT -> "Unidad"
     AndroidSection.PREHOSPITAL_REPORT -> "Reporte"
     AndroidSection.UNIDENTIFIED_PATIENT -> "Paciente"
+    // D132: one short word survives the largest font size in the bar.
+    AndroidSection.SHIFTS -> "Turnos"
+    AndroidSection.LOG -> "Bitácora"
     else -> section.label
 }
 
