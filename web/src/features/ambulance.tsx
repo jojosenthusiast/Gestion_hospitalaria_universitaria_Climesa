@@ -11,7 +11,7 @@ import { CrewAction,CrewCoverage,missingCrew } from './ambulance/crew';
 import { CrewCoverageWarning,DispatchBlockStrip,ReadinessItem,noActiveService } from './ambulance/readiness';
 import { AdminCloseAction } from './ambulance/admin-close';
 import { useQuickAction } from './personal/accion';
-import { isUnclosed,mapLink,milestoneNames,priorityLevel,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type PrehospitalView } from './ambulance/types';
+import { isUnclosed,mapLink,milestoneNames,priorityLevel,priorityNames,roleNames,stateNames,typeNames,type AmbulanceRequest,type AmbulanceStatus,type ArrivalCandidate,type ArrivalList,type PrehospitalView } from './ambulance/types';
 import './ambulance/ambulance.css';
 export * from './ambulance/types';
 const signNames:Record<string,string>={heartRate:'Frecuencia cardiaca',systolic:'Presión sistólica',diastolic:'Presión diastólica',respiratoryRate:'Frecuencia respiratoria',oxygenSaturation:'Saturación de oxígeno',temperature:'Temperatura',glasgow:'Glasgow'};
@@ -23,6 +23,8 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  // Lote 5 S8: who may put the unit in maintenance is the API's `canSetMaintenance` (Jefatura or the crew); an older API without it falls back to the permission.
  const manage=data.data&&typeof data.data.canSetMaintenance==='boolean'?data.data.canSetMaintenance:can(profile,'ambulancia.mantenimiento');
  const dispatcher=can(profile,'ambulancia.despachar'),phoneDesk=profile.permissions.some(p=>p.code==='ambulancia.solicitar'&&p.context!=='propio'),receiver=can(profile,'ambulancia.recibir_prehospital');
+ // P3 W1: once the service is finished it is no longer `activeService`; reception still opens the report from `/ambulancia/llegada`.
+ const arrivals=useData<ArrivalList>(api,'/ambulancia/llegada',version,receiver);
  const [dispatching,setDispatching]=useState<AmbulanceRequest|'direct'|null>(null),[discarding,setDiscarding]=useState<AmbulanceRequest|null>(null),[calling,setCalling]=useState(false),[report,setReport]=useState<string|null>(null);
  const pendingCount=data.data?.pendingRequests?.length??0,previous=useRef<number|null>(null);
  useEffect(()=>{if(previous.current!==null&&pendingCount>previous.current)beep();if(data.data)previous.current=pendingCount;},[pendingCount,data.data]);
@@ -41,6 +43,7 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
   {(dispatcher||manage)&&<CrewCoverageWarning api={api} version={version}/>}
   {done&&<Notice kind="success">{done}</Notice>}
   {s.activeService?<ActiveService api={api} canOperate={can(profile,'ambulancia.operar')} closeAbove={dispatcher&&closeInNotice(s)} onSaved={saved} service={s.activeService} onReport={receiver&&(s.activeService.hasPrehospital||s.activeService.milestones?.some(m=>m.type==='en_hospital'))?()=>setReport(s.activeService!.id):undefined}/>:null}
+  {receiver&&<ArrivalsToReceive services={(arrivals.data?.services??[]).filter(a=>a.serviceId!==s.activeService?.id)} onReport={setReport}/>}
   {dispatcher&&s.pendingRequests&&<RequestsBoard status={s} onDispatch={setDispatching} onDiscard={setDiscarding}/>}
   {dispatcher&&s.unit.state==='disponible'&&!s.dispatchBlock&&<p><button type="button" className="secondary-button" onClick={()=>setDispatching('direct')}>Despachar traslado sin solicitud</button></p>}
   {manage&&s.unit.state!=='en_servicio'&&<MaintenancePanel status={s} api={api} profile={profile} onSaved={data.refresh}/>}
@@ -50,6 +53,11 @@ export function AmbulancePage({api,profile,version}:{api:Api;profile:AccessProfi
  {calling&&<PhoneRequestForm api={api} profile={profile} onClose={()=>setCalling(false)} onRegistered={data.refresh} doneMessage={callDone} onSaved={()=>saved(callDone)}/>}
  {report&&<PrehospitalDialog api={api} serviceId={report} version={version} onClose={()=>setReport(null)}/>}
  </>;
+}
+/** P3 W1: services that arrived (or finished) without a registered handover; reception opens each report to mark it received. */
+function ArrivalsToReceive({services,onReport}:{services:ArrivalCandidate[];onReport:(serviceId:string)=>void}){
+ if(!services.length)return null;
+ return <section aria-label="Por recibir"><h2>Por recibir</h2><ul className="record-list">{services.map(a=><li key={a.serviceId}><span><strong>{a.state?(a.state==='despachado'?'Despachada':milestoneNames[a.state]??a.state):a.arrived?'En hospital':'En curso'}</strong> <small className="muted">Despachada {formatTime(a.dispatchedAt)} · {formatRelative(a.dispatchedAt)}</small></span> <button type="button" className="row-action" onClick={()=>onReport(a.serviceId)}>Ver reporte prehospital</button></li>)}</ul></section>;
 }
 /** The unit's state badge: an available unit that cannot be dispatched (no crew, RN-30) does not read «Disponible». */
 export function UnitBadge({status:s}:{status:AmbulanceStatus}){

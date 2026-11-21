@@ -25,6 +25,16 @@ function Panel<T>({ title, state, empty, isEmpty, children, className = '' }: { 
   return <section className={`public-panel ${className}`.trim()} aria-label={title}><h2>{title}</h2>{body}</section>;
 }
 
+/**
+ * P3 W9: «Números llamados» joins the four queues. It shows data as soon as any queue has data, «Cargando…» only while
+ * queues without data are still loading, and «no disponible» only when every queue failed.
+ */
+export function combinedQueueState(states: Remote<PublicQueue>[]): Remote<PublicQueue[]> {
+  const loaded = states.flatMap(s => s.data ? [s.data] : []);
+  const error = loaded.length === 0 && states.length > 0 && states.every(s => s.error) ? states[0].error : null;
+  return { data: loaded.length ? loaded : null, loading: loaded.length === 0 && states.some(s => s.loading), error, refresh: () => states.forEach(s => s.refresh()) };
+}
+
 /** W34 · pantalla pública sin sesión (televisor de sala de espera). Solo agregados y datos públicos; sin interacción. */
 export function PublicScreen({ api: given }: { api?: Api }) {
   const api = useMemo(() => given ?? new PublicApi(), [given]);
@@ -53,7 +63,7 @@ export function PublicScreen({ api: given }: { api?: Api }) {
     <header className="public-header"><Brand light /><h1>Información del hospital</h1><Clock /></header>
     {!live && <p className="public-band" role="status">Actualizando en cuanto vuelva la conexión.</p>}
     <main className="public-grid">
-      <Panel title="Números llamados" state={queues[0].state} empty="" isEmpty={() => false} className="public-panel-queue">{() =>
+      <Panel title="Números llamados" state={combinedQueueState(queues.map(q => q.state))} empty="" isEmpty={() => false} className="public-panel-queue">{() =>
         <div className="public-queues">{queues.map(({ service, state }) => <div key={service.id} className="public-queue" aria-label={service.label}>
           <h3>{service.label}</h3>
           {state.data && state.data.llamados.length > 0

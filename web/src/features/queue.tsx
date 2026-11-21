@@ -104,6 +104,8 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const absenceTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>()), heldTickets = useRef(new Map<string, QueueTicket>());
   const liveTickets = useRef<QueueTicket[]>([]);
   liveTickets.current = Array.isArray(data.data) ? data.data : [];
+  // P3 W13: the undo toast is offered only while the live ticket still allows it (window not expired, same day, not moved on).
+  const liveCanUndo = (ticketId: string) => { const ticket = liveTickets.current.find(t => t.id === ticketId); return !!ticket && canUndoCall(ticket); };
   const dropAbsence = (id: string) => { clearTimeout(absenceTimers.current.get(id)); absenceTimers.current.delete(id); heldTickets.current.delete(id); setAbsences(current => { const next = { ...current }; delete next[id]; return next; }); };
   const sendAbsence = useRef<(ticket: QueueTicket) => void>(() => undefined);
   sendAbsence.current = ticket => { dropAbsence(ticket.id); void move(liveTickets.current.find(t => t.id === ticket.id) ?? ticket, 'cerrado', true); };
@@ -183,13 +185,13 @@ export function QueuePage({ api, profile, version }: { api: Api; profile: Access
   const summaryShown = !!data.data && (loaded.length > 0 || call || issue);
   return <>
     <CompactHeader breadcrumb="Atención / Flujo de llegada" title="Fila del día" actions={<>
-      {readOnly && <ReadOnlyBadge who="Recepción, Asistencia o Medicina" what="la fila del día" />}
+      {readOnly && <ReadOnlyBadge who="Recepción, Enfermería o Medicina" what="la fila del día" />}
       </>}/>
     {/* Owner batch 2 (S28): the summary and the line's actions sit on top, so a long board never hides them. */}
     {summaryShown && <QueueSummary visible={loadedVisible} now={now} proposal={showNext && next.data && !Array.isArray(next.data) && next.data.service === nextService ? next.data.proposal : null}
             onCallNext={call && showNext && nextService ? () => void callNext(nextService, office) : null} callDisabled={action.busy || waitingNext === 0}
             onIssue={issue ? () => setIssueOpen(true) : null} />}
-    {toast && !action.error && <div className="qb-undo" role="status"><span>{toast.text}</span>{toast.undo && undos[toast.undo.ticketId] && <button className="row-action" disabled={action.busy} onClick={() => void undoCall(toast.undo!)}><Icon name="retry" size={16} />Deshacer</button>}
+    {toast && !action.error && <div className="qb-undo" role="status"><span>{toast.text}</span>{toast.undo && undos[toast.undo.ticketId] && liveCanUndo(toast.undo.ticketId) && <button className="row-action" disabled={action.busy} onClick={() => void undoCall(toast.undo!)}><Icon name="retry" size={16} />Deshacer</button>}
       <button type="button" className="icon-button qb-undo-close" aria-label="Cerrar aviso" onClick={() => setToast(null)}><Icon name="close" size={16} /></button></div>}
     <section className="data-workbench" aria-label="Tablero de la fila">
       <RemoteState state={data}>{all => {
@@ -358,8 +360,9 @@ function Lane({ column, tickets, now, busy, call, manage, issue, pendingIds, ave
         {/* R1: only allowed actions; «No se presentó» stays visible (disabled, reason as tooltip) because it is the next step after the calls. */}
         {ACTION_ORDER.map(name => <ActionButton key={name} action={name} allowed={allowed} blocked={blocked} showBlocked={name === 'no_se_presento' || (name === 'llamar' && ticket.state === 'llamado')} disabled={busy} onClick={() => void (name === 'no_se_presento' ? onMove(ticket, 'cerrado') : onTransition(ticket, actionPath[name]))}>{actionLabel(ticket, name)}{name === 'llamar' && <> <Icon name="arrow" size={16} /></>}</ActionButton>)}
         {ticket.state === 'en_atencion' && ticket.consultationId && ticket.consultationState === 'abierta' && <a className="row-action" href={`#/consultas?consulta=${ticket.consultationId}`}>Retomar consulta <Icon name="arrow" size={16} /></a>}
-        {/* Audit D42: «Deshacer llamado» stays on every called card the server lets this account undo, not only right after the call. */}
-        {call && ticket.state === 'llamado' && (canUndoCall(ticket) || !!undos[ticket.id]) && <button type="button" className="row-action" disabled={busy}
+        {/* Audit D42: «Deshacer llamado» stays on every called card the server lets this account undo, not only right after the call.
+            P3 W13: only the server's `undoActions` decide it; a remembered local call never offers an undo the server would refuse. */}
+        {call && canUndoCall(ticket) && <button type="button" className="row-action" disabled={busy}
           title={ticket.llamados > 1 ? `Quita el último llamado; quedan ${ticket.llamados - 1}.` : 'El número vuelve a En espera.'}
           onClick={() => onUndo(undos[ticket.id] ?? { ticketId: ticket.id, label: '', version: ticket.version })}><Icon name="retry" size={16} />Deshacer llamado</button>}
         <QueueCardMenu label={`Más acciones de ${ticketCode(ticket)}`} disabled={busy} items={cardMenuItems(ticket, { moves, priorities: changingPriority, canVoid: voidable(ticket, issue, now),

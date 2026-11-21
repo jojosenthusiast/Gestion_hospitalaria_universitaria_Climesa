@@ -172,7 +172,7 @@ describe('B2-B3 · tablero', () => {
     const rows: Record<string, unknown>[] = [ticket({ allowedActions: ['llamar'] }), ticket({ id: 't-8', numero: 8, allowedActions: ['llamar'] })];
     const write = vi.fn(async (path: string) => {
       const id = path.split('/')[2], index = rows.findIndex(r => r.id === id);
-      if (index >= 0 && path.endsWith('/llamar')) rows[index] = { ...rows[index], state: 'llamado', llamados: 1, version: 3, allowedActions: ['atender'] };
+      if (index >= 0 && path.endsWith('/llamar')) rows[index] = { ...rows[index], state: 'llamado', llamados: 1, version: 3, allowedActions: ['atender'], undoActions: ['deshacer_llamado'] };
       return { id, version: 3, state: 'llamado', llamados: 1 };
     });
     const api = montar(rows, write as unknown as Api['write']);

@@ -113,6 +113,7 @@ export function PendingTray({ groups, extras = [], children, othersClear = true 
 /** A figure of the day. `value` null means «not applicable now» and hides it; the remote drives loading and error. */
 export type Figure = { id: string; label: string; value: number | string | null; state: Remote<unknown>; href?: string; of?: string; /** Owner batch 5 (S4): a short split under the label («5 de fila, 3 con cita», free beds per room type). */ detail?: ReactNode };
 const shown = (figure: Figure) => figure.state.error ? '—' : !figure.state.data ? null : typeof figure.value === 'number' ? formatNumber(figure.value) : figure.value;
+export const isTextFigure = (figure: Figure) => typeof figure.value === 'string' && /\p{L}/u.test(figure.value);
 /** The day's figures, each shown once. A failed source shows «—» and one line with its retry under the strip. */
 export function DayFigures({ figures }: { figures: Figure[] }) {
   const visible = figures.filter(f => !(f.state.data && !f.state.error && f.value === null));
@@ -122,7 +123,8 @@ export function DayFigures({ figures }: { figures: Figure[] }) {
     <ul>{visible.map(figure => {
       const value = shown(figure);
       const body = <>
-        <span className={`figure-value${value === null ? ' is-loading' : ''}`}>{value ?? ''}</span>
+        {/* P3 W3: a word figure («En mantenimiento») wraps at a smaller size instead of being cut. */}
+        <span className={`figure-value${value === null ? ' is-loading' : ''}${isTextFigure(figure) ? ' is-text' : ''}`}>{value ?? ''}</span>
         <span className="figure-label">{figure.label}{figure.of && value !== null && value !== '—' ? <small> {figure.of}</small> : null}</span>
         {figure.detail && value !== null && value !== '—' ? <span className="figure-detail">{figure.detail}</span> : null}
       </>;

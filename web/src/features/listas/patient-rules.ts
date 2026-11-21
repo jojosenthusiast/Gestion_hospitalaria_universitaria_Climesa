@@ -1,4 +1,5 @@
 import { validDui } from '../../lib/identity';
+import { localDayKey } from '../../lib/format';
 
 /** Reglas de captura de la ficha del paciente (ronda 2, obs. 6). Reflejan las de la API (`validateDemographics`); la API sigue siendo quien decide. */
 export type PatientDraft = { givenNames: string; surnames: string; dui?: string | null; birth?: string | null; phone?: string | null; email?: string | null; address?: string | null };
@@ -20,10 +21,11 @@ export function validatePatientDraft(draft: PatientDraft, today = new Date()): P
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) errors.email = 'Revisa el correo: falta el @ o el dominio.';
   const birth = draft.birth?.trim();
   if (birth) {
-    const parsed = new Date(`${birth}T12:00:00Z`), limit = new Date(today); limit.setUTCFullYear(limit.getUTCFullYear() - 120);
+    // P3 W16: "today" is the El Salvador civil day (like the API), not the UTC day that is already tomorrow after 18:00.
+    const parsed = new Date(`${birth}T12:00:00Z`), todayKey = localDayKey(today), limitKey = `${Number(todayKey.slice(0, 4)) - 120}${todayKey.slice(4)}`;
     if (Number.isNaN(parsed.valueOf())) errors.birth = 'La fecha de nacimiento no es válida.';
-    else if (birth > today.toISOString().slice(0, 10)) errors.birth = 'La fecha de nacimiento no puede ser futura.';
-    else if (birth < limit.toISOString().slice(0, 10)) errors.birth = 'La fecha de nacimiento tiene más de 120 años: revísala.';
+    else if (birth > todayKey) errors.birth = 'La fecha de nacimiento no puede ser futura.';
+    else if (birth < limitKey) errors.birth = 'La fecha de nacimiento tiene más de 120 años: revísala.';
   }
   return errors;
 }

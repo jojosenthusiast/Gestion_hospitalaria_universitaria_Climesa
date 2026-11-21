@@ -4,6 +4,7 @@ import type { AccessProfile, Api } from '../lib/api';
 import { CompactHeader } from '../components/system';
 import { Notice } from '../components/ui';
 import { PrescriptionPrintDialog, PrintPrescriptionButton, type PrintablePrescription } from './prescription-print';
+import { labOrderStateLabel } from './listas/lab-worklist';
 import './clinical-history.css';
 
 type HistoryDiagnosis = { code: string; description: string; principal: boolean; note?: string | null };
@@ -43,7 +44,7 @@ export function ClinicalHistoryDialog({ api, patientId, patientName, version, on
         <section aria-label="Resultados de laboratorio">
           <h3>Laboratorio</h3>
           {h.laboratory.length ? <ul className="history-list">{h.laboratory.map(o => <li key={o.id}>
-            <div className="history-item-head"><div><small>Ordenada: {formatDateTime(o.createdAt)}{o.reviewedAt ? ` · Revisada: ${formatDateTime(o.reviewedAt)}` : ''}</small></div><Tag value={o.state} /></div>
+            <div className="history-item-head"><div><small>Ordenada: {formatDateTime(o.createdAt)}{o.reviewedAt ? ` · Revisada: ${formatDateTime(o.reviewedAt)}` : ''}</small></div><Tag value={o.state} label={labOrderStateLabel(o.state)} /></div>
             <ul>{o.items.map(i => <li key={i.id}><strong>{i.code} · {i.name}</strong>{i.result ? <> · {i.result.text ?? i.result.value}{i.unit ? ` ${i.unit}` : ''} <Tag value={i.result.mark} /></> : ' · Sin valor disponible'}</li>)}</ul>
           </li>)}</ul> : <Empty title="Sin órdenes de laboratorio" description="Las órdenes del paciente aparecerán aquí con su estado." />}
         </section>
@@ -104,7 +105,7 @@ export function MyHistoryPage({ api, profile, version }: { api: Api; profile: Ac
         <section aria-labelledby="mh-laboratorio" className="my-history-section">
           <h2 id="mh-laboratorio">Exámenes de laboratorio <span className="section-count">{h.laboratory.length}</span></h2>
           {h.laboratory.length ? <ol className="mh-list">{h.laboratory.map(o => <li key={o.id} className="mh-item">
-            <header className="mh-head"><div><strong>Orden del {formatDateTime(o.createdAt)}</strong><small>{o.reviewedAt ? `Revisada por tu médico el ${formatDateTime(o.reviewedAt)}` : 'Pendiente de revisión médica'}</small></div><Tag value={o.state} /></header>
+            <header className="mh-head"><div><strong>Orden del {formatDateTime(o.createdAt)}</strong><small>{o.reviewedAt ? `Revisada por tu médico el ${formatDateTime(o.reviewedAt)}` : 'Pendiente de revisión médica'}</small></div><Tag value={o.state} label={labOrderStateLabel(o.state)} /></header>
             <table className="mh-results"><caption className="sr-only">Resultados de la orden</caption><thead><tr><th>Examen</th><th>Resultado</th></tr></thead><tbody>{o.items.map(i => { const value = resultText(i); return <tr key={i.id}><td>{i.name} <small className="mono-data">{i.code}</small></td><td>{value ? <span className="mh-value">{value} {i.result && i.result.mark !== 'normal' ? <Tag value={i.result.mark} /> : null}</span> : <span className="muted">Valor pendiente de revisión</span>}</td></tr>; })}</tbody></table>
           </li>)}</ol> : <Empty title="No hay órdenes de laboratorio." description="Las órdenes que pida tu médico aparecerán aquí con su estado." />}
         </section>

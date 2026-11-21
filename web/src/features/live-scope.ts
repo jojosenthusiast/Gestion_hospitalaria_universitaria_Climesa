@@ -25,6 +25,8 @@ const rules: [RegExp, (match: RegExpMatchArray) => LiveScope][] = [
   [/^\/personal(\/|\?|$)/, () => of('personal')],
   [/^\/espacios(\/|\?|$)/, () => of('espacio', 'cama')],
   [/^\/camas(\/|\?|$)/, () => of('cama', 'admision', 'espacio')],
+  // P3 W12: week templates change with their own entity, not with shifts.
+  [/^\/turnos\/plantillas(\?|$)/, () => of('plantilla_semana')],
   [/^\/turnos(\/|\?|$)/, () => of('turno', 'personal')],
   [/^\/usuarios(\/|\?|$)/, () => of('usuario', 'personal')],
   [/^\/inicio(\?|$)/, () => of('cama', 'paciente', 'personal', 'usuario', 'turno', 'admision')],

@@ -26,6 +26,9 @@ export function crewProblem(pool:CrewCandidate[],chosen:string[]){const picked=p
  return null;}
 /** MA-AMB-04: `handover` dice quién recibió al paciente; marcar recibido es del personal clínico en las apps (`allowedActions`). */
 export type PrehospitalView={serviceId:string;version:number;active:boolean;arrived:boolean;priority:string;patientLinked:boolean;clinical:boolean;handover:{receivedAt:string;receivedByName:string|null}|null;allowedActions:string[];reports:{id:string;priority:string;estimatedArrival?:string|null;capturedAt:string;receivedAt:string;reason?:string;vitalSigns?:Record<string,number>}[]};
+/** MA-AMB-04: `GET /ambulancia/llegada`, services the hospital receives or waits for (no clinical data). */
+export type ArrivalCandidate={serviceId:string;dispatchedAt:string;active:boolean;arrived:boolean;priority?:string;hasPrehospital?:boolean;urgent?:boolean;state?:string};
+export type ArrivalList={serviceId:string|null;services:ArrivalCandidate[]};
 export const stateNames:Record<string,string>={disponible:'Disponible',en_servicio:'En servicio',en_mantenimiento:'En mantenimiento'};
 export const priorityNames:Record<string,string>={roja:'Roja',naranja:'Naranja',amarilla:'Amarilla',verde:'Verde'};
 /** Triage colour on the shared priority scale: red is the only emergency; orange and yellow are urgent; green is routine. */

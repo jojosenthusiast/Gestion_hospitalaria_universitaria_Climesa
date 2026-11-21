@@ -12,7 +12,7 @@ const options: { format: ExportFormat; label: string; hint: string }[] = [
  * Menú «Exportar». `table` se evalúa al elegir el formato, así que siempre exporta lo que hay en pantalla;
  * si no hay filas el menú queda deshabilitado en lugar de generar un archivo vacío.
  */
-export function ExportMenu({ table, label = 'Exportar', disabled = false }: { table: () => ExportTable; label?: string; disabled?: boolean }) {
+export function ExportMenu({ table, label = 'Exportar', disabled = false, keepLabel = false }: { table: () => ExportTable; label?: string; disabled?: boolean; keepLabel?: boolean }) {
   const [open, setOpen] = useState(false), [busy, setBusy] = useState<ExportFormat | null>(null), [error, setError] = useState<string | null>(null);
   const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   useEffect(() => {
@@ -33,7 +33,7 @@ export function ExportMenu({ table, label = 'Exportar', disabled = false }: { ta
     finally { setBusy(null); }
   }
   return <div className="export-menu" ref={root}>
-    <button ref={trigger} type="button" className="secondary-button export-trigger" aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)}><Icon name="download" size={18} /><span className="export-label">{label}</span></button>
+    <button ref={trigger} type="button" className={`secondary-button export-trigger${keepLabel ? ' keep-label' : ''}`} aria-haspopup="menu" aria-expanded={open} disabled={disabled} onClick={() => setOpen(value => !value)}><Icon name="download" size={18} /><span className="export-label">{label}</span></button>
     {open && <div className="export-popover" role="menu" aria-label="Formato de exportación">
       {options.map(option => <button key={option.format} type="button" role="menuitem" disabled={busy !== null} onClick={() => void run(option.format)}><strong>{busy === option.format ? 'Generando…' : option.label}</strong><span>{option.hint}</span></button>)}
       {error && <p className="export-error" role="alert">{error}</p>}

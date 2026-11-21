@@ -141,7 +141,7 @@ function PublishedNotices({ api, profile, version }: { api: Api; profile: Access
             <td data-label="Aviso"><strong>{a.titulo}</strong><small>{a.cuerpo}</small></td>
             <td data-label="Nivel"><NoticeLevelBadge level={a.nivel} /></td>
             <td data-label="Dónde se ve">{audienceText(a)}</td>
-            <td data-label="Vigencia">{a.desde ? noticeWhen(a.desde) : '—'}<small>hasta {a.hasta ? shortWhen(a.hasta) : '—'}</small></td>
+            <td data-label="Vigencia" className="notice-validity"><span>desde {a.desde ? shortWhen(a.desde) : '—'}</span><small>hasta {a.hasta ? shortWhen(a.hasta) : '—'}</small></td>
             <td data-label="Enterado" className="numeric">{count ? (count.destinatarios ? `${count.enterados}/${count.destinatarios} enterados` : String(count.enterados)) : '—'}</td>
             <td data-label="Estado"><Tag value={stateTag[a.estado] ?? a.estado} label={stateLabel[a.estado] ?? a.estado} />
               {a.estado === 'retirado' && <small>{a.retiradoEn ? `${noticeWhen(a.retiradoEn)} · ` : ''}Motivo: {a.motivoRetiro ?? 'sin motivo registrado'}</small>}</td>
