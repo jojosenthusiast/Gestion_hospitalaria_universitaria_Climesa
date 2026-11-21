@@ -1,6 +1,7 @@
 import {validDui} from '../platform/identity.rules';
 export {validDui} from '../platform/identity.rules';
 import { BadRequestException } from '@nestjs/common';
+import { businessDate } from '../platform/clock';
 export const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 export const phonetic = (s: string) => normalize(s).replace(/qu/g,'k').replace(/ll/g,'y').replace(/ch/g,'x').replace(/h/g,'').replace(/v/g,'b').replace(/z/g,'s').replace(/c(?=[ei])/g,'s').replace(/c/g,'k');
 export function recordNumber(sequence: string | number): string {
@@ -23,8 +24,9 @@ export function validateDemographics(data: Demographics, today: Date): Demograph
   validateContact(data);
   if (data.birth) {
     const parsed = new Date(data.birth+'T12:00:00Z');
-    const min = new Date(today); min.setUTCFullYear(min.getUTCFullYear()-120);
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.birth) || Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0,10)!==data.birth || data.birth>today.toISOString().slice(0,10) || data.birth<min.toISOString().slice(0,10)) throw new BadRequestException('Revisa la fecha de nacimiento; no puede ser futura ni superar 120 años.');
+    // Business day in America/El_Salvador: from 18:00 local the UTC date is already tomorrow's (it must not admit it).
+    const day = businessDate(today), min = `${String(Number(day.slice(0,4))-120).padStart(4,'0')}${day.slice(4)}`;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(data.birth) || Number.isNaN(parsed.valueOf()) || parsed.toISOString().slice(0,10)!==data.birth || data.birth>day || data.birth<min) throw new BadRequestException('Revisa la fecha de nacimiento; no puede ser futura ni superar 120 años.');
   }
   if (data.provisional && (!Number.isInteger(data.estimatedAge) || data.estimatedAge!<0 || data.estimatedAge!>120 || (data.description?.trim().length ?? 0)<10)) throw new BadRequestException('Una identidad provisional necesita edad estimada y señas de al menos diez caracteres.');
   return {...data, givenNames: data.givenNames?.trim() ?? '', surnames: data.surnames?.trim() ?? '', dui: data.dui ? data.dui.replace(/-/g,'') : null, birth: data.birth || null, phone: data.phone?.replace(/-/g,'') || null, email: data.email?.trim() || null};

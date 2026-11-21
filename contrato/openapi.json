@@ -35332,6 +35332,7 @@
           "capacidad_de_categoria",
           "limite_habitaciones_vip",
           "limite_habitaciones_semiprivadas",
+          "admision_activa",
           "turno_iniciado",
           "turno_con_citas",
           "descanso_insuficiente",

@@ -176,6 +176,11 @@ export class PersonnelService implements OnModuleInit,OnModuleDestroy {
       // CARGA-01: un borrador no contaba como carga; al publicarlo se revisan sus días seguidos aquí y el descanso y el
       // tope de 7 días en la base, uno por uno y en orden, para que cada uno vea a los ya publicados.
       const drafts=(await c.query("SELECT id,persona_id,lower(periodo) AS start FROM personal.turno WHERE estado='borrador' AND periodo && tstzrange($1,$2) AND ($3::uuid IS NULL OR area_id=$3) ORDER BY lower(periodo),id FOR UPDATE",[start,end,dto.areaId??null])).rows;
+      // A shift saved meanwhile for the same person (`checkShift` locks the person) would not count these drafts as load:
+      // lock each person before the checks, in id order so two publishes never deadlock. Shift row first, then person,
+      // the same order as moving a shift.
+      const people=[...new Set(drafts.map(d=>d.persona_id as string))];
+      if(people.length)await c.query('SELECT id FROM personal.persona WHERE id=ANY($1::uuid[]) ORDER BY id FOR UPDATE',[people]);
       const rows:{id:string;persona_id:string;version:number}[]=[];
       for(const draft of drafts){
         const day=businessDate(new Date(draft.start));

@@ -15,6 +15,8 @@ const CONSTRAINT_CODES: Record<string, { codigo: string; message: string }> = {
   consulta_ticket_unico: { codigo: 'consulta_ya_iniciada', message: 'La consulta ya fue iniciada para este número.' },
   // RN-02: two assignments of the same bed at once; the database keeps one (20261017000800_hospitalizacion.sql).
   ocupacion_cama_cama_id_periodo_excl: { codigo: 'cama_ocupada', message: 'Otra persona tomó esta cama.' },
+  // RN-10: two admissions of the same patient at once; the unique index keeps one (20261017000800_hospitalizacion.sql).
+  admision_activa_unica: { codigo: 'admision_activa', message: 'El paciente ya tiene una admisión activa.' },
 };
 
 /** FR-100-11: todo error sale como `application/problem+json` con `codigo` estable, mensaje en español y `requestId`; nunca trazas ni SQL. */

@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import type { PoolClient } from 'pg';
-import { Actor } from '../platform/actor';
+import { Actor, SYSTEM_ACTOR } from '../platform/actor';
 import { AuditService } from '../platform/audit.service';
 import { Clock } from '../platform/clock';
 import { CommandService } from '../platform/command.service';
@@ -124,14 +124,19 @@ export class PrivacyService {
       : { integra: false, revisados: result.checked, primeraFallida: result.seq, motivo: result.reason, verificadoEn: this.clock.now().toISOString() };
   }
 
-  /** FR-110-08: date, role and reason of each access by other people; never staff names. */
+  /**
+   * FR-110-08: date, role and reason of each access by other people; never staff names. List reads (queue, agenda,
+   * unsigned consultations, searches) audit one row with the patients in `detalle.patientIds`, so they count too;
+   * rows of the system actor (automatic sweeps) are not someone looking at the record.
+   */
   async myAccesses(actor: Actor) {
     if (!actor.patientId) return [];
     return this.db.transaction(async c => {
       const rows = (await c.query(`SELECT a.registrado_en AS fecha,a.accion,a.entidad,a.motivo,
           (SELECT string_agg(r.nombre,', ' ORDER BY r.codigo) FROM acceso.rol r WHERE r.codigo=ANY(string_to_array(a.actor_rol,','))) AS rol
-        FROM plataforma.auditoria a WHERE a.paciente_id=$1 AND a.actor_id IS DISTINCT FROM $2 AND a.resultado='exito'
-        ORDER BY a.seq DESC LIMIT 300`, [actor.patientId, actor.id])).rows as Row[];
+        FROM plataforma.auditoria a WHERE (a.paciente_id=$1 OR (a.detalle->'patientIds') ? $1::text)
+          AND a.actor_id IS DISTINCT FROM $2 AND a.actor_id IS DISTINCT FROM $3 AND a.resultado='exito'
+        ORDER BY a.seq DESC LIMIT 300`, [actor.patientId, actor.id, SYSTEM_ACTOR.id])).rows as Row[];
       await this.commands.audit(c, actor, { action: 'auditoria.mis_accesos', entity: 'auditoria', permission: 'auditoria.mis_accesos', detail: { filas: rows.length } });
       // The audit `motivo` may hold free text written by staff; legacy rows of the retired exceptional-access module keep their label.
       return rows.filter(r => isRecordAccess(r.accion)).slice(0, 200).map(r => ({
