@@ -8,6 +8,8 @@ import { LabResultsInbox } from './lab-results-inbox';
 import { DayFigures, PendingTray, QuickActions, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 import { MyShift, OnShiftNow, canonicalRole, roleDashboards, roleOrder, type RoleId } from './roles';
 import { coverageTodayGroup } from './coverage-tray';
+import { ExportMenu } from '../../components/export-menu';
+import { dailyReport } from './daily-report';
 
 const unique = <T extends { id: string }>(items: T[]) => [...new Map(items.map(item => [item.id, item])).values()];
 
@@ -40,11 +42,16 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
   const groups: TrayGroupSpec[] = unique(roles.flatMap((role: RoleId) => roleDashboards[role].tray(ctx)));
   const figures: Figure[] = unique(roles.flatMap((role: RoleId) => roleDashboards[role].figures(ctx)));
   const actions: QuickAction[] = unique(roles.flatMap((role: RoleId) => roleDashboards[role].actions));
+  const reportRoles = roles.includes('ADM') || roles.includes('JOP'), board = d.board.data;
   const followUps = can(profile, 'citas.agendar'), results = can(profile, 'laboratorio.revisar');
   // The «Al día» line needs to know the S10 groups are empty too.
   const s10Clear = (!followUps || (!!d.followUps.data && d.followUps.data.length === 0)) && (!results || (!!d.labPending.data && d.labPending.data.length === 0));
   return <>
-    <CompactHeader breadcrumb="CLIMESA / Inicio" title={roleDashboards[roles[0]].title} actions={<QuickActions actions={actions} profile={profile} />} />
+    <CompactHeader breadcrumb="CLIMESA / Inicio" title={roleDashboards[roles[0]].title} actions={<>
+      <QuickActions actions={actions} profile={profile} />
+      {/* P3 S6: Administración and Jefatura export the day's board (PDF, CSV or Excel); ExportMenu records it in /exportaciones first. */}
+      {reportRoles && board && <ExportMenu label="Reporte del día" table={() => dailyReport(board)} />}
+    </>} />
     <CriticalNoticeBanner api={api} version={version} />
     <div className="day-panel">
       {/* S10: follow-up appointments proposed when results arrive (Recepción), and results for the doctor to review.

@@ -139,6 +139,11 @@ export class OperationsFixtures {
   request(path: string): unknown {
     const url = new URL(path, 'https://fixture.invalid'), p = url.pathname, q = url.searchParams;
     if (p === '/metricas/tablero') return this.board();
+    // P3 S5: public occupancy per floor and room type (ADM reads free beds by type from it).
+    if (p === '/publico/ocupacion') {
+      const keys = [...new Set(this.beds.map(b => `${b.level}|${b.category}`))].sort();
+      return { actualizadoEn: new Date().toISOString(), ocupacion: keys.map(key => { const [level, category] = key.split('|'), beds = this.beds.filter(b => `${b.level}|${b.category}` === key); return { planta: Number(level), categoria: category, camas: beds.length, libres: beds.filter(b => b.state === 'libre').length, ocupadas: beds.filter(b => b.state === 'ocupada').length }; }) };
+    }
     // D3: the lab's own turnaround, the last 7 days of the same series.
     if (p === '/laboratorio/tiempo-entrega') return this.series('tiempo_laboratorio', addDays(localDay(), -6), localDay());
     if (/^\/metricas\/[a-z_]+$/.test(p)) return this.series(p.split('/')[2], q.get('desde') ?? addDays(localDay(), -6), q.get('hasta') ?? localDay());

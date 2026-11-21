@@ -54,8 +54,8 @@ describe('Laboratorio (W20, W21)', () => {
   it('muestra un avance de seis pasos y marca cuál es el actual', async () => {
     montar(['laboratorio.ver_cola'], 'en_proceso', undefined, orden('en_proceso', { sampleTakenAt: '2026-11-13T15:30:00Z' }, false));
     const pasos = await screen.findByRole('list', { name: /Avance de la orden de Paciente Ficticio Dos/ });
-    expect(within(pasos).getAllByRole('listitem').map(li => li.textContent?.replace(/^\d/, ''))).toEqual(['Solicitada', 'Muestra tomada', 'En proceso · ahora', 'Completada', 'Revisada por médico', 'Visible al paciente']);
-    expect(within(pasos).getByText('En proceso · ahora').closest('li')?.getAttribute('aria-current')).toBe('step');
+    expect(within(pasos).getAllByRole('listitem').map(li => li.textContent?.replace(/^\d/, ''))).toEqual(['Solicitada', 'Muestra tomada', 'En Proceso · ahora', 'Completada', 'Revisada por médico', 'Visible al paciente']);
+    expect(within(pasos).getByText('En Proceso · ahora').closest('li')?.getAttribute('aria-current')).toBe('step');
   });
 
   it('dice quién actúa ahora en cada estado', async () => {

@@ -48,7 +48,8 @@
 .connection-band { padding: 11px 22px; display: flex; align-items: center; justify-content: center; gap: 9px; border-bottom: 1px solid currentColor; background: var(--soft); color: var(--primary-text); font-size: 13px; font-weight: 700; line-height: 1.4; }
 .connection-offline { background: var(--warning-soft); color: var(--warning); }
 .conflict-notice { display: grid; gap: 10px; justify-items: start; }
-.auth-forgot { justify-self: start; }
+.auth-forgot, .auth-public { justify-self: start; }
+.auth-public { margin-top: 4px; }
 .password-change { margin: 24px 0; padding-top: 20px; border-top: 1px solid var(--line, currentColor); }
 .password-change h3 { display: flex; align-items: center; gap: 8px; margin: 0; }
 .hospital-main { width: min(1240px, calc(100% - 64px)); flex: 1; margin: 0 auto; padding: var(--space-6) 0 var(--space-12); min-width: 0; }

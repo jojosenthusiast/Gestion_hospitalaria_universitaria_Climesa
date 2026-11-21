@@ -94,8 +94,8 @@ export function BoardView({ board: t }: { board: MetricsBoard }) {
             <p className="board-note">de {t.fila.emitidos} números emitidos hoy</p></>}
       </Tarjeta>
       <Tarjeta titulo="Órdenes de laboratorio">
-        <div className="board-figures"><Cifra valor={t.laboratorio.pendiente} etiqueta="Pendientes" /><Cifra valor={t.laboratorio.enProceso} etiqueta="En proceso" /><Cifra valor={t.laboratorio.completadoHoy} etiqueta="Completadas hoy" /></div>
-        <HBarList title="Laboratorio por estado" data={[{ label: 'Pendientes', value: t.laboratorio.pendiente, tone: 'warn' }, { label: 'En proceso', value: t.laboratorio.enProceso, tone: 'info' }, { label: 'Completadas hoy', value: t.laboratorio.completadoHoy, tone: 'ok' }, { label: 'Canceladas hoy', value: t.laboratorio.canceladoHoy, tone: 'slate' }]} />
+        <div className="board-figures"><Cifra valor={t.laboratorio.pendiente} etiqueta="Pendientes" /><Cifra valor={t.laboratorio.enProceso} etiqueta="En Proceso" /><Cifra valor={t.laboratorio.completadoHoy} etiqueta="Completadas hoy" /></div>
+        <HBarList title="Laboratorio por estado" data={[{ label: 'Pendientes', value: t.laboratorio.pendiente, tone: 'warn' }, { label: 'En Proceso', value: t.laboratorio.enProceso, tone: 'info' }, { label: 'Completadas hoy', value: t.laboratorio.completadoHoy, tone: 'ok' }, { label: 'Canceladas hoy', value: t.laboratorio.canceladoHoy, tone: 'slate' }]} />
       </Tarjeta>
       <Tarjeta titulo="Turnos"><div className="board-figures"><Cifra valor={t.turnosEnCurso} etiqueta="En curso ahora" /></div></Tarjeta>
       <Tarjeta titulo="Pacientes"><div className="board-figures"><Cifra valor={t.pacientesActivos} etiqueta="Activos" /></div></Tarjeta>

@@ -4,6 +4,7 @@ import { useData, type Remote } from '../common';
 import type { Consultation } from '../consultations';
 import type { IndicatorSeries } from '../metrics';
 import type { MetricsBoard } from '../tablero';
+import type { PublicOccupancy } from '../../lib/publico';
 import type { LabProposal } from './lab-follow-up';
 import type { LabFollowUp } from './lab-results-inbox';
 
@@ -19,6 +20,8 @@ export type AdmissionRow = { id: string; patientName: string; state: string; req
 export const sources = {
   summary: { path: '/inicio', any: ['sesion.perfil'] },
   board: { path: '/metricas/tablero', any: ['metricas.ver'] },
+  // P3 S5: free beds per room type for accounts without the bed board (ADM); public aggregates, no patient data.
+  publicBeds: { path: '/publico/ocupacion', any: ['metricas.ver'] },
   queue: { path: '/fila', any: ['fila.ver'] },
   appts: { path: '/citas', any: ['citas.ver'] },
   apptRequests: { path: '/citas/solicitudes-categoria', any: ['citas.agendar'] },
@@ -43,7 +46,7 @@ export const sources = {
 export type Source = keyof typeof sources;
 
 export type DashboardData = {
-  summary: Remote<Summary>; board: Remote<MetricsBoard>; queue: Remote<QueueTicket[]>; appts: Remote<Appointment[]>; apptRequests: Remote<AppointmentRequestRow[]>;
+  summary: Remote<Summary>; board: Remote<MetricsBoard>; publicBeds: Remote<PublicOccupancy>; queue: Remote<QueueTicket[]>; appts: Remote<Appointment[]>; apptRequests: Remote<AppointmentRequestRow[]>;
   lab: Remote<LabOrderRow[]>; myLab: Remote<LabOrderRow[]>; labTurnaround: Remote<IndicatorSeries>; beds: Remote<Bed[]>; admissions: Remote<AdmissionRow[]>; stock: Remote<StockRow[]>;
   ambulance: Remote<AmbulanceStatus>; shifts: Remote<Shift[]>; myShifts: Remote<Shift[]>; agenda: Remote<Consultation[]>;
   users: Remote<UserAccount[]>; staff: Remote<Staff[]>; audit: Remote<AuditRow[]>;
@@ -60,7 +63,7 @@ function useSource<T>(api: Api, profile: AccessProfile, version: number, needed:
  */
 export function useDashboardData(api: Api, profile: AccessProfile, version: number, needed: ReadonlySet<Source>): DashboardData {
   return {
-    summary: useSource<Summary>(api, profile, version, needed, 'summary'), board: useSource<MetricsBoard>(api, profile, version, needed, 'board'), queue: useSource<QueueTicket[]>(api, profile, version, needed, 'queue'), appts: useSource<Appointment[]>(api, profile, version, needed, 'appts'), apptRequests: useSource<AppointmentRequestRow[]>(api, profile, version, needed, 'apptRequests'),
+    summary: useSource<Summary>(api, profile, version, needed, 'summary'), board: useSource<MetricsBoard>(api, profile, version, needed, 'board'), publicBeds: useSource<PublicOccupancy>(api, profile, version, needed, 'publicBeds'), queue: useSource<QueueTicket[]>(api, profile, version, needed, 'queue'), appts: useSource<Appointment[]>(api, profile, version, needed, 'appts'), apptRequests: useSource<AppointmentRequestRow[]>(api, profile, version, needed, 'apptRequests'),
     lab: useSource<LabOrderRow[]>(api, profile, version, needed, 'lab'), myLab: useSource<LabOrderRow[]>(api, profile, version, needed, 'myLab'), labTurnaround: useSource<IndicatorSeries>(api, profile, version, needed, 'labTurnaround'), beds: useSource<Bed[]>(api, profile, version, needed, 'beds'), admissions: useSource<AdmissionRow[]>(api, profile, version, needed, 'admissions'), stock: useSource<StockRow[]>(api, profile, version, needed, 'stock'),
     ambulance: useSource<AmbulanceStatus>(api, profile, version, needed, 'ambulance'), shifts: useSource<Shift[]>(api, profile, version, needed, 'shifts'), myShifts: useSource<Shift[]>(api, profile, version, needed, 'myShifts'), agenda: useSource<Consultation[]>(api, profile, version, needed, 'agenda'),
     users: useSource<UserAccount[]>(api, profile, version, needed, 'users'), staff: useSource<Staff[]>(api, profile, version, needed, 'staff'), audit: useSource<AuditRow[]>(api, profile, version, needed, 'audit'),

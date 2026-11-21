@@ -15,7 +15,7 @@ afterEach(() => { cleanup(); location.hash = ''; });
 describe('etiquetas de estado en español (WEB-07 / W-08)', () => {
   it('los estados de fila, laboratorio e inventario no se muestran crudos', () => {
     render(<>{['en_espera', 'llamado', 'en_atencion', 'no_se_presento', 'en_proceso', 'bajo_minimo', 'vencido', 'critico_alto', 'sin_rango'].map(v => <Tag key={v} value={v} />)}</>);
-    for (const label of ['En espera', 'Llamado', 'En atención', 'No se presentó', 'En proceso', 'Bajo mínimo', 'Vencido', 'Crítico alto', 'Sin rango']) expect(screen.getByText(label)).toBeTruthy();
+    for (const label of ['En espera', 'Llamado', 'En atención', 'No se presentó', 'En Proceso', 'Bajo mínimo', 'Vencido', 'Crítico alto', 'Sin rango']) expect(screen.getByText(label)).toBeTruthy();
     expect(screen.queryByText(/_/)).toBeNull();
   });
 

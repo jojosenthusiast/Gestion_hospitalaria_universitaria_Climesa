@@ -9,7 +9,7 @@ export type LabGroupId = 'en_proceso' | 'muestra' | 'externa' | 'por_revisar' | 
  * the external orders. What waits for the doctor and what is closed go last; closed groups start folded.
  */
 export const LAB_GROUPS: { id: LabGroupId; label: string; folded: boolean }[] = [
-  { id: 'en_proceso', label: 'En proceso', folded: false },
+  { id: 'en_proceso', label: 'En Proceso', folded: false },
   { id: 'muestra', label: 'Por tomar muestra', folded: false },
   { id: 'externa', label: 'Externas: esperan el informe', folded: false },
   { id: 'por_revisar', label: 'Esperan revisión médica', folded: false },

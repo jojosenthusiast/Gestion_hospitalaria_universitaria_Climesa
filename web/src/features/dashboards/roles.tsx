@@ -15,7 +15,7 @@ import { auditActionLabel } from './labels';
 import { coverageTodayGroup } from './coverage-tray';
 import { needsStaffLink } from '../personal/filters';
 import { waitingSplit, waitingSplitText } from '../listas/queue-board';
-import { BedTypeBreakdown, bedTypeCounts } from '../../components/bed-types';
+import { BedTypeBreakdown, bedTypeCounts, bedTypeTotals } from '../../components/bed-types';
 import { AttentionList, Panel, PanelState, isToday, localDay, timeLabel, type Figure, type QuickAction, type TrayGroupSpec } from './parts';
 
 export type RoleId = 'ADM' | 'JOP' | 'DPD' | 'REC' | 'ENF' | 'MED' | 'LAB' | 'PAR' | 'PAC';
@@ -34,7 +34,11 @@ const grid = (children: ReactNode) => <div className="dash-grid">{children}</div
 /** Owner batch 5 (S4): «En espera» says how many came to the queue today and how many have an appointment. */
 const waitingFigure = (d: DashboardData) => fig('espera', 'En espera', d.queue, r => waitingSplit(r).total, { href: '#/fila', detail: d.queue.data ? waitingSplitText(waitingSplit(d.queue.data)) : undefined });
 /** Owner batch 5 (S4): free beds per room type under the total, read from the bed board when the account has it. */
-const freeByType = (d: DashboardData) => d.beds.data ? <BedTypeBreakdown counts={bedTypeCounts(d.beds.data.map(b => ({ category: b.category, free: b.state === 'libre' })))} /> : undefined;
+const freeByType = (d: DashboardData) => d.beds.data ? <BedTypeBreakdown counts={bedTypeCounts(d.beds.data.map(b => ({ category: b.category, free: b.state === 'libre' })))} />
+  // P3 S5: an account without the bed board (ADM) reads the same counts from the public occupancy aggregates.
+  : Array.isArray(d.publicBeds.data?.ocupacion) ? <BedTypeBreakdown counts={bedTypeTotals(d.publicBeds.data.ocupacion.map(o => ({ category: o.categoria, free: o.libres, total: o.camas })))} /> : undefined;
+/** P3 S5: the unit's state from `/metricas/tablero`; a hospital without a unit says so instead of hiding the figure. */
+const ambulanceFigure = (d: DashboardData, extra: Partial<Figure> = {}) => fig('ambulancia', 'Ambulancia', d.board, b => b.ambulancia ? unitStateNames[b.ambulancia.estado] ?? 'Otro estado' : 'Sin unidad', { detail: d.board.data?.ambulancia ? (d.board.data.ambulancia.paramedicoDeTurno ? 'Paramédico de turno' : 'Sin paramédico de turno') : undefined, ...extra });
 const shiftText = (s: Shift) => `${isToday(s.start) ? 'Hoy' : formatDate(s.start, { withYear: false })} · ${timeLabel(s.start)}–${timeLabel(s.end)} · ${s.area}`;
 const nextShift = (rows: Shift[]) => [...rows].filter(s => s.state !== 'cancelado' && new Date(s.end).getTime() > Date.now()).sort((a, b) => a.start.localeCompare(b.start))[0];
 const PRIORITY_ORDER: Record<string, number> = { emergencia: 0, urgente: 1, rutina: 2 };
@@ -158,7 +162,7 @@ const occupancy = (b: { camas: { total: number; libres: number } }) => b.camas.t
 // ───────────────────────────── ADM · administración del sistema (sin contenido clínico)
 const adm: RoleDashboard = {
   title: 'Administración del sistema',
-  needs: ['users', 'staff', 'board'],
+  needs: ['users', 'staff', 'board', 'publicBeds'],
   actions: [
     { id: 'invitar', label: 'Invitar persona', hint: 'Crea la cuenta y envía el correo de activación', icon: 'userPlus', href: '#/personal?accion=invitar', permission: 'usuarios.invitar' },
     { id: 'espacio', label: 'Agregar espacio', hint: 'Planta, habitación o cama del edificio', icon: 'building', href: '#/espacios?accion=crear', permission: 'espacios.configurar' },
@@ -172,8 +176,9 @@ const adm: RoleDashboard = {
     fig('cuentas-activas', 'Cuentas activas', d.users, u => u.filter(x => x.state === 'activo').length, { href: '#/personal?cuenta=con' }),
     fig('cuentas-inactivas', 'Cuentas desactivadas', d.users, u => u.filter(x => x.state !== 'activo').length || null),
     fig('personal', 'Personal activo', d.staff, s => s.filter(x => x.active).length, { href: '#/personal' }),
-    fig('ocupacion', 'Ocupación de camas', d.board, b => { const p = occupancy(b); return p === null ? null : formatPercent(p); }, { href: '#/camas' }),
+    fig('ocupacion', 'Ocupación de camas', d.board, b => { const p = occupancy(b); return p === null ? null : formatPercent(p); }, { href: '#/camas', detail: freeByType(d) }),
     fig('turnos', 'Turnos en curso', d.board, b => b.turnosEnCurso, { href: '#/turnos' }),
+    ambulanceFigure(d),
   ],
   panels: ({ d }) => grid(<>
     <Panel title="Cuentas activas por rol" icon="users">
@@ -213,6 +218,7 @@ const jop: RoleDashboard = {
     fig('lab-pendiente', 'Órdenes por tomar', d.board, b => b.laboratorio.pendiente, { href: '#/laboratorio' }),
     fig('lab-proceso', 'Órdenes en proceso', d.board, b => b.laboratorio.enProceso),
     fig('turnos', 'Turnos en curso', d.board, b => b.turnosEnCurso, { href: '#/turnos' }),
+    ambulanceFigure(d, { href: '#/ambulancia' }),
   ],
 };
 
@@ -364,7 +370,7 @@ const lab: RoleDashboard = {
   }, lowStock(d)],
   figures: ({ d }) => {
     return [
-      fig('lab-proceso', 'En proceso', d.lab, r => labCount(r, 'en_proceso'), { href: '#/laboratorio' }),
+      fig('lab-proceso', 'En Proceso', d.lab, r => labCount(r, 'en_proceso'), { href: '#/laboratorio' }),
       fig('lab-hoy', 'Completadas hoy', d.labTurnaround, s => turnaroundDay(s, localDay())?.muestras ?? 0),
       fig('lab-revision', 'Sin revisión médica', d.lab, r => pendingReview(r).length),
       // W-LAB-2: no «—» card when nothing was completed today. D2: the median sits next to the average.
