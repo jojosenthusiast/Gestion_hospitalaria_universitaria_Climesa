@@ -16,8 +16,14 @@ public final class PatientExamsViewModel {
     nonisolated public init() {}
 
     public func load(user: String, now: Date = Date()) async {
-        await loader.load { try await client().get("/me/laboratorio", as: [LabOrder].self) }
-        if loader.value != nil { markSeen(user, now) }
+        // Only this read counts: after a failed reload the loader still holds the previous list, which is not "seen now".
+        var fresh = false
+        await loader.load {
+            let orders = try await client().get("/me/laboratorio", as: [LabOrder].self)
+            fresh = true
+            return orders
+        }
+        if fresh { markSeen(user, now) }
     }
 }
 
@@ -74,6 +80,9 @@ public final class AmbulanceRequestViewModel {
         }
         if ok { cancelling = nil }
         await load()
+        // A refused cancel whose fresh request can no longer be cancelled (dispatch confirmed or resolved it meanwhile)
+        // closes the sheet: offering the button again would only be refused again.
+        if !ok, loader.error == nil, loader.value?.first(where: { $0.id == request.id })?.canCancel != true { cancelling = nil }
     }
 
     public func send() async {

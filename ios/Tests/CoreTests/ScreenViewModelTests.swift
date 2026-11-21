@@ -201,6 +201,23 @@ final class PatientExamsViewModelTests: XCTestCase {
         XCTAssertEqual(model.loader.error, APIFailure.transport.userMessage)
         XCTAssertEqual(seen, 0)
     }
+
+    /// I2: a failed reload keeps the previous list on screen, but it is not a fresh read, so it does not mark them seen.
+    func testAFailedReloadAfterASuccessIsNotSeenAgain() async {
+        let api = FakeClinicalAPI()
+        await api.reply("GET", "/me/laboratorio", labOrdersJSON)
+        let model = PatientExamsViewModel()
+        model.client = { api }
+        var seen: [Date] = []
+        model.markSeen = { _, at in seen.append(at) }
+        let first = Date(timeIntervalSince1970: 1_000)
+        await model.load(user: "u1", now: first)
+        await api.fail("GET", "/me/laboratorio", .transport)
+        await model.load(user: "u1", now: Date(timeIntervalSince1970: 2_000))
+        XCTAssertEqual(model.loader.value?.count, 2)
+        XCTAssertNotNil(model.loader.error)
+        XCTAssertEqual(seen, [first])
+    }
 }
 
 @MainActor
@@ -267,6 +284,27 @@ final class AmbulanceRequestViewModelTests: XCTestCase {
         let calls = await api.calls
         XCTAssertEqual(calls.first?.body, #"{"reason":"Ya no hace falta","version":2}"#)
         XCTAssertEqual(calls.last?.path, "/ambulancia/solicitudes/mias")
+    }
+
+    /// I1: a refused cancel whose fresh request can no longer be cancelled closes the sheet; one still cancellable keeps it.
+    func testRefusedCancelClosesTheSheetOnlyWhenTheFreshRequestCannotBeCancelled() async throws {
+        let conflict = APIFailure.http(status: 409, problem: Problem(status: 409, code: "transicion_invalida", detail: "Despacho ya confirmó la solicitud."))
+        await api.fail("POST", "/ambulancia/solicitudes/r1/cancelar", conflict)
+        await api.reply("GET", "/ambulancia/solicitudes/mias", ambulanceJSON)
+        let request = try decode([OwnAmbulanceRequest].self, ambulanceJSON)[0]
+        let model = makeModel()
+        model.askCancel(request)
+        await model.cancel(request, success: "Solicitud cancelada.")
+        XCTAssertEqual(model.cancelling?.id, "r1")
+        XCTAssertNotNil(model.submission.error)
+
+        let confirmed = ambulanceJSON.replacingOccurrences(of: #""por_confirmar""#, with: #""confirmada""#)
+            .replacingOccurrences(of: #"["cancelar"]"#, with: "[]")
+        await api.reply("GET", "/ambulancia/solicitudes/mias", confirmed)
+        await model.cancel(request, success: "Solicitud cancelada.")
+        XCTAssertNil(model.cancelling)
+        XCTAssertNotNil(model.submission.error)
+        XCTAssertEqual(model.loader.value?.first?.canCancel, false)
     }
 
     func testPrefillFillsOnlyEmptyFieldsOnce() async {

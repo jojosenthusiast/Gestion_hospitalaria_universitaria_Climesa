@@ -155,9 +155,9 @@ public enum AmbulanceRules {
         return errors
     }
 
-    /// Nombre del hito para el paciente.
+    /// Nombre del hito, el mismo texto que la web (`milestoneNames`) y Android (`AmbulanceLabels.milestone`).
     public static func milestoneLabel(_ type: String) -> String {
-        ["salida": "Salida", "en_escena": "En el lugar", "trasladando": "Hacia el hospital", "en_hospital": "En el hospital", "finalizado": "Finalizado"][type] ?? "Avance"
+        ["salida": "Salida", "en_escena": "En escena", "trasladando": "Trasladando", "en_hospital": "En hospital", "finalizado": "Finalizado"][type] ?? "Avance"
     }
 
     /// MA-AMB-05: la solicitud que sigue la pantalla: la activa más reciente (por confirmar o en camino).

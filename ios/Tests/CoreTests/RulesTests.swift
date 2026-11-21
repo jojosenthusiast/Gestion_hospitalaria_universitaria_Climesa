@@ -96,6 +96,42 @@ final class DatesAndLiveTopicTests: XCTestCase {
         XCTAssertEqual(ClimesaDates.display(nil), "—")
     }
 
+    /// I6: the same text as the web (`formatDateTime`, `formatDate`, `formatTime`): 24 h whatever the phone uses,
+    /// es_SV month names and the year only when it is not the current one.
+    func testDisplayUsesTheWebTextWith24HoursAndNoCurrentYear() throws {
+        let now = try XCTUnwrap(ClimesaDates.parse("2026-11-20T15:00:00.000Z"))
+        // 2026-11-16T21:33Z is 15:33 in El Salvador (UTC-6).
+        XCTAssertEqual(ClimesaDates.display("2026-11-16T21:33:00.000Z", now: now), "16 nov, 15:33")
+        XCTAssertEqual(ClimesaDates.display("2026-11-16T21:33:00.000Z", .date, now: now), "16 nov")
+        XCTAssertEqual(ClimesaDates.display("2026-11-16T15:05:00Z", .time, now: now), "09:05")
+        XCTAssertEqual(ClimesaDates.display("2025-03-03T15:05:00Z", now: now), "3 mar 2025, 09:05")
+        XCTAssertEqual(ClimesaDates.display("2025-03-03T15:05:00Z", .date, now: now), "3 mar 2025")
+        // 2026-01-01T03:00Z is still 31 Dec 2025 in El Salvador: the local year decides.
+        XCTAssertEqual(ClimesaDates.display("2026-01-01T03:00:00Z", .date, now: now), "31 dic 2025")
+        XCTAssertEqual(ClimesaDates.display("2026-11-20"), "2026-11-20")
+        XCTAssertEqual(ClimesaDates.display("no es fecha"), "—")
+    }
+
+    /// I8: the ambulance position arrives every few seconds and reloads no screen; the other ambulance events do.
+    func testAmbulanceLocationReloadsNothing() {
+        XCTAssertEqual(InvalidationRule.topics(for: DomainEvent(type: "ambulancia.ubicacion", entity: "servicio", id: "s1", version: 3)), [])
+        XCTAssertEqual(InvalidationRule.topics(for: DomainEvent(type: "ambulancia.hito", entity: "servicio", id: "s1", version: 3)), [.ambulance])
+        let next = LiveReducer.apply(.event(DomainEvent(type: "ambulancia.ubicacion", entity: "servicio", id: "s1", version: 4)), to: LiveSnapshot())
+        XCTAssertEqual(next.version(.ambulance), 0)
+    }
+
+    /// I4 and I5: the ambulance texts are the web's (`milestoneNames`) and Android's (`AmbulanceLabels`).
+    func testAmbulanceLabelsMatchWebAndAndroid() {
+        XCTAssertEqual(AmbulanceRules.milestoneLabel("salida"), "Salida")
+        XCTAssertEqual(AmbulanceRules.milestoneLabel("en_escena"), "En escena")
+        XCTAssertEqual(AmbulanceRules.milestoneLabel("trasladando"), "Trasladando")
+        XCTAssertEqual(AmbulanceRules.milestoneLabel("en_hospital"), "En hospital")
+        XCTAssertEqual(AmbulanceRules.milestoneLabel("finalizado"), "Finalizado")
+        XCTAssertEqual(AmbulanceRequestState.descartada.label, "No se pudo atender")
+        XCTAssertEqual(AmbulanceRequestState.porConfirmar.label, "Por confirmar")
+        XCTAssertEqual(AmbulanceRequestState.cancelada.label, "Cancelada")
+    }
+
     func testCadaEventoInvalidaSuGrupo() {
         let fila = DomainEvent(type: "fila.actualizada", entity: "ticket_fila", id: "t1", version: 2)
         let next = LiveReducer.apply(.event(fila), to: LiveSnapshot())

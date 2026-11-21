@@ -215,7 +215,7 @@ public enum DischargeSummaryRules {
         return parts.joined(separator: " · ") + (followUp.state == "solicitada" ? " (por confirmar)" : "")
     }
 
-    /// Signature line, the same words as Android: "Firmada el 18 nov 2026, 10:32 por Dra. Ficticia" (no " por" without a name).
+    /// Signature line, the same words as Android: "Firmada el 18 nov, 10:32 por Dra. Ficticia" (no " por" without a name).
     public static func signedLine(_ discharge: Admission.Discharge) -> String {
         let line = "Firmada el \(ClimesaDates.display(discharge.signedAt))"
         guard let name = discharge.signedByName?.trimmingCharacters(in: .whitespaces), !name.isEmpty else { return line }

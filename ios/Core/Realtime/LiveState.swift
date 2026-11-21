@@ -29,7 +29,8 @@ public enum InvalidationRule {
         if type.hasPrefix("consulta.") || event.entity == "consulta" { topics.insert(.consultations) }
         if type.hasPrefix("laboratorio.") || event.entity == "orden_laboratorio" { topics.insert(.laboratory) }
         if type.hasPrefix("admision.") || type.hasPrefix("cama.") { topics.insert(.admissions) }
-        if type.hasPrefix("ambulancia.") { topics.insert(.ambulance) }
+        // `ambulancia.ubicacion` arrives every few seconds and changes nothing a screen shows (same as Android).
+        if type.hasPrefix("ambulancia."), type != "ambulancia.ubicacion" { topics.insert(.ambulance) }
         if type.hasPrefix("aviso.") || type.hasPrefix("cama.") || type.hasPrefix("turno.") || type.hasPrefix("metricas.") { topics.insert(.hospitalInfo) }
         if type.hasPrefix("aviso.") || event.entity == "aviso" { topics.insert(.notices) }
         if type.hasPrefix("vinculacion.") { topics.insert(.link) }

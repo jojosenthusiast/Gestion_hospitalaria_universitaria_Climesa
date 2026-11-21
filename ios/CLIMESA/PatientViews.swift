@@ -630,6 +630,7 @@ private struct RescheduleAppointmentSheet: View {
     let appointment: Appointment
     let reload: () async -> Void
     @EnvironmentObject private var account: AccountModel
+    @Environment(LiveViewModel.self) private var live
     @Environment(\.dismiss) private var dismiss
     @State private var availability = Loader<Availability>()
     @State private var submission = Submission()
@@ -685,7 +686,14 @@ private struct RescheduleAppointmentSheet: View {
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.reschedule.submit"), loading: submission.busy) { Task { await send() } }.disabled(slot == nil)
             }
-            .task(id: day) { slot = nil; await loadSlots() }
+            // The free slots change with any booking or shift change, not only with the chosen day.
+            .task(id: "\(day)|\(live.snapshot.version([.appointments, .shifts]))") {
+                if let picked = slot, ClimesaDates.parse(picked.start).map(ClimesaDates.localDay) != day { slot = nil }
+                await loadSlots()
+                // A slot taken meanwhile is no longer offered, so it cannot stay selected.
+                if let picked = slot, availability.error == nil, let value = availability.value,
+                   !AppointmentRules.freeSlots(value, excluding: appointment.start).contains(picked) { slot = nil }
+            }
         }
     }
 
@@ -1500,7 +1508,8 @@ struct AmbulanceRequestView: View {
                 }
             }
             Text(verbatim: request.notice).font(Typo.small).foregroundStyle(Theme.muted)
-            PatientSubmissionNotice(submission: submission)
+            // The write's result belongs to the request being followed, not to how the last one ended.
+            if request.isActive { PatientSubmissionNotice(submission: submission) }
             if request.canCancel {
                 CrudButton(kind: .deactivate, label: L.text("ambulance.cancel"), loading: submission.busy) { model.askCancel(request) }
             }
@@ -1512,6 +1521,8 @@ struct AmbulanceRequestView: View {
             ScreenFrame(title: "ambulance.cancel", onClose: { model.cancelling = nil }) {
                 Text("ambulance.cancel.detail").font(Typo.body).foregroundStyle(Theme.ink)
                 PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $model.cancelReason, lines: 2...4, error: nil)
+                // A refused cancel says why here, where the patient is looking, not behind the sheet.
+                PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("ambulance.cancel"), kind: .destructive, loading: submission.busy) { Task { await cancel(request) } }
             }
         }

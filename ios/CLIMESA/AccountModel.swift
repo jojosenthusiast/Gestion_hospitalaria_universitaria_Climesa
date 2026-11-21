@@ -180,9 +180,9 @@ struct Shift:Decodable,Identifiable {
     /// ASIS-01: asistencia derivada por la API (la entrada se confirma sola al iniciar) y tipo de turno (guardia de 24 h).
     var version:Int?=nil; var attendance:String?=nil; var late:Bool?=nil; var type:String?=nil
     static func display(_ value:String)->String {
-        let iso=ISO8601DateFormatter(); iso.formatOptions=[.withInternetDateTime,.withFractionalSeconds]
-        let date=iso.date(from:value) ?? ISO8601DateFormatter().date(from:value)
-        guard let date else { return L.text("shift.unavailable") }; let formatter=DateFormatter(); formatter.locale=Locale(identifier:"es_SV"); formatter.timeZone=TimeZone(identifier:"America/El_Salvador"); formatter.dateStyle = .medium; formatter.timeStyle = .short; return formatter.string(from:date)
+        // Same text as every other screen and the web: "16 nov, 09:33" (24 h, the year only when it is not this one).
+        guard ClimesaDates.parse(value) != nil else { return L.text("shift.unavailable") }
+        return ClimesaDates.display(value)
     }
 }
 @MainActor final class ShiftModel:ObservableObject {
