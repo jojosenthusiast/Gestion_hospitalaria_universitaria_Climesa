@@ -265,7 +265,15 @@ class AdmissionIntakeViewModel @Inject constructor(private val api: ApiGateway, 
             try {
                 api.request("/admisiones", "POST", body)
                 mutable.value = AdmissionIntakeState(finished = true)
-            } catch (e: CancellationException) { throw e } catch (e: Exception) { mutable.update { it.copy(busy = false, error = userMessage(e, "No se pudo crear el ingreso.")) } }
+            } catch (e: CancellationException) { throw e } catch (e: Exception) {
+                val message = userMessage(e, "No se pudo crear el ingreso.")
+                if ((e as? sv.edu.catolica.climesa.data.AuthRequestException)?.code == "cama_ocupada") {
+                    // The bed was taken meanwhile: back to the bed step with a fresh map, saying why.
+                    mutable.update { it.copy(busy = false, draft = it.draft.copy(bed = null)) }
+                    goTo(5, canAssignBed)
+                    mutable.update { it.copy(error = message) }
+                } else mutable.update { it.copy(busy = false, error = message) }
+            }
         }
     }
 }

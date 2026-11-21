@@ -21,6 +21,8 @@ internal object StatusCatalog {
         "disponible" to "Disponible", "en_servicio" to "En servicio", "en_mantenimiento" to "En mantenimiento",
         "vencida" to "Vencida", "reprogramada" to "Reprogramada", "cerrado" to "Cerrado sin atender", "aprobada" to "Aprobada",
         "agotado" to "Agotado", "por_vencer" to "Por vencer", "coincide" to "Coincide", "revisar" to "Revisar",
+        // Audit 2 D7: same names as the web (`system.tsx`) and iOS (`StatusCatalog.swift`).
+        "ok" to "En orden", "atendido" to "Atendido", "requiere_atencion" to "Requiere atención",
     )
     private val tones: Map<String, StatusTone> = buildMap {
         listOf("activo", "libre", "exito", "completado", "disponible").forEach { put(it, StatusTone.SUCCESS) }

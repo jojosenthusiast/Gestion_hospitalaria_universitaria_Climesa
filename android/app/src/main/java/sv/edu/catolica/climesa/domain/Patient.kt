@@ -116,21 +116,22 @@ object PatientRules {
     }
 }
 
-/** Age and sex for the patient list (obs 15): "34 años · Femenino". Unknown parts are left out; DUI never goes in the list. */
+/** Age and sex for the patient list (obs 15): "34 años · Femenino". Unknown parts are left out; DUI never goes in the list.
+ * Ages count on the hospital's calendar day (America/El_Salvador), never the device zone (audit 2 D9). */
 object PatientSummary {
-    fun age(birth: LocalDate?, today: LocalDate = LocalDate.now()): Int? =
+    fun age(birth: LocalDate?, today: LocalDate = ReceptionScheduling.today()): Int? =
         birth?.takeIf { !it.isAfter(today) }?.let { java.time.Period.between(it, today).years }
 
-    fun ageText(birth: LocalDate?, today: LocalDate = LocalDate.now()): String? = age(birth, today)?.let { if (it == 1) "1 año" else "$it años" }
+    fun ageText(birth: LocalDate?, today: LocalDate = ReceptionScheduling.today()): String? = age(birth, today)?.let { if (it == 1) "1 año" else "$it años" }
 
     /** Same line from a `PatientCandidateResponse`: exact age from `birth`, else the `ageRange` the role may see. */
-    fun fromApi(birth: String?, ageRange: String?, sex: String?, today: LocalDate = LocalDate.now()): String? {
+    fun fromApi(birth: String?, ageRange: String?, sex: String?, today: LocalDate = ReceptionScheduling.today()): String? {
         val date = birth?.takeIf { it.isNotBlank() && it != "null" }?.take(10)?.let { runCatching { LocalDate.parse(it) }.getOrNull() }
         val age = ageText(date, today) ?: ageRange?.takeIf { it.isNotBlank() && it != "null" }?.let { "$it años" }
         val sexLabel = when (sex) { "femenino" -> Sex.FEMALE.label; "masculino" -> Sex.MALE.label; "indeterminado" -> Sex.INDETERMINATE.label; else -> null }
         return listOfNotNull(age, sexLabel).joinToString(" · ").ifBlank { null }
     }
 
-    fun line(p: Patient, today: LocalDate = LocalDate.now()): String? =
+    fun line(p: Patient, today: LocalDate = ReceptionScheduling.today()): String? =
         listOfNotNull(ageText(p.birth, today), p.sex.takeIf { it != Sex.UNKNOWN }?.label).joinToString(" · ").ifBlank { null }
 }

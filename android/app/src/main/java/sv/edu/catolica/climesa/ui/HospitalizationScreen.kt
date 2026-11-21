@@ -224,7 +224,7 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
     /** Idempotent per channel list: reloads when an admission event (`admision.actualizada`) arrives or after a reconnection gap. */
     fun startLive(channels: List<String>) {
         live.start(viewModelScope, channels) { signal ->
-            if (signal is RealtimeSignal.Event && AdmissionEvents.matches(signal.event) || signal is RealtimeSignal.Resync) {
+            if (signal is RealtimeSignal.Event && sv.edu.catolica.climesa.domain.WardEvents.matches(signal.event) || signal is RealtimeSignal.Resync) {
                 load(silent = true)
                 mutable.value.notes?.let { loadNotes(it.admissionId, silent = true) }
             }
@@ -366,8 +366,20 @@ class HospitalizationViewModel @Inject constructor(private val api: ApiGateway, 
             } catch (e: CancellationException) { throw e
             } catch (e: Exception) {
                 mutable.update { it.copy(busy = false, formError = failure(e)) }
-                if (HospitalizationRules.staleCode((e as? AuthRequestException)?.code)) load(silent = true)
+                val code = (e as? AuthRequestException)?.code
+                if (HospitalizationRules.staleCode(code)) load(silent = true)
+                // The chosen bed was taken meanwhile: read the suggestions again, keeping the error in the open dialog.
+                if (code == "cama_ocupada") mutable.value.selectedId?.let(::refreshSuggestions)
             }
+        }
+    }
+
+    private fun refreshSuggestions(admissionId: String) {
+        viewModelScope.launch {
+            try {
+                val suggestions = AdmissionParser.suggestions(api.request("/admisiones/$admissionId/sugerencias-cama"))
+                mutable.update { if (it.selectedId == admissionId) it.copy(suggestions = suggestions) else it }
+            } catch (e: CancellationException) { throw e } catch (_: Exception) { /* The dialog already shows the assign error. */ }
         }
     }
 
@@ -585,19 +597,31 @@ private fun AdmissionCard(row: HospitalAdmission, busy: Boolean, model: Hospital
             FormField(stringResource(R.string.hosp_alta_resumen), form.summary, model::onSummary, hint = stringResource(R.string.hosp_alta_resumen_ayuda) + " " + HospitalizationRules.counter(form.summary, HospitalizationRules.SUMMARY_MAX), error = HospitalizationRules.summaryError(form.summary), enabled = !state.busy, singleLine = false)
             if (form.type == DischargeType.VOLUNTARY) Row(verticalAlignment = Alignment.CenterVertically) { Checkbox(form.voluntaryConsent, model::onVoluntaryConsent, enabled = !state.busy); Text(stringResource(R.string.hosp_alta_constancia), style = MaterialTheme.typography.bodySmall) }
             Text(stringResource(R.string.hosp_alta_pendientes), style = MaterialTheme.typography.labelLarge)
-            form.pending.forEachIndexed { index, item ->
+            // D13: each pending row keeps its own identity, so removing one never moves another row's «Otro» choice.
+            val rowKeys = androidx.compose.runtime.remember(form.admissionId) { PendingRowKeys() }
+            rowKeys.sync(form.pending.size)
+            form.pending.forEachIndexed { index, item -> androidx.compose.runtime.key(rowKeys[index]) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         FormField(stringResource(R.string.hosp_alta_pendiente), item.description, { model.onPending(index, item.copy(description = it)) }, enabled = !state.busy)
                         ResponsiblePicker(item.responsible, !state.busy) { model.onPending(index, item.copy(responsible = it)) }
                         if (item.description.isNotBlank() != item.responsible.isNotBlank()) Text(stringResource(R.string.hosp_alta_pendiente_incompleto), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error)
                     }
-                    IconButton(onClick = { model.removePending(index) }, enabled = !state.busy) { Icon(Icons.Default.Close, stringResource(R.string.hosp_alta_quitar)) }
+                    IconButton(onClick = { rowKeys.remove(index); model.removePending(index) }, enabled = !state.busy) { Icon(Icons.Default.Close, stringResource(R.string.hosp_alta_quitar)) }
                 }
-            }
+            } }
             TextButton(onClick = model::addPending, enabled = !state.busy) { Text(stringResource(R.string.hosp_alta_agregar)) }
         }
     }
+}
+
+/** D13: stable composition keys for the pending rows of the discharge form; a removed row takes its key with it. */
+internal class PendingRowKeys {
+    private val keys = ArrayList<Long>()
+    private var next = 0L
+    fun sync(size: Int) { while (keys.size < size) keys.add(next++); while (keys.size > size) keys.removeAt(keys.lastIndex) }
+    operator fun get(index: Int): Long = keys[index]
+    fun remove(index: Int) { if (index in keys.indices) keys.removeAt(index) }
 }
 
 /** D89: "Quién responde" is a choice of the usual teams, with «Otro» for a name or team that is not listed. */

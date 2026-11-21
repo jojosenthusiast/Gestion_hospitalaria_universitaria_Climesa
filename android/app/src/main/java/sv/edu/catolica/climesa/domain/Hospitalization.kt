@@ -353,5 +353,5 @@ object HospitalizationRules {
     }
 
     /** Codes after which the shown list is stale and must be fetched again. */
-    fun staleCode(code: String?): Boolean = code == "transicion_invalida" || code == "version_conflicto"
+    fun staleCode(code: String?): Boolean = code == "transicion_invalida" || code == "version_conflicto" || code == "cama_ocupada"
 }

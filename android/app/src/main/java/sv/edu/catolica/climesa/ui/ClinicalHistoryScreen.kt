@@ -124,7 +124,7 @@ private fun ConsultationHistoryCard(consultation: HistoryConsultation) {
 
 @Composable
 private fun OrderHistoryCard(order: LaboratoryOrder) {
-    SectionCard(title = stringResource(R.string.historial_laboratorio), action = { StatusTag(order.state) }) {
+    SectionCard(title = stringResource(R.string.historial_laboratorio), action = { StatusTag(order.state, label = sv.edu.catolica.climesa.domain.LaboratoryLabels.state(order.state)) }) {
         order.items.forEach { item ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Spacing.sm), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
                 Text("${item.code} · ${item.name}", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)

@@ -93,13 +93,22 @@ class FileDraftStore(
         val target = file(userId, key)
         if (!target.isFile) return null
         val bytes = runCatching { target.readBytes() }.getOrNull() ?: return null
-        runCatching { return JSONObject(String(cipher.decrypt(bytes), Charsets.UTF_8)) }
-        // Written in clear by a version before encryption: seal it now so pending queues survive the update.
+        val failure = try {
+            val plain = cipher.decrypt(bytes)
+            // Decrypted but not JSON: the file is damaged beyond use.
+            return runCatching { JSONObject(String(plain, Charsets.UTF_8)) }.getOrNull() ?: run { runCatching { target.delete() }; null }
+        } catch (e: Exception) { e }
+        // Written in clear by a version before encryption: seal it now so pending queues survive the update. A readable
+        // draft is returned even if sealing it fails, and is never deleted.
         val legacy = runCatching { JSONObject(String(bytes, Charsets.UTF_8)) }.getOrNull()
-        if (legacy != null && save(userId, key, legacy)) return legacy
-        runCatching { target.delete() }
+        if (legacy != null) { save(userId, key, legacy); return legacy }
+        // Only a payload that is provably not ours (tampered, sealed with a lost key, or too short to be sealed) is deleted.
+        // A Keystore that is momentarily unavailable (KeyStoreException, ProviderException...) keeps the file for a later read.
+        if (unreadable(failure)) runCatching { target.delete() }
         return null
     }
+
+    private fun unreadable(e: Exception) = e is javax.crypto.AEADBadTagException || e is IllegalArgumentException
 
     @Synchronized override fun clear(userId: String, key: String) { runCatching { file(userId, key).delete() } }
 

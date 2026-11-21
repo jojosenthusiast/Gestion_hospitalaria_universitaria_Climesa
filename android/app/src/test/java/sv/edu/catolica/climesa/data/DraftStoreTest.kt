@@ -178,4 +178,28 @@ class DraftStoreTest {
         assertNull(drafts.load("u-1", "consulta:c1"))
         assertEquals("propia", drafts.load("u-2", "consulta:c2")?.getString("plan"))
     }
+
+    /** Audit 2 D3: a Keystore that is momentarily unavailable never deletes a sealed draft; it reads again once the key is back. */
+    @Test fun anUnavailableKeystoreKeepsTheDraft() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        FileDraftStore(root, TestCipher).save("u-1", "signos", JSONObject().put("fc", "90"))
+        val locked = object : PayloadCipher {
+            override fun encrypt(plain: ByteArray): ByteArray = throw java.security.ProviderException("keystore")
+            override fun decrypt(sealed: ByteArray): ByteArray = throw java.security.KeyStoreException("keystore")
+        }
+        assertNull(FileDraftStore(root, locked).load("u-1", "signos"))
+        assertEquals("90", FileDraftStore(root, TestCipher).load("u-1", "signos")?.getString("fc"))
+    }
+
+    /** Audit 2 D3: a readable draft written in clear is returned and kept even when sealing it again fails. */
+    @Test fun aLegacyClearDraftIsReturnedEvenIfItCannotBeSealed() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        val file = java.io.File(java.io.File(root, "u-1"), "signos.json").apply { parentFile.mkdirs(); writeText(JSONObject().put("fc", "80").toString()) }
+        val failing = object : PayloadCipher {
+            override fun encrypt(plain: ByteArray): ByteArray = throw java.security.ProviderException("keystore")
+            override fun decrypt(sealed: ByteArray): ByteArray = throw javax.crypto.AEADBadTagException("clear")
+        }
+        assertEquals("80", FileDraftStore(root, failing).load("u-1", "signos")?.getString("fc"))
+        assertTrue(file.isFile)
+    }
 }
