@@ -50,8 +50,10 @@ internal fun DemoAccountPicker(accounts: List<DemoAccount>, enabled: Boolean, on
                 modifier = Modifier.fillMaxWidth().menuAnchor(MenuAnchorType.PrimaryNotEditable).semantics { contentDescription = label },
             )
             ExposedDropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                // Several accounts may share a role (prueba.med and prueba.med1), so the e-mail identifies each option.
                 accounts.forEach { account ->
-                    DropdownMenuItem(text = { Text(account.role) }, onClick = { selected = account.role; expanded = false; onPick(account) })
+                    val option = "${account.role} · ${account.email}"
+                    DropdownMenuItem(text = { Text(option) }, onClick = { selected = option; expanded = false; onPick(account) })
                 }
             }
         }
