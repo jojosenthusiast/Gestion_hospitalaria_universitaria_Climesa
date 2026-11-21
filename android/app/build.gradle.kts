@@ -33,6 +33,9 @@ gradle.taskGraph.whenReady {
         throw GradleException("CLIMESA: CLIMESA_DEMO_LOGIN=true solo se permite en debug; un build release nunca incluye las cuentas de prueba.")
     }
 }
+// TEMPORARY for the stakeholder demo (2026-11-21): screen recording and screen sharing stay allowed so the app can be
+// presented over Meet. Build with -PCLIMESA_SECURE_SCREEN=true to block screenshots and recordings again (FLAG_SECURE).
+val climesaSecureScreen = providers.gradleProperty("CLIMESA_SECURE_SCREEN").map { it.toBoolean() }.getOrElse(false)
 if (climesaDemoLogin && climesaDemoCredentials.isBlank()) logger.warn("CLIMESA: CLIMESA_DEMO_LOGIN=true pero no existe ../demo-credenciales.json; el ingreso no mostrará cuentas de prueba.")
 
 // Release signing comes only from Gradle properties (~/.gradle/gradle.properties) or environment variables, never
@@ -62,6 +65,7 @@ android {
         buildConfigField("String", "WEB_URL", buildConfigString(climesaWebUrl))
         buildConfigField("boolean", "DEMO_LOGIN", (climesaDemoLogin && climesaDemoCredentials.isNotBlank()).toString())
         buildConfigField("String", "DEMO_CREDENTIALS", buildConfigString(climesaDemoCredentials.lines().joinToString("")))
+        buildConfigField("boolean", "SECURE_SCREEN", climesaSecureScreen.toString())
     }
     buildFeatures { compose = true; buildConfig = true }
     signingConfigs {
