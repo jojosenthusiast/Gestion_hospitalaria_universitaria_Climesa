@@ -114,3 +114,4 @@ W57,Web,Contadora (rol F),Biblioteca normativa,"Tasas, tablas y plazos con vigen
 A13,Android,PAC,Mi cuenta,Saber cuánto y por qué,"Cargos, pagos y factura propia",Descargar factura,Se actualiza al cargar,Solo la cuenta propia; nada económico a clínicos,F,006
 A15,Android,PAC,Mi habitación,Saber dónde estoy hospitalizado,"Cama, categoría, aislamiento, médico tratante y estado de la admisión activa (lee /admisiones)",Ninguna,En vivo,Solo la admisión propia,R,108
 I13,iOS,PAC,Mi cuenta,Saber cuánto y por qué,"Cargos, pagos y factura propia",Descargar factura,Se actualiza al cargar,Solo la cuenta propia; nada económico a clínicos,F,006
+I15,iOS,PAC,Mi habitación,Saber dónde estoy hospitalizado,"Cama, categoría, aislamiento, médico tratante y estado de la admisión activa (lee /admisiones)",Ninguna,En vivo,Solo la admisión propia,R,108
