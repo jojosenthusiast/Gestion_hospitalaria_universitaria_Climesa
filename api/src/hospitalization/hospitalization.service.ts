@@ -233,6 +233,9 @@ export class HospitalizationService {
       if (consultation?.doctorId !== actor.staffId) throw new ForbiddenException('La consulta no es tuya: solo su médico puede indicar la hospitalización.');
       const patient = (await c.query('SELECT id,coalesce(sexo,\'no_registrado\') AS sex FROM pacientes.paciente WHERE id=$1', [dto.patientId])).rows[0];
       if (!patient) throw new NotFoundException('No se encontró el paciente.');
+      // RN-10: same pre-check as `create`; the unique index `admision_activa_unica` still decides a race (errors.filter.ts).
+      const existing = await c.query(`SELECT id FROM hospitalizacion.admision WHERE paciente_id=$1 AND estado IN ('pendiente_cama','hospitalizado','alta_firmada') LIMIT 1`, [dto.patientId]);
+      if (existing.rowCount) throw new ProblemException('admision_activa', 409, 'El paciente ya tiene una admisión activa.');
       const row = (await c.query(`INSERT INTO hospitalizacion.admision(paciente_id,origen,origen_id,categoria_pedida,sexo_paciente,aislamiento,medico_tratante_id,fecha_programada,creado_por,motivo,tipo_aislamiento,inestable,postquirurgico,visitas_permitidas,visitantes_max) VALUES($1,'consulta',$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id,estado AS state,version`, [dto.patientId,dto.originId,dto.requestedCategory,patient.sex,dto.isolation,actor.staffId,dto.scheduledAt ?? null,actor.id,...this.intakeColumns(dto)])).rows[0];
       await this.commands.audit(c, actor, { action: 'admision.solicitar', entity: 'admision', entityId: row.id, patientId: dto.patientId, permission: 'admision.solicitar' });
       await this.commands.event(c, 'admision.creada', 'admision', row.id, row.version, await channelsFor(c, ['admision.ver', 'camas.asignar']));

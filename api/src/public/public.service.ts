@@ -304,7 +304,7 @@ export class PublicService {
    * válida y advertencia de datos personales. `keptFrom` es el inicio vigente que conserva una edición sin `desde`;
    * `client` es la transacción del comando cuando la regla corre dentro de ella.
    */
-  private async checkNotice(dto: NoticeDto, now: Date, kept?: { from: Date; nivel: string; areas: string[] }, client?: PoolClient) {
+  private async checkNotice(dto: NoticeDto, now: Date, kept?: { from: Date; nivel: string; areas: string[]; roles: string[]; publico: boolean }, client?: PoolClient) {
     const keptFrom = kept?.from;
     const zoned = (value: string) => /(Z|[+-]\d\d:\d\d)$/.test(value);
     if ((dto.desde && !zoned(dto.desde)) || !zoned(dto.hasta)) throw new ProblemException('validacion', 400, 'Indica la vigencia con zona horaria.', dto.desde && !zoned(dto.desde) ? 'desde' : 'hasta');
@@ -313,8 +313,9 @@ export class PublicService {
     if (to <= now) throw new ProblemException('validacion', 400, 'El aviso ya habría vencido; indica un fin futuro.', 'hasta');
     // S11: without a level a new notice is informativo and an edit keeps the current one (old clients do not send it).
     const level = (dto.nivel ?? kept?.nivel ?? 'informativo') as NoticeLevel;
-    const priority = dto.prioridad ?? (dto.nivel ? priorityOfLevel(dto.nivel) : 'atencion'), roles = [...new Set(dto.roles ?? [])].sort();
-    const areas = [...new Set(dto.areas ?? kept?.areas ?? [])].sort(), isPublic = dto.publico ?? (roles.length === 0 && areas.length === 0);
+    const priority = dto.prioridad ?? (dto.nivel ? priorityOfLevel(dto.nivel) : 'atencion'), roles = [...new Set(dto.roles ?? kept?.roles ?? [])].sort();
+    // An edit that does not send the audience keeps the current one: leaving `roles` out never makes a notice public.
+    const areas = [...new Set(dto.areas ?? kept?.areas ?? [])].sort(), isPublic = dto.publico ?? kept?.publico ?? (roles.length === 0 && areas.length === 0);
     if (areas.length) {
       const sql = "SELECT codigo FROM infra.espacio WHERE codigo = ANY($1::text[]) AND tipo IN ('area','bahia') AND activo";
       const found = client ? (await client.query<{ codigo: string }>(sql, [areas])).rows : await this.db.query<{ codigo: string }>(sql, [areas]);
@@ -370,7 +371,7 @@ export class PublicService {
     const now = this.clock.now();
     const result = await this.commands.run(actor, `avisos.publicar:aviso.editar:${id}`, key, { id, ...dto }, async c => {
       const current = await this.openNotice(c, id, dto.version, now);
-      const { from, to, priority, level, roles, areas, isPublic, found } = await this.checkNotice(dto, now, { from: new Date(current.desde), nivel: current.nivel, areas: current.areas }, c);
+      const { from, to, priority, level, roles, areas, isPublic, found } = await this.checkNotice(dto, now, { from: new Date(current.desde), nivel: current.nivel, areas: current.areas, roles: current.roles, publico: current.publico }, c);
       const row = (await c.query<NoticeRow>(
         `UPDATE publico.aviso SET titulo=$2,cuerpo=$3,vigencia=tstzrange($4::timestamptz,$5::timestamptz,'[)'),prioridad=$6,publico=$7,roles=$8,editado_en=$9,editado_por=$10,nivel=$11,areas=$12,version=version+1
          WHERE id=$1 RETURNING ${NOTICE_COLUMNS}`,

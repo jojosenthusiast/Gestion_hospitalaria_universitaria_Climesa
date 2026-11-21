@@ -14,6 +14,8 @@ export const PROBLEM_CODES = [
   'personal_en_descanso', 'personal_jornada_ocupada', 'horas_semanales_excedidas', 'inscripcion_no_vigente', 'capacidad_bajo_ocupacion',
   // Parcial 3: bed clash and the 5 VIP / 6 semi-private rooms enforced by PostgreSQL (20261130002000).
   'cama_ocupada', 'habitacion_fuera_de_planta', 'capacidad_de_categoria', 'limite_habitaciones_vip', 'limite_habitaciones_semiprivadas',
+  // RN-10: one active admission per patient (pre-check of the indication and unique index `admision_activa_unica`).
+  'admision_activa',
   // Shifts: attendance, load and states (20261120003000; ASIS-01, CARGA-01, MA-TUR-01..05).
   'turno_iniciado', 'turno_con_citas', 'descanso_insuficiente', 'carga_semanal_excedida', 'dias_seguidos_excedidos', 'tripulante_en_servicio',
   'sin_asistencia_marcada', 'entrada_automatica', 'medico_ausente', 'tripulante_ausente',

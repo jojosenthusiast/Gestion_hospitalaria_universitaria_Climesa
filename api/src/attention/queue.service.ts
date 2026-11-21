@@ -67,11 +67,16 @@ export class QueueService {
     return date;
   }
 
+  /**
+   * The number a command changes (call, state, undo call, priority). A number of a previous day is out of today's queue:
+   * it is refused, so a stale screen cannot revive it; the patient gets a new one for today.
+   */
   private async ownTicket(c: PoolClient, actor: Actor, id: string, lock = true) {
-    const row = (await c.query(`SELECT id,servicio AS service,fecha,numero,paciente_id AS "patientId",estado AS state,
+    const row = (await c.query(`SELECT id,servicio AS service,fecha::text AS fecha,numero,paciente_id AS "patientId",estado AS state,
       consultorio_id AS "officeId",llamados,version,prioridad AS priority FROM atencion.ticket_fila WHERE id=$1 ${lock ? 'FOR UPDATE' : ''}`, [id])).rows[0] as QueueRow | undefined;
     if (!row) throw new NotFoundException('No se encontró el número de fila.');
     if (!this.seesWholeQueue(actor) && (!actor.patientId || actor.patientId !== row.patientId)) throw new ForbiddenException('Solo puedes consultar tu propio número de fila.');
+    if (String(row.fecha) < this.clock.today()) throw new ProblemException('transicion_invalida', 409, 'El número es de un día anterior; emite uno nuevo para hoy.');
     return row;
   }
 
@@ -120,7 +125,9 @@ export class QueueService {
       // SEG-02: aggregated read audit with every patient listed.
       await this.commands.audit(c, actor, { action: 'fila.leer', entity: 'ticket_fila', permission: 'fila.ver', detail: { date, patientIds: [...new Set(rows.map(row => row.patientId).filter(Boolean))] } });
       const policies = await this.queuePolicies(c);
-      const abilities = { call: contextsOf(actor, 'fila.llamar').length > 0, manage: contextsOf(actor, 'fila.gestionar').length > 0 };
+      // A previous day's queue is read only: its numbers refuse every command (`ownTicket`), so none is offered.
+      const current = date >= this.clock.today();
+      const abilities = { call: current && contextsOf(actor, 'fila.llamar').length > 0, manage: current && contextsOf(actor, 'fila.gestionar').length > 0 };
       const now = this.clock.now().valueOf();
       // Lote 5: age only with pacientes.ver_nacimiento, sex only with pacientes.ver_ficha (privacidad.md).
       const seesAge = hasPermission(actor, 'pacientes.ver_nacimiento'), seesSex = hasPermission(actor, 'pacientes.ver_ficha');
