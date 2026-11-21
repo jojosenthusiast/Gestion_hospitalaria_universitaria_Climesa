@@ -43,11 +43,16 @@ internal fun SectionCard(
 ) {
     ClimesaCard(modifier) {
         Column(Modifier.fillMaxWidth().padding(Spacing.md), verticalArrangement = Arrangement.spacedBy(Spacing.sm + Spacing.xs)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            val heading: @Composable (Modifier) -> Unit = { m ->
+                Column(m, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     eyebrow?.let { Text(it.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.climesa.primaryText) }
                     Text(title, style = MaterialTheme.typography.titleMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
                 }
+            }
+            // D10: with large text the action goes below the title instead of squeezing it.
+            if (action != null && largeText()) { heading(Modifier.fillMaxWidth()); action() }
+            else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
+                heading(Modifier.weight(1f))
                 action?.invoke()
             }
             content()
@@ -98,6 +103,7 @@ internal fun DataRow(
     blockedReason: String? = null,
 ) {
     @Suppress("NAME_SHADOWING") val onClick = onClick.takeIf { blockedReason == null }
+    val stacked = largeText()
     val body: @Composable () -> Unit = {
         Column {
             Row(
@@ -119,8 +125,10 @@ internal fun DataRow(
                     subtitle?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 3, overflow = TextOverflow.Ellipsis) }
                     meta?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis) }
                     blockedReason?.let { BlockedReason(it) }
+                    // D10: with large text the status goes below the title instead of squeezing it.
+                    if (stacked) status?.invoke()
                 }
-                status?.invoke()
+                if (!stacked) status?.invoke()
                 if (onClick != null) Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.climesa.primaryText)
             }
             if (divider) HorizontalDivider(color = MaterialTheme.climesa.line)
@@ -132,6 +140,10 @@ internal fun DataRow(
         else -> ClimesaCard(modifier) { body() }
     }
 }
+
+/** D10: the system font scale is above 130 %, where a trailing badge or action would squeeze a row's title. */
+@Composable
+internal fun largeText(): Boolean = androidx.compose.ui.platform.LocalConfiguration.current.fontScale > 1.3f
 
 /** Label above a value, for detail sheets (ficha). */
 @Composable

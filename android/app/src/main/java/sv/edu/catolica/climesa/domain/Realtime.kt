@@ -152,7 +152,8 @@ object ProfileEvents {
 object PortalEvents {
     fun matches(path: String?, event: EventoDominio): Boolean = when {
         path == null -> false
-        path.startsWith("/inicio") -> BedEvents.matches(event) || PatientEvents.matches(event)
+        // Audit 2 D8: the home summary also counts staff, accounts, shifts and admissions.
+        path.startsWith("/inicio") -> BedEvents.matches(event) || PatientEvents.matches(event) || LiveEntities.matches(event, "personal", "usuario", "turno", "admision")
         path.startsWith("/turnos") -> LiveEntities.matches(event, "turno", "personal")
         path.startsWith("/pacientes") -> PatientEvents.matches(event)
         path.startsWith("/admisiones") -> LiveEntities.matches(event, "admision", "alta", "cama")
@@ -200,9 +201,17 @@ object DoctorDayEvents {
     fun matches(event: EventoDominio) = ConsultationEvents.matches(event) || QueueEvents.matches(event)
 }
 
-/** Hospitalization list: admissions (including discharge) publish `admision.*` on entity `admision`. */
+/** Admissions (including discharge) publish `admision.*` on entity `admision`. */
 object AdmissionEvents {
     fun matches(event: EventoDominio) = LiveEntities.matches(event, "admision")
+}
+
+/**
+ * Hospitalization screen (audit 2 D8): admissions plus beds, because a bed changing state (`cama.*`) changes the suggested
+ * beds and the indicated-admissions tray. Kept apart so the history and vital signs do not reload on every bed event.
+ */
+object WardEvents {
+    fun matches(event: EventoDominio) = AdmissionEvents.matches(event) || LiveEntities.matches(event, "cama")
 }
 
 /** Inventory screen: stock movements publish `inventario.actualizado` on entity `articulo`. */

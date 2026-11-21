@@ -74,9 +74,11 @@ fun ClimesaApp(authModel:AuthViewModel,dark:Boolean,setDark:(Boolean)->Unit){
     var selectedRole by rememberSaveable(account.session.userId){mutableStateOf(roles.firstOrNull().orEmpty())}
     val role=selectedRole.takeIf{it in roles}?:roles.firstOrNull().orEmpty()
     if(roles.isEmpty()){Surface{Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),verticalArrangement=Arrangement.Center){SectionIntro("",stringResource(R.string.app_rol_sin_android));Spacer(Modifier.height(16.dp));Text(PlatformGate.message(account.profile.platforms,"android",BuildConfig.WEB_URL));Spacer(Modifier.height(24.dp));PrimaryButton(stringResource(R.string.cerrar_sesion),logout)}};return}
+    // D11: the role bar takes only the top and side insets; the screen below does not pad the status bar again.
+    val roleBarInsets=androidx.compose.foundation.layout.WindowInsets.safeDrawing.only(androidx.compose.foundation.layout.WindowInsetsSides.Top+androidx.compose.foundation.layout.WindowInsetsSides.Horizontal)
     Column(Modifier.fillMaxSize()){
-        if(roles.size>1){var menu by remember{mutableStateOf(false)};Surface(color=BrandNavy){Box(Modifier.fillMaxWidth().safeDrawingPadding().padding(horizontal=20.dp)){TextButton(onClick={menu=true}){Text("${RoleAccess.label(role)}  ▾",color=Color.White)};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){roles.forEach{r->DropdownMenuItem(text={Text(RoleAccess.label(r))},onClick={selectedRole=r;menu=false})}}}}}
-        Box(Modifier.weight(1f)){if(role=="REC"){
+        if(roles.size>1){var menu by remember{mutableStateOf(false)};Surface(color=BrandNavy){Box(Modifier.fillMaxWidth().windowInsetsPadding(roleBarInsets).padding(horizontal=20.dp)){TextButton(onClick={menu=true}){Text("${RoleAccess.label(role)}  ▾",color=Color.White)};DropdownMenu(expanded=menu,onDismissRequest={menu=false}){roles.forEach{r->DropdownMenuItem(text={Text(RoleAccess.label(r))},onClick={selectedRole=r;menu=false})}}}}}
+        Box(Modifier.weight(1f).then(if(roles.size>1)Modifier.consumeWindowInsets(roleBarInsets) else Modifier)){if(role=="REC"){
             val reception:ReceptionViewModel=viewModel()
             DisposableEffect(account.session.userId){reception.reload();onDispose{reception.clear()}}
             LaunchedEffect(account.session.userId,account.profile.channels){reception.startLive(account.profile.channels)}

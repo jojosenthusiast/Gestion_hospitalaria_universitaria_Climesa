@@ -350,8 +350,17 @@ private fun ConsultationPage(item: MedicalAppointment, profile: AccessProfile?, 
         }
         if (item.consultationId != null && !signed && "recetas.emitir" in permissions) {
             FormField(stringResource(R.string.consulta_medicamento), medication, { medication = it.take(200) })
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_dosis), dose, { dose = it.take(200) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_via), route, { route = it.take(100) }, Modifier.weight(1f)) }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_frecuencia), frequency, { frequency = it.take(200) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_duracion), duration, { duration = it.take(100) }, Modifier.weight(1f)) }
+            // D14: on a narrow phone or with large text each field takes its own row, so its label is never cut.
+            val config = androidx.compose.ui.platform.LocalConfiguration.current
+            if (config.screenWidthDp < 400 || config.fontScale > 1.3f) {
+                FormField(stringResource(R.string.consulta_dosis), dose, { dose = it.take(200) })
+                FormField(stringResource(R.string.consulta_via), route, { route = it.take(100) })
+                FormField(stringResource(R.string.consulta_frecuencia), frequency, { frequency = it.take(200) })
+                FormField(stringResource(R.string.consulta_duracion), duration, { duration = it.take(100) })
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_dosis), dose, { dose = it.take(200) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_via), route, { route = it.take(100) }, Modifier.weight(1f)) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { FormField(stringResource(R.string.consulta_frecuencia), frequency, { frequency = it.take(200) }, Modifier.weight(1f)); FormField(stringResource(R.string.consulta_duracion), duration, { duration = it.take(100) }, Modifier.weight(1f)) }
+            }
             FormField(stringResource(R.string.consulta_indicaciones), instructions, { instructions = it.take(1000) }, singleLine = false)
             SecondaryButton(stringResource(R.string.consulta_emitir_receta), { model.prescription(item, medication, dose, route, frequency, duration, instructions) { medication = ""; dose = ""; route = ""; frequency = ""; duration = ""; instructions = "" } }, enabled = !busy && listOf(medication, dose, route, frequency, duration).all { it.trim().isNotBlank() })
             StepNotice(stepNotice, RecordSection.PRESCRIPTION)

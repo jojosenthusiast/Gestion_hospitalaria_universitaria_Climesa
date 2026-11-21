@@ -32,6 +32,8 @@ internal fun FormSheet(onDismiss: () -> Unit, dirty: Boolean = false, content: @
     ModalBottomSheet(
         onDismissRequest = { if (hasInput) asking = true else onDismiss() },
         sheetState = sheetState,
+        // D4: the sheet window's taps count as activity for the inactivity sign-out.
+        modifier = androidx.compose.ui.Modifier.keepsSessionAlive(),
         properties = ModalBottomSheetProperties(shouldDismissOnBackPress = !dirty),
     ) {
         // Inside the sheet's own window: back with typed data asks first.
