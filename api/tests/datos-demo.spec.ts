@@ -416,7 +416,11 @@ describe('Datos de demostración (tools/demo)', () => {
     await t.pg.exec(semilla);
     const nueva = await demo();
     await t.pg.exec(limpieza);
+    // The old seed predates 20261130002000 (5 VIP / 6 semi-private): its floor-4 rooms already exist in such a base, so it
+    // is loaded the way it was applied then, without the room-category trigger.
+    await t.pg.exec('ALTER TABLE infra.espacio DISABLE TRIGGER espacio_habitacion_categoria');
     await t.pg.exec(semillaAnterior);
+    await t.pg.exec('ALTER TABLE infra.espacio ENABLE TRIGGER espacio_habitacion_categoria');
     const conAnterior = await demo();
     expect(conAnterior['pacientes.paciente']).toBeGreaterThan(0);
     await t.pg.exec(semilla);

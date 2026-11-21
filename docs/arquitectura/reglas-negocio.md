@@ -3,7 +3,7 @@
 Una sola lista de las reglas que el sistema hace cumplir. Cada spec las referencia por ID (`RN-xx`). Fuente entre paréntesis.
 
 ## Infraestructura y camas
-- **RN-01** Planta 3: 5 habitaciones VIP individuales (VIP-301 a VIP-305). Planta 2: 6 habitaciones semiprivadas de 2 camas (HAB-201 a HAB-206), 12 camas. Total de hospitalización: 17 camas. Son datos de configuración (REQ-HAB-01, 02, 07).
+- **RN-01** Planta 3: 5 habitaciones VIP individuales (VIP-301 a VIP-305). Planta 2: 6 habitaciones semiprivadas de 2 camas (HAB-201 a HAB-206), 12 camas. Total de hospitalización: 17 camas. Son datos de configuración (REQ-HAB-01, 02, 07) que PostgreSQL garantiza: no entra una 6.ª VIP activa ni una 7.ª semiprivada activa, una VIP solo vive en la planta 3 con 1 cama y una semiprivada solo en la planta 2 con hasta 2 (`20261130002000_habitaciones_por_categoria.sql`; códigos `limite_habitaciones_vip`, `limite_habitaciones_semiprivadas`, `habitacion_fuera_de_planta`, `capacidad_de_categoria`).
 - **RN-02** Ninguna cama tiene dos ocupaciones que se traslapen; ninguna habitación supera su capacidad (REQ-HAB-03, D-013).
 - **RN-03** Estados de cama: libre, reservada (asignada a una admisión que aún no llega, vence a las 2 h), ocupada, en limpieza, bloqueada (motivo obligatorio). Solo "libre" se puede asignar.
 - **RN-04** Al registrar la salida física la cama pasa a "en limpieza"; vuelve a "libre" cuando otra persona verifica la lista de limpieza (D-013, R03).

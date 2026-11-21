@@ -372,7 +372,7 @@ export class HospitalizationService {
     if (!bed) throw new NotFoundException('No se encontró la cama activa.');
     if (bed.version !== dto.version) throw new VersionConflictException(bed.version, 'La cama cambió; vuelve a consultar.');
     const state = (await c.query('SELECT estado FROM infra.v_estado_cama WHERE cama_id=$1', [dto.bedId])).rows[0]?.estado;
-    if (state !== 'libre') throw new ConflictException('Otra persona tomó esta cama.');
+    if (state !== 'libre') throw new ProblemException('cama_ocupada', 409, 'Otra persona tomó esta cama.', 'bedId');
     if (bed.categoria !== admission.requestedCategory && admission.requestedCategory === 'semiprivada' && !admission.authorizedBy) throw new ConflictException('La categoría de cama no coincide con la solicitud.');
     await this.checkRoomCompatibility(c, bed.roomId, admission);
     const now = this.clock.now();
