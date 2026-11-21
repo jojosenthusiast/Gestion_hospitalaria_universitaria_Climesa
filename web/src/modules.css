@@ -589,7 +589,7 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 /* Sweep 2026-11-17: on a phone «Exportar» is an icon button at the end of the toolbar, not a full row. */
 @media (max-width: 767px) { .export-trigger:not(.keep-label) .export-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } .export-trigger:not(.keep-label) { min-width: 44px; padding-inline: 10px; justify-content: center; } .export-popover { right: 0; left: auto; max-width: calc(100vw - 32px); } }
 /* P3 W2: on a narrow phone the export menu opens as a bottom sheet, like the filter panel. */
-@media (max-width: 520px) { .export-popover { position: fixed; top: auto; bottom: 0; left: 0; right: 0; max-width: none; min-width: 0; border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding-bottom: calc(6px + env(safe-area-inset-bottom)); } }
+@media (max-width: 520px) { .export-menu .export-popover { position: fixed; top: auto; bottom: 0; left: 0; right: 0; max-width: none; min-width: 0; border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding-bottom: calc(6px + env(safe-area-inset-bottom)); } }
 .export-popover { position: absolute; z-index: 20; right: 0; top: calc(100% + 6px); min-width: 250px; padding: 6px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-float); }
 .export-popover button { padding: 9px 12px; display: grid; gap: 1px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--ink); text-align: left; }
 .export-popover button:hover:not(:disabled) { background: var(--soft); }
