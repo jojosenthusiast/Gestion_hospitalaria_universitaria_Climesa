@@ -51,22 +51,24 @@ public enum ClimesaDates {
 
     public enum Style: Sendable { case dateTime, date, time }
 
-    /// Texto para mostrar en español de El Salvador. Devuelve "—" si la fecha no se puede leer.
-    public static func display(_ text: String?, _ style: Style = .dateTime) -> String {
+    /// Texto para mostrar en español de El Salvador, el mismo que la web (`formatDate`, `formatTime`, `formatDateTime`):
+    /// "16 nov, 09:33", "16 nov" y "09:33" (24 h, sin depender del formato del teléfono); el año solo cuando no es el
+    /// actual ("3 mar 2025, 09:33"). Devuelve "—" si la fecha no se puede leer.
+    public static func display(_ text: String?, _ style: Style = .dateTime, now: Date = Date()) -> String {
         guard let date = parse(text) else {
             // Un día sin hora (`yyyy-MM-dd`) se muestra tal cual.
             if let text, text.count == 10 { return text }
             return "—"
         }
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "es_SV")
-        formatter.timeZone = zone
+        let parts = calendar.dateComponents([.year, .month, .day], from: date)
+        let year = parts.year ?? 0
+        let thisYear = calendar.component(.year, from: now)
+        let day = "\(parts.day ?? 0) \(monthsShort[((parts.month ?? 1) - 1) % 12])" + (year == thisYear ? "" : " \(year)")
         switch style {
-        case .dateTime: formatter.dateStyle = .medium; formatter.timeStyle = .short
-        case .date: formatter.dateStyle = .medium; formatter.timeStyle = .none
-        case .time: formatter.dateStyle = .none; formatter.timeStyle = .short
+        case .dateTime: return "\(day), \(clock(date))"
+        case .date: return day
+        case .time: return clock(date)
         }
-        return formatter.string(from: date)
     }
 
     // MARK: Short dates without the year (owner rule R4, same as Android `MyShifts.relative` and `ShortDay`)

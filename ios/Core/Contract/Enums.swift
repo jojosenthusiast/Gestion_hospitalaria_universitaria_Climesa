@@ -173,7 +173,7 @@ public enum AmbulanceRequestState: String, ContractEnum {
         switch self {
         case .porConfirmar: return "Por confirmar"
         case .confirmada: return "Confirmada"
-        case .descartada: return "Descartada"
+        case .descartada: return "No se pudo atender"
         case .cancelada: return "Cancelada"
         case .desconocido: return "Sin estado"
         }
