@@ -25,6 +25,19 @@ describe('login de prueba (temporal)', () => {
     expect(demoAccountsFrom('true', raw)).toHaveLength(2);
   });
 
+  it('solo ofrece roles que usan la web; varias cuentas del mismo rol se distinguen por el correo', () => {
+    const mixed = JSON.stringify([
+      { rol: 'REC', correo: 'rec@example.test', contrasena: 'Placeholder-REC-1' },
+      { rol: 'REC', correo: 'rec1@example.test', contrasena: 'Placeholder-REC-2' },
+      { rol: 'ENF', correo: 'enf@example.test', contrasena: 'Placeholder-ENF-1' },
+      { rol: 'MED', correo: 'med@example.test', contrasena: 'Placeholder-MED-1' },
+      { rol: 'PAR', correo: 'par@example.test', contrasena: 'Placeholder-PAR-1' },
+    ]);
+    expect(demoAccountsFrom('true', mixed).map(a => a.correo)).toEqual(['rec@example.test', 'rec1@example.test']);
+    render(<Harness demoAccounts={demoAccountsFrom('true', mixed)} />);
+    expect(screen.getAllByRole('option').map(o => o.textContent)).toEqual(['Elige un rol', 'REC · rec@example.test', 'REC · rec1@example.test']);
+  });
+
   it('descarta entradas mal formadas y JSON inválido', () => {
     expect(parseDemoCredentials('no es json')).toEqual([]);
     expect(parseDemoCredentials(undefined)).toEqual([]);
@@ -40,7 +53,7 @@ describe('login de prueba (temporal)', () => {
   it('elegir un rol llena el correo y la contraseña; el usuario todavía pulsa Iniciar sesión', async () => {
     render(<Harness demoAccounts={demoAccountsFrom('true', raw)} />);
     expect(screen.getByText('Modo de prueba: cuentas ficticias')).toBeTruthy();
-    await userEvent.selectOptions(screen.getByLabelText('Cuenta de prueba'), 'REC');
+    await userEvent.selectOptions(screen.getByLabelText('Cuenta de prueba'), 'rec@example.test');
     expect((screen.getByLabelText(/^Correo electrónico/) as HTMLInputElement).value).toBe('rec@example.test');
     expect((screen.getByLabelText(/^Contraseña/) as HTMLInputElement).value).toBe('Placeholder-REC-1');
   });

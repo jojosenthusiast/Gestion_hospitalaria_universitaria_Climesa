@@ -265,11 +265,12 @@ describe('pantallas de solo lectura según el permiso', () => {
   });
 });
 describe('rol sin web (FR-120-03)', () => {
-  it('un médico (Android e iOS) ve "Tu rol no usa esta aplicación" y ningún menú', async () => {
+  it('un médico (Android e iOS) vuelve al ingreso con el error genérico y sin ningún menú', async () => {
     auth.getSession.mockResolvedValue({ data: { session } });
     simular(perfil('MED', permisosDe('MED'), ['ios', 'android']));
     render(<App />);
-    expect(await screen.findByText('Tu rol no usa esta aplicación')).toBeTruthy();
+    expect(await screen.findByText('Correo o contraseña incorrectos, o la cuenta todavía no está activa.')).toBeTruthy();
+    expect(screen.queryByText('Tu rol no usa esta aplicación')).toBeNull();
     expect(screen.queryByRole('navigation', { name: 'Navegación principal' })).toBeNull();
   });
 });

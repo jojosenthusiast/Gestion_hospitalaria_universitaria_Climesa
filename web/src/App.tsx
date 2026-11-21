@@ -14,7 +14,7 @@ import { LoginView,PatientSignupInfoView,StatusView } from './components/ui';
 import { HospitalShell } from './features/shell';
 import { PublicScreen } from './features/public-screen';
 import { PasswordRecoveryView } from './features/password';
-import { ConfirmEmail,LANDING_PATHS,PlatformGuidanceScreen,SetPasswordLanding } from './features/auth-landing';
+import { ConfirmEmail,LANDING_PATHS,SetPasswordLanding } from './features/auth-landing';
 import './modules.css';
 /**
  * Fase 2, S3: una sola pantalla de arranque. Comprobar la sesión y validar los permisos se ven como un mismo paso,
@@ -22,9 +22,12 @@ import './modules.css';
  */
 function StartupView({slow=false}:{slow?:boolean}){return <StatusView title="Abriendo tu espacio de trabajo" detail={slow?SLOW_SERVER_MESSAGE:'Comprobando tu sesión y los permisos de tu cuenta.'}/>;}
 /** La ruta del hash pertenece a la sesión: al salir se limpia para que la siguiente cuenta no herede una sección ajena (obs. 15). */
+/** Same text for a wrong password and for an account that cannot use the web: the login never reveals which accounts exist. */
+const INVALID_LOGIN='Correo o contraseña incorrectos, o la cuenta todavía no está activa.';
+type ExitReason='idle'|'expired'|'platform';
 const resetRoute=()=>{if(location.hash)history.replaceState(null,'',location.pathname+location.search);};
 export default function App(){
- const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[expired,setExpired]=useState<false|'idle'|'expired'>(false);
+ const [session,setSession]=useState<Session|null>(null),[ready,setReady]=useState(false),[expired,setExpired]=useState<false|ExitReason>(false);
  useEffect(()=>{if(!supabase){setReady(true);return;}let cancelled=false;void supabase.auth.getSession().then(({data})=>{if(!cancelled){setSession(data.session);setReady(true);}});const {data}=supabase.auth.onAuthStateChange((_event,next)=>{setSession(next);setReady(true);});return()=>{cancelled=true;data.subscription.unsubscribe();};},[]);
  useEffect(()=>{if(ready&&!session)resetRoute();},[ready,session]);
  // W34: la pantalla pública no usa sesión; sin Supabase solo pierde el tiempo real.
@@ -39,18 +42,18 @@ export default function App(){
  if(location.pathname==='/recuperar')return <PasswordRecoveryView onRequest={async email=>{await supabase!.auth.resetPasswordForEmail(email,{redirectTo:`${location.origin}${LANDING_PATHS.reset}`});}}/>;
  if(location.pathname===LANDING_PATHS.reset)return <SetPasswordLanding reset/>;
  if(!ready)return <StartupView/>;
- if(!session)return <Login notice={expired==='idle'?'Tu sesión se cerró por inactividad. Ingresa nuevamente.':expired==='expired'?EXPIRED_NOTICE:new URLSearchParams(location.search).get('contrasena')==='actualizada'?'Contraseña actualizada. Ingresa con tu nueva contraseña.':undefined} onAttempt={()=>setExpired(false)}/>;
- return <Portal session={session} onExpired={(reason='idle')=>{setExpired(reason);void supabase?.auth.signOut({scope:'local'});}}/>;
+ if(!session)return <Login error={expired==='platform'?INVALID_LOGIN:undefined} notice={expired==='idle'?'Tu sesión se cerró por inactividad. Ingresa nuevamente.':expired==='expired'?EXPIRED_NOTICE:new URLSearchParams(location.search).get('contrasena')==='actualizada'?'Contraseña actualizada. Ingresa con tu nueva contraseña.':undefined} onAttempt={()=>setExpired(false)}/>;
+ return <Portal session={session} onExpired={(reason='idle')=>{setExpired(reason);if(reason==='platform')setSession(null);void supabase?.auth.signOut({scope:'local'});}}/>;
 }
-function Login({notice,onAttempt}:{notice?:string;onAttempt:()=>void}){
- const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null);
+function Login({notice,error:initialError,onAttempt}:{notice?:string;error?:string;onAttempt:()=>void}){
+ const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(initialError??null);
  // MA-OPS-01: wake the sleeping API while the person types, so the profile check after signing in answers quickly.
  useEffect(()=>{if(import.meta.env.PROD)warmUpApi();},[]);
- async function submit(e:FormEvent){e.preventDefault();onAttempt();setBusy(true);setError(null);try{const {error}=await supabase!.auth.signInWithPassword({email:email.trim(),password});if(error)setError('Correo o contraseña incorrectos, o la cuenta todavía no está activa.');}catch{setError('No se pudo conectar. Revisa tu conexión e intenta de nuevo.');}finally{setBusy(false);}}
+ async function submit(e:FormEvent){e.preventDefault();onAttempt();setBusy(true);setError(null);try{const {error}=await supabase!.auth.signInWithPassword({email:email.trim(),password});if(error)setError(INVALID_LOGIN);}catch{setError('No se pudo conectar. Revisa tu conexión e intenta de nuevo.');}finally{setBusy(false);}}
  return <LoginView {...{email,password,setEmail,setPassword,busy,error,notice,demoAccounts}} accepted={new URLSearchParams(location.search).get('invitacion')==='aceptada'} onSubmit={submit}/>;
 }
 const EXPIRED_NOTICE='Tu sesión expiró. Ingresa nuevamente.';
-function Portal({session,onExpired}:{session:Session;onExpired:(reason?:'idle'|'expired')=>void}){
+function Portal({session,onExpired}:{session:Session;onExpired:(reason?:ExitReason)=>void}){
  // WEB-10: one client per session. The token is read on every request, so a renewed token does not
  // recreate the client: pending intent keys survive and the views do not all reload on renewal.
  const token=useRef(session.access_token);token.current=session.access_token;
@@ -60,13 +63,12 @@ function Portal({session,onExpired}:{session:Session;onExpired:(reason?:'idle'|'
  const api=useMemo(()=>new IntentApi(async()=>{const {data}=await supabase!.auth.getSession();return data.session?.access_token??token.current;},renewOnce(()=>supabase!.auth.refreshSession().then(({data,error})=>!error&&!!data.session,()=>false),()=>expire.current('expired'))),[]);
  const [profile,setProfile]=useState<AccessProfile|null>(null),[error,setError]=useState<string|null>(null),[denied,setDenied]=useState(false),[loading,setLoading]=useState(true),[slow,setSlow]=useState(false);
  // MA-OPS-01: /auth/me is usually the request that wakes the API; it is retried and, after 5 s, the screen says why it waits.
- const load=useCallback(()=>{setLoading(true);setError(null);setDenied(false);setSlow(false);void retryColdStart(()=>api.request<AccessProfile>('/auth/me'),()=>setSlow(true)).then(setProfile).catch(e=>{setDenied(e instanceof ApiError&&e.status===403);setError(e instanceof Error?e.message:'No se pudo verificar el acceso.');}).finally(()=>{setLoading(false);setSlow(false);});},[api]);
+ const load=useCallback(()=>{setLoading(true);setError(null);setDenied(false);setSlow(false);void retryColdStart(()=>api.request<AccessProfile>('/auth/me'),()=>setSlow(true)).then(p=>{if(!p.platforms.includes('web')){expire.current('platform');return;}setProfile(p);}).catch(e=>{if(e instanceof ApiError&&e.status===403){expire.current('platform');return;}setDenied(e instanceof ApiError&&e.status===403);setError(e instanceof Error?e.message:'No se pudo verificar el acceso.');}).finally(()=>{setLoading(false);setSlow(false);});},[api]);
  useEffect(load,[load]);
  if(loading&&!profile)return <StartupView slow={slow}/>;
  // S8: a 403 is the server's answer, not a failure: its reason, no retry (it can never succeed); «Cerrar sesión» stays.
  if(denied)return <div><StatusView settled title="Tu cuenta no tiene acceso" detail={error??'Tu cuenta no tiene permiso para usar esta aplicación.'}/><button className="access-logout" onClick={()=>void supabase?.auth.signOut({scope:'local'})}>Cerrar sesión</button></div>;
  if(error||!profile)return <div><StatusView title="No pudimos validar el acceso" detail={error??'Intenta nuevamente.'} action="Volver a intentar" onAction={load}/><button className="access-logout" onClick={()=>void supabase?.auth.signOut({scope:'local'})}>Cerrar sesión</button></div>;
- if(!profile.platforms.includes('web'))return <PlatformGuidanceScreen profile={profile} title="Tu rol no usa esta aplicación" action={{label:'Cerrar sesión',onClick:()=>void supabase?.auth.signOut({scope:'local'})}}/>;
  return <LivePortal {...{api,profile,session,onExpired}} refreshProfile={load}/>;
 }
 function LivePortal({api,profile,session,onExpired,refreshProfile}:{api:IntentApi;profile:AccessProfile;session:Session;onExpired:()=>void;refreshProfile:()=>void}){

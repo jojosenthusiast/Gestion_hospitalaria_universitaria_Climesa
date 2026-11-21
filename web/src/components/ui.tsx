@@ -149,9 +149,10 @@ function DemoAccountPicker({ accounts, disabled, onPick }: { accounts: DemoAccou
       <Notice kind="info">Modo de prueba: cuentas ficticias</Notice>
       <div className="field">
         <label htmlFor={selectId}>Cuenta de prueba</label>
-        <select id={selectId} defaultValue="" disabled={disabled} onChange={e => { const account = accounts.find(a => a.rol === e.target.value); if (account) onPick(account); }}>
+        <select id={selectId} defaultValue="" disabled={disabled} onChange={e => { const account = accounts.find(a => a.correo === e.target.value); if (account) onPick(account); }}>
           <option value="" disabled>Elige un rol</option>
-          {accounts.map(a => <option key={a.rol} value={a.rol}>{a.rol}</option>)}
+          {/* Several accounts may share a role (prueba.med and prueba.med1), so the e-mail identifies each option. */}
+          {accounts.map(a => <option key={a.correo} value={a.correo}>{`${a.rol} · ${a.correo}`}</option>)}
         </select>
       </div>
     </>

@@ -20,10 +20,15 @@ export function parseDemoCredentials(raw: string | undefined): DemoAccount[] {
   }
 }
 
+/** Roles whose `plataformas` include web (docs/arquitectura/datos/roles.csv); the others sign in only on Android or iOS. */
+export const WEB_DEMO_ROLES = ['ADM', 'JOP', 'REC', 'LAB', 'DPD', 'PAC'];
+
+/** The web picker only offers accounts whose role can use the web. */
 export function demoAccountsFrom(flag: string | undefined, raw: string | undefined): DemoAccount[] {
-  return flag === 'true' ? parseDemoCredentials(raw) : [];
+  return flag === 'true' ? parseDemoCredentials(raw).filter(a => WEB_DEMO_ROLES.includes(a.rol.toUpperCase())) : [];
 }
 
-export const demoAccounts: DemoAccount[] = import.meta.env.VITE_DEMO_LOGIN === 'true'
-  ? parseDemoCredentials(import.meta.env.VITE_DEMO_CREDENTIALS as string | undefined)
-  : [];
+export const demoAccounts: DemoAccount[] = demoAccountsFrom(
+  import.meta.env.VITE_DEMO_LOGIN as string | undefined,
+  import.meta.env.VITE_DEMO_CREDENTIALS as string | undefined,
+);
