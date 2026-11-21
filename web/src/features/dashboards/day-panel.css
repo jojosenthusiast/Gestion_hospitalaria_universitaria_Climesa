@@ -36,6 +36,7 @@
 .day-figures li > a:hover { background: var(--soft); }
 .day-figures li > a:focus-visible { outline: 2px solid var(--outline); outline-offset: -2px; }
 .figure-value { font-size: var(--text-2xl); font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; letter-spacing: -0.01em; white-space: nowrap; }
+.figure-value.is-text { white-space: normal; font-size: var(--text-lg); line-height: 1.25; overflow-wrap: anywhere; }
 .figure-value.is-loading { width: 3ch; height: 24px; border-radius: var(--radius-chip); background: color-mix(in srgb, var(--line) 70%, transparent); }
 .figure-label { color: var(--muted); font-size: var(--text-sm); font-weight: 600; line-height: 1.35; }
 .figure-label small { font-weight: 400; font-variant-numeric: tabular-nums; }
@@ -69,3 +70,5 @@
 .on-shift-roles strong { font-variant-numeric: tabular-nums; }
 .on-shift-gaps { margin: 0; }
 .figure-detail { color: var(--muted); font-size: var(--text-xs, 0.75rem); line-height: 1.35; font-variant-numeric: tabular-nums; }
+/* P3 W11: 44px touch target on touch screens. */
+@media (pointer: coarse) { .tray-more { min-height: 44px; } }

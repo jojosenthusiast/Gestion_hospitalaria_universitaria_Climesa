@@ -153,3 +153,5 @@
   .lab-body { padding: var(--space-4); }
   .cl-detail.lab-detail { padding: var(--space-4); }
 }
+/* P3 W11: 44px touch target on touch screens. */
+@media (pointer: coarse) { .lab-sheet-add { min-height: 44px; } }

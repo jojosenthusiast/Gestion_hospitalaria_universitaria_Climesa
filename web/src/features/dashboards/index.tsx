@@ -42,7 +42,8 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
   const groups: TrayGroupSpec[] = unique(roles.flatMap((role: RoleId) => roleDashboards[role].tray(ctx)));
   const figures: Figure[] = unique(roles.flatMap((role: RoleId) => roleDashboards[role].figures(ctx)));
   const actions: QuickAction[] = unique(roles.flatMap((role: RoleId) => roleDashboards[role].actions));
-  const reportRoles = roles.includes('ADM') || roles.includes('JOP'), board = d.board.data;
+  // P3 W15: the role offers the report only when the account may read the metrics it exports.
+  const reportRoles = (roles.includes('ADM') || roles.includes('JOP')) && can(profile, 'metricas.ver'), board = d.board.data;
   const followUps = can(profile, 'citas.agendar'), results = can(profile, 'laboratorio.revisar');
   // The «Al día» line needs to know the S10 groups are empty too.
   const s10Clear = (!followUps || (!!d.followUps.data && d.followUps.data.length === 0)) && (!results || (!!d.labPending.data && d.labPending.data.length === 0));
@@ -50,7 +51,7 @@ export function Dashboard({ api, profile, version }: { api: Api; profile: Access
     <CompactHeader breadcrumb="CLIMESA / Inicio" title={roleDashboards[roles[0]].title} actions={<>
       <QuickActions actions={actions} profile={profile} />
       {/* P3 S6: Administración and Jefatura export the day's board (PDF, CSV or Excel); ExportMenu records it in /exportaciones first. */}
-      {reportRoles && board && <ExportMenu label="Reporte del día" table={() => dailyReport(board)} />}
+      {reportRoles && board && <ExportMenu label="Reporte del día" keepLabel table={() => dailyReport(board)} />}
     </>} />
     <CriticalNoticeBanner api={api} version={version} />
     <div className="day-panel">

@@ -86,6 +86,8 @@
 
 /* Superficies, herramientas y estados */
 .data-workbench, .profile-sheet { min-width: 0; overflow-x: auto; overflow-y: clip; border: 1px solid var(--line); border-top: 4px solid var(--primary); border-radius: var(--radius-card); background: var(--surface); color: var(--ink); box-shadow: var(--shadow-soft); scrollbar-width: thin; }
+/* P3 W2: an open export or filter popover must not be clipped by the card's horizontal scroll. */
+.data-workbench:has(.export-menu [aria-expanded="true"], .filter-panel), .profile-sheet:has(.export-menu [aria-expanded="true"], .filter-panel) { overflow: visible; }
 .table-toolbar { padding: 22px 24px; display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--surface) 92%, var(--soft)); }
 .table-toolbar > .field { flex: 1 1 280px; max-width: 560px; }
 .table-toolbar > .select-field { flex: 0 1 230px; }
@@ -334,7 +336,7 @@
   .record-table td::before { content: attr(data-label); display: block; margin-bottom: 5px; color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
   .record-table td:first-child { grid-column: 1 / -1; }
   .record-table td:first-child strong { font-size: 16px; }
-  .record-table td:last-child { white-space: normal; }
+  .record-table td:last-child { min-width: 0; white-space: normal; }
   .record-table .row-action { min-height: 40px; }
   .table-footnote { padding: 14px 18px; }
   .number-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -376,6 +378,9 @@
   .future-module { padding: 26px 20px; }
 }
 
+/* P3 W6: below 480px the role and the account do not fit next to the full brand name. */
+@media (max-width: 480px) { .hospital-header .brand-name { display: none; } }
+
 @media (max-width: 380px) {
   .hospital-header-inner { padding-inline: 14px; }
   .hospital-header .brand-name { display: none; }
@@ -405,7 +410,7 @@
 .history-item-head small { display: block; color: var(--muted); }
 /* W34 · pantalla pública (modo televisor): letras grandes, sin interacción, solo datos públicos. */
 .public-screen { min-height: 100vh; padding: clamp(16px, 3vw, 40px); background: var(--bg); color: var(--ink); font-size: clamp(18px, 1.6vw, 28px); }
-.public-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding: 16px 24px; border-radius: var(--radius-panel); background: var(--navy); color: var(--on-primary); }
+.public-header { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 24px; padding: 16px 24px; border: 1px solid rgb(255 255 255 / 0.12); border-radius: var(--radius-panel); background: var(--navy); color: var(--on-primary); }
 .public-header h1 { margin: 0; font-size: clamp(24px, 2.6vw, 44px); }
 .public-clock { display: grid; justify-items: end; }
 .public-clock time { font-size: clamp(28px, 3vw, 52px); font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -425,7 +430,7 @@
 .public-floors li, .public-doctors li { display: grid; gap: 4px; padding-bottom: 12px; border-bottom: 1px solid var(--line); }
 .public-floors b { font-size: 1.3em; color: var(--success); }
 .public-doctors small { color: var(--muted); }
-.public-notices li { padding: 12px 16px; border-left: 4px solid var(--accent); background: var(--soft); border-radius: var(--radius-control); }
+.public-notices li { overflow-wrap: anywhere; padding: 12px 16px; border-left: 4px solid var(--accent); background: var(--soft); border-radius: var(--radius-control); }
 .public-notices p { margin: 4px 0 0; }
 
 /* W18/W19 ambulancia: hitos del servicio y barra de filtros de la bitácora. */
@@ -582,7 +587,9 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
 .export-menu { position: relative; display: inline-block; }
 .export-trigger { min-height: 42px; padding-block: 8px; }
 /* Sweep 2026-11-17: on a phone «Exportar» is an icon button at the end of the toolbar, not a full row. */
-@media (max-width: 767px) { .export-trigger .export-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } .export-trigger { min-width: 44px; padding-inline: 10px; justify-content: center; } .export-popover { right: 0; left: auto; } }
+@media (max-width: 767px) { .export-trigger:not(.keep-label) .export-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; } .export-trigger:not(.keep-label) { min-width: 44px; padding-inline: 10px; justify-content: center; } .export-popover { right: 0; left: auto; max-width: calc(100vw - 32px); } }
+/* P3 W2: on a narrow phone the export menu opens as a bottom sheet, like the filter panel. */
+@media (max-width: 520px) { .export-menu .export-popover { position: fixed; top: auto; bottom: 0; left: 0; right: 0; max-width: none; min-width: 0; border-radius: var(--radius-panel) var(--radius-panel) 0 0; padding-bottom: calc(6px + env(safe-area-inset-bottom)); } }
 .export-popover { position: absolute; z-index: 20; right: 0; top: calc(100% + 6px); min-width: 250px; padding: 6px; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: var(--radius-card); background: var(--surface); box-shadow: var(--shadow-float); }
 .export-popover button { padding: 9px 12px; display: grid; gap: 1px; border: 0; border-radius: var(--radius-control); background: transparent; color: var(--ink); text-align: left; }
 .export-popover button:hover:not(:disabled) { background: var(--soft); }
@@ -602,7 +609,6 @@ a.kpi:hover { border-color: color-mix(in srgb, var(--kpi) 45%, var(--line)); bac
   .timeline li { grid-template-columns: 46px minmax(0, 1fr); }
   .timeline li > :nth-child(n + 3) { grid-column: 2; justify-self: start; }
   .metric-figure { grid-column: 1 / -1; }
-  .export-popover { right: auto; left: 0; }
 }
 @media (max-width: 420px) { .kpi-row { grid-template-columns: 1fr; } }
 

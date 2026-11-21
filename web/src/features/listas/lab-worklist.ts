@@ -7,6 +7,9 @@ export type WorkOrder = {
 
 export type Stage = 'pendiente' | 'en_proceso' | 'por_revisar' | 'liberada' | 'cancelada';
 export const STAGE_LABEL: Record<Stage, string> = { pendiente: 'Pendiente', en_proceso: 'En Proceso', por_revisar: 'Por revisar', liberada: 'Liberada', cancelada: 'Cancelada' };
+/** P3 W4: an order's `state` as the history reads it (same words as Android `LaboratoryLabels.state`), not the generic «Pendiente de iniciar». */
+export const LAB_ORDER_STATE_LABEL: Record<string, string> = { pendiente: 'Pendiente', en_proceso: 'En Proceso', completado: 'Completado', cancelado: 'Cancelado' };
+export const labOrderStateLabel = (state: string) => LAB_ORDER_STATE_LABEL[state];
 /** Un solo tono por etapa; la misma paleta se usa en chips, borde de la fila y filtros. */
 export const STAGE_TONE: Record<Stage, string> = { pendiente: 'warning', en_proceso: 'info', por_revisar: 'review', liberada: 'success', cancelada: 'muted' };
 

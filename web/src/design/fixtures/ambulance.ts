@@ -69,6 +69,8 @@ export class AmbulanceFixtures {
   request(path: string): unknown {
     const url = new URL(path, 'https://fixture.invalid'), p = url.pathname, q = url.searchParams;
     if (p === '/ambulancia') return this.status();
+    // MA-AMB-04: the active service is the only one the hospital is waiting for in the preview.
+    if (p === '/ambulancia/llegada') { const s = this.status() as unknown as { activeService?: { id: string; dispatchedAt: string; priority: string } | null }; const a = s.activeService; return { serviceId: a?.id ?? null, services: a ? [{ serviceId: a.id, dispatchedAt: a.dispatchedAt, active: true, arrived: false, priority: a.priority, urgent: true, hasPrehospital: true, state: 'trasladando' }] : [] }; }
     if (/^\/ambulancia\/servicios\/[^/]+\/prehospital$/.test(p)) {
       const clinical = ['MED', 'ENF', 'JOP', 'REC'].includes(this.role);
       return { serviceId: p.split('/')[3], version: 1, active: true, arrived: false, priority: 'naranja', patientLinked: true, clinical, handover: null, allowedActions: [], reports: [{ id: uuid(400), priority: 'naranja', estimatedArrival: new Date(Date.now() + 8 * MIN).toISOString(), capturedAt: ago(7), receivedAt: ago(7), ...(clinical ? { reason: 'Dolor torácico opresivo de 1 hora, diaforesis. Antecedente de hipertensión.', vitalSigns: { heartRate: 108, systolic: 152, diastolic: 94, respiratoryRate: 22, oxygenSaturation: 93, temperature: 36.8, glasgow: 15 } } : {}) }] };

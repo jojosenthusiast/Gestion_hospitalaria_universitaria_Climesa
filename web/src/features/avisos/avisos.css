@@ -110,3 +110,7 @@
 .notice-audience-summary { padding: 12px 14px; display: grid; gap: 6px; border: 1px solid var(--line); border-radius: var(--radius-control); background: var(--surface); font-size: 14px; }
 .notice-audience-summary ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; overflow-wrap: anywhere; }
 .notice-audience-summary p { margin: 0; }
+/* P3 W8: the validity reads «desde … / hasta …» on two unbroken lines with aligned digits. */
+.notice-validity > span, .notice-validity > small { white-space: nowrap; font-variant-numeric: tabular-nums; }
+/* P3 W11: 44px touch target on touch screens. */
+@media (pointer: coarse) { .notice-preview-toggle { min-height: 44px; } }

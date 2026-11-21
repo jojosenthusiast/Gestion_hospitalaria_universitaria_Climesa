@@ -186,7 +186,7 @@ export function HospitalShell({api,profile,version=0,connection='live',onLogout,
     <Brand light/>
     <div className="workspace-role"><span>{roleLabel}</span><span className="mono-label">HOSPITAL UNIVERSITARIO</span></div><HospitalDate />
     <NoticesBell api={api} version={version} current={route==='avisos'}/>
-    <details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{avatarInitial(profile.name||profile.email)}</span><span className="account-menu-label">Mi cuenta</span><span aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details>
+    <details className="account-menu"><summary aria-label="Opciones de cuenta"><span className="account-avatar">{avatarInitial(profile.name||profile.email)}</span><span className="account-menu-label">Mi cuenta</span><span className="account-chevron" aria-hidden="true">⌄</span></summary><div className="account-popover"><span>Sesión iniciada</span><strong>{profile.email}</strong><a href="#/perfil">Ver mi cuenta</a><button onClick={onLogout}><Icon name="logout" size={18}/>Cerrar sesión</button></div></details>
    </div>
   </header>
   <div className="hospital-frame">

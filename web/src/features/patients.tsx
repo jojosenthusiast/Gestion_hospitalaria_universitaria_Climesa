@@ -10,6 +10,7 @@ import { joinParts,plural } from '../lib/format';
 import { ageFrom,profileGaps,validatePatientDraft } from './listas/patient-rules';
 import type { ClinicalHistory } from './clinical-history';
 import { dayKey,dayLabel,timeRange } from './listas/schedule';
+import { labOrderStateLabel } from './listas/lab-worklist';
 import './listas/lists.css';
 import './listas/patients-table.css';
 import { matchesPatientState,sanitizePatientFilters,canFilterAdmissions,patientEmptyState,patientFilterDefaults,patientListPath,PATIENT_PAGE,patientStateOptions,situationChip,situationOptions,stateChip,type PatientFilters } from './listas/patient-filters';
@@ -195,7 +196,7 @@ function PatientClinicalTab({api,id,version,tab}:{api:Api;id:string;version:numb
  const data=useData<ClinicalHistory>(api,`/pacientes/${id}/historial`,version);
  return <RemoteState state={data}>{h=>{
   if(tab==='consultas')return h.consultations.length?<ul className="cl-list">{h.consultations.map(k=><li key={k.id}><span><strong>{k.reason||'Consulta sin motivo registrado'}</strong><small>{formatDateTime(k.signedAt??k.startedAt)} · {k.doctor.name}{k.diagnoses[0]?` · ${k.diagnoses[0].description}`:''}</small></span><Tag value={k.state}/></li>)}</ul>:<Empty title="Sin consultas" description="No hay consultas registradas para este paciente."/>;
-  if(tab==='laboratorio')return h.laboratory.length?<ul className="cl-list">{h.laboratory.map(o=><li key={o.id}><span><strong>{o.items.map(i=>i.name).join(', ')||'Orden de laboratorio'}</strong><small>{formatDateTime(o.createdAt)}{o.reviewedAt?' · revisada':''}</small></span><Tag value={o.state}/></li>)}</ul>:<Empty title="Sin estudios" description="No hay órdenes de laboratorio para este paciente."/>;
+  if(tab==='laboratorio')return h.laboratory.length?<ul className="cl-list">{h.laboratory.map(o=><li key={o.id}><span><strong>{o.items.map(i=>i.name).join(', ')||'Orden de laboratorio'}</strong><small>{formatDateTime(o.createdAt)}{o.reviewedAt?' · revisada':''}</small></span><Tag value={o.state} label={labOrderStateLabel(o.state)}/></li>)}</ul>:<Empty title="Sin estudios" description="No hay órdenes de laboratorio para este paciente."/>;
   return h.admissions.length?<ul className="cl-list">{h.admissions.map(a=><li key={a.id}><span><strong>Ingreso por {a.origin.replace(/_/g,' ')}</strong><small>{formatDateTime(a.createdAt)} · {a.doctor.name}</small></span><Tag value={a.state}/></li>)}</ul>:<Empty title="Sin ingresos" description="Este paciente no ha sido hospitalizado."/>;
  }}</RemoteState>;
 }

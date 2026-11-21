@@ -99,7 +99,9 @@ describe('Fila del día · tablero (S9)', () => {
   });
 
   it('después de llamar ofrece deshacer con la versión que devolvió el servidor', async () => {
-    const api = montar(['fila.ver', 'fila.llamar'], [ticket({ allowedActions: ['llamar'] })], async path => path.endsWith('/llamar') ? { id: 't-7', version: 3, state: 'llamado', llamados: 1 } : { id: 't-7', version: 4, state: 'en_espera', llamados: 0 });
+    // P3 W13: the undo is offered because the server lists deshacer_llamado on the called ticket.
+    const rows = [ticket({ allowedActions: ['llamar'] })];
+    const api = montar(['fila.ver', 'fila.llamar'], rows, async path => { if (path.endsWith('/llamar')) { rows[0] = ticket({ state: 'llamado', llamados: 1, version: 3, allowedActions: ['atender'], undoActions: ['deshacer_llamado'] }); return { id: 't-7', version: 3, state: 'llamado', llamados: 1 }; } return { id: 't-7', version: 4, state: 'en_espera', llamados: 0 }; });
     await userEvent.click(await screen.findByRole('button', { name: /^Llamar$/ }));
     expect(await screen.findByText('Llamaste CON 7.')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
