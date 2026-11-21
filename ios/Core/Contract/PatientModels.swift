@@ -39,10 +39,14 @@ public struct QueueTicket: Decodable, Sendable, Identifiable, Equatable {
     /// B5: numbers waiting before this one in its area, when the API sends it (today only the issue response does);
     /// nil otherwise, and the public board gives the estimate.
     public var ahead: Int? = nil
+    /// Lote 5 S11: age in years on the ticket's day (`pacientes.ver_nacimiento`) and sex (`pacientes.ver_ficha`); nil on an
+    /// older API or without the permission.
+    public var patientAge: Int? = nil
+    public var patientSex: String? = nil
     enum CodingKeys: String, CodingKey {
         case id, service, date = "fecha", number = "numero", patientId, patientName, state, officeId, calls = "llamados", version, issuedAt
         case consultationId, consultationState, allowedActions, blockedActions, maxCalls, callsForAbsence
-        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead
+        case area, priority, appointmentAt, walkIn, officeCode, undoActions, calledByMe, calledByColleague, ahead, patientAge, patientSex
     }
 }
 
@@ -384,30 +388,29 @@ public struct ClinicalHistory: Decodable, Sendable, Equatable {
     public let allowedActions: [String]?
 }
 
-/// `LinkRequestResponse` de `POST /cuentas/vinculacion`.
-public struct LinkRequestResult: Decodable, Sendable, Equatable {
-    public let id: String
-    public let state: LinkState
-    public let createdAt: String
-    public let resolvedAt: String?
-    public let rejectionReason: String?
-    public let version: Int
-}
-
-/// `MyLinkResponse` of `GET /me/vinculacion` (G2): the account's last link request, so the screen opens in its real state.
+/// `MyLinkResponse` of `GET /me/vinculacion` (U12): linking is automatic by verified email. The account joins the one
+/// active record whose email matches the email Supabase Auth confirmed, so the app shows either the linked record or the
+/// email Recepción must write on the record. The retired DUI request (`request`) always comes back null and is not read.
 public struct MyLink: Decodable, Sendable, Equatable {
-    /// `LinkDeclaredResponse`: what the account declared, to ask again with the form filled in.
-    public struct Declared: Decodable, Sendable, Equatable {
-        public let dui: String
-        /// Local day `yyyy-MM-dd`.
-        public let birth: String?
-        public init(dui: String, birth: String?) { self.dui = dui; self.birth = birth }
-    }
     public let linked: Bool
-    /// nil when the account never asked.
-    public let request: LinkRequestResult?
-    /// Absent when the account never asked, and on a server before R7.
-    public let declared: Declared?
+    /// The account's email; nil when the server has none.
+    public let email: String?
+    /// Supabase Auth confirmed the email. Only a confirmed email joins the account with the record.
+    public let emailVerified: Bool
+
+    public init(linked: Bool, email: String?, emailVerified: Bool) {
+        self.linked = linked; self.email = email; self.emailVerified = emailVerified
+    }
+
+    enum CodingKeys: String, CodingKey { case linked, email, emailVerified }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        linked = try container.decode(Bool.self, forKey: .linked)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        // A server before U12 does not send it: treat the email as not confirmed yet.
+        emailVerified = try container.decodeIfPresent(Bool.self, forKey: .emailVerified) ?? false
+    }
 }
 
 /// `MyAccessResponse` de `GET /me/accesos`: quién vio mi expediente, sin nombres de personas.
@@ -416,7 +419,14 @@ public struct MyAccess: Decodable, Sendable, Equatable {
     public let role: String
     public let dataType: String
     public let reason: String
-    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo" }
+    /// D120: true for the urgent read of an ambulance reception; nil from an older API.
+    public var urgent: Bool? = nil
+    /// D130: the person's name, only when the API sends it; otherwise the row shows the role alone.
+    public var name: String? = nil
+    enum CodingKeys: String, CodingKey { case date = "fecha", role = "rol", dataType = "tipoDato", reason = "motivo", urgent = "urgente", name = "nombre" }
+
+    /// D120: urgent by the API flag, or by the reason text an older API writes.
+    public var isUrgent: Bool { (urgent ?? false) || AccessLogRules.isUrgentReason(reason) }
 }
 
 /// `PublicOccupancyResponse` de `GET /publico/ocupacion`.
@@ -560,7 +570,7 @@ public struct AppointmentCategory: Decodable, Sendable, Identifiable, Equatable 
     public let code: String
     public let name: String
     public let description: String
-    /// Clave estable del ícono (`piel`, `corazon`...); la app la traduce a un SF Symbol (`CategoryRequestRules.symbol`).
+    /// Clave estable del ícono (`piel`, `corazon`...); la app la traduce a su glifo web (`CategoryRequestRules.icon`).
     public let icon: String
     public let specialties: [String]
     public let keywords: String
@@ -637,4 +647,30 @@ public struct CategoryRequestCommandResult: Decodable, Sendable, Equatable {
     public let version: Int
     public let state: String
     public let appointmentId: String?
+}
+
+/// D128 · `RequestLimitResponse` of `GET /citas/solicitudes-categoria/limite`: pending requests that count for the limit,
+/// the policy maximum, and whether a new one would be accepted (with the server's code and reason). Read tolerantly: a
+/// missing field never fails the read, and a missing `canRequest` counts as allowed.
+public struct CategoryRequestLimit: Decodable, Sendable, Equatable {
+    public let pending: Int
+    public let max: Int
+    public let canRequest: Bool
+    public let code: String?
+    public let reason: String?
+
+    public init(pending: Int, max: Int, canRequest: Bool, code: String? = nil, reason: String? = nil) {
+        self.pending = pending; self.max = max; self.canRequest = canRequest; self.code = code; self.reason = reason
+    }
+
+    enum CodingKeys: String, CodingKey { case pending, max, canRequest, code, reason }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        pending = (try? container.decodeIfPresent(Int.self, forKey: .pending)) ?? 0
+        max = (try? container.decodeIfPresent(Int.self, forKey: .max)) ?? 0
+        canRequest = (try? container.decodeIfPresent(Bool.self, forKey: .canRequest)) ?? true
+        code = try? container.decodeIfPresent(String.self, forKey: .code)
+        reason = try? container.decodeIfPresent(String.self, forKey: .reason)
+    }
 }

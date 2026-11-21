@@ -14,9 +14,12 @@ final class PlatformParityTests: XCTestCase {
     func testFamiliasDeEstadoIgualesALaWeb() {
         let expected: [String: StatusFamily] = [
             "por_vencer": .espera, "revisar": .espera, "bajo_minimo": .espera,
-            "ok": .listo, "coincide": .listo, "agotado": .cerrado, "atendido": .listo
+            "ok": .listo, "coincide": .listo, "atendido": .listo
         ]
         for (value, family) in expected { XCTAssertEqual(StatusFamily.of(value), family, value) }
+        // R1: «agotado» asks for attention: urgent priority, never a closed (grey) family.
+        XCTAssertNil(StatusFamily.of("agotado"))
+        XCTAssertEqual(StatusBadgeStyle.of("agotado").priority, .urgente)
         let labels = ["atendido": "Atendido", "agotado": "Agotado", "por_vencer": "Por vencer", "ok": "En orden",
                       "coincide": "Coincide", "revisar": "Revisar"]
         for (value, label) in labels { XCTAssertEqual(StatusBadgeStyle.of(value).label, label, value) }

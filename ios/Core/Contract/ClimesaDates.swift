@@ -155,6 +155,14 @@ public enum ClimesaDates {
         return "\(weekday) \(parts.day ?? 0) de \(monthsLong[((parts.month ?? 1) - 1) % 12])"
     }
 
+    /// "Miércoles, 18 de noviembre": the date line under the clock, the same text as the web header
+    /// (`Intl.DateTimeFormat('es-SV', { weekday: 'long', day: 'numeric', month: 'long' })` with its first letter up).
+    public static func clockDay(_ date: Date) -> String {
+        let parts = calendar.dateComponents([.weekday, .day, .month], from: date)
+        let weekday = capitalized(weekdays[((parts.weekday ?? 1) - 1) % 7])
+        return "\(weekday), \(parts.day ?? 0) de \(monthsLong[((parts.month ?? 1) - 1) % 12])"
+    }
+
     /// "Mié 18 nov": the clock's date line when the bar is too narrow for `longDay`.
     public static func compactDay(_ date: Date) -> String { capitalized(dayMonth(date)) }
 

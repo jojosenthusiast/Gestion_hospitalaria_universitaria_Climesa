@@ -17,11 +17,16 @@ public struct AccessProfile: Codable, Sendable {
     public let patientId: String?
     /// Persona de personal vinculada (médico); la usa la indicación de hospitalización como médico tratante.
     public let staffId: String?
-    public init(id: String, email: String, name: String, roles: [String], platforms: [String], permissions: [Permission], channels: [String] = [], patientId: String? = nil, staffId: String? = nil) {
+    /// D129: name and number of the linked record (`patientName`, `patientRecord` of `/auth/me`); nil without a link or
+    /// from an older API.
+    public let patientName: String?
+    public let patientRecord: String?
+    public init(id: String, email: String, name: String, roles: [String], platforms: [String], permissions: [Permission], channels: [String] = [], patientId: String? = nil, staffId: String? = nil,
+                patientName: String? = nil, patientRecord: String? = nil) {
         self.id=id; self.email=email; self.name=name; self.roles=roles; self.platforms=platforms; self.permissions=permissions; self.channels=channels
-        self.patientId=patientId; self.staffId=staffId
+        self.patientId=patientId; self.staffId=staffId; self.patientName=patientName; self.patientRecord=patientRecord
     }
-    private enum CodingKeys: String, CodingKey { case id, email, name, roles, platforms, permissions, channels, patientId, staffId }
+    private enum CodingKeys: String, CodingKey { case id, email, name, roles, platforms, permissions, channels, patientId, staffId, patientName, patientRecord }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         id = try container.decode(String.self, forKey: .id)
@@ -34,6 +39,15 @@ public struct AccessProfile: Codable, Sendable {
         channels = try container.decodeIfPresent([String].self, forKey: .channels) ?? []
         patientId = try container.decodeIfPresent(String.self, forKey: .patientId)
         staffId = try container.decodeIfPresent(String.self, forKey: .staffId)
+        patientName = try container.decodeIfPresent(String.self, forKey: .patientName)
+        patientRecord = try container.decodeIfPresent(String.self, forKey: .patientRecord)
+    }
+
+    /// D129: the name to greet. An account without a staff record is a patient: its linked record's name wins (the API
+    /// now sends it as `name` too); a staff member keeps their own name.
+    public var displayName: String {
+        if staffId == nil, let linked = patientName?.trimmingCharacters(in: .whitespacesAndNewlines), !linked.isEmpty { return linked }
+        return name.isEmpty ? (patientName ?? "") : name
     }
     public func hasPermission(_ code: String) -> Bool { permissions.contains { $0.code == code } }
     // Solo se invoca con el perfil verificado que devuelve /auth/me; nunca con metadatos del JWT.
@@ -71,18 +85,19 @@ public enum AppTab: String, Equatable, Hashable, Sendable, CaseIterable {
     /// Clave de Localizable.xcstrings con el título de la pestaña.
     public var titleKey: String { "tab.\(rawValue)" }
 
-    public var symbol: String {
+    /// Web icon of the tab (same concept as the web module).
+    public var icon: ClimesaIconName {
         switch self {
-        case .miDia: return "calendar.day.timeline.left"
-        case .pacientes: return "person.2"
-        case .resultados: return "doc.text"
-        case .turnos: return "clock"
-        case .perfil: return "person.crop.circle"
-        case .inicio: return "house"
-        case .fila: return "list.number"
-        case .citas: return "calendar"
-        case .examenes: return "testtube.2"
-        case .mas: return "ellipsis.circle"
+        case .miDia: return .home
+        case .pacientes: return .users
+        case .resultados: return .lab
+        case .turnos: return .clock
+        case .perfil: return .user
+        case .inicio: return .home
+        case .fila: return .queue
+        case .citas: return .calendar
+        case .examenes: return .lab
+        case .mas: return .menu
         }
     }
 
@@ -141,22 +156,31 @@ public enum AppSection: String, CaseIterable, Hashable, Sendable {
 
     public var titleKey: String { "section.\(rawValue)" }
 
+    /// Web icon of the section; nil where the web has no icon for the concept (the view keeps `symbol`).
+    public var icon: ClimesaIconName? {
+        switch self {
+        case .vinculacion, .ubicacion: return nil
+        case .historial: return .audit
+        case .ambulancia: return .ambulance
+        case .hospital: return .building
+        case .accesos: return .privacy
+        case .perfil: return .user
+        case .hospitalizados: return .bed
+        case .llegadaAmbulancia: return .ambulance
+        case .misDatos: return .clipboard
+        case .miHabitacion: return .bed
+        case .agenda: return .calendar
+        case .ambulanciaEstado: return .ambulance
+        case .avisos: return .bell
+        }
+    }
+
+    /// SF Symbol outline for the sections without a web icon (`icon == nil`).
     public var symbol: String {
         switch self {
         case .vinculacion: return "link"
-        case .historial: return "doc.text.magnifyingglass"
-        case .ambulancia: return "cross.case"
-        case .hospital: return "building.2"
-        case .accesos: return "eye"
-        case .perfil: return "person.crop.circle"
-        case .hospitalizados: return "bed.double"
-        case .llegadaAmbulancia: return "light.beacon.max"
-        case .misDatos: return "person.text.rectangle"
-        case .miHabitacion: return "bed.double.fill"
         case .ubicacion: return "map"
-        case .agenda: return "calendar.badge.clock"
-        case .ambulanciaEstado: return "cross.case"
-        case .avisos: return "bell"
+        default: return "circle"
         }
     }
 

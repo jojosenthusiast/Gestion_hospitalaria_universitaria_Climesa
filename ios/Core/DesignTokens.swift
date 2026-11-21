@@ -146,15 +146,15 @@ public enum StatusFamily: String, CaseIterable, Sendable {
         }
     }
 
-    /// SF Symbol (sección 7): reloj, megáfono, pulso, check, cruz, alerta.
-    public var symbol: String {
+    /// Web icon (`STATUS_FAMILIES` in system.tsx): clock, megaphone, pulse, check, close, alert.
+    public var icon: ClimesaIconName {
         switch self {
-        case .espera: return "clock"
-        case .llamado: return "megaphone"
-        case .atencion: return "waveform.path.ecg"
-        case .listo: return "checkmark"
-        case .cerrado: return "xmark"
-        case .critico: return "exclamationmark.triangle"
+        case .espera: return .clock
+        case .llamado: return .megaphone
+        case .atencion: return .pulse
+        case .listo: return .check
+        case .cerrado: return .close
+        case .critico: return .alert
         }
     }
 
@@ -207,15 +207,19 @@ public enum StatusFamily: String, CaseIterable, Sendable {
         // Una cita confirmada o reprogramada espera su hora: no es "Llamado" (megáfono). Mismo mapa que web `familyOfValue`.
         "en_espera": .espera, "solicitada": .espera, "pendiente": .espera, "pendiente_cama": .espera, "borrador": .espera,
         "publicado": .espera, "reservada": .espera, "provisional": .espera, "por_vencer": .espera, "revisar": .espera,
-        "confirmada": .espera, "reprogramada": .espera, "bajo_minimo": .espera,
+        "reprogramada": .espera, "bajo_minimo": .espera,
+        // D96: a bed being cleaned waits (clock); it is not in use like an occupied one (pulse). Same as web and Android.
+        "limpieza": .espera,
         "llamado": .llamado, "en_proceso": .atencion,
         "en_atencion": .atencion, "en_curso": .atencion, "ocupada": .atencion, "hospitalizado": .atencion,
-        "en_servicio": .atencion, "abierta": .atencion, "limpieza": .atencion,
+        "en_servicio": .atencion, "abierta": .atencion, "requiere_atencion": .atencion,
+        // D124: a confirmed appointment is settled (check), not pending like a request (striped clock).
+        "confirmada": .listo,
         "atendida": .listo, "atendido": .listo, "completado": .listo, "firmada": .listo, "alta_firmada": .listo, "egresado": .listo, "libre": .listo,
         "disponible": .listo, "activo": .listo, "exito": .listo, "normal": .listo, "aprobada": .listo, "ok": .listo, "coincide": .listo,
         "cancelado": .cerrado, "cancelada": .cerrado, "no_asistio": .cerrado, "no_se_presento": .cerrado, "cerrado": .cerrado,
-        "rechazada": .cerrado, "vencida": .cerrado, "vencido": .cerrado, "bloqueada": .cerrado, "inactivo": .cerrado,
-        "desactivado": .cerrado, "denegado": .cerrado, "fallido": .cerrado, "en_mantenimiento": .cerrado, "agotado": .cerrado,
+        "rechazada": .cerrado, "vencida": .cerrado, "bloqueada": .cerrado, "inactivo": .cerrado,
+        "desactivado": .cerrado, "denegado": .cerrado, "fallido": .cerrado, "en_mantenimiento": .cerrado,
         "critico_alto": .critico, "critico_bajo": .critico
     ]
 
@@ -223,17 +227,30 @@ public enum StatusFamily: String, CaseIterable, Sendable {
     public static func of(_ value: String) -> StatusFamily? { byValue[value] }
 }
 
-/// Lo que dibuja una insignia de estado: texto y, si la tiene, su familia (ícono + patrón + color).
+/// Lo que dibuja una insignia de estado: texto y, si la tiene, su familia (ícono + patrón + color) o su prioridad.
 public struct StatusBadgeStyle: Equatable, Sendable {
     public let label: String
     public let family: StatusFamily?
+    /// R1 (web `statusPriority`): a value that asks for attention without being a step of a flow wears the priority
+    /// badge instead of a family (`alto`, `bajo`, `agotado`, `vencido` are urgent; `urgente` and `emergencia` are their
+    /// own priority). Red stays for critical values and emergencies.
+    public let priority: Priority?
 
-    /// Valor sin familia: se muestra neutro, con un punto y su texto.
-    public var isNeutral: Bool { family == nil }
+    public init(label: String, family: StatusFamily?, priority: Priority? = nil) {
+        self.label = label; self.family = family; self.priority = priority
+    }
+
+    /// Valor sin familia ni prioridad: se muestra neutro, con un punto y su texto.
+    public var isNeutral: Bool { family == nil && priority == nil }
 
     /// `label` reemplaza la etiqueta común; un valor desconocido usa el código con espacios.
     public static func of(_ value: String, label: String? = nil) -> StatusBadgeStyle {
-        StatusBadgeStyle(label: StatusCatalog.style(for: value, label: label).label, family: StatusFamily.of(value))
+        if let priority = Priority(rawValue: value), priority != .rutina {
+            return StatusBadgeStyle(label: label ?? priority.label, family: nil, priority: priority)
+        }
+        let text = StatusCatalog.style(for: value, label: label).label
+        if let priority = Priority.ofStatus(value) { return StatusBadgeStyle(label: text, family: nil, priority: priority) }
+        return StatusBadgeStyle(label: text, family: StatusFamily.of(value))
     }
 }
 
@@ -251,12 +268,19 @@ public enum Priority: String, CaseIterable, Sendable {
         }
     }
 
-    public var symbol: String {
+    /// Web icon (`PRIORITIES` in system.tsx): alert, double chevron, minus.
+    public var icon: ClimesaIconName {
         switch self {
-        case .emergencia: return "exclamationmark.triangle"
-        case .urgente: return "chevron.up.2"
-        case .rutina: return "minus"
+        case .emergencia: return .alert
+        case .urgente: return .chevronsUp
+        case .rutina: return .minus
         }
+    }
+
+    /// R1 (web `priorityOfValue`): status values that ask for attention show as urgent priority (amber, double
+    /// chevron): a lab value out of range that is not critical, and stock that ran out or expired.
+    public static func ofStatus(_ value: String) -> Priority? {
+        ["alto", "bajo", "agotado", "vencido"].contains(value) ? .urgente : nil
     }
 
     public var strong: ColorPair {
@@ -321,13 +345,13 @@ public enum MotionToken {
 public enum CrudKind: String, CaseIterable, Sendable {
     case create, edit, deactivate, view
 
-    /// SF Symbol of the action.
-    public var symbol: String {
+    /// Web icon of the action (`CrudButton` in system.tsx).
+    public var icon: ClimesaIconName {
         switch self {
-        case .create: return "plus"
-        case .edit: return "pencil"
-        case .deactivate: return "trash"
-        case .view: return "eye"
+        case .create: return .plus
+        case .edit: return .pencil
+        case .deactivate: return .trash
+        case .view: return .eye
         }
     }
 

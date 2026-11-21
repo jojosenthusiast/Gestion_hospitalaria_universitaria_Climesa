@@ -11,7 +11,8 @@ enum L {
 struct BrandHeader:View {
     var body:some View {
         HStack(spacing:Spacing.m) {
-            Image(systemName:"plus").font(Typo.subheading).foregroundStyle(Theme.navy)
+            // Web `Brand`: a thick cross on the accent tile.
+            BrandCross().stroke(Theme.navy,lineWidth:5).frame(width:20,height:20)
                 .frame(width:32,height:32).background(Theme.accent,in:RoundedRectangle(cornerRadius:Radius.control)).accessibilityHidden(true)
             VStack(alignment:.leading,spacing:2) {
                 Text(verbatim:"climesa").font(Typo.heading)
@@ -23,6 +24,16 @@ struct BrandHeader:View {
         .padding(.horizontal,Spacing.l).padding(.vertical,Spacing.m)
         .background(Theme.navy)
         .accessibilityElement(children:.combine)
+    }
+}
+
+/// The web brand mark: two crossing strokes (`M13 4v18M4 13h18` on a 26 grid).
+private struct BrandCross:Shape {
+    func path(in rect:CGRect)->Path {
+        var path=Path()
+        path.move(to:CGPoint(x:rect.midX,y:rect.minY)); path.addLine(to:CGPoint(x:rect.midX,y:rect.maxY))
+        path.move(to:CGPoint(x:rect.minX,y:rect.midY)); path.addLine(to:CGPoint(x:rect.maxX,y:rect.midY))
+        return path
     }
 }
 
@@ -53,7 +64,7 @@ private struct AuthField:View {
             .textInputAutocapitalization(plain ? TextInputAutocapitalization.never : TextInputAutocapitalization.words)
             .autocorrectionDisabled(plain)
             .font(Typo.body).foregroundStyle(Theme.ink)
-            .padding(.horizontal,Spacing.m).frame(minHeight:Spacing.control)
+            .padding(.horizontal,14).frame(minHeight:Spacing.input)
             .background(Theme.surface,in:RoundedRectangle(cornerRadius:Radius.control))
             .overlay(RoundedRectangle(cornerRadius:Radius.control).stroke(Theme.controlLine,lineWidth:1))
         }
@@ -200,7 +211,7 @@ struct ResendConfirmationButton:View {
             let seconds=ResendCooldown.remainingSeconds(until:account.resendAvailableAt,now:context.date)
             Button { Task { await account.resendConfirmation(email:email) } } label: {
                 HStack(spacing:Spacing.s) {
-                    if !account.sendingEmail { Image(systemName:"envelope").accessibilityHidden(true) }
+                    if !account.sendingEmail { ClimesaIcon(.mail, size: 18).accessibilityHidden(true) }
                     if account.sendingEmail { Text("auth.resend.sending") }
                     else if seconds>0 { Text(verbatim:String(format:L.text("auth.resend.wait"),seconds)) }
                     else { Text("auth.resend") }
@@ -219,7 +230,7 @@ struct CheckEmailView:View {
         ScrollView {
             BrandHeader()
             VStack(alignment:.leading,spacing:Spacing.space4) {
-                Label { Text("auth.check.headline").font(Typo.heading).foregroundStyle(Theme.ink) } icon: { Image(systemName:"envelope.badge").foregroundStyle(Theme.primaryText) }
+                Label { Text("auth.check.headline").font(Typo.heading).foregroundStyle(Theme.ink) } icon: { ClimesaIcon(.mail, size: 22).foregroundStyle(Theme.primaryText) }
                     .accessibilityAddTraits(.isHeader)
                 Text("auth.check.sent").font(Typo.body).foregroundStyle(Theme.ink)
                 Text(verbatim:email).font(Typo.subheading).foregroundStyle(Theme.ink).textSelection(.enabled)

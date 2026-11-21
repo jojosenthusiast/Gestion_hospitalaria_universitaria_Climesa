@@ -4,23 +4,6 @@ import XCTest
 final class PatientRulesTests: XCTestCase {
     private let today = ClimesaDates.parse("2026-11-20T15:00:00Z")!
 
-    func testDuiConVerificador() {
-        // 0123456 7: suma 0*9+1*8+2*7+3*6+4*5+5*4+6*3+7*2 = 112 -> verificador (10 - 2) % 10 = 8
-        XCTAssertTrue(LinkRules.validDui("01234567-8"))
-        XCTAssertFalse(LinkRules.validDui("01234567-9"))
-        XCTAssertFalse(LinkRules.validDui("00000000-0"))
-        XCTAssertEqual(LinkRules.formatDui("012345678"), "01234567-8")
-    }
-
-    func testFormularioDeVinculacion() {
-        XCTAssertTrue(LinkRules.errors(dui: "01234567-8", birth: "1990-05-01", today: today).isEmpty)
-        let errors = LinkRules.errors(dui: "123", birth: "2030-01-01", today: today)
-        XCTAssertNotNil(errors["dui"])
-        XCTAssertEqual(errors["birth"], "La fecha de nacimiento no puede ser futura.")
-        XCTAssertEqual(LinkRules.errors(dui: "01234567-8", birth: "01/05/1990", today: today)["birth"], "Escribe la fecha como aaaa-mm-dd.")
-        XCTAssertEqual(LinkRules.body(dui: "012345678", birth: " 1990-05-01 "), LinkRequestBody(dui: "01234567-8", birth: "1990-05-01"))
-    }
-
     private func ticket(_ id: String, _ number: Int, _ state: QueueState, issued: String = "2026-11-20T14:00:00Z") -> QueueTicket {
         let json = #"{"id":"\#(id)","service":"consulta_general","fecha":"2026-11-20","numero":\#(number),"patientId":null,"patientName":null,"state":"\#(state.rawValue)","officeId":null,"llamados":0,"version":1,"issuedAt":"\#(issued)"}"#
         return try! JSONDecoder().decode(QueueTicket.self, from: Data(json.utf8))

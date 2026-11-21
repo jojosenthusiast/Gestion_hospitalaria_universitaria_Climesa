@@ -3,9 +3,11 @@ import SwiftUI
     @StateObject private var account=AccountModel()
     @Environment(\.scenePhase) private var phase
     @State private var leftAt:Date?
+    /// Atkinson and the brand colours in the UIKit bars; the app follows the system light or dark mode (web parity).
+    init() { ClimesaAppearance.apply() }
     var body:some Scene {
         WindowGroup {
-            RootView().environmentObject(account).tint(Theme.primaryText).preferredColorScheme(.light)
+            RootView().environmentObject(account).tint(Theme.primaryText)
                 .safeAreaInset(edge:.bottom) { ServerWakeBanner() }
                 .task { await account.restore() }
                 .onChange(of:phase) { _,value in

@@ -48,6 +48,8 @@ struct RoleTabsView:View {
     @State private var notices=NoticeInboxModel()
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var shifts=ShiftModel()
+    /// Lote 5 S9: `GET /me/turno-activo`, read on launch and on each return to the foreground; nil on 404 or failure.
+    @State private var shiftGate:ActiveShiftStatus?
 
     init(profile:AccessProfile,role:String,tabs:[AppTab]) {
         self.profile=profile; self.role=role; self.tabs=tabs
@@ -60,16 +62,18 @@ struct RoleTabsView:View {
                 NavigationStack {
                     ScrollView {
                         // S1: sin título gigante; el título de la pestaña va en línea en la barra de navegación (HIG).
-                        VStack(alignment:.leading,spacing:Spacing.space6) {
+                        VStack(alignment:.leading,spacing:Spacing.gap) {
                             content(for:tab)
-                        }.padding(Spacing.space6).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
-                    }.safeAreaInset(edge:.top,spacing:0) { ConnectionBanner(state:live.snapshot.connection) }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
+                        }.padding(Spacing.gutter).frame(maxWidth:760,alignment:.leading).frame(maxWidth:.infinity)
+                    }.dismissibleKeyboard().safeAreaInset(edge:.top,spacing:0) {
+                        VStack(spacing:0) { ConnectionBanner(state:live.snapshot.connection); ShiftGateBanner(status:shiftGate) }
+                    }.background(Theme.bg).navigationTitle(Text(LocalizedStringKey(tab.titleKey))).navigationBarTitleDisplayMode(.inline)
                         .climesaNavBar()
                         .toolbarBackground(Theme.surface,for:.tabBar).toolbarBackground(.visible,for:.tabBar)
                         // Avisos one tap away on every tab (Android/web bell); the count no longer sits on Más.
                         .toolbar { ToolbarItem(placement:.topBarTrailing) { HStack(spacing:Spacing.space2) { LiveClock(); NoticesBell(model:notices) } } }
                         .refreshable { await refresh(tab) }
-                }.tabItem { Label(LocalizedStringKey(tab.titleKey),systemImage:tab.symbol) }.tag(tab)
+                }.tabItem { Label { Text(LocalizedStringKey(tab.titleKey)) } icon: { Image(uiImage:tab.icon.templateImage()) } }.tag(tab)
             }
         }
         .environment(live)
@@ -83,11 +87,21 @@ struct RoleTabsView:View {
         }
         .onChange(of:live.snapshot.profileVersion) { _,_ in Task { await account.refreshProfile() } }
         .onChange(of:scenePhase) { _,value in
-            if value == .background { live.sceneEnteredBackground() } else if value == .active { live.sceneBecameActive() }
+            if value == .background { live.sceneEnteredBackground() } else if value == .active { live.sceneBecameActive(); Task { await loadShiftGate() } }
         }
+        .task(id:"\(role)#\(live.snapshot.shiftsVersion)") { await loadShiftGate() }
         .onChange(of:role) { _,_ in selection=tabs.first ?? .perfil }
         .onAppear { if let saved=AppTab(rawValue:storedTab),tabs.contains(saved) { selection=saved } }
         .onChange(of:selection) { _,tab in storedTab=tab.rawValue }
+    }
+
+    /// Staff only: a patient never works by shifts. A server without the endpoint (404) or any failure hides the banner;
+    /// the API still refuses a write with 403 `sin_turno_activo` and its message.
+    private func loadShiftGate() async {
+        guard role != "PAC" else { shiftGate=nil; return }
+        do { shiftGate=try await account.client().get(ShiftGate.path,as:ActiveShiftStatus.self) }
+        catch is CancellationError {}
+        catch { shiftGate=nil }
     }
 
     @ViewBuilder private func content(for tab:AppTab)->some View {
@@ -112,28 +126,28 @@ struct RoleTabsView:View {
     }
 }
 
-/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("9+" over nine). It turns red
-/// while an in-force critical notice is still unread.
+/// Bell in the top bar of every tab: opens Avisos and shows the in-force unread count ("99+" over ninety-nine). Web
+/// `.notices-bell-count`: a white pill with primary text, red only while an in-force critical notice is unread.
 struct NoticesBell:View {
     let model:NoticeInboxModel
 
     var body:some View {
         let count=NoticeRules.badge(model.inbox,hiding:model.hidden)
         let critical=NoticeRules.bellIsCritical(model.inbox,hiding:model.hidden)
+        let tone=NoticeRules.bellBadgeTone(model.inbox,hiding:model.hidden)
         NavigationLink {
             ScreenFrame(title:"section.avisos") { NoticesView() }
         } label: {
-            Image(systemName:critical ? "bell.badge.fill":"bell")
-                .font(.system(size:18,weight:.semibold))
-                .foregroundStyle(Theme.onPrimary)
+            ClimesaIcon(.bell,size:22)
+                .foregroundStyle(Color.white)
                 .frame(width:44,height:44)
                 .overlay(alignment:.topTrailing) {
-                    if let text=NoticeRules.badgeText(count) {
-                        Text(verbatim:text).font(Typo.tag).foregroundStyle(Theme.onStatus)
+                    if let text=NoticeRules.badgeText(count), let tone {
+                        Text(verbatim:text).font(Atkinson.text(11,.bold,relativeTo:.caption2).monospacedDigit())
+                            .foregroundStyle(tone == .critical ? Color.white:Theme.primaryText)
                             .padding(.horizontal,5).frame(minWidth:18,minHeight:18)
-                            .background(critical ? Theme.critical:Theme.primary,in:Capsule())
-                            .overlay(Capsule().strokeBorder(Theme.navy,lineWidth:1.5))
-                            .offset(x:2,y:2)
+                            .background(tone == .critical ? Theme.critical:Theme.surface,in:Capsule())
+                            .offset(x:-2,y:4)
                     }
                 }
                 .contentShape(Rectangle())
@@ -160,6 +174,26 @@ struct ConnectionBanner:View {
     }
 }
 
+/// Lote 5 S9: «Sin turno activo: puedes consultar pero no registrar.» with the next published shift, under the connection line.
+struct ShiftGateBanner:View {
+    let status:ActiveShiftStatus?
+    var body:some View {
+        if ShiftGate.showsBanner(status) {
+            HStack(alignment:.firstTextBaseline,spacing:Spacing.s) {
+                ClimesaIcon(.clock,size:16).accessibilityHidden(true)
+                VStack(alignment:.leading,spacing:2) {
+                    Text(verbatim:ShiftGate.bannerTitle).font(Typo.label).fixedSize(horizontal:false,vertical:true)
+                    if let next=ShiftGate.nextText(status?.next,now:Date()) { Text(verbatim:next).font(Typo.small).fixedSize(horizontal:false,vertical:true) }
+                }
+                Spacer(minLength:0)
+            }
+            .foregroundStyle(Theme.warning).padding(.horizontal,Spacing.gutter).padding(.vertical,Spacing.s)
+            .frame(maxWidth:.infinity,alignment:.leading).background(Theme.warningSoft)
+            .accessibilityElement(children:.combine)
+        }
+    }
+}
+
 struct ShiftsContent:View {
     @EnvironmentObject private var account:AccountModel
     @ObservedObject var model:ShiftModel
@@ -168,9 +202,11 @@ struct ShiftsContent:View {
     @State private var showPast=false
     var body:some View {
         VStack(alignment:.leading,spacing:Spacing.space6) {
+            // Lote 5 S9: «Mis turnos» is read-only; Jefatura publishes and changes them.
+            ReadOnlyBadge(who:"Jefatura de Operaciones",what:"tus turnos")
             if model.loading && model.shifts.isEmpty { Skeleton(label:L.text("shifts.loading")) }
             else if let error=model.error { ErrorStateView(message:error) { Task { await model.load(api:account.api) } } }
-            else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty"),symbol:"calendar") }
+            else if model.shifts.isEmpty { EmptyStateView(title:L.text("shifts.empty")) }
             // Por día asignado (Hoy, Mañana, día y fecha) y por hora de inicio; la entrada se confirma sola (ASIS-01).
             // Abre en hoy: lo de hoy en adelante primero; los días anteriores quedan plegados abajo (S12, últimos 7 días).
             let days=ShiftAttendanceRules.byDay(model.shifts,start:{ ShiftAttendanceRules.date($0.start) },end:{ ShiftAttendanceRules.date($0.end) },today:Date())
@@ -226,19 +262,33 @@ struct ProfileContent:View {
         VStack(alignment:.leading,spacing:Spacing.space6) {
             SectionCard {
                 HStack(spacing:Spacing.m) {
-                    Text(verbatim:String((profile.name.isEmpty ? profile.email:profile.name).prefix(1)).uppercased()).font(Typo.heading)
-                        .foregroundStyle(Theme.primaryText).frame(width:48,height:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
+                    // D129: a patient account greets with the linked patient's name.
+                    Text(verbatim:String((profile.displayName.isEmpty ? profile.email:profile.displayName).prefix(1)).uppercased()).font(Typo.heading)
+                        .foregroundStyle(Theme.primaryText).frame(minWidth:48,minHeight:48).background(Theme.soft,in:Circle()).accessibilityHidden(true)
                     VStack(alignment:.leading,spacing:2) {
-                        Text(verbatim:profile.name.isEmpty ? L.text("profile.welcome"):profile.name).font(Typo.heading).foregroundStyle(Theme.ink)
+                        Text(verbatim:profile.displayName.isEmpty ? L.text("profile.welcome"):profile.displayName).font(Typo.heading).foregroundStyle(Theme.ink)
                         Text(verbatim:profile.email).font(Typo.small).foregroundStyle(Theme.muted)
                     }
                 }
                 Divider().overlay(Theme.line)
-                Text(verbatim:String(format:L.text("profile.roles"),RoleNames.list(profile.roles))).font(Typo.small).foregroundStyle(Theme.ink)
+                // Web `RoleChip`: each role with its identity glyph and tone.
+                FlowLayout(spacing:Spacing.space2) { ForEach(profile.roles,id:\.self) { code in RoleChip(code:code,label:RoleNames.label(code)) } }
+                    .accessibilityElement(children:.ignore)
+                    .accessibilityLabel(Text(verbatim:String(format:L.text("profile.roles"),RoleNames.list(profile.roles))))
                 Text("auth.footer").font(Typo.small).foregroundStyle(Theme.muted)
             }
             if profile.allowedIOSRoles.count>1 {
-                Picker("profile.work_role",selection:$account.role) { ForEach(profile.allowedIOSRoles,id:\.self) { Text(LocalizedStringKey(RolePolicy.labelKey($0))).tag($0) } }.pickerStyle(.segmented)
+                ClimesaSegmented(title:L.text("profile.work_role"),options:profile.allowedIOSRoles.map { ClimesaSegmented<String>.Option($0,L.text(RolePolicy.labelKey($0))) },selection:$account.role)
+            }
+            // Lote 5 S16: the patient reaches «Quién vio mi expediente» from Perfil too.
+            if AppSection.visible(for:account.role,profile:profile).contains(.accesos) {
+                NavigationLink { PatientSectionView(section:.accesos,profile:profile) } label: {
+                    SectionCard {
+                        ListRow(title:L.text("section.accesos"),subtitle:L.text("profile.accesos.hint")) {
+                            ClimesaIcon(.chevron,size:16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                        }
+                    }
+                }.buttonStyle(.plain)
             }
             ClimesaButton(title:L.text("profile.refresh"),kind:.secondary) { Task { await account.refreshProfile() } }
             // Rojo solo para lo crítico: cerrar sesión es una acción secundaria.

@@ -15,7 +15,7 @@ struct SectionCard<Content: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
-            if let eyebrow { Text(verbatim: eyebrow).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase) }
+            if let eyebrow { Text(verbatim: eyebrow).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking) }
             if let title { Text(verbatim: title).font(Typo.subheading).foregroundStyle(Theme.ink).accessibilityAddTraits(.isHeader) }
             content()
         }
@@ -57,7 +57,7 @@ struct StatTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            if let title { Text(verbatim: title).font(Typo.eyebrow).foregroundStyle(Theme.muted).textCase(.uppercase) }
+            if let title { Text(verbatim: title).font(Typo.eyebrow).foregroundStyle(Theme.muted).textCase(.uppercase).tracking(Typo.eyebrowTracking) }
             HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
                 Text(verbatim: value).font(Typo.stat).foregroundStyle(Theme.ink)
                 if let unit { Text(verbatim: unit).font(Typo.heading).foregroundStyle(Theme.muted) }
@@ -122,7 +122,7 @@ private extension ListRow {
         VStack(alignment: .leading, spacing: 3) {
             Text(verbatim: title).font(Typo.subheading).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
             if let subtitle, !subtitle.isEmpty { Text(verbatim: subtitle).font(Typo.small).foregroundStyle(Theme.muted) }
-            if let meta, !meta.isEmpty { Text(verbatim: meta).font(Typo.eyebrow).foregroundStyle(Theme.muted) }
+            if let meta, !meta.isEmpty { Text(verbatim: meta).font(Typo.time).foregroundStyle(Theme.muted) }
         }
     }
 }
@@ -151,7 +151,7 @@ struct FormField: View {
                 if secure { SecureField(placeholder, text: $text) } else { TextField(placeholder, text: $text) }
             }
             .font(Typo.body).foregroundStyle(Theme.ink)
-            .padding(.horizontal, Spacing.m).frame(minHeight: Spacing.control)
+            .padding(.horizontal, 14).frame(minHeight: Spacing.input)
             .background(Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
             .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(error == nil ? Theme.controlLine : Theme.danger, lineWidth: error == nil ? 1 : 2))
             if let error { Text(verbatim: error).font(Typo.caption).foregroundStyle(Theme.danger).accessibilityLabel(Text(verbatim: error)) }
@@ -187,31 +187,47 @@ enum ClimesaButtonKind {
 }
 
 /// Estilo de botón de 48 pt de alto con estado de carga (`.primary-button` / `.secondary-button` de web).
+/// CRUD kinds follow web `crud.css`: 44 pt tall, 15/800 text with its icon, a 36 pt square when icon-only (inside a
+/// 44 pt touch target), and a disabled CRUD button keeps its colours at half opacity.
 struct ClimesaButtonStyle: ButtonStyle {
     var kind: ClimesaButtonKind = .primary
     var loading = false
-    /// A square 48 pt button that only shows its symbol (CRUD actions on a row); the label goes to VoiceOver.
+    /// A square button that only shows its icon (CRUD actions on a row); the label goes to VoiceOver.
     var iconOnly = false
     @Environment(\.isEnabled) private var enabled
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var isCrud: Bool {
+        switch kind {
+        case .create, .edit, .deactivate, .view: return true
+        case .primary, .secondary, .destructive: return false
+        }
+    }
+
     func makeBody(configuration: Configuration) -> some View {
-        HStack(spacing: Spacing.s) {
+        let shape = RoundedRectangle(cornerRadius: Radius.control)
+        let height: CGFloat = isCrud ? 44 : Spacing.control
+        let square: CGFloat = isCrud ? 36 : Spacing.control
+        return HStack(spacing: Spacing.s) {
             if loading { ProgressView().tint(foreground) }
-            configuration.label.font(Typo.label).lineLimit(2).multilineTextAlignment(.center)
+            configuration.label
+                .font(isCrud ? Atkinson.text(15, .extraBold, relativeTo: .subheadline) : Typo.label)
+                .lineLimit(2).multilineTextAlignment(.center)
         }
         .foregroundStyle(foreground)
-        .frame(minWidth: iconOnly ? Spacing.control : nil, maxWidth: iconOnly ? Spacing.control : CGFloat.infinity, minHeight: Spacing.control)
+        .frame(minWidth: iconOnly ? square : nil, maxWidth: iconOnly ? square : CGFloat.infinity, minHeight: iconOnly ? square : height)
         .padding(.horizontal, iconOnly ? 0 : Spacing.l)
-        .background(background, in: RoundedRectangle(cornerRadius: Radius.control))
-        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(border, lineWidth: 1))
-        .opacity(configuration.isPressed ? 0.85 : 1)
-        .scaleEffect(configuration.isPressed && !reduceMotion ? 0.99 : 1)
+        .background(background, in: shape)
+        .overlay(shape.stroke(border, lineWidth: 1))
+        .opacity(isCrud && !enabled ? 0.5 : (configuration.isPressed ? 0.85 : 1))
+        .scaleEffect(configuration.isPressed && !reduceMotion ? (isCrud ? 0.96 : 0.99) : 1)
         .animation(Motion.feedback(Motion.instant, reduceMotion: reduceMotion), value: configuration.isPressed)
+        .frame(minWidth: iconOnly ? 44 : nil, minHeight: iconOnly ? 44 : nil)
+        .contentShape(Rectangle())
     }
 
     private var foreground: Color {
-        if !enabled { return Theme.muted }
+        if !enabled && !isCrud { return Theme.muted }
         switch kind {
         case .primary, .create: return Theme.onPrimary
         case .secondary, .view: return Theme.ink
@@ -220,7 +236,7 @@ struct ClimesaButtonStyle: ButtonStyle {
         }
     }
     private var background: Color {
-        if !enabled { return Theme.disabled }
+        if !enabled && !isCrud { return Theme.disabled }
         switch kind {
         case .primary, .create: return Theme.primary
         case .secondary, .edit, .deactivate, .view: return Theme.surface
@@ -228,7 +244,7 @@ struct ClimesaButtonStyle: ButtonStyle {
         }
     }
     private var border: Color {
-        if !enabled { return Theme.disabled }
+        if !enabled && !isCrud { return Theme.disabled }
         switch kind {
         case .primary, .create: return Theme.primary
         case .secondary, .view: return Theme.controlLine
@@ -290,10 +306,12 @@ struct CrudLabel: View {
     var body: some View {
         Group {
             if iconOnly {
-                Image(systemName: kind.symbol).accessibilityLabel(Text(verbatim: label))
+                ClimesaIcon(kind.icon, size: 18).accessibilityElement().accessibilityLabel(Text(verbatim: label))
             } else {
-                Label { Text(verbatim: label) } icon: { Image(systemName: kind.symbol).accessibilityHidden(true) }
-                    .labelStyle(.titleAndIcon)
+                HStack(spacing: Spacing.s) {
+                    ClimesaIcon(kind.icon, size: 18).accessibilityHidden(true)
+                    Text(verbatim: label)
+                }
             }
         }
         .help(Text(verbatim: label))
@@ -311,13 +329,16 @@ struct ReadOnlyBadge: View {
 
     var body: some View {
         Button { open = true } label: {
-            Label { Text(verbatim: ReadOnlyCue.label) } icon: { Image(systemName: "lock.fill").accessibilityHidden(true) }
-                .labelStyle(.titleAndIcon)
-                .font(Typo.tag).foregroundStyle(Theme.muted)
-                .padding(.horizontal, Spacing.space3).padding(.vertical, Spacing.space1)
-                .background(Theme.blockedSoft, in: Capsule())
-                .overlay(Capsule().stroke(Theme.line, lineWidth: 1))
-                .frame(minHeight: 44).contentShape(Rectangle())
+            // Web `.readonly-badge`: warning-tinted pill, ink text 14/800, lock in the warning colour, 34 pt tall.
+            HStack(spacing: 6) {
+                ClimesaIcon(.lock, size: 16).foregroundStyle(Theme.warning).accessibilityHidden(true)
+                Text(verbatim: ReadOnlyCue.label).font(Atkinson.text(14, .extraBold, relativeTo: .subheadline)).foregroundStyle(Theme.ink)
+            }
+            .padding(.horizontal, Spacing.space3)
+            .frame(minHeight: 34)
+            .background(Theme.warningSoft, in: Capsule())
+            .overlay(Capsule().stroke(Theme.warning.opacity(0.55), lineWidth: 1))
+            .frame(minHeight: 44).contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(Text(verbatim: ReadOnlyCue.label))
@@ -331,20 +352,23 @@ struct ReadOnlyBadge: View {
     }
 }
 
-/// Owner obs. 2: live clock of the navy top bar, next to the bell. Time «HH:mm:ss» (24 h) and the day below it, both in
-/// El Salvador time: «Miércoles 18 de noviembre» with room (regular width), «Mié 18 nov» on a phone so it fits an
-/// iPhone SE. `TimelineView` redraws only this view once a second; it is a display clock, never a data refresh.
+/// Owner obs. 2: live clock of the navy top bar, next to the bell (web `HospitalDate`). Time «HH:mm:ss» (24 h) in
+/// sans 18/800 with tabular figures, white, over the day in #D3DBE6, both in El Salvador time: «Miércoles, 18 de
+/// noviembre» with room (regular width), «Mié 18 nov» on a phone so it fits an iPhone SE (the web hides the date line on
+/// a phone). `TimelineView` redraws only this view once a second; it is a display clock, never a data refresh.
 struct LiveClock: View {
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         TimelineView(.periodic(from: .now, by: 1)) { context in
             let date = context.date
-            VStack(alignment: .trailing, spacing: 0) {
+            VStack(alignment: .trailing, spacing: 1) {
                 Text(verbatim: ClimesaDates.clockSeconds(date))
-                    .font(Typo.tag).foregroundStyle(Theme.onPrimary)
-                Text(verbatim: sizeClass == .regular ? ClimesaDates.longDay(date) : ClimesaDates.compactDay(date))
-                    .font(Typo.caption).foregroundStyle(Theme.onPrimary.opacity(0.85))
+                    .font(Atkinson.text(18, .extraBold, relativeTo: .headline).monospacedDigit())
+                    .tracking(0.36)
+                    .foregroundStyle(Color.white)
+                Text(verbatim: sizeClass == .regular ? ClimesaDates.clockDay(date) : ClimesaDates.compactDay(date))
+                    .font(Typo.caption.monospacedDigit()).foregroundStyle(Color(light: 0xD3DBE6, dark: 0xD3DBE6))
             }
             .lineLimit(1)
             .fixedSize()
@@ -360,7 +384,7 @@ struct BlockedReasonLine: View {
     let text: String
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
-            Image(systemName: "info.circle").foregroundStyle(Theme.muted).accessibilityHidden(true)
+            ClimesaIcon(.info, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true).alignmentGuide(.firstTextBaseline) { $0[.bottom] - 3 }
             Text(verbatim: text).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
@@ -369,17 +393,20 @@ struct BlockedReasonLine: View {
 
 // MARK: - Estados de pantalla
 
-/// Sin datos (diseño 04, «Vacío»).
+/// Sin datos (web `.section-empty`): one calm muted line (and its detail), no box, no icon, no second title.
 struct EmptyStateView: View {
     var title = L.text("ds.empty.title")
     var message: String?
-    var symbol = "tray"
 
     var body: some View {
-        StateLayout(symbol: symbol, tint: Theme.primaryText, tintSoft: Theme.soft) {
-            Text(verbatim: title).font(Typo.subheading).foregroundStyle(Theme.ink)
+        VStack(alignment: .leading, spacing: Spacing.space1) {
+            Text(verbatim: title).font(Typo.body).foregroundStyle(Theme.muted)
             if let message { Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.muted) }
         }
+        .fixedSize(horizontal: false, vertical: true)
+        .padding(.vertical, Spacing.space2)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
     }
 }
 
@@ -398,45 +425,84 @@ struct LoadingStateView: View {
     }
 }
 
-/// S8: an answer that trying again cannot change (403): the server's message as information, without «Reintentar».
+/// S8 (web `.section-state-info`): an answer that trying again cannot change (403). A quiet soft box: lock on the left,
+/// «No tienes acceso a esta información» and the server's message, without «Volver a intentar».
 struct InfoStateView: View {
     let message: String
-    var symbol = "lock.shield"
+    var title = L.text("ds.info.title")
 
     var body: some View {
-        StateLayout(symbol: symbol, tint: Theme.primaryText, tintSoft: Theme.soft) {
-            Text(verbatim: message).font(Typo.body).foregroundStyle(Theme.ink)
-        }
+        StateBox(icon: .lock, tint: Theme.primaryText, background: Theme.soft, border: Theme.line, title: title, message: message)
     }
 }
 
-/// Error con acción «Reintentar» (diseño 04, «Error»).
+/// Error (web `.section-state-error`): danger-tinted box, alert on the left, «No pudimos cargar esta información», the
+/// message, and «Volver a intentar» with its icon.
 struct ErrorStateView: View {
     let message: String
+    var title = L.text("ds.error.title")
     var retry: (() -> Void)?
 
     var body: some View {
-        StateLayout(symbol: "exclamationmark.triangle", tint: Theme.danger, tintSoft: Theme.dangerSoft) {
-            Text(verbatim: message).font(Typo.body).foregroundStyle(Theme.ink)
-            if let retry { ClimesaButton(title: L.text("ds.retry"), kind: .secondary, action: retry) }
+        StateBox(icon: .alert, tint: Theme.danger, background: Theme.dangerSoft, border: Theme.danger.opacity(0.35), title: title, message: message) {
+            if let retry { RetryButton(action: retry) }
         }
     }
 }
 
-private struct StateLayout<Body: View>: View {
-    let symbol: String
-    let tint: Color
-    let tintSoft: Color
-    @ViewBuilder let content: () -> Body
+/// «Volver a intentar» with the web retry icon (secondary look).
+struct RetryButton: View {
+    let action: () -> Void
 
     var body: some View {
-        VStack(spacing: Spacing.m) {
-            Image(systemName: symbol).font(Typo.title).foregroundStyle(tint)
-                .frame(width: 64, height: 64).background(tintSoft, in: Circle()).accessibilityHidden(true)
-            content()
+        Button(action: action) {
+            HStack(spacing: Spacing.s) {
+                ClimesaIcon(.retry, size: 18).accessibilityHidden(true)
+                Text(verbatim: L.text("ds.retry"))
+            }
         }
-        .multilineTextAlignment(.center)
-        .frame(maxWidth: .infinity).padding(Spacing.xl)
+        .buttonStyle(ClimesaButtonStyle(kind: .secondary))
+        .fixedSize(horizontal: true, vertical: false)
+    }
+}
+
+/// The web section state layout: icon column on the left, then a bold title, the message in ink and the action.
+private struct StateBox<Action: View>: View {
+    let icon: ClimesaIconName
+    let tint: Color
+    let background: Color
+    let border: Color
+    let title: String
+    let message: String
+    @ViewBuilder let action: () -> Action
+
+    init(icon: ClimesaIconName, tint: Color, background: Color, border: Color, title: String, message: String,
+         @ViewBuilder action: @escaping () -> Action) {
+        self.icon = icon; self.tint = tint; self.background = background; self.border = border
+        self.title = title; self.message = message; self.action = action
+    }
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.card)
+        HStack(alignment: .top, spacing: Spacing.space3) {
+            ClimesaIcon(icon, size: 20).foregroundStyle(tint).padding(.top, 2).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: Spacing.space1) {
+                Text(verbatim: title).font(Typo.subheading).foregroundStyle(tint)
+                Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                action().padding(.top, Spacing.space1)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(Spacing.space4)
+        .background(background, in: shape)
+        .overlay(shape.strokeBorder(border, lineWidth: 1))
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private extension StateBox where Action == EmptyView {
+    init(icon: ClimesaIconName, tint: Color, background: Color, border: Color, title: String, message: String) {
+        self.init(icon: icon, tint: tint, background: background, border: border, title: title, message: message) { EmptyView() }
     }
 }
 
@@ -448,7 +514,7 @@ struct ConflictBanner: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.m) {
             HStack(alignment: .top, spacing: Spacing.m) {
-                Image(systemName: "exclamationmark.circle.fill").foregroundStyle(Theme.danger).accessibilityHidden(true)
+                ClimesaIcon(.alert, size: 18).foregroundStyle(Theme.danger).accessibilityHidden(true)
                 Text(verbatim: message).font(Typo.small).foregroundStyle(Theme.danger)
             }
             ClimesaButton(title: L.text("ds.reload"), kind: .secondary, action: reload)
@@ -598,9 +664,10 @@ extension View {
 
 // MARK: Estados
 
-/// Filter chip that wears the badge of the status it filters (Android `StatusFilterChip`, web `ChipGroup` `status`):
-/// unselected shows the badge texture; selected fills with the strong colour and keeps the texture. A value without
-/// family («Todos») stays neutral. The count goes in the label: "Sin leer (3)".
+/// Filter chip (web `.cl-chip`, `ChipGroup`): a pill with a 1.5 pt border, 13/700 text and the count in a small pill.
+/// Neutral: surface and line border; selected: soft fill, primary border and primary text, the count pill solid primary.
+/// A chip that filters by a status wears that status's look (web `statusFilterLook`): the family colour, icon and
+/// texture, solid when selected. A value without family («Todos») stays neutral.
 struct StatusFilterChip: View {
     let label: String
     var count: Int?
@@ -613,92 +680,149 @@ struct StatusFilterChip: View {
 
     var body: some View {
         let family = status.flatMap(StatusFamily.of)
-        let text = count.map { "\(label) (\($0))" } ?? label
-        let shape = RoundedRectangle(cornerRadius: Radius.chip)
-        if family == nil, let priority { priorityChip(priority, text: text, shape: shape) } else {
+        let spoken = count.map { "\(label) (\($0))" } ?? label
+        let colors = look(family)
+        let icon = lookIcon(family)
         Button(action: action) {
             HStack(spacing: 6) {
-                if let family { Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true) }
-                Text(verbatim: text).lineLimit(1)
+                if let icon { ClimesaIcon(icon, size: 14).accessibilityHidden(true) }
+                Text(verbatim: label).lineLimit(1)
+                if let count { countPill(count, colors: colors) }
             }
-            .font(selected ? Typo.label : Typo.tag)
-            .foregroundStyle(foreground(family))
+            .font(Atkinson.text(13, .bold, relativeTo: .footnote))
+            .foregroundStyle(foreground(colors, family: family))
             .padding(.horizontal, Spacing.space3)
+            .frame(minHeight: 36)
+            .background { background(colors, family: family).clipShape(Capsule()) }
+            .overlay { border(colors, family: family) }
             .frame(minHeight: 44)
-            .background { background(family).clipShape(shape) }
-            .overlay { border(family) }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: text))
-        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
-        }
-    }
-
-    /// Priority look: soft fill and strong border; selected fills strong (emergency is always solid, like its badge).
-    private func priorityChip(_ priority: Priority, text: String, shape: RoundedRectangle) -> some View {
-        let colors = Theme.colors(for: priority)
-        let solid = selected || priority == .emergencia
-        return Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: priority.symbol).imageScale(.small).accessibilityHidden(true)
-                Text(verbatim: text).lineLimit(1)
-            }
-            .font(selected ? Typo.label : Typo.tag)
-            .foregroundStyle(solid ? Theme.onStatus : colors.strong)
-            .padding(.horizontal, Spacing.space3)
-            .frame(minHeight: 44)
-            .background(solid ? colors.strong : colors.soft, in: shape)
-            .overlay(shape.strokeBorder(colors.strong, lineWidth: selected ? 2 : 1))
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityElement(children: .ignore)
-        .accessibilityLabel(Text(verbatim: text))
+        .accessibilityLabel(Text(verbatim: spoken))
         .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 
-    private func foreground(_ family: StatusFamily?) -> Color {
-        guard let family else { return selected ? Theme.onPrimary : Theme.ink }
-        return selected || family.pattern == .solido ? Theme.onStatus : Theme.colors(for: family).strong
+    /// The status family colours, or the priority's (urgent, emergency); nil is the neutral chip («Rutina» included).
+    private func look(_ family: StatusFamily?) -> (strong: Color, soft: Color)? {
+        if let family { return Theme.colors(for: family) }
+        if let priority, priority != .rutina { return Theme.colors(for: priority) }
+        return nil
     }
 
-    @ViewBuilder private func background(_ family: StatusFamily?) -> some View {
-        if let family {
-            let colors = Theme.colors(for: family)
-            if selected {
-                switch family.pattern {
-                case .rayado: ZStack { colors.strong; DiagonalStripes().fill(Theme.onStatus.opacity(0.22)) }
-                case .punteado: ZStack { colors.strong; DotGrid().fill(Theme.onStatus.opacity(0.4)) }
+    private func lookIcon(_ family: StatusFamily?) -> ClimesaIconName? {
+        if let family { return family.icon }
+        if let priority, priority != .rutina { return priority.icon }
+        return nil
+    }
+
+    private func countPill(_ count: Int, colors: (strong: Color, soft: Color)?) -> some View {
+        let fill: Color
+        let text: Color
+        if let colors {
+            fill = selected ? Theme.onStatus : Theme.surface
+            text = colors.strong
+        } else {
+            fill = selected ? Theme.primary : Theme.bg
+            text = selected ? Theme.onPrimary : Theme.muted
+        }
+        return Text(verbatim: String(count))
+            .font(Atkinson.text(12, .extraBold, relativeTo: .caption).monospacedDigit())
+            .foregroundStyle(text)
+            .padding(.horizontal, 6).frame(minWidth: 20)
+            .background(fill, in: Capsule())
+    }
+
+    private func foreground(_ colors: (strong: Color, soft: Color)?, family: StatusFamily?) -> Color {
+        guard let colors else { return selected ? Theme.primaryText : Theme.ink }
+        return selected || family?.pattern == .solido || priority == .emergencia ? Theme.onStatus : colors.strong
+    }
+
+    @ViewBuilder private func background(_ colors: (strong: Color, soft: Color)?, family: StatusFamily?) -> some View {
+        if let colors {
+            if selected || family?.pattern == .solido || (family == nil && priority == .emergencia) {
+                switch family?.pattern {
+                case .rayado?: ZStack { colors.strong; DiagonalStripes().fill(Theme.onStatus.opacity(0.22)) }
+                case .punteado?: ZStack { colors.strong; DotGrid().fill(Theme.onStatus.opacity(0.4)) }
                 default: colors.strong
                 }
-            } else if family.pattern == .solido {
-                colors.strong
-            } else {
+            } else if let family {
                 PatternFill(pattern: family.pattern, strong: colors.strong, soft: colors.soft)
+            } else {
+                colors.soft
             }
         } else {
-            selected ? Theme.primary : Theme.surface
+            selected ? Theme.soft : Theme.surface
         }
     }
 
-    @ViewBuilder private func border(_ family: StatusFamily?) -> some View {
-        if let family {
-            let colors = Theme.colors(for: family)
-            if selected && family.pattern == .doble {
-                ZStack {
-                    RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(colors.strong, lineWidth: 1)
-                    RoundedRectangle(cornerRadius: CGFloat(RadiusToken.inner(outer: RadiusToken.chip, padding: 2))).strokeBorder(Theme.onStatus, lineWidth: 1).padding(2)
-                }
-            } else if selected {
-                RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(colors.strong, lineWidth: 2)
+    @ViewBuilder private func border(_ colors: (strong: Color, soft: Color)?, family: StatusFamily?) -> some View {
+        if let colors {
+            if let family, !selected {
+                PatternBorder(pattern: family.pattern, color: colors.strong, radius: 999)
             } else {
-                PatternBorder(pattern: family.pattern, color: colors.strong)
+                Capsule().strokeBorder(colors.strong, lineWidth: 1.5)
             }
         } else {
-            RoundedRectangle(cornerRadius: Radius.chip).strokeBorder(selected ? Theme.primary : Theme.controlLine, lineWidth: 1)
+            Capsule().strokeBorder(selected ? Theme.primary : Theme.line, lineWidth: 1.5)
         }
+    }
+}
+
+/// R4a segmented control (web `Segmented` + segmented.css): one bordered group 44 tall, segments split by a 1 pt line,
+/// 14/600 text; the selected segment has the soft fill and primary text, its count pill solid primary.
+struct ClimesaSegmented<Value: Hashable>: View {
+    struct Option {
+        let value: Value
+        let label: String
+        var count: Int? = nil
+
+        init(_ value: Value, _ label: String, count: Int? = nil) { self.value = value; self.label = label; self.count = count }
+    }
+
+    let title: String
+    let options: [Option]
+    @Binding var selection: Value
+
+    var body: some View {
+        let shape = RoundedRectangle(cornerRadius: Radius.control)
+        HStack(spacing: 0) {
+            ForEach(Array(options.enumerated()), id: \.offset) { index, option in
+                segment(option, first: index == 0)
+            }
+        }
+        .background(Theme.surface)
+        .clipShape(shape)
+        .overlay(shape.strokeBorder(Theme.controlLine, lineWidth: 1))
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel(Text(verbatim: title))
+    }
+
+    private func segment(_ option: Option, first: Bool) -> some View {
+        let selected = option.value == selection
+        return Button { selection = option.value } label: {
+            HStack(spacing: Spacing.space2) {
+                Text(verbatim: option.label).lineLimit(1).minimumScaleFactor(0.8)
+                if let count = option.count {
+                    Text(verbatim: String(count))
+                        .font(Atkinson.text(12, .bold, relativeTo: .caption).monospacedDigit())
+                        .foregroundStyle(selected ? Theme.onPrimary : Theme.muted)
+                        .padding(.horizontal, 6).frame(minWidth: 20)
+                        .background(selected ? Theme.primary : Theme.bg, in: Capsule())
+                }
+            }
+            .font(Atkinson.text(14, .semibold, relativeTo: .subheadline))
+            .foregroundStyle(selected ? Theme.primaryText : Theme.ink)
+            .padding(.horizontal, Spacing.space3)
+            .frame(maxWidth: .infinity, minHeight: 44)
+            .background(selected ? Theme.soft : Color.clear)
+            .overlay(alignment: .leading) { if !first { Rectangle().fill(Theme.line).frame(width: 1) } }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(verbatim: option.count.map { "\(option.label) (\($0))" } ?? option.label))
+        .accessibilityAddTraits(selected ? [.isButton, .isSelected] : .isButton)
     }
 }
 
@@ -711,10 +835,12 @@ struct CategoryMarks: View {
         if let categories, !categories.isEmpty {
             HStack(spacing: 4) {
                 ForEach(categories, id: \.code) { category in
-                    Image(systemName: CategoryRequestRules.symbol(category.icon))
-                        .font(Typo.small).foregroundStyle(Theme.primaryText)
+                    // Web `CategoryBadges`: the category glyph on its identity tone (`categoryTone`).
+                    let tone = CategoryRequestRules.tone(category.icon)
+                    ClimesaIcon(CategoryRequestRules.icon(category.icon), size: 14)
+                        .foregroundStyle(Color(tone.foreground))
                         .frame(width: 22, height: 22)
-                        .background(Theme.soft, in: RoundedRectangle(cornerRadius: Radius.chip))
+                        .background(Color(tone.background), in: Circle())
                 }
             }
             .accessibilityElement(children: .ignore)
@@ -759,7 +885,9 @@ struct StatusBadge: View {
     var body: some View {
         let style = StatusBadgeStyle.of(value, label: label)
         Group {
-            if let family = style.family { FamilyBadge(family: family, text: style.label) }
+            // R1 (web `StatusBadge`): a value that asks for attention (`alto`, `agotado`...) wears the urgent priority.
+            if let priority = style.priority { PriorityBadge(priority, label: style.label) }
+            else if let family = style.family { FamilyBadge(family: family, text: style.label) }
             else { NeutralBadge(tone: fallbackTone, text: style.label) }
         }
         .accessibilityElement(children: .ignore)
@@ -776,7 +904,7 @@ private struct FamilyBadge: View {
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
         let solid = family.pattern == .solido
         HStack(spacing: 6) {
-            Image(systemName: family.symbol).imageScale(.small).accessibilityHidden(true)
+            ClimesaIcon(family.icon, size: 14).accessibilityHidden(true)
             Text(verbatim: text).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
         .font(Typo.tag)
@@ -827,9 +955,10 @@ private struct PatternFill: View {
 private struct PatternBorder: View {
     let pattern: StatusPattern
     let color: Color
+    var radius: CGFloat = Radius.chip
 
     var body: some View {
-        let shape = RoundedRectangle(cornerRadius: Radius.chip)
+        let shape = RoundedRectangle(cornerRadius: radius)
         switch pattern {
         case .rayado, .solido: shape.strokeBorder(color, lineWidth: 1)
         case .punteado: shape.strokeBorder(color, style: StrokeStyle(lineWidth: 1, lineCap: .round, dash: [0.5, 2.5]))
@@ -838,7 +967,7 @@ private struct PatternBorder: View {
         case .doble:
             ZStack {
                 shape.strokeBorder(color, lineWidth: 1)
-                RoundedRectangle(cornerRadius: CGFloat(RadiusToken.inner(outer: RadiusToken.chip, padding: 2))).strokeBorder(color, lineWidth: 1).padding(2)
+                RoundedRectangle(cornerRadius: radius == Radius.chip ? CGFloat(RadiusToken.inner(outer: RadiusToken.chip, padding: 2)) : radius).strokeBorder(color, lineWidth: 1).padding(2)
             }
         }
     }
@@ -895,7 +1024,7 @@ struct PriorityBadge: View {
         let emergency = priority == .emergencia
         let shape = RoundedRectangle(cornerRadius: Radius.chip)
         HStack(spacing: 6) {
-            Image(systemName: priority.symbol).imageScale(.small).accessibilityHidden(true)
+            ClimesaIcon(priority.icon, size: 14).accessibilityHidden(true)
             Text(verbatim: label ?? priority.label).lineLimit(1)
         }
         .font(Typo.tag)
@@ -946,7 +1075,7 @@ private struct LegendGroup<Items: View>: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.space2) {
-            Text(verbatim: title).font(Typo.eyebrow).foregroundStyle(Theme.muted).textCase(.uppercase).accessibilityAddTraits(.isHeader)
+            Text(verbatim: title).font(Typo.eyebrow).foregroundStyle(Theme.muted).textCase(.uppercase).tracking(Typo.eyebrowTracking).accessibilityAddTraits(.isHeader)
             FlowLayout(spacing: Spacing.space2) { items() }
         }
     }
@@ -994,5 +1123,104 @@ struct FlowLayout: Layout {
         }
         if !current.indices.isEmpty { rows.append(current) }
         return rows
+    }
+}
+
+// MARK: - Lote 5 (S2, S3): card action roles and required fields
+
+extension ClimesaButtonKind {
+    /// Lote 5 S2: a card action's role picks its look (`CardActionRole.crud`): main step filled, edit outlined primary,
+    /// danger outlined red, neutral outlined grey.
+    init(_ role: CardActionRole) { self.init(role.crud) }
+}
+
+/// Lote 5 S2: one action of a card, drawn by its role, with its own spinner. An action the person can never do is not
+/// passed (never shown disabled).
+struct CardActionButton: View {
+    let title: String
+    let role: CardActionRole
+    var icon: ClimesaIconName? = nil
+    var loading = false
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.s) {
+                if let icon { ClimesaIcon(icon, size: 18).accessibilityHidden(true) }
+                Text(verbatim: title)
+            }
+        }
+        .buttonStyle(ClimesaButtonStyle(kind: ClimesaButtonKind(role), loading: loading))
+        .disabled(loading)
+    }
+}
+
+/// Label of a `NavigationLink` styled as a card action (`ClimesaButtonStyle(kind: ClimesaButtonKind(role))`).
+struct CardActionLabel: View {
+    let title: String
+    var icon: ClimesaIconName? = nil
+
+    var body: some View {
+        HStack(spacing: Spacing.s) {
+            if let icon { ClimesaIcon(icon, size: 18).accessibilityHidden(true) }
+            Text(verbatim: title)
+        }
+    }
+}
+
+/// Lote 5 S3: a field label with the red «*» of a required field; VoiceOver reads «obligatorio» instead of the mark.
+struct RequiredLabel: View {
+    let label: String
+    var required = false
+
+    var body: some View {
+        let mark = required ? Text(verbatim: " \(FormCopy.requiredMark)").foregroundColor(Theme.danger) : Text(verbatim: "")
+        (Text(verbatim: label).foregroundColor(Theme.ink) + mark)
+            .font(Typo.label)
+            .fixedSize(horizontal: false, vertical: true)
+            .accessibilityLabel(Text(verbatim: required ? "\(label), \(FormCopy.requiredSpoken)" : label))
+    }
+}
+
+/// «Los campos con * son obligatorios.» once, above a form that has required fields.
+struct RequiredLegend: View {
+    var body: some View {
+        Text(verbatim: FormCopy.legend).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+    }
+}
+
+/// Lote 5 S3: the answer to «¿se guardó?»: a green check with what was saved and when.
+struct SavedFeedback: View {
+    let text: String
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+            ClimesaIcon(.check, size: 16).accessibilityHidden(true)
+            Text(verbatim: text).fixedSize(horizontal: false, vertical: true)
+        }
+        .font(Typo.caption).foregroundStyle(Theme.success)
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// Lote 5 S2: a card's actions on one line when they fit, stacked when they do not (large text, narrow screen). The
+/// line sits inside the card, under its content, so it is clear which card the buttons belong to.
+struct ActionRow<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: Spacing.s) { content() }
+            VStack(alignment: .leading, spacing: Spacing.s) { content() }
+        }
+    }
+}
+
+/// Lote 5 S13: the flag next to a result: «En rango», «Alto», «Bajo», «Crítico alto»… on its result colour.
+struct LabFlagBadge: View {
+    let flag: LabFlag
+
+    var body: some View {
+        StatusBadge(flag.statusValue, label: flag.label)
     }
 }

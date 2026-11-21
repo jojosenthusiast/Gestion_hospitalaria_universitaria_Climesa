@@ -16,7 +16,7 @@ Las pestañas salen del perfil verificado de `/auth/me` (`TabPolicy` en `Core/Ac
 | Rol | Pantalla | Endpoints |
 |---|---|---|
 | Todos | I01 Ingreso, I02 Crear cuenta | Supabase Auth (`/auth/v1/token`, `/auth/v1/signup`), `GET /auth/me` |
-| PAC | I03 Vincular expediente (Más) | `POST /cuentas/vinculacion`; cambia sola con `vinculacion.resuelta` |
+| PAC | I03 Vincular expediente (Más) | `GET /me/vinculacion`: automática por correo verificado; sin vincular pide «Pide en Recepción que anoten este correo: {email}» (sin formulario de DUI) |
 | PAC | I04 Inicio | `GET /fila`, `GET /citas`, `GET /me/laboratorio`, `GET /publico/avisos` |
 | PAC | I05 Mi turno en fila | `GET /fila`, `GET /publico/fila/{servicio}`; vibra al pasar a Llamado |
 | PAC | I06 Mis citas | `GET /citas`, `GET /citas/catalogos`, `GET /citas/disponibilidad`, `POST /citas/solicitudes`, `POST /citas/{id}/cancelar` |
@@ -41,7 +41,8 @@ Lo que la API todavía no ofrece (cuántos faltan exacto, seguimiento y cancelac
 - `Core/Contract`: modelos `Codable` escritos a mano según `contrato/openapi.json` (enums con nombre del contrato y etiqueta en español; un valor desconocido no rompe la lectura), cuerpos de escritura, `Problem` (problem+json: el cliente decide por `codigo`, muestra `detail` y el código de soporte `requestId`), fechas de `America/El_Salvador` y `SubmissionIntent`/`IntentBook` (`Idempotency-Key` por intención del usuario, regla de `docs/arquitectura/convenciones-api.md`).
 - `Core/Rules`: validaciones y reglas de presentación probadas (DUI, citas, fila, ambulancia, revisión de resultados, alta).
 - `CLIMESA/Network.swift`: `AuthService` (Supabase Auth por REST, renovación del token) y `APIClient` (Bearer, `Idempotency-Key`, errores `APIFailure`). Un 401 renueva la sesión una vez y repite la llamada. Si Auth rechaza la renovación (400/401), la sesión se borra y `AccountModel` vuelve al ingreso con "Tu sesión expiró". Si la llamada repetida vuelve a dar 401, o `/auth/me` responde 401/403 al restaurar o volver a verificar la sesión, el ingreso muestra «Tu acceso fue retirado. Si crees que es un error, contacta a administración.» (`SessionEndRules` en `Core/SessionFlow.swift`). Un 403 a una acción y los errores de red nunca cierran la sesión. Cerrar sesión borra la sesión del Keychain y todo lo que estaba en memoria.
-- `CLIMESA/Support.swift`: `Loader` (lectura con carga y error) y `Submission` (escritura con su intención) como view models `@MainActor @Observable`.
+- `Core/Screen/ScreenState.swift`: `Loader` (lectura con carga y error), `Submission` (escritura con su intención), `SubmissionBook` y `Part`, todos `@MainActor @Observable`.
+- MVVM (`Core/ViewModels/`): la vista dibuja el estado y llama métodos de su view model; no arma llamadas a la red. `ClinicalAPI` es el protocolo con las dos llamadas que usan (`get` y `send` con `Idempotency-Key`); `APIClient` lo implementa (`CLIMESA/Network.swift`) y las pruebas usan uno falso (`Tests/CoreTests/ScreenViewModelTests.swift`). Hoy tienen view model propio la consulta (`ConsultationViewModel`: inicio, guardado y autoguardado, diagnósticos, receta, órdenes de laboratorio, firma y llamado del siguiente), Mis exámenes (`PatientExamsViewModel`) y Pedir ambulancia (`AmbulanceRequestViewModel`: formulario, prellenado, solicitud y cancelación). La vista crea su view model en `@State` y le pasa el cliente de la sesión antes de cada llamada.
 - `CLIMESA/PatientViews.swift`, `DoctorViews.swift`, `ConsultationView.swift`: pantallas. Toda escritura sobre un registro existente envía su `version`; tras un `version_conflicto` la pantalla vuelve a pedir el registro.
 - Tiempo real sin sondeo: `Core/Realtime` implementa el protocolo Phoenix de Supabase (igual que web y Android) sobre `URLSessionWebSocketTask` con canales privados de `/auth/me`. `LiveReducer` sube un contador por grupo (`LiveTopic`: fila, citas, consultas, laboratorio, admisiones, ambulancia, ...) y cada pantalla vuelve a pedir sus datos con `.task(id:)`. Tras una caída hay una sola consulta `GET /eventos?after=<seq>` que invalida todo.
 - La sesión se cierra al volver después de cinco minutos en segundo plano; antes de ese límite solo se verifica de nuevo el perfil.
@@ -63,13 +64,15 @@ xcodebuild -project CLIMESA.xcodeproj -scheme CLIMESA -configuration Debug -sdk 
 
 Prueba de humo en simulador (`CLIMESAUITests`, XCUITest): arranca la app y comprueba que aparece el botón "Ingresar". Local: `xcodebuild test -project CLIMESA.xcodeproj -scheme CLIMESA -destination 'platform=iOS Simulator,name=iPhone 16' CODE_SIGNING_ALLOWED=NO`.
 
-El workflow `.github/workflows/ios.yml` (macOS 15) comprueba que cada `.swift` esté en el proyecto, corre `swift test`, compila para simulador sin firma y corre esa prueba de UI en un simulador. Falta probar en simulador o dispositivo con una cuenta MED y otra PAC: sesión restaurada, rol sin iOS, API caída, 401, cierre de sesión, retorno tras cinco minutos y cada pantalla de la tabla. Instalar en un iPhone o publicar en TestFlight requiere firmar con una cuenta de Apple.
+El workflow `.github/workflows/ios.yml` (macOS 15) comprueba que cada `.swift` esté en el proyecto, corre `swift test`, compila para simulador sin firma y corre esa prueba de UI en un simulador. Falta probar a mano, en simulador o dispositivo, con una cuenta MED y otra PAC: sesión restaurada, rol sin iOS, API caída, 401, cierre de sesión, retorno tras cinco minutos y cada pantalla de la tabla. Instalar en un iPhone o publicar en TestFlight requiere firmar con una cuenta de Apple.
 
 ## IPA sin firmar (sideloading)
 
 El job `ipa` de `.github/workflows/ios.yml` compila `CLIMESA-sin-firmar.ipa` en un runner macOS 15 de GitHub Actions. Corre en push a `main`, en PRs que tocan `ios/**` o el workflow, y a mano (Actions → iOS → Run workflow). El IPA no está firmado: lo firma tu cuenta de Apple al instalarlo. Requiere iOS 17 o posterior.
 
 ### Descargar el IPA
+
+La entrega ya incluye uno: `instalar/ios/CLIMESA-ios-2026-11-20-sin-firmar.ipa` (sin firmar; se instala igual que el del workflow). Para uno más reciente:
 
 1. Abre la ejecución del workflow en la pestaña Actions y espera a que el job `ipa` termine en verde.
 2. En la sección Artifacts descarga `CLIMESA-ios-ipa`. GitHub lo guarda 14 días.

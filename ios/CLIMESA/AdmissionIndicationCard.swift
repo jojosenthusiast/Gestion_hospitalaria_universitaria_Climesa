@@ -56,10 +56,9 @@ struct AdmissionIndicationCard: View {
         Text("admission.intro").font(Typo.small).foregroundStyle(Theme.muted)
         VStack(alignment: .leading, spacing: Spacing.s) {
             Text("admission.category").font(Typo.label).foregroundStyle(Theme.ink)
-            Picker("admission.category", selection: $category) {
-                Text(verbatim: RoomCategory.semiprivada.label).tag(RoomCategory.semiprivada)
-                Text(verbatim: RoomCategory.vip.label).tag(RoomCategory.vip)
-            }.pickerStyle(.segmented)
+            ClimesaSegmented(title: L.text("admission.category"),
+                             options: [ClimesaSegmented<RoomCategory>.Option(.semiprivada, RoomCategory.semiprivada.label), ClimesaSegmented<RoomCategory>.Option(.vip, RoomCategory.vip.label)],
+                             selection: $category)
             FieldError(text: submission.fieldErrors["requestedCategory"])
         }
         Toggle("admission.isolation", isOn: $isolation).font(Typo.body).tint(Theme.primary).frame(minHeight: Spacing.control)

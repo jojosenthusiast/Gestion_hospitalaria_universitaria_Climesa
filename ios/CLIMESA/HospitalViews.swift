@@ -71,7 +71,7 @@ struct HospitalInfoView: View {
                 }
             }
         } else {
-            EmptyStateView(title: L.text("hospital.unavailable"), symbol: "building.2")
+            EmptyStateView(title: L.text("hospital.unavailable"))
         }
     }
 
@@ -91,7 +91,7 @@ struct HospitalInfoView: View {
                 }
             }
         } else {
-            EmptyStateView(title: L.text("hospital.doctors.none"), symbol: "stethoscope")
+            EmptyStateView(title: L.text("hospital.doctors.none"))
         }
     }
 
@@ -131,7 +131,7 @@ struct LocationView: View {
             }
             SectionTitle("location.floors")
             LoadState(loader: loader, retry: load) { occupancy in
-                if occupancy.rows.isEmpty { EmptyStateView(title: L.text("hospital.unavailable"), symbol: "building.2") }
+                if occupancy.rows.isEmpty { EmptyStateView(title: L.text("hospital.unavailable")) }
                 ForEach(OccupancyRules.floors(occupancy.rows)) { floor in
                     SectionCard(title: floor.floor.map { String(format: L.text("hospital.floor"), $0) } ?? L.text("hospital.floor.none")) {
                         ForEach(Array(floor.rows.enumerated()), id: \.offset) { index, row in
@@ -171,7 +171,7 @@ struct MyRoomView: View {
             } else if RoomRules.waiting(admissions, patientId: profile.patientId) != nil {
                 PatientNotice(text: L.text("room.waiting"))
             } else if discharge == nil {
-                EmptyStateView(title: L.text("room.none"), message: L.text("room.none.body"), symbol: "bed.double")
+                EmptyStateView(title: L.text("room.none"), message: L.text("room.none.body"))
             }
             // D7: resumen del alta firmada (también 30 días después de la salida).
             if let discharge, let summary = discharge.discharge { DischargeSummaryCard(admission: discharge, discharge: summary) }
@@ -286,7 +286,6 @@ private struct EditMyDataSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var submission = Submission()
     @State private var phone: String
-    @State private var email: String
     @State private var address: String
     @State private var errors: [String: String] = [:]
 
@@ -294,7 +293,6 @@ private struct EditMyDataSheet: View {
         self.patient = patient
         self.reload = reload
         _phone = State(initialValue: patient.phone ?? "")
-        _email = State(initialValue: patient.email ?? "")
         _address = State(initialValue: patient.address ?? "")
     }
 
@@ -303,11 +301,16 @@ private struct EditMyDataSheet: View {
             ScreenFrame(title: "mydata.edit", onClose: { dismiss() }) {
                 SectionCard {
                     FormField(label: L.text("mydata.phone"), text: $phone, error: error("phone")).keyboardType(.phonePad).textContentType(.telephoneNumber)
-                    FormField(label: L.text("mydata.email"), text: $email, error: error("email")).textContentType(.emailAddress)
-                        .keyboardType(.emailAddress).textInputAutocapitalization(.never).autocorrectionDisabled()
                     PatientTextArea(label: L.text("mydata.address"), text: $address, lines: 1...4, error: error("address"))
                 }
-                if submission.lastFailure?.isVersionConflict == true {
+                // U12: the email links the account with the record, so only Recepción changes it; shown, never sent.
+                SectionCard {
+                    DataLine(label: L.text("mydata.email"), value: patient.email)
+                    ReadOnlyBadge(who: "Recepción", what: "tu correo")
+                }
+                if let message = PatientProfileRules.failureMessage(code: submission.lastFailure?.code) {
+                    PatientNotice(text: message, failure: true)
+                } else if submission.lastFailure?.isVersionConflict == true {
                     ConflictBanner(message: L.text("mydata.conflict")) { Task { await reload(); dismiss() } }
                 } else if submission.lastFailure?.code == "sin_vinculacion" {
                     PatientNotice(text: L.text("mydata.unlinked"), failure: true)
@@ -323,9 +326,9 @@ private struct EditMyDataSheet: View {
     private func error(_ field: String) -> String? { errors[field] ?? submission.fieldErrors[field] }
 
     private func save() async {
-        errors = PatientProfileRules.errors(phone: phone, email: email, address: address)
+        errors = PatientProfileRules.errors(phone: phone, address: address)
         guard errors.isEmpty else { return }
-        let body = PatientProfileRules.body(version: patient.version, phone: phone, email: email, address: address)
+        let body = PatientProfileRules.body(version: patient.version, phone: phone, address: address)
         let ok = await submission.run(patient.id, body: body, success: L.text("mydata.saved")) { key in
             _ = try await account.client().send("PATCH", "/me/paciente", body: body, key: key, as: PatientUpdateResult.self)
         }

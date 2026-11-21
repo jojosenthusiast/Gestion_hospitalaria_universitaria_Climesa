@@ -14,7 +14,7 @@ struct DoctorAgendaView: View {
         LoadState(loader: loader, retry: load) { entries in
             let upcoming = AgendaRules.upcoming(entries, now: Date())
             let past = AgendaRules.past(entries, now: Date())
-            if upcoming.isEmpty { EmptyStateView(title: L.text("agenda.none"), symbol: "calendar") }
+            if upcoming.isEmpty { EmptyStateView(title: L.text("agenda.none")) }
             ForEach(upcoming) { day in dayCard(day) }
             if !past.isEmpty {
                 Toggle("agenda.past", isOn: $showPast).font(Typo.label).tint(Theme.primary)
@@ -123,7 +123,7 @@ private struct DoctorPatientVitals: View {
                     if items.isEmpty { Text("consultation.vitals.none").font(Typo.small).foregroundStyle(Theme.muted) }
                     ForEach(Array(items.enumerated()), id: \.element.id) { index, sign in
                         if index > 0 { Divider().overlay(Theme.line) }
-                        ListRow(title: ConsultationView.vitalsText(sign), meta: ClimesaDates.short(sign.takenAt))
+                        VitalSignsBlock(sign: sign, when: ClimesaDates.short(sign.takenAt))
                     }
                     // D5 · rule 8: recording depends on `signos.registrar`, never on the role.
                     if VitalsEntryRules.canRecord(account.profile) {
@@ -190,7 +190,8 @@ private struct VitalsEntrySheet: View {
     }
 
     private func binding(_ measure: VitalEntryMeasure) -> Binding<String> {
-        Binding(get: { values[measure] ?? "" }, set: { values[measure] = String($0.prefix(6)) })
+        // D78: digits only (one decimal separator where the measure takes it), at most six characters.
+        Binding(get: { values[measure] ?? "" }, set: { values[measure] = VitalsEntryRules.sanitize(measure, $0) })
     }
 
     private func save() async {
@@ -274,7 +275,7 @@ private struct ExternalRecordSheet: View {
                 if matches.isEmpty { Text("record.external.noMatch").font(Typo.small).foregroundStyle(Theme.muted) }
                 ForEach(matches) { exam in
                     Button { add(exam) } label: {
-                        Label { Text(verbatim: "\(exam.name) · \(exam.code)") } icon: { Image(systemName: "plus.circle") }
+                        Label { Text(verbatim: "\(exam.name) · \(exam.code)") } icon: { ClimesaIcon(.plus, size: 18) }
                             .font(Typo.body).foregroundStyle(Theme.primaryText).frame(maxWidth: .infinity, minHeight: Spacing.control, alignment: .leading)
                     }
                     .buttonStyle(.plain)
@@ -416,7 +417,7 @@ struct AmbulanceOverviewView: View {
                 StatusTag(tag.value, label: tag.label)
             }
             if let line = AmbulanceLogRules.serviceLine(value) {
-                Label { Text(verbatim: line) } icon: { Image(systemName: "cross.case").accessibilityHidden(true) }
+                Label { Text(verbatim: line) } icon: { ClimesaIcon(.ambulance, size: 18).accessibilityHidden(true) }
                     .labelStyle(.titleAndIcon).font(Typo.label).foregroundStyle(Theme.ink)
             }
             if let crew = AmbulanceLogRules.crewNotice(value) {
@@ -426,7 +427,7 @@ struct AmbulanceOverviewView: View {
                 // A dispatch block is a warning, not a critical value: warning tone, red stays for critical. Its reason
                 // is already the header's subtitle; this line says what to do.
                 HStack(alignment: .top, spacing: Spacing.s) {
-                    Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(Theme.warning).accessibilityHidden(true)
+                    ClimesaIcon(.alert, size: 18).foregroundStyle(Theme.warning).accessibilityHidden(true)
                     Text(verbatim: AmbulanceLogRules.blockAdvice(block, canPlanShifts: account.can("turnos.planificar"))).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
                 }
             }
@@ -444,7 +445,7 @@ struct AmbulanceOverviewView: View {
                         HStack {
                             Text(verbatim: AmbulanceRules.milestoneLabel(type)).font(Typo.small).foregroundStyle(done == nil ? Theme.muted : Theme.ink)
                             Spacer()
-                            Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.mono).foregroundStyle(Theme.muted)
+                            Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.time).foregroundStyle(Theme.muted)
                         }
                     }
                 }
@@ -460,7 +461,7 @@ struct AmbulanceOverviewView: View {
                 .onSubmit { Task { await loadLog() } }
             Button { filtersOpen.toggle() } label: {
                 HStack {
-                    Image(systemName: "line.3.horizontal.decrease.circle").accessibilityHidden(true)
+                    ClimesaIcon(.filter, size: 18).accessibilityHidden(true)
                     Text(verbatim: query.activeCount == 0 ? L.text("ambulance.log.filters") : String(format: L.text("ambulance.log.filters.active"), query.activeCount)).font(Typo.label)
                     Spacer()
                     Image(systemName: filtersOpen ? "chevron.up" : "chevron.down").accessibilityHidden(true)
@@ -477,7 +478,7 @@ struct AmbulanceOverviewView: View {
             }
         }
         LoadState(loader: log, retry: loadLog) { entries in
-            if entries.isEmpty { EmptyStateView(title: L.text("ambulance.log.none"), symbol: "list.bullet.rectangle") }
+            if entries.isEmpty { EmptyStateView(title: L.text("ambulance.log.none")) }
             // Day-grouped: today open, the past days folded (open by themselves when nothing happened today).
             let days = AmbulanceLogRules.days(entries)
             if let today = days.today { dayGroup(ClimesaDates.localDay(Date()), today) }

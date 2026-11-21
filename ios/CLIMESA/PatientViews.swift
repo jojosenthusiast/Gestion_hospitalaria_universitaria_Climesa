@@ -39,7 +39,8 @@ struct PatientHomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty { CriticalNoticeBanner(model: notices) }
+            // D68: the banner also stays to confirm «Enterado» or «Recordarme» where they were asked.
+            if !NoticeRules.banner(notices.inbox, hiding: notices.hidden).isEmpty || notices.bannerDone != nil { CriticalNoticeBanner(model: notices) }
             if !linked { linkCard }
             if requestSent { PatientNotice(text: L.text("appointments.category.sent")) }
             LoadState(loader: loader, retry: load) { home in
@@ -100,7 +101,7 @@ struct PatientHomeView: View {
         }
     }
 
-    /// S13: while the account is not linked, linking is the one thing to do: open the form in one tap.
+    /// S13: while the account is not linked, linking is the one thing to do: open its status (U12: by email) in one tap.
     @ViewBuilder private var linkCard: some View {
         SectionCard {
             Text("home.unlinked.title").font(Typo.subheading).foregroundStyle(Theme.ink)
@@ -186,7 +187,7 @@ private struct ShortcutTile: View {
     let item: PatientHomeRules.Shortcut
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
-            Image(systemName: item.symbol).font(Typo.heading).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+            ClimesaIcon(item.icon, size: 24).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
             Text(verbatim: item.title).font(Typo.label).foregroundStyle(Theme.ink).lineLimit(2).fixedSize(horizontal: false, vertical: true)
         }
         .padding(Spacing.m)
@@ -212,7 +213,7 @@ private struct HomeCardLink<Content: View>: View {
                 HStack(spacing: Spacing.xs) {
                     Spacer()
                     Text("home.open").font(Typo.label).foregroundStyle(Theme.primaryText)
-                    Image(systemName: "chevron.right").font(Typo.small).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
+                    ClimesaIcon(.chevron, size: 14).foregroundStyle(Theme.primaryText).accessibilityHidden(true)
                 }
             }
             .contentShape(Rectangle())
@@ -301,7 +302,7 @@ struct PatientQueueView: View {
             if let ticket = QueueRules.activeTicket(list) {
                 QueueTicketCard(ticket: ticket, board: board.value)
             } else {
-                EmptyStateView(title: L.text("queue.none.title"), message: L.text("queue.none.body"), symbol: "person.2")
+                EmptyStateView(title: L.text("queue.none.title"), message: L.text("queue.none.body"))
             }
         }
         .task(id: live.snapshot.version(.queue)) { await load() }
@@ -337,7 +338,7 @@ private struct CalledCover: View {
     var body: some View {
         VStack(spacing: Spacing.space6) {
             Spacer()
-            Image(systemName: "bell.badge.fill").font(.system(size: 56, weight: .semibold)).foregroundStyle(Theme.onPrimary).accessibilityHidden(true)
+            ClimesaIcon(.bell, size: 56).foregroundStyle(Theme.onPrimary).accessibilityHidden(true)
             Text(verbatim: PatientTurnRules.calledTitle(office: office))
                 .font(Typo.number(40)).foregroundStyle(Theme.onPrimary).multilineTextAlignment(.center).minimumScaleFactor(0.5)
                 .accessibilityAddTraits(.isHeader)
@@ -372,7 +373,7 @@ private struct QueueTicketCard: View {
             VStack(alignment: .leading, spacing: Spacing.m) {
                 HStack(spacing: Spacing.s) {
                     AreaTag(QueueBoardRules.area(ticket))
-                    Text(verbatim: ticket.service.label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase)
+                    Text(verbatim: ticket.service.label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking)
                 }
                 HStack(alignment: .firstTextBaseline) {
                     Text(verbatim: "\(ticket.number)").font(Typo.number(96)).foregroundStyle(Theme.ink).minimumScaleFactor(0.5)
@@ -413,7 +414,7 @@ struct PatientAppointmentsView: View {
 
     var body: some View {
         if linked { content } else {
-            EmptyStateView(title: L.text("appointments.unlinked.title"), message: L.text("appointments.unlinked.body"), symbol: "link")
+            EmptyStateView(title: L.text("appointments.unlinked.title"), message: L.text("appointments.unlinked.body"))
         }
     }
 
@@ -436,7 +437,7 @@ struct PatientAppointmentsView: View {
                     VStack(alignment: .leading, spacing: Spacing.space4) {
                         // I-26: one empty state per screen; inside a section, one line.
                         if split.upcoming.isEmpty && split.past.isEmpty {
-                            EmptyStateView(title: L.text("appointments.upcoming.none"), symbol: "calendar")
+                            EmptyStateView(title: L.text("appointments.upcoming.none"))
                         } else {
                             if let next = split.upcoming.first {
                                 // A1: the next appointment leads, on its own card; the others follow.
@@ -544,7 +545,7 @@ private struct AppointmentRow: View {
             }
             switch option {
             case let .allowed(deadline):
-                Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { Image(systemName: "clock") }
+                Label { Text(verbatim: AppointmentRules.cancelDeadlineText(deadline, now: now)) } icon: { ClimesaIcon(.clock, size: 16) }
                     .font(Typo.small).foregroundStyle(Theme.muted)
             case .tooLate, .blocked:
                 // S0: the shared gate's reason (too late, or the server's own reason) instead of a silent gap.
@@ -642,26 +643,34 @@ private struct RescheduleAppointmentSheet: View {
                 SectionCard { ListRow(title: ClimesaDates.short(appointment.start), subtitle: appointment.doctorName) }
                 Text("appointments.reschedule.intro").font(Typo.small).foregroundStyle(Theme.muted)
                 SectionTitle("appointments.date")
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: Spacing.s) {
-                        ForEach(DayChipRules.days(from: Date()), id: \.self) { option in
-                            Button { day = option } label: {
-                                Text(verbatim: DayChipRules.label(option, today: Date())).font(Typo.label)
-                                    .padding(.horizontal, Spacing.m).frame(minHeight: 44)
-                                    .background(day == option ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
-                                    .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(day == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
-                                    .foregroundStyle(day == option ? Theme.onPrimary : Theme.ink)
-                                    .contentShape(Rectangle())
+                // D126: the chosen day chip always comes fully into view, never half cut at the edge.
+                ScrollViewReader { chips in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Spacing.s) {
+                            ForEach(DayChipRules.days(from: Date()), id: \.self) { option in
+                                Button { day = option } label: {
+                                    Text(verbatim: DayChipRules.label(option, today: Date())).font(Typo.label)
+                                        .padding(.horizontal, Spacing.m).frame(minHeight: 44)
+                                        .background(day == option ? Theme.primary : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.control))
+                                        .overlay(RoundedRectangle(cornerRadius: Radius.control).stroke(day == option ? Theme.primary : Theme.controlLine, lineWidth: 1))
+                                        .foregroundStyle(day == option ? Theme.onPrimary : Theme.ink)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                                .id(option)
+                                .accessibilityAddTraits(day == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityAddTraits(day == option ? AccessibilityTraits.isSelected : AccessibilityTraits())
                         }
+                        .padding(.horizontal, 1)
+                    }
+                    .onChange(of: day) { _, picked in
+                        withAnimation(.easeOut(duration: 0.2)) { chips.scrollTo(picked, anchor: .center) }
                     }
                 }
                 SectionTitle("appointments.slots")
                 LoadState(loader: availability, retry: loadSlots) { value in
                     let free = AppointmentRules.freeSlots(value, excluding: appointment.start)
-                    if free.isEmpty { EmptyStateView(title: L.text("appointments.slots.none"), symbol: "calendar.badge.exclamationmark") }
+                    if free.isEmpty { EmptyStateView(title: L.text("appointments.slots.none")) }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 90))], spacing: 8) {
                         ForEach(free, id: \.self) { period in
                             Button { slot = period } label: {
@@ -729,9 +738,9 @@ private struct MyCategoryRequests: View {
 
     @ViewBuilder private func requestCard(_ item: CategoryRequest) -> some View {
             SectionCard {
-                ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note) {
-                    PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
-                }
+                // D123: the state goes on its own line above, so the reasons and the note keep the full width.
+                PatientTag(CategoryRequestRules.badgeValue(item.state), label: L.text(CategoryRequestRules.stateKey(item.state)))
+                ListRow(title: item.categoryNames, subtitle: L.text(item.franja.titleKey), meta: item.note)
                 if let appointment = item.appointment {
                     Text(verbatim: String(format: L.text("appointments.category.assigned"), appointment.doctorName, ClimesaDates.short(appointment.start)))
                         .font(Typo.small).foregroundStyle(Theme.primary)
@@ -771,36 +780,60 @@ private struct CategoryRequestSheet: View {
     @State private var doctor: AppointmentCatalogs.Doctor?
     /// R2: «Con turno (N)» is the default chip; «Todos (N)» shows the doctors without a shift today too.
     @State private var shiftFilter: DoctorShiftFilter = .conTurno
+    /// D128: the server's request limit, read when the sheet opens; nil until it answers or from an older API.
+    @State private var limit: CategoryRequestLimit?
 
     var body: some View {
         NavigationStack {
             ScreenFrame(title: "appointments.request.title", onClose: { dismiss() }) {
+                if CategoryRequestRules.blocked(limit), let limit {
+                    // D128 (S12): at the limit the server's reason shows first and nothing can be filled or sent.
+                    PatientNotice(text: CategoryRequestRules.limitText(limit), failure: true)
+                    ClimesaButton(title: CategoryRequestRules.backToAppointments, kind: .secondary) { dismiss() }
+                } else {
+                    form
+                }
+            }
+            .task { await loadLimit() }
+            .task { await loadCategories() }
+            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
+        }
+    }
+
+    @ViewBuilder private var form: some View {
                 Group {
                 SectionTitle("appointments.category.reason")
                 Text(verbatim: String(format: L.text("appointments.category.count"), picked.count)).font(Typo.caption).foregroundStyle(Theme.muted)
                 searchField(L.text("appointments.category.search"), text: $query)
                 LoadState(loader: categories, retry: loadCategories) { list in
                     let visible = CategoryRequestRules.filter(list, query: query, picked: picked)
-                    if visible.isEmpty { EmptyStateView(title: L.text("appointments.category.none"), symbol: "magnifyingglass") }
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
-                        ForEach(visible) { category in categoryButton(category) }
+                    if visible.isEmpty { EmptyStateView(title: L.text("appointments.category.none")) }
+                    // Lote 5 S16: grouped by body area (Cuerpo, Interno y digestivo, Mente y emociones, Sentidos, General).
+                    ForEach(CategoryGroups.sections(visible)) { section in
+                        Text(verbatim: section.group.title).font(Typo.label).foregroundStyle(Theme.muted).padding(.top, Spacing.s)
+                            .accessibilityAddTraits(.isHeader)
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 150), spacing: Spacing.s)], spacing: Spacing.s) {
+                            ForEach(section.categories) { category in categoryButton(category) }
+                        }
                     }
                 }
                 }
                 SectionTitle("appointments.category.franja")
-                Picker("appointments.category.franja", selection: $franja) {
-                    ForEach(RequestFranja.allCases, id: \.self) { Text(LocalizedStringKey($0.titleKey)).tag($0) }
-                }.pickerStyle(.segmented)
+                ClimesaSegmented(title: L.text("appointments.category.franja"),
+                                 options: RequestFranja.allCases.map { ClimesaSegmented<RequestFranja>.Option($0, L.text($0.titleKey)) },
+                                 selection: $franja)
                 PatientTextArea(label: L.text("appointments.category.note"), text: $note, lines: 2...4,
                                 error: note.count > CategoryRequestRules.noteMax ? L.text("appointments.category.note.long") : submission.fieldErrors["note"])
                 doctorSection
                 PatientSubmissionNotice(submission: submission)
                 ClimesaButton(title: L.text("appointments.category.submit"), loading: submission.busy) { Task { await send() } }
                     .disabled(!CategoryRequestRules.canSend(picked: picked, note: note))
-            }
-            .task { await loadCategories() }
-            .task(id: doctorOpen) { if doctorOpen && catalog.value == nil { await loadCatalog() } }
-        }
+    }
+
+    /// D128: asks the server whether a new request would be accepted; a failure (older API) leaves the form open as before.
+    private func loadLimit() async {
+        guard let api = try? account.client() else { return }
+        limit = try? await api.get(CategoryRequestRules.limitPath, as: CategoryRequestLimit.self)
     }
 
     private func categoryButton(_ category: AppointmentCategory) -> some View {
@@ -808,7 +841,7 @@ private struct CategoryRequestSheet: View {
         let full = !selected && picked.count >= CategoryRequestRules.maxCategories
         return Button { picked = CategoryRequestRules.toggle(picked, category.code) } label: {
             HStack(spacing: Spacing.s) {
-                Image(systemName: selected ? "checkmark.circle.fill" : CategoryRequestRules.symbol(category.icon)).frame(width: 22)
+                ClimesaIcon(selected ? .check : CategoryRequestRules.icon(category.icon), size: 20).frame(width: 22)
                 Text(verbatim: category.name).font(Typo.label).multilineTextAlignment(.leading)
                 Spacer(minLength: 0)
             }
@@ -863,7 +896,7 @@ private struct CategoryRequestSheet: View {
 
     private func searchField(_ label: String, text: Binding<String>) -> some View {
         HStack(spacing: Spacing.s) {
-            Image(systemName: "magnifyingglass").foregroundStyle(Theme.muted)
+            ClimesaIcon(.search, size: 18).foregroundStyle(Theme.muted)
             TextField(label, text: text).font(Typo.body).foregroundStyle(Theme.ink).textInputAutocapitalization(.never).autocorrectionDisabled()
         }
         .padding(.horizontal, Spacing.m).frame(minHeight: Spacing.control)
@@ -904,14 +937,16 @@ struct PatientExamsView: View {
     let profile: AccessProfile
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
-    @State private var loader = Loader<[LabOrder]>()
+    /// S13: the read and the «seen» mark live in the view model.
+    @State private var model = PatientExamsViewModel()
+    private var loader: Loader<[LabOrder]> { model.loader }
     @State private var filter: LabFilter = .all
     @State private var showPast = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.space4) {
             if profile.patientId == nil {
-                EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link")
+                EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"))
             } else {
                 LoadState(loader: loader, retry: load) { orders in
                     // Each chip wears the badge of the stage it filters (pending waits, in process, done).
@@ -924,7 +959,7 @@ struct PatientExamsView: View {
                     .accessibilityElement(children: .contain)
                     .accessibilityLabel(Text("exams.filter"))
                     let shown = filter.apply(orders)
-                    if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none"), symbol: "testtube.2") }
+                    if shown.isEmpty { EmptyStateView(title: L.text(orders.isEmpty ? "exams.none" : "exams.filter.none")) }
                     // Closed results beyond the newest few fold under «Ver N más».
                     let folded = PatientLabRules.fold(shown)
                     if !shown.isEmpty {
@@ -946,11 +981,9 @@ struct PatientExamsView: View {
     }
 
     private func load() async {
-        await loader.load { try await account.client().get("/me/laboratorio", as: [LabOrder].self) }
+        model.client = { [account] in try account.client() }
         // G6: the results on screen are seen, so «Resultados nuevos» on Inicio goes back to 0 (stored on the device, G-7).
-        if loader.value != nil {
-            _ = DraftStore.shared.save(PatientResultsRules.Seen(at: Date()), user: profile.id, key: PatientResultsRules.seenKey)
-        }
+        await model.load(user: profile.id)
     }
 }
 
@@ -960,12 +993,14 @@ struct LabOrderRow: View {
     let critical: Bool
     /// The patient's own list does not repeat their name on every row.
     var showPatient = true
+    /// Lote 5 S13: «2 fuera de rango · 1 crítico» for the doctor's list; nil hides it.
+    var summary: String? = nil
     /// A row inside a `ListCard`, not a card of its own (I-9).
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.s) {
             ListRow(title: order.items.map(\.name).joined(separator: ", "), subtitle: showPatient ? order.patientName : nil,
                     meta: ClimesaDates.short(order.completedAt ?? order.createdAt)) {
-                Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
             }
             HStack(spacing: Spacing.s) {
                 PatientTag(PatientLabRules.badgeValue(order), label: status)
@@ -973,8 +1008,11 @@ struct LabOrderRow: View {
                 if order.priority == .urgente { PriorityBadge(order.priority.rawValue) }
                 if critical { PatientTag("critico_alto", label: L.text("results.critical")) }
             }
-            .padding(.bottom, Spacing.s)
+            if let summary {
+                Text(verbatim: summary).font(Typo.small).foregroundStyle(critical ? Theme.danger : Theme.warning)
+            }
         }
+        .padding(.bottom, Spacing.s)
         .contentShape(Rectangle())
     }
 }
@@ -1008,6 +1046,10 @@ struct LabOrderDetail: View {
             // R7 C1: the doctor's note for the patient arrives only with the released results.
             if !staffView, showValues, let note = order.patientNote, !note.isEmpty { PatientNotice(text: String(format: L.text("exams.doctorNote"), note)) }
             ForEach(order.items) { item in
+                if staffView && showValues {
+                    // Lote 5 S13: each component with its value, unit, range and a coloured flag, so the review is not monotonous.
+                    StaffLabResultCard(item: item)
+                } else {
                 SectionCard(title: staffView ? "\(item.name) (\(item.code))" : item.name) {
                     if showValues {
                         HStack {
@@ -1032,8 +1074,53 @@ struct LabOrderDetail: View {
                         }
                     }
                 }
+                }
             }
         }
+    }
+}
+
+/// Lote 5 S13 · one result component for the doctor: name and code, the value large with its unit, the reference range
+/// and the flag (En rango, Alto, Bajo, Crítico) on its colour; a critical value gets a red edge on the whole card.
+struct StaffLabResultCard: View {
+    let item: LabOrderItem
+
+    var body: some View {
+        let flag = LabResultView.flag(item)
+        VStack(alignment: .leading, spacing: Spacing.s) {
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.s) {
+                Text(verbatim: item.name).font(Typo.subheading).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                Text(verbatim: item.code).font(Typo.caption).foregroundStyle(Theme.muted)
+                Spacer(minLength: Spacing.s)
+                LabFlagBadge(flag: flag)
+            }
+            HStack(alignment: .firstTextBaseline, spacing: Spacing.xs) {
+                Text(verbatim: LabResultCopy.value(item)).font(Typo.heading).foregroundStyle(flag.critical ? Theme.danger : Theme.ink)
+                    .fixedSize(horizontal: false, vertical: true)
+                if item.result?.value != nil, let unit = item.unit, !unit.isEmpty { Text(verbatim: unit).font(Typo.label).foregroundStyle(Theme.muted) }
+            }
+            if let range = PatientLabRules.rangeText(item.referenceRange) {
+                Text(verbatim: String(format: L.text("results.range"), range)).font(Typo.small).foregroundStyle(Theme.muted)
+            }
+            if let observation = LabFollowUpRules.labNote(item.result, staffView: true) {
+                Text(verbatim: String(format: L.text(item.result?.relevant == true ? "exams.observation.relevant" : "exams.observation"), observation))
+                    .font(Typo.small).foregroundStyle(item.result?.relevant == true ? Theme.ink : Theme.muted).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(Spacing.l)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(flag.critical ? Theme.dangerSoft : Theme.surface, in: RoundedRectangle(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).stroke(flag.critical ? Theme.danger : (flag.outOfRange ? Theme.warning : Theme.line), lineWidth: flag.outOfRange ? 2 : 1))
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// The value shown for a result: the number without its unit, the written result, or «Pendiente».
+enum LabResultCopy {
+    static func value(_ item: LabOrderItem) -> String {
+        guard let result = item.result else { return LabFlag.pending.label }
+        if result.value != nil { return PatientLabRules.valueText(result, unit: nil) }
+        return result.text ?? "—"
     }
 }
 
@@ -1048,12 +1135,12 @@ struct MoreView: View {
                 NavigationLink { PatientSectionView(section: section, profile: profile) } label: {
                     SectionCard {
                         HStack(spacing: Spacing.m) {
-                            Image(systemName: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
+                            SectionIcon(icon: section.icon, symbol: section.symbol).foregroundStyle(Theme.primaryText).frame(width: 28).accessibilityHidden(true)
                             Text(LocalizedStringKey(section.titleKey)).font(Typo.subheading).foregroundStyle(Theme.ink)
                             Spacer()
                             // D1: the unread count (`noLeidos`) on the Avisos entry.
                             if section == .avisos, let unread = NoticeRules.badge(notices.inbox, hiding: notices.hidden) { UnreadBadge(count: unread) }
-                            Image(systemName: "chevron.right").foregroundStyle(Theme.muted).accessibilityHidden(true)
+                            ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
                         }
                     }
                 }.buttonStyle(.plain)
@@ -1084,7 +1171,7 @@ struct PatientSectionView: View {
             case .vinculacion: LinkRecordView()
             case .historial:
                 if let patientId = profile.patientId { ClinicalHistoryView(patientId: patientId) }
-                else { EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked"), symbol: "link") }
+                else { EmptyStateView(title: L.text("home.unlinked.title"), message: L.text("exams.unlinked")) }
             case .ambulancia: AmbulanceRequestView()
             case .hospital: HospitalInfoView()
             case .ubicacion: LocationView()
@@ -1102,32 +1189,24 @@ struct PatientSectionView: View {
     }
 }
 
-/// I03 · Vincular expediente (G2). Opens in the real state of the request (`GET /me/vinculacion`): the form when there is
-/// none, «En revisión desde …», approved, or rejected with the reason and «Volver a pedir» filled with what was declared.
-/// A failed read is shown with «Reintentar» and is never taken as "no request", so nobody asks twice. It rereads on
-/// `vinculacion.*` (tiempo real).
+/// I03 · Vincular expediente (U12). Linking is automatic by verified email (`GET /me/vinculacion`): the linked state, a
+/// request to confirm the email first, or «Pide en Recepción que anoten este correo: {email}». There is no form: the
+/// account joins its record on its next session or when Recepción saves that email on the record. A failed read is shown
+/// with «Reintentar». It rereads on `vinculacion.*` (tiempo real); a refreshed profile with a record shows it linked.
 struct LinkRecordView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
     @State private var loader = Loader<MyLink>()
-    @State private var submission = Submission()
-    @State private var dui = ""
-    @State private var birth = Calendar.current.date(byAdding: .year, value: -30, to: Date()) ?? Date()
-    @State private var errors: [String: String] = [:]
-    /// The request this screen just created, until a read returns it.
-    @State private var sent: LinkRequestResult?
-    /// «Volver a pedir» after a rejection: the form, filled with what was declared.
-    @State private var retrying = false
 
     private var profileLinked: Bool { account.profile?.patientId != nil }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             if profileLinked {
-                PatientNotice(text: L.text("link.approved"))
+                content(.linked)
             } else {
                 LoadState(loader: loader, retry: load) { link in
-                    content(LinkStatusRules.screen(link, profileLinked: false, sent: sent))
+                    content(LinkStatusRules.screen(link, profileLinked: false))
                 }
             }
         }
@@ -1136,76 +1215,30 @@ struct LinkRecordView: View {
 
     @ViewBuilder private func content(_ screen: LinkStatusRules.Screen) -> some View {
         switch screen {
-        case .form:
-            form
-        case let .pending(since):
-            SectionCard(eyebrow: L.text("link.status")) {
-                PatientTag(LinkState.pendiente.rawValue, label: LinkStatusRules.pendingText(since))
-                EmptyNote("link.pending.body")
-            }
-        case .approved:
+        case .linked:
             PatientNotice(text: L.text("link.approved"))
-        case let .rejected(reason, prefill):
-            PatientNotice(text: LinkStatusRules.rejectedText(reason), failure: true)
-            if retrying {
-                form
-            } else {
-                ClimesaButton(title: L.text("link.retry")) {
-                    if let prefill {
-                        dui = prefill.dui
-                        if let day = LinkStatusRules.birthDate(prefill.birth) { birth = day }
-                    }
-                    retrying = true
-                }
-            }
+        case let .emailNotVerified(email):
+            // Confirm the email first: only a confirmed email joins the account with the record.
+            PatientNotice(text: LinkStatusRules.confirmEmailText, failure: true)
+            receptionCard(email)
+        case let .askReception(email):
+            receptionCard(email)
         }
     }
 
-    @ViewBuilder private var form: some View {
-        Text("link.intro").font(Typo.body).foregroundStyle(Theme.muted)
-        SectionCard {
-            FormField(label: L.text("link.dui"), text: $dui, error: errors["dui"] ?? submission.fieldErrors["dui"])
-                .keyboardType(.numbersAndPunctuation)
-            VStack(alignment: .leading, spacing: Spacing.s) {
-                DatePicker("link.birth", selection: $birth, in: ...Date(), displayedComponents: .date).font(Typo.label).foregroundStyle(Theme.ink)
-                FieldError(text: errors["birth"] ?? submission.fieldErrors["birth"])
-            }
+    /// «Pide en Recepción que anoten este correo: {email}», with what happens next.
+    private func receptionCard(_ email: String?) -> some View {
+        SectionCard(eyebrow: L.text("link.status")) {
+            Text(verbatim: LinkStatusRules.receptionText(email)).font(Typo.body).foregroundStyle(Theme.ink)
+            EmptyNote("link.reception.body")
         }
-        PatientSubmissionNotice(submission: submission)
-        ClimesaButton(title: L.text("link.submit"), loading: submission.busy) { Task { await send() } }
     }
 
     private func load() async {
         await loader.load { try await account.client().get("/me/vinculacion", as: MyLink.self) }
         guard let link = loader.value else { return }
-        if link.request?.id == sent?.id { sent = nil }
-        // Approved on the server before the profile knows it: refresh the profile so the tabs follow.
-        if LinkStatusRules.screen(link, profileLinked: false) == .approved { await account.refreshProfile() }
-    }
-
-    private func send() async {
-        let day = Self.dayText(birth)
-        errors = LinkRules.errors(dui: dui, birth: day, today: Date())
-        guard errors.isEmpty else { return }
-        let body = LinkRules.body(dui: dui, birth: day)
-        var created: LinkRequestResult?
-        let ok = await submission.run(body: body) { key in
-            created = try await account.client().send("POST", "/cuentas/vinculacion", body: body, key: key, as: LinkRequestResult.self)
-        }
-        guard ok, let created else { return }
-        sent = created
-        retrying = false
-        await load()
-    }
-
-    /// La fecha elegida en el calendario del dispositivo, como `yyyy-MM-dd`.
-    static func dayText(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "en_US_POSIX")
-        formatter.timeZone = .current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: date)
+        // Linked on the server before the profile knows it: refresh the profile so the tabs follow.
+        if LinkStatusRules.screen(link, profileLinked: false) == .linked { await account.refreshProfile() }
     }
 }
 
@@ -1224,7 +1257,7 @@ struct ClinicalHistoryView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             if let denied = RecordAccess.deniedMessage(for: loader.failure, viewerIsPatient: viewerIsPatient) {
-                EmptyStateView(title: L.text("history.forbidden.title"), message: denied, symbol: "lock.shield")
+                InfoStateView(message: denied, title: L.text("history.forbidden.title"))
             } else {
                 LoadState(loader: loader, retry: load) { history in
                     // S4: the history's `allowedActions` decide when present; otherwise the permission, as before.
@@ -1257,7 +1290,7 @@ private struct HistoryContent: View {
                 }
             }
             SectionTitle("history.consultations")
-            if history.consultations.isEmpty { EmptyStateView(title: L.text("history.none"), symbol: "stethoscope") }
+            if history.consultations.isEmpty { EmptyStateView(title: L.text("history.none")) }
             ForEach(history.consultations) { consultation in
                 NavigationLink {
                     ScreenFrame(title: "history.consultation") { ConsultationRecord(consultation: consultation) }
@@ -1268,24 +1301,31 @@ private struct HistoryContent: View {
                                 meta: consultation.diagnoses.isEmpty ? nil : consultation.diagnoses.map { "\($0.code) \($0.description)" }.joined(separator: " · ")) {
                             PatientTag(consultation.state.rawValue, label: consultation.state.label)
                         }
+                        // Lote 5 S16: the row says when the consultation left a prescription, opened in its detail.
+                        if !consultation.prescriptions.isEmpty {
+                            Label { Text(verbatim: HistoryCopy.prescriptionLine(consultation.prescriptions.reduce(0) { $0 + $1.items.count })) } icon: { ClimesaIcon(.clipboard, size: 14) }
+                                .font(Typo.small).foregroundStyle(Theme.primaryText)
+                        }
                     }
                 }.buttonStyle(.plain)
             }
             SectionTitle("history.laboratory")
-            if history.laboratory.isEmpty { EmptyStateView(title: L.text("history.none"), symbol: "testtube.2") }
-            ForEach(history.laboratory) { order in
-                SectionCard {
-                    ListRow(title: ClimesaDates.display(order.createdAt, .date)) { PatientTag(order.state.rawValue, label: order.state.label) }
-                    ForEach(order.items) { item in
-                        HStack {
-                            Text(verbatim: item.name).font(Typo.small).foregroundStyle(Theme.ink)
-                            Spacer()
-                            if let result = item.result {
-                                Text(verbatim: PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark), unit: item.unit)).font(Typo.mono).foregroundStyle(Theme.ink)
-                                if let mark = result.mark { PatientTag(mark.rawValue, label: mark.label) }
+            if history.laboratory.isEmpty { EmptyStateView(title: L.text("history.none")) }
+            // Lote 5 S15: one row per order (exams, date, how many fell out of range); its detail says why it was ordered.
+            ForEach(ClinicalRecordLab.rows(history)) { row in
+                if let order = history.laboratory.first(where: { $0.id == row.orderId }) {
+                    NavigationLink {
+                        ScreenFrame(title: "history.lab.detail") { RecordLabDetail(order: order, history: history, viewerIsPatient: viewerIsPatient) }
+                    } label: {
+                        SectionCard {
+                            ListRow(title: row.exams, subtitle: ClinicalRecordLab.summary(row), meta: ClimesaDates.display(row.orderedAt, .date)) {
+                                HStack(spacing: Spacing.s) {
+                                    PatientTag(order.state.rawValue, label: order.state.label)
+                                    ClimesaIcon(.chevron, size: 16).foregroundStyle(Theme.muted).accessibilityHidden(true)
+                                }
                             }
                         }
-                    }
+                    }.buttonStyle(.plain)
                 }
             }
             if !viewerIsPatient && !history.admissions.isEmpty {
@@ -1294,6 +1334,59 @@ private struct HistoryContent: View {
                     SectionCard {
                         ListRow(title: ClimesaDates.display(admission.createdAt, .date), subtitle: admission.doctor.name) {
                             PatientTag(admission.state.rawValue, label: admission.state.label)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Copy of the record list that depends on a count.
+enum HistoryCopy {
+    static func prescriptionLine(_ medicines: Int) -> String {
+        medicines == 1 ? "Con receta · 1 medicamento" : "Con receta · \(medicines) medicamentos"
+    }
+}
+
+/// Lote 5 S15 · one order of the record: «Por qué se pidió» (consultation, doctor, reason, diagnoses), then its results.
+private struct RecordLabDetail: View {
+    let order: ClinicalHistory.LabOrder
+    let history: ClinicalHistory
+    var viewerIsPatient = true
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionCard(title: L.text("history.lab.why")) {
+                if let origin = LabOriginRules.of(history, consultationId: order.consultationId) {
+                    ListRow(title: String(format: L.text("history.lab.origin"), ClimesaDates.display(origin.date, .date)),
+                            subtitle: origin.doctor ?? L.text("history.doctor.unknown"))
+                    if let reason = origin.reason {
+                        Text(verbatim: reason).font(Typo.body).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                    }
+                    ForEach(origin.diagnoses, id: \.self) { diagnosis in
+                        Text(verbatim: diagnosis).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                    }
+                } else {
+                    Text("history.lab.noOrigin").font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            SectionCard {
+                ListRow(title: L.text("history.lab.ordered"), meta: ClimesaDates.display(order.createdAt, .date)) {
+                    PatientTag(order.state.rawValue, label: order.state.label)
+                }
+                if let row = ClinicalRecordLab.rows(history).first(where: { $0.orderId == order.id }) {
+                    Text(verbatim: ClinicalRecordLab.summary(row)).font(Typo.label).foregroundStyle(Theme.warning)
+                }
+            }
+            SectionCard(title: L.text("history.laboratory")) {
+                ForEach(order.items) { item in
+                    HStack {
+                        Text(verbatim: item.name).font(Typo.small).foregroundStyle(Theme.ink).fixedSize(horizontal: false, vertical: true)
+                        Spacer()
+                        if let result = item.result {
+                            Text(verbatim: PatientLabRules.valueText(LabItemResult(value: result.value, text: result.text, mark: result.mark), unit: item.unit)).font(Typo.mono).foregroundStyle(Theme.ink)
+                            if let mark = result.mark { PatientTag(mark.rawValue, label: mark.label) }
                         }
                     }
                 }
@@ -1337,7 +1430,7 @@ struct LabeledText: View {
     let label: LocalizedStringKey
     let text: String
     var body: some View {
-        SectionCard { Text(label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase); Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink) }
+        SectionCard { Text(label).font(Typo.eyebrow).foregroundStyle(Theme.primaryText).textCase(.uppercase).tracking(Typo.eyebrowTracking); Text(verbatim: text).font(Typo.body).foregroundStyle(Theme.ink) }
     }
 }
 
@@ -1347,19 +1440,18 @@ struct LabeledText: View {
 struct AmbulanceRequestView: View {
     @EnvironmentObject private var account: AccountModel
     @Environment(LiveViewModel.self) private var live
-    @State private var loader = Loader<[OwnAmbulanceRequest]>()
-    @State private var submission = Submission()
-    @State private var cancelling: OwnAmbulanceRequest?
-    @State private var cancelReason = ""
-    @State private var address = ""
-    @State private var municipality = ""
-    @State private var reason = ""
-    @State private var phone = ""
-    @State private var errors: [String: String] = [:]
-    /// S13: the notice naming what the contact on file filled (address, phone or both), to say where it came from.
-    @State private var prefillNotice: String?
-    /// The prefill runs once per screen, so a field the patient cleared is not filled again when the view reappears.
-    @State private var didPrefill = false
+    /// S13: the form, the own requests, the prefill and the writes live in the view model; the view draws them.
+    @State private var model = AmbulanceRequestViewModel()
+    private var loader: Loader<[OwnAmbulanceRequest]> { model.loader }
+    private var submission: Submission { model.submission }
+    private var errors: [String: String] { model.errors }
+    private var prefillNotice: String? { model.prefillNotice }
+
+    /// The view model, bound to the session's client before each call.
+    private var vm: AmbulanceRequestViewModel {
+        model.client = { [account] in try account.client() }
+        return model
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -1385,7 +1477,7 @@ struct AmbulanceRequestView: View {
         }
         .task(id: live.snapshot.version(.ambulance)) { await load() }
         .task { await prefill() }
-        .sheet(item: $cancelling) { request in cancelSheet(request) }
+        .sheet(item: $model.cancelling) { request in cancelSheet(request) }
     }
 
     private func activeCard(_ request: OwnAmbulanceRequest) -> some View {
@@ -1403,23 +1495,23 @@ struct AmbulanceRequestView: View {
                     HStack {
                         Text(verbatim: AmbulanceRules.milestoneLabel(type)).font(Typo.small).foregroundStyle(done == nil ? Theme.muted : Theme.ink)
                         Spacer()
-                        Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.mono).foregroundStyle(Theme.muted)
+                        Text(verbatim: done.map { ClimesaDates.display($0.occurredAt, .time) } ?? "—").font(Typo.time).foregroundStyle(Theme.muted)
                     }
                 }
             }
             Text(verbatim: request.notice).font(Typo.small).foregroundStyle(Theme.muted)
             PatientSubmissionNotice(submission: submission)
             if request.canCancel {
-                CrudButton(kind: .deactivate, label: L.text("ambulance.cancel"), loading: submission.busy) { cancelReason = ""; cancelling = request }
+                CrudButton(kind: .deactivate, label: L.text("ambulance.cancel"), loading: submission.busy) { model.askCancel(request) }
             }
         }
     }
 
     private func cancelSheet(_ request: OwnAmbulanceRequest) -> some View {
         NavigationStack {
-            ScreenFrame(title: "ambulance.cancel", onClose: { cancelling = nil }) {
+            ScreenFrame(title: "ambulance.cancel", onClose: { model.cancelling = nil }) {
                 Text("ambulance.cancel.detail").font(Typo.body).foregroundStyle(Theme.ink)
-                PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $cancelReason, lines: 2...4, error: nil)
+                PatientTextArea(label: L.text("ambulance.cancel.reason"), text: $model.cancelReason, lines: 2...4, error: nil)
                 ClimesaButton(title: L.text("ambulance.cancel"), kind: .destructive, loading: submission.busy) { Task { await cancel(request) } }
             }
         }
@@ -1429,10 +1521,10 @@ struct AmbulanceRequestView: View {
         VStack(alignment: .leading, spacing: 16) {
                 SectionCard {
                     if let prefillNotice { Text(LocalizedStringKey(prefillNotice)).font(Typo.small).foregroundStyle(Theme.muted).fixedSize(horizontal: false, vertical: true) }
-                    PatientTextArea(label: L.text("ambulance.address"), text: $address, lines: 1...3, error: errors["address"] ?? submission.fieldErrors["address"])
-                    FormField(label: L.text("ambulance.municipality"), text: $municipality)
-                    PatientTextArea(label: L.text("ambulance.reason"), text: $reason, lines: 2...5, error: errors["reason"] ?? submission.fieldErrors["reason"])
-                    FormField(label: L.text("ambulance.phone"), text: $phone, error: errors["contactPhone"] ?? submission.fieldErrors["contactPhone"])
+                    PatientTextArea(label: L.text("ambulance.address"), text: $model.address, lines: 1...3, error: errors["address"] ?? submission.fieldErrors["address"])
+                    FormField(label: L.text("ambulance.municipality"), text: $model.municipality)
+                    PatientTextArea(label: L.text("ambulance.reason"), text: $model.reason, lines: 2...5, error: errors["reason"] ?? submission.fieldErrors["reason"])
+                    FormField(label: L.text("ambulance.phone"), text: $model.phone, error: errors["contactPhone"] ?? submission.fieldErrors["contactPhone"])
                         .keyboardType(.phonePad).textContentType(.telephoneNumber)
                 }
                 PatientSubmissionNotice(submission: submission)
@@ -1440,41 +1532,19 @@ struct AmbulanceRequestView: View {
         }
     }
 
-    private func load() async { await loader.load { try await account.client().get("/ambulancia/solicitudes/mias", as: [OwnAmbulanceRequest].self) } }
+    private func load() async { await vm.load() }
 
-    /// Fills address and phone from "Mis datos" (`GET /me/paciente`) without overwriting what was typed. Best effort:
-    /// if the read fails, the form stays empty and works as before.
+    /// Prefill from "Mis datos" only for a linked patient who may read it (best effort, once per screen).
     private func prefill() async {
-        guard !didPrefill else { return }
-        didPrefill = true
-        guard let profile = account.profile, profile.patientId != nil,
-              profile.hasPermission(AppSection.misDatos.requiredPermission ?? "") else { return }
-        guard let patient = try? await account.client().get("/me/paciente", as: PatientProfile.self) else { return }
-        // Recompute against the fields as they are now: the patient may have typed while the read was in flight.
-        let filled = AmbulancePrefillRules.prefill(address: address, phone: phone, from: patient)
-        address = filled.address
-        phone = filled.phone
-        prefillNotice = filled.noticeKey
+        let allowed = account.profile.map { $0.patientId != nil && $0.hasPermission(AppSection.misDatos.requiredPermission ?? "") } ?? false
+        await vm.prefill(allowed: allowed)
     }
 
     private func cancel(_ request: OwnAmbulanceRequest) async {
-        let body = AmbulanceCancelBody(version: request.version, reason: cancelReason)
-        let ok = await submission.run(request.id, body: body, success: L.text("ambulance.cancel.done")) { key in
-            _ = try await account.client().send("POST", "/ambulancia/solicitudes/\(request.id)/cancelar", body: body, key: key, as: AmbulanceRequestStateResult.self)
-        }
-        if ok { cancelling = nil }
-        await load()
+        await vm.cancel(request, success: L.text("ambulance.cancel.done"))
     }
 
-    private func send() async {
-        errors = AmbulanceRules.errors(address: address, reason: reason, phone: phone)
-        guard errors.isEmpty else { return }
-        let body = AmbulanceRules.body(address: address, municipality: municipality, reason: reason, phone: phone)
-        let ok = await submission.run(body: body) { key in
-            _ = try await account.client().send("POST", "/ambulancia/solicitudes", body: body, key: key, as: AmbulanceRequestCreated.self)
-        }
-        if ok { await load() }
-    }
+    private func send() async { await vm.send() }
 }
 
 /// I11 · Quién vio mi expediente: fecha, rol y motivo de cada acceso.
@@ -1486,7 +1556,7 @@ struct MyAccessView: View {
 
     var body: some View {
         LoadState(loader: loader, retry: load) { rows in
-            if rows.isEmpty { EmptyStateView(title: L.text("accesses.none"), symbol: "eye.slash") }
+            if rows.isEmpty { EmptyStateView(title: L.text("accesses.none")) }
             // Grouped by day ("Hoy · mié 18 nov"); the last week stays open, older days fold under one line.
             let now = Date()
             let days = AccessLogRules.byDay(rows, now: now)
@@ -1508,18 +1578,32 @@ struct MyAccessView: View {
     }
 
     @ViewBuilder private func accessDay(_ day: AccessLogRules.Day, now: Date) -> some View {
-        ListCard(title: ClimesaDates.shortDay(day.day, now: now), items: Array(day.rows.enumerated()).map { AccessItem(index: $0.offset, row: $0.element) }) { item in
-            ListRow(title: String(format: L.text("accesses.row"), RoleNames.label(item.row.role), item.row.dataType),
-                    subtitle: String(format: L.text("accesses.reason"), item.row.reason), meta: ClimesaDates.display(item.row.date, .time))
+        // D130: a burst of the same access is one row; who and what in plain words; an urgent access is marked.
+        let groups = AccessLogRules.collapse(day.rows)
+        ListCard(title: ClimesaDates.shortDay(day.day, now: now), items: Array(groups.enumerated()).map { AccessItem(index: $0.offset, group: $0.element) }) { item in
+            let row = item.group.row
+            ListRow(title: AccessLogRules.who(row, roleLabel: RoleNames.label(row.role)),
+                    subtitle: [AccessLogRules.detail(row), AccessLogRules.burstText(item.group.count)].compactMap { $0 }.joined(separator: " · "),
+                    meta: accessTime(item.group)) {
+                if row.isUrgent { PatientTag("critico_alto", label: AccessLogRules.urgentLabel) }
+            }
         }
+    }
+
+    /// One time, or «HH:mm a HH:mm» when the row stands for a burst.
+    private func accessTime(_ group: AccessLogRules.Group) -> String {
+        let last = ClimesaDates.display(group.latest, .time)
+        guard group.count > 1 else { return last }
+        let first = ClimesaDates.display(group.earliest, .time)
+        return first == last ? last : "\(first) a \(last)"
     }
 
     private func load() async { await loader.load { try await account.client().get("/me/accesos", as: [MyAccess].self) } }
 }
 
-/// One row of a day of «Quién vio mi expediente» (rows have no id of their own).
+/// One row (one access or one burst, D130) of a day of «Quién vio mi expediente» (rows have no id of their own).
 private struct AccessItem: Identifiable {
     let index: Int
-    let row: MyAccess
+    let group: AccessLogRules.Group
     var id: Int { index }
 }

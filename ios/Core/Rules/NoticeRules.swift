@@ -86,10 +86,17 @@ public enum NoticeRules {
         return unread > 0 ? unread : nil
     }
 
-    /// Text on the bell: "4", "9+" over nine, nil for none.
+    /// Text on the bell: "4", "99+" over ninety-nine (Lote 5 S1, Android `bellBadgeText`), nil for none.
     public static func badgeText(_ count: Int?) -> String? {
         guard let count, count > 0 else { return nil }
-        return count > 9 ? "9+" : String(count)
+        return count > 99 ? "99+" : String(count)
+    }
+
+    /// Look of the bell count (web `.notices-bell-count`): a white pill with primary text, red only while an in-force
+    /// critical notice is unread. Nil when there is no count to show.
+    public static func bellBadgeTone(_ inbox: NoticeInbox?, hiding hidden: Set<String> = []) -> BellBadgeTone? {
+        guard badgeText(badge(inbox, hiding: hidden)) != nil else { return nil }
+        return bellIsCritical(inbox, hiding: hidden) ? .critical : .neutral
     }
 
     /// The bell turns red while an in-force critical notice is still unread (and was not handled here).
@@ -190,6 +197,12 @@ public enum NoticeRules {
         return String(format: "%.1f", hours).replacingOccurrences(of: ".", with: ",")
     }
 
+    /// D68: the answer to «Enterado» on the Inicio banner, shown there (not later in Avisos).
+    public static let acknowledgedText = "Listo: diste «Enterado»."
+
+    /// D68: the answer to «Recordarme en N h», with the hours so it says when the notice comes back.
+    public static func snoozedText(_ hours: Double) -> String { "Listo: te lo recordamos en \(hoursText(hours)) h." }
+
     /// Mensaje en español de un «Enterado» o «Recordarme» rechazado. Tras el error la bandeja se vuelve a leer.
     public static func actionMessage(_ error: Error) -> String {
         switch (error as? APIFailure)?.code {
@@ -199,4 +212,9 @@ public enum NoticeRules {
         default: return error.userMessage
         }
     }
+}
+
+/// Bell count look: `neutral` is the white pill with primary text, `critical` the red one.
+public enum BellBadgeTone: Equatable, Sendable {
+    case neutral, critical
 }

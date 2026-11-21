@@ -248,3 +248,6 @@ enum Query {
         return value.addingPercentEncoding(withAllowedCharacters:allowed) ?? ""
     }
 }
+
+/// S13: the screen view models (Core/ViewModels) reach the API through this protocol; `APIClient` already has both calls.
+extension APIClient: ClinicalAPI {}
