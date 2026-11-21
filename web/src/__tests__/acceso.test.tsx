@@ -45,28 +45,22 @@ beforeEach(() => {
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.clearAllMocks(); });
 
 describe('portal según plataformas del perfil', () => {
-  it('muestra "Tu rol no usa esta aplicación" si el perfil no incluye web (MED: Android e iOS)', async () => {
+  it('un rol sin web (MED: Android e iOS) vuelve al ingreso con el mismo error genérico de credenciales', async () => {
     auth.getSession.mockResolvedValue({ data: { session } });
     responderPerfil(perfil(['MED'], ['android', 'ios']));
     render(<App />);
-    expect(await screen.findByText('Tu rol no usa esta aplicación')).toBeTruthy();
-    expect(screen.getByText(/Android e iOS|iOS e Android/)).toBeTruthy();
+    expect(await screen.findByText('Correo o contraseña incorrectos, o la cuenta todavía no está activa.')).toBeTruthy();
+    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(screen.queryByText('Tu rol no usa esta aplicación')).toBeNull();
     expect(screen.queryByRole('navigation', { name: 'Navegación principal' })).toBeNull();
   });
 
-  it('muestra "Tu rol no usa esta aplicación" para un paciente (PAC)', async () => {
+  it('una cuenta que la API rechaza (403) tampoco revela el motivo', async () => {
     auth.getSession.mockResolvedValue({ data: { session } });
-    responderPerfil(perfil(['PAC'], ['android', 'ios']));
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ title: 'Cuenta desactivada', status: 403 }), { status: 403, headers: { 'Content-Type': 'application/problem+json' } }))));
     render(<App />);
-    expect(await screen.findByText('Tu rol no usa esta aplicación')).toBeTruthy();
-  });
-
-  it('cierra la sesión local desde el aviso de rol sin web', async () => {
-    auth.getSession.mockResolvedValue({ data: { session } });
-    responderPerfil(perfil(['MED'], ['android', 'ios']));
-    render(<App />);
-    await userEvent.click(await screen.findByRole('button', { name: /Cerrar sesión/ }));
-    expect(auth.signOut).toHaveBeenCalledWith({ scope: 'local' });
+    expect(await screen.findByText('Correo o contraseña incorrectos, o la cuenta todavía no está activa.')).toBeTruthy();
+    expect(screen.queryByText(/Cuenta desactivada|no tiene acceso/)).toBeNull();
   });
 
   it('muestra la navegación del portal si el perfil incluye web (ADM)', async () => {
