@@ -26,7 +26,7 @@
     <!-- Turnos: filtros de estado, área y rol -->
 
     <!-- Laboratorio: recorrido de la orden -->
-    <string name="lab_ayuda">Cada orden avanza por pasos: Solicitada, Muestra, En proceso, Completada, Revisada y Visible al paciente. Abajo de cada una verás quién actúa ahora.</string>
+    <string name="lab_ayuda">Cada orden avanza por pasos: Solicitada, Muestra, En Proceso, Completada, Revisada y Visible al paciente. Abajo de cada una verás quién actúa ahora.</string>
     <string name="lab_ayuda_paciente">Tus exámenes y en qué paso van. Los valores aparecen cuando tu médico los revisa.</string>
     <string name="lab_paso_actual">Paso %1$d de %2$d: %3$s</string>
     <string name="lab_paso_completo">Completo: resultados liberados</string>

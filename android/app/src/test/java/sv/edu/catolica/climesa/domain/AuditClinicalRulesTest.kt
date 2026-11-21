@@ -15,7 +15,7 @@ class AuditClinicalRulesTest {
     @Test fun pasoActualDiceLoQueFalta() {
         assertEquals("Revisión del médico", LabFlow.currentLabel(4))
         assertEquals("Toma de muestra", LabFlow.currentLabel(1))
-        assertEquals("En proceso", LabFlow.currentLabel(2))
+        assertEquals("En Proceso", LabFlow.currentLabel(2))
     }
 
     // D71: the inbox row keeps which values come from a critical item.

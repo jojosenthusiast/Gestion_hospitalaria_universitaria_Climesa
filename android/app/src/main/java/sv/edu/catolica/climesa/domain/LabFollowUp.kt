@@ -208,7 +208,7 @@ object LabProposalRules {
 
 /** Worklist groups in the order work happens; what is closed starts folded. Same groups as the web list. */
 enum class LabGroup(val label: String, val folded: Boolean) {
-    IN_PROCESS("En proceso", false), SAMPLE("Por tomar muestra", false), EXTERNAL("Externas: esperan el informe", false),
+    IN_PROCESS("En Proceso", false), SAMPLE("Por tomar muestra", false), EXTERNAL("Externas: esperan el informe", false),
     TO_REVIEW("Esperan revisión médica", false), RELEASED("Liberadas", true), CANCELLED("Canceladas", true),
 }
 

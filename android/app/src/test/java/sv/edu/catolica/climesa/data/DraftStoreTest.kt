@@ -8,7 +8,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class DraftStoreTest {
-    private fun store() = FileDraftStore(Files.createTempDirectory("borradores").toFile())
+    private fun store() = FileDraftStore(Files.createTempDirectory("borradores").toFile(), sv.edu.catolica.climesa.data.TestCipher)
 
     @Test fun aSavedDraftComesBackForTheSameUserAndKey() {
         val drafts = store()
@@ -47,10 +47,53 @@ class DraftStoreTest {
 
     @Test fun aCorruptFileReadsAsNoDraft() {
         val root = Files.createTempDirectory("borradores").toFile()
-        val drafts = FileDraftStore(root)
+        val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
         drafts.save("u-1", "k", JSONObject().put("a", 1))
         root.walkTopDown().filter { it.isFile }.forEach { it.writeText("{no es json") }
         assertNull(drafts.load("u-1", "k"))
+        // S8: a file that does not decrypt is deleted, not kept around.
+        assertTrue(root.walkTopDown().none { it.isFile })
+    }
+
+    /** S8: drafts are encrypted at rest; the clinical text never appears in the file, yet it reads back intact. */
+    @Test fun aDraftIsEncryptedOnDiskAndReadsBack() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
+        val value = JSONObject().put("plan", "Reposo absoluto y control de glucosa")
+        assertTrue(drafts.save("u-1", "consulta:c1", value))
+        val bytes = root.walkTopDown().single { it.isFile }.readBytes()
+        val onDisk = String(bytes, Charsets.ISO_8859_1)
+        assertTrue(!onDisk.contains("Reposo absoluto") && !onDisk.contains("\"plan\"") && !onDisk.contains(value.toString()))
+        assertEquals(value.toString(), drafts.load("u-1", "consulta:c1").toString())
+    }
+
+    /** S8: a draft left in clear text by an older version is kept and sealed on first read, so pending queues survive the update. */
+    @Test fun aLegacyPlaintextDraftIsMigratedToCiphertext() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        val legacy = java.io.File(root, "u-1/hitos.json").apply { parentFile?.mkdirs(); writeText("""{"items":[{"hito":"salida"}]}""") }
+        val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
+        assertEquals("salida", drafts.load("u-1", "hitos")?.getJSONArray("items")?.getJSONObject(0)?.getString("hito"))
+        assertTrue(legacy.exists())
+        assertTrue(!String(legacy.readBytes(), Charsets.ISO_8859_1).contains("salida"))
+        assertEquals("salida", drafts.load("u-1", "hitos")?.getJSONArray("items")?.getJSONObject(0)?.getString("hito"))
+    }
+
+    /** S10: every saved draft counts as activity, so typing a long note never trips the inactivity sign-out. */
+    @Test fun savingADraftReportsActivity() {
+        var writes = 0
+        val drafts = FileDraftStore(Files.createTempDirectory("borradores").toFile(), sv.edu.catolica.climesa.data.TestCipher) { writes++ }
+        drafts.save("u-1", "consulta", JSONObject().put("motivo", "dolor"))
+        assertEquals(1, writes)
+    }
+
+    /** S8: a draft sealed with another key (or tampered) is deleted and reads as absent. */
+    @Test fun aForeignKeyDraftIsDeleted() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
+        val other = FileDraftStore(root, AesGcmCipher { javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey() })
+        other.save("u-1", "signos", JSONObject().put("fc", "90"))
+        assertNull(drafts.load("u-1", "signos"))
+        assertTrue(root.walkTopDown().none { it.isFile })
     }
 
     @Test fun endingTheSessionByHandOrByInactivityDropsEveryDraft() {
@@ -88,7 +131,7 @@ class DraftStoreTest {
     /** Re-review of #117: pending writes hold clinical data; they expire 24 h after their last write, on app start or any sign-in. */
     @Test fun pendingWritesExpireAfterOneDay() {
         val root = Files.createTempDirectory("borradores").toFile()
-        val drafts = FileDraftStore(root)
+        val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
         var clock = 0L
         val session = SessionDrafts(drafts) { clock }
         drafts.save("par-1", "hitos:cola", JSONObject().put("items", org.json.JSONArray().put(JSONObject().put("type", "en_escena"))))
@@ -113,7 +156,7 @@ class DraftStoreTest {
     /** Sweep U6 defect 2: the "results seen" marker is not clinical data; it never expires and still survives sign-out. */
     @Test fun theResultsSeenMarkerNeverExpiresAndSurvivesSignOut() {
         val root = Files.createTempDirectory("borradores").toFile()
-        val drafts = FileDraftStore(root)
+        val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
         var clock = 0L
         val session = SessionDrafts(drafts) { clock }
         ResultsSeen.mark(drafts, "pac-1", java.time.Instant.parse("2026-11-10T08:00:00Z"))

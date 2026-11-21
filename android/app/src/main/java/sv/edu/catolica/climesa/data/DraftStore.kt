@@ -64,10 +64,18 @@ object NoDraftStore : DraftStore {
 }
 
 /**
- * One JSON file per draft under `[root]/<user>/<key>.json`, in app-private storage excluded from backups
+ * One file per draft under `[root]/<user>/<key>.json`, in app-private storage excluded from backups
  * ([of] uses `noBackupFilesDir`). Names are reduced to safe characters so a key never leaves its user folder.
+ * The JSON is sealed with [cipher] (AES-GCM with an Android Keystore key in the app): clinical text is never stored in clear.
+ * A file written in clear before encryption is sealed on its first read; one that does not decrypt (tampered, or whose
+ * key is gone) is deleted and reads as no draft.
  */
-class FileDraftStore(private val root: File) : DraftStore {
+class FileDraftStore(
+    private val root: File,
+    private val cipher: PayloadCipher,
+    /** Called after every successful save: a draft autosaved while typing counts as activity for the inactivity sign-out. */
+    private val onWrite: () -> Unit = {},
+) : DraftStore {
     private fun safe(value: String) = value.map { if (it.isLetterOrDigit() || it == '-' || it == '_') it else '_' }.joinToString("").ifBlank { "_" }
     private fun folder(userId: String) = File(root, safe(userId))
     private fun file(userId: String, key: String) = File(folder(userId), safe(key) + ".json")
@@ -76,14 +84,22 @@ class FileDraftStore(private val root: File) : DraftStore {
         val target = file(userId, key)
         target.parentFile?.mkdirs()
         val temp = File(target.parentFile, target.name + ".tmp")
-        temp.writeText(value.toString(), Charsets.UTF_8)
+        temp.writeBytes(cipher.encrypt(value.toString().toByteArray(Charsets.UTF_8)))
         if (!temp.renameTo(target)) { target.delete(); check(temp.renameTo(target)) }
         true
-    }.getOrDefault(false)
+    }.getOrDefault(false).also { if (it) runCatching(onWrite) }
 
-    @Synchronized override fun load(userId: String, key: String): JSONObject? = runCatching {
-        file(userId, key).takeIf { it.isFile }?.readText(Charsets.UTF_8)?.let(::JSONObject)
-    }.getOrNull()
+    @Synchronized override fun load(userId: String, key: String): JSONObject? {
+        val target = file(userId, key)
+        if (!target.isFile) return null
+        val bytes = runCatching { target.readBytes() }.getOrNull() ?: return null
+        runCatching { return JSONObject(String(cipher.decrypt(bytes), Charsets.UTF_8)) }
+        // Written in clear by a version before encryption: seal it now so pending queues survive the update.
+        val legacy = runCatching { JSONObject(String(bytes, Charsets.UTF_8)) }.getOrNull()
+        if (legacy != null && save(userId, key, legacy)) return legacy
+        runCatching { target.delete() }
+        return null
+    }
 
     @Synchronized override fun clear(userId: String, key: String) { runCatching { file(userId, key).delete() } }
 
@@ -113,6 +129,9 @@ class FileDraftStore(private val root: File) : DraftStore {
     }
 
     companion object {
-        fun of(context: Context) = FileDraftStore(File(context.noBackupFilesDir, "borradores"))
+        private const val KEY_ALIAS = "climesa_drafts_v1"
+
+        fun of(context: Context, onWrite: () -> Unit = {}) =
+            FileDraftStore(File(context.noBackupFilesDir, "borradores"), AesGcmCipher { AndroidKeyStoreKeys.getOrCreate(KEY_ALIAS) }, onWrite)
     }
 }

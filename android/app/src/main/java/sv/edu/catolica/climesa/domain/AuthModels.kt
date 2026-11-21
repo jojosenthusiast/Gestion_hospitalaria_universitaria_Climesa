@@ -120,7 +120,7 @@ object AndroidSections {
 
     /** Jefe de Operaciones and Laboratorio use the web only (D-090): they have no Android catalog and see "Tu rol no usa esta aplicación". */
     private val roleCatalog = mapOf(
-        "REC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
+        "REC" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.QUEUE, AndroidSection.PATIENTS, AndroidSection.APPOINTMENTS, AndroidSection.LINKING, AndroidSection.ADMISSION, AndroidSection.BEDS, AndroidSection.DISPATCH, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),
         "AST" to careStation,
         "ENF" to careStation,
         "MED" to listOf(AndroidSection.HOME, AndroidSection.NOTICES, AndroidSection.MEDICAL_DAY, AndroidSection.RESULT_REVIEW, AndroidSection.HOSPITALIZED, AndroidSection.RECORD, AndroidSection.VITAL_SIGNS, AndroidSection.AMBULANCE_ARRIVAL, AndroidSection.UNIT, AndroidSection.LOG, AndroidSection.SHIFTS, AndroidSection.HOSPITAL_INFO, AndroidSection.PROFILE),

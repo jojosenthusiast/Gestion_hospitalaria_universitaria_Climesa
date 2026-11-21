@@ -270,7 +270,7 @@ object RoleDashboard {
                 title, ChartKind.BARS,
                 listOf(
                     ChartSlice("Solicitadas", counts.requested, DashboardTone.WARNING),
-                    ChartSlice("En proceso", counts.inProcess, DashboardTone.PROCESS),
+                    ChartSlice("En Proceso", counts.inProcess, DashboardTone.PROCESS),
                     ChartSlice("Por revisar", counts.toReview, DashboardTone.RESERVED),
                     ChartSlice("Liberadas", counts.released, DashboardTone.SUCCESS),
                 ),

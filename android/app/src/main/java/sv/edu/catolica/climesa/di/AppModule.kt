@@ -26,7 +26,7 @@ object AppModule {
     /** Reads the document picked for a lab attachment upload (T07c). */
     @Provides @Singleton fun documents(@ApplicationContext context:Context):sv.edu.catolica.climesa.data.DocumentReader=sv.edu.catolica.climesa.data.ContentDocumentReader(context)
     /** Local drafts of long forms, per user (see [DraftStore]). */
-    @Provides @Singleton fun drafts(@ApplicationContext context:Context):DraftStore=FileDraftStore.of(context)
+    @Provides @Singleton fun drafts(@ApplicationContext context:Context):DraftStore=FileDraftStore.of(context){sv.edu.catolica.climesa.SessionActivity.timeout.touch()}
     @Provides @Singleton fun patients(api:ApiClient):PatientRepository=RemotePatientRepository(api)
     @Provides @Singleton fun beds(api:ApiClient):BedRepository=RemoteBedRepository(api)
     @Provides @Singleton fun roleSource(api:ApiClient):sv.edu.catolica.climesa.ui.RoleDataSource=object:sv.edu.catolica.climesa.ui.RoleDataSource{

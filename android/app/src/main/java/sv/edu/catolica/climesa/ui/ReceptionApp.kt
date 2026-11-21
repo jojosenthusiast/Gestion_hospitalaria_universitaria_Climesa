@@ -101,6 +101,7 @@ import java.time.format.DateTimeFormatter
             page==AndroidSection.QUEUE -> QueueScreen(account.profile,userId=account.session.userId,quickAction=inbox.actionFor(page),onQuickActionHandled={inbox.consume(page)},subject=inbox.subjectFor(page))
             page==AndroidSection.HOSPITAL_INFO -> HospitalInfoScreen()
             page==AndroidSection.DISPATCH -> AmbulanceScreen(page,account.profile,account.session.userId,quickAction=inbox.actionFor(page),onQuickActionHandled={inbox.consume(page)})
+            page==AndroidSection.LOG -> AmbulanceScreen(page,account.profile,account.session.userId)
             page==AndroidSection.ADMISSION -> HospitalizationScreen(profile=account.profile,quickAction=inbox.actionFor(page),onQuickActionHandled={inbox.consume(page)},subject=inbox.subjectFor(page))
             page==AndroidSection.SHIFTS -> MyShiftsScreen(account,"REC")
             page==AndroidSection.PROFILE -> Profile(state,dark,setDark,account,{if(!signingOut)logout()})

@@ -7,7 +7,7 @@ data class LabStep(val label: String, val status: LabStepStatus)
 
 /** Stage filters of the lab list: they tell each role which orders wait for it. */
 enum class LabFilter(val label: String) {
-    ALL("Todas"), REQUESTED("Solicitadas"), IN_PROCESS("En proceso"), TO_REVIEW("Por revisar"), RELEASED("Liberadas");
+    ALL("Todas"), REQUESTED("Solicitadas"), IN_PROCESS("En Proceso"), TO_REVIEW("Por revisar"), RELEASED("Liberadas");
 
     fun matches(order: LaboratoryOrder) = when (this) {
         ALL -> true
@@ -19,12 +19,12 @@ enum class LabFilter(val label: String) {
 }
 
 /**
- * Journey of a lab order, shown the same way to every role (web `LabStepper`): Solicitada, Muestra, En proceso,
+ * Journey of a lab order, shown the same way to every role (web `LabStepper`): Solicitada, Muestra, En Proceso,
  * Completada, Revisada, Visible al paciente. The API has four states plus the review date, so "Muestra" is done as soon as
  * the order leaves `pendiente`, and "Revisada" and "Visible al paciente" happen together (D-040: review releases the values).
  */
 object LabFlow {
-    val stepLabels = listOf("Solicitada", "Muestra", "En proceso", "Completada", "Revisada", "Visible al paciente")
+    val stepLabels = listOf("Solicitada", "Muestra", "En Proceso", "Completada", "Revisada", "Visible al paciente")
 
     /** Index of the step that is happening now; `stepLabels.size` when everything is done. */
     private fun currentIndex(order: LaboratoryOrder) = when {
