@@ -67,13 +67,29 @@ class DraftStoreTest {
         assertEquals(value.toString(), drafts.load("u-1", "consulta:c1").toString())
     }
 
-    /** S8: a draft left in clear text by an older version (or sealed with another key) is deleted and reads as absent. */
-    @Test fun aLegacyPlaintextOrForeignKeyDraftIsDeleted() {
+    /** S8: a draft left in clear text by an older version is kept and sealed on first read, so pending queues survive the update. */
+    @Test fun aLegacyPlaintextDraftIsMigratedToCiphertext() {
         val root = Files.createTempDirectory("borradores").toFile()
-        val legacy = java.io.File(root, "u-1/signos.json").apply { parentFile?.mkdirs(); writeText("""{"fc":"80"}""") }
+        val legacy = java.io.File(root, "u-1/hitos.json").apply { parentFile?.mkdirs(); writeText("""{"items":[{"hito":"salida"}]}""") }
         val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
-        assertNull(drafts.load("u-1", "signos"))
-        assertTrue(!legacy.exists())
+        assertEquals("salida", drafts.load("u-1", "hitos")?.getJSONArray("items")?.getJSONObject(0)?.getString("hito"))
+        assertTrue(legacy.exists())
+        assertTrue(!String(legacy.readBytes(), Charsets.ISO_8859_1).contains("salida"))
+        assertEquals("salida", drafts.load("u-1", "hitos")?.getJSONArray("items")?.getJSONObject(0)?.getString("hito"))
+    }
+
+    /** S10: every saved draft counts as activity, so typing a long note never trips the inactivity sign-out. */
+    @Test fun savingADraftReportsActivity() {
+        var writes = 0
+        val drafts = FileDraftStore(Files.createTempDirectory("borradores").toFile(), sv.edu.catolica.climesa.data.TestCipher) { writes++ }
+        drafts.save("u-1", "consulta", JSONObject().put("motivo", "dolor"))
+        assertEquals(1, writes)
+    }
+
+    /** S8: a draft sealed with another key (or tampered) is deleted and reads as absent. */
+    @Test fun aForeignKeyDraftIsDeleted() {
+        val root = Files.createTempDirectory("borradores").toFile()
+        val drafts = FileDraftStore(root, sv.edu.catolica.climesa.data.TestCipher)
         val other = FileDraftStore(root, AesGcmCipher { javax.crypto.KeyGenerator.getInstance("AES").apply { init(256) }.generateKey() })
         other.save("u-1", "signos", JSONObject().put("fc", "90"))
         assertNull(drafts.load("u-1", "signos"))

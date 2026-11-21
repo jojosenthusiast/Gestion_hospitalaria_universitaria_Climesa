@@ -24,7 +24,7 @@ import sv.edu.catolica.climesa.ui.*
 class MainActivity : ComponentActivity() {
     private var backgroundAt: Long? = null
     /** S10: 5 minutes without touching the app while it is on screen also closes the session. */
-    private val inactivity = InactivityTimeout(SystemClock::elapsedRealtime)
+    private val inactivity = SessionActivity.timeout
     override fun onUserInteraction() { super.onUserInteraction(); inactivity.touch() }
     override fun onStop() { backgroundAt = SystemClock.elapsedRealtime(); super.onStop() }
     override fun onStart() {
