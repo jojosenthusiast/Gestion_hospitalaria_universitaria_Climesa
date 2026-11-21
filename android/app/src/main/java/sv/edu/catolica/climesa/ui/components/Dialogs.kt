@@ -7,6 +7,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.stringResource
 import sv.edu.catolica.climesa.R
 
@@ -54,6 +56,10 @@ internal fun ConfirmDialog(
     val shownError = ConfirmDialogText.shownError(error, onDone != null)
     AlertDialog(
         onDismissRequest = { if (!busy) onDismiss() },
+        // D4: taps inside the dialog window never reach Activity.onUserInteraction; they count as activity here.
+        modifier = androidx.compose.ui.Modifier.keepsSessionAlive(),
+        // D12: a dialog with inputs (a reason) is not dropped by a stray tap outside it.
+        properties = androidx.compose.ui.window.DialogProperties(dismissOnClickOutside = body == null),
         shape = MaterialTheme.shapes.large,
         containerColor = MaterialTheme.colorScheme.surface,
         title = { Text(title, style = MaterialTheme.typography.titleLarge) },
@@ -79,6 +85,16 @@ internal fun ConfirmDialog(
         },
         dismissButton = { TextButton(onClick = onDismiss, enabled = !busy) { Text(dismissLabel, style = MaterialTheme.typography.labelLarge) } },
     )
+}
+
+/**
+ * D4: every pointer event inside a dialog or sheet window (which `MainActivity.onUserInteraction` never sees) touches the
+ * inactivity clock, so a person working in a dialog is not signed out. Observes in the Initial pass and consumes nothing.
+ */
+internal fun androidx.compose.ui.Modifier.keepsSessionAlive(): androidx.compose.ui.Modifier = pointerInput(Unit) {
+    awaitPointerEventScope {
+        while (true) { awaitPointerEvent(PointerEventPass.Initial); sv.edu.catolica.climesa.SessionActivity.timeout.touch() }
+    }
 }
 
 /** What [ConfirmDialog] prints as its error. */

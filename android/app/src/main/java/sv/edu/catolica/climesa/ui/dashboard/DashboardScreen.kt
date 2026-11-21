@@ -239,6 +239,8 @@ private fun AmbulanceAlertCard(alert: sv.edu.catolica.climesa.domain.AmbulanceAl
 @Composable
 private fun AttentionRow(item: DashboardAttention, onClick: () -> Unit) {
     val (fg, soft) = item.tone.colors()
+    val stacked = sv.edu.catolica.climesa.ui.largeText()
+    val action: @Composable () -> Unit = { if (item.tone == DashboardTone.DANGER) PrimaryButton(item.actionLabel, onClick, fill = false) else RowAction(item.actionLabel, onClick) }
     Row(
         Modifier.fillMaxWidth().padding(start = Spacing.md, end = Spacing.sm, top = Spacing.sm, bottom = Spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
@@ -250,8 +252,10 @@ private fun AttentionRow(item: DashboardAttention, onClick: () -> Unit) {
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
             Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 2, overflow = TextOverflow.Ellipsis)
             Text(item.detail, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            // D10: with large text the action goes below the title instead of squeezing it.
+            if (stacked) action()
         }
-        if (item.tone == DashboardTone.DANGER) PrimaryButton(item.actionLabel, onClick, fill = false) else RowAction(item.actionLabel, onClick)
+        if (!stacked) action()
     }
 }
 

@@ -31,7 +31,8 @@ internal fun FormField(
 ) {
     OutlinedTextField(
         value = value,
-        onValueChange = onChange,
+        // D4: typing on the on-screen keyboard never reaches Activity.onUserInteraction; each change counts as activity.
+        onValueChange = { sv.edu.catolica.climesa.SessionActivity.timeout.touch(); onChange(it) },
         modifier = modifier.fillMaxWidth(),
         label = { Text(label) },
         enabled = enabled,

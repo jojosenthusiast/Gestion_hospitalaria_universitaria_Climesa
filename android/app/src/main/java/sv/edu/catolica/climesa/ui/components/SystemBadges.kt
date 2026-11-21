@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -110,6 +111,9 @@ private fun DrawScope.stripes(color: Color, step: Float, width: Float) {
     }
 }
 
+/** D10: a long state never pushes a row's title out; the label ends in an ellipsis past this width. */
+private val BadgeMaxWidth = 180.dp
+
 /**
  * State as icon + label + pattern (S7), never colour alone. Same as the web `StatusBadge`: [family] null is the neutral
  * badge with a dot (values like `alto`, `sin_rango`).
@@ -120,24 +124,24 @@ internal fun FamilyBadge(text: String, family: StatusFamily?, modifier: Modifier
     if (family == null) {
         val fg = MaterialTheme.colorScheme.onSurfaceVariant
         Row(
-            modifier.clip(shape).background(MaterialTheme.colorScheme.background).border(1.dp, fg.copy(alpha = .3f), shape).padding(horizontal = Space2, vertical = 3.dp),
+            modifier.widthIn(max = BadgeMaxWidth).clip(shape).background(MaterialTheme.colorScheme.background).border(1.dp, fg.copy(alpha = .3f), shape).padding(horizontal = Space2, vertical = 3.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             Box(Modifier.size(7.dp).background(fg, CircleShape))
-            Text(text, style = badgeTextStyle(), color = fg, maxLines = 1)
+            Text(text, style = badgeTextStyle(), color = fg, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
         }
         return
     }
     val (fam, soft) = MaterialTheme.system.status(family)
     val fg = MaterialTheme.system.badge(family, MaterialTheme.colorScheme.surface).first
     Row(
-        modifier.statusPattern(family.pattern, fam, soft, MaterialTheme.colorScheme.surface).padding(horizontal = Space2, vertical = 3.dp),
+        modifier.widthIn(max = BadgeMaxWidth).statusPattern(family.pattern, fam, soft, MaterialTheme.colorScheme.surface).padding(horizontal = Space2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(family.icon.vector(), null, Modifier.size(14.dp), tint = fg)
-        Text(text, style = badgeTextStyle(), color = fg, maxLines = 1)
+        Text(text, style = badgeTextStyle(), color = fg, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 
@@ -158,12 +162,12 @@ internal fun PriorityBadge(priority: Priority, modifier: Modifier = Modifier, la
     val text = if (priority == Priority.EMERGENCIA) bg else fg
     val fill = if (priority == Priority.EMERGENCIA) fg else bg
     Row(
-        modifier.clip(shape).background(fill).border(1.dp, fg, shape).padding(horizontal = Space2, vertical = 3.dp),
+        modifier.widthIn(max = BadgeMaxWidth).clip(shape).background(fill).border(1.dp, fg, shape).padding(horizontal = Space2, vertical = 3.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
         Icon(priority.icon.vector(), null, Modifier.size(14.dp), tint = text)
-        Text(label, style = badgeTextStyle(), color = text, maxLines = 1)
+        Text(label, style = badgeTextStyle(), color = text, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
     }
 }
 

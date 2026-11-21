@@ -130,7 +130,9 @@ internal fun PortalScaffold(
                             }
                         }
                     }
-                    HospitalClock()
+                    // D5: on a narrow phone or with large text the clock would truncate the page title; the title wins.
+                    val config = androidx.compose.ui.platform.LocalConfiguration.current
+                    if (config.screenWidthDp >= 400 && config.fontScale <= 1.15f) HospitalClock()
                 },
             )
         },
