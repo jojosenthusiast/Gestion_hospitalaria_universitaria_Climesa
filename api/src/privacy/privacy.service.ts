@@ -132,11 +132,20 @@ export class PrivacyService {
   async myAccesses(actor: Actor) {
     if (!actor.patientId) return [];
     return this.db.transaction(async c => {
-      const rows = (await c.query(`SELECT a.registrado_en AS fecha,a.accion,a.entidad,a.motivo,
+      const all = (await c.query(`SELECT a.registrado_en AS fecha,a.accion,a.entidad,a.motivo,(a.paciente_id IS NULL) AS lista,
           (SELECT string_agg(r.nombre,', ' ORDER BY r.codigo) FROM acceso.rol r WHERE r.codigo=ANY(string_to_array(a.actor_rol,','))) AS rol
         FROM plataforma.auditoria a WHERE (a.paciente_id=$1 OR (a.detalle->'patientIds') ? $1::text)
           AND a.actor_id IS DISTINCT FROM $2 AND a.actor_id IS DISTINCT FROM $3 AND a.resultado='exito'
-        ORDER BY a.seq DESC LIMIT 300`, [actor.patientId, actor.id, SYSTEM_ACTOR.id])).rows as Row[];
+        ORDER BY a.seq DESC LIMIT 1000`, [actor.patientId, actor.id, SYSTEM_ACTOR.id])).rows as (Row & { lista: boolean })[];
+      // A live board re-reads the list on every change: one list read per action, role and hour is enough for the patient.
+      const seen = new Set<string>();
+      const rows = all.filter(r => {
+        if (!r.lista) return true;
+        const key = `${r.accion}|${r.rol}|${new Date(r.fecha as string | Date).toISOString().slice(0, 13)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(0, 300);
       await this.commands.audit(c, actor, { action: 'auditoria.mis_accesos', entity: 'auditoria', permission: 'auditoria.mis_accesos', detail: { filas: rows.length } });
       // The audit `motivo` may hold free text written by staff; legacy rows of the retired exceptional-access module keep their label.
       return rows.filter(r => isRecordAccess(r.accion)).slice(0, 200).map(r => ({
